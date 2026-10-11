@@ -179,6 +179,7 @@ public static class Cli
         Say(Run("record_stop"));
         var file = Path.GetFullPath(o.Out);
         Say(Run("export", new JsonObject { ["file"] = file }));
+        for (int i = 0; i < 60 && !File.Exists(file); i++) Thread.Sleep(500);   // the Scope may write the export asynchronously
         if (!File.Exists(file)) { Say("SCOPE FAILED: no file written"); return Failed; }
         Say($"SCOPE OK: {file}");
         return Ok;
@@ -544,6 +545,7 @@ public static class Cli
         if (o.Solution != null && o.Attach != null) throw new Exception("use either --solution or --attach");
         if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception("Solution not found: " + o.Solution);
         if (o.TimeoutSec < 10) throw new Exception("--timeout is in seconds (min. 10)");
+        if (o.Seconds < 1) throw new Exception("--seconds must be at least 1");
         if (o.Command is "library" or "archive" or "scope" && o.Out == null) throw new Exception($"{o.Command} needs --out <file>");
         return o;
     }
