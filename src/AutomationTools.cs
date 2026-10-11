@@ -104,6 +104,7 @@ public sealed partial class ToolRegistry
                 var links = Count(xml, "<Link");
                 if (string.IsNullOrEmpty(Str(a, "file"))) return $"{links} links\n" + (xml.Length > 20000 ? xml[..20000] + "\n... (shortened, use file=)" : xml);
                 var file = Path.GetFullPath(Str(a, "file"));
+                Directory.CreateDirectory(Path.GetDirectoryName(file)!);
                 File.WriteAllText(file, xml);
                 return $"{links} links exported to {file}";
             }));
@@ -382,7 +383,7 @@ public sealed partial class ToolRegistry
                 ComCall.Invoke(plc, "RunStaticAnalysis", false);
                 o.AppendLine($"{plc.Name}: static analysis run");
             }
-            if (!string.IsNullOrEmpty(metrics)) { ComCall.Invoke(plc, "ExportStandardMetrics", Path.GetFullPath(metrics)); o.AppendLine($"{plc.Name}: metrics: {metrics}"); }
+            if (!string.IsNullOrEmpty(metrics)) { Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(metrics))!); ComCall.Invoke(plc, "ExportStandardMetrics", Path.GetFullPath(metrics)); o.AppendLine($"{plc.Name}: metrics: {metrics}"); }
         }
         var (compile, _) = tc.ReadErrorList(2000);
         int errs = compile.Count(e => e.Level == "ERROR"), warns = compile.Count(e => e.Level == "WARN");

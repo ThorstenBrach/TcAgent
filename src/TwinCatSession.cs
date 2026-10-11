@@ -243,9 +243,10 @@ public sealed class TwinCatSession
         {
             var t = Type.GetTypeFromProgID(id);
             if (t == null) continue;
+            DTE2 dte = null;
             try
             {
-                var dte = (DTE2)Activator.CreateInstance(t);
+                dte = (DTE2)Activator.CreateInstance(t);
                 dte.SuppressUI = !visible;
                 dte.MainWindow.Visible = visible;
                 dte.UserControl = visible;
@@ -259,7 +260,11 @@ public sealed class TwinCatSession
                 try { AttachedPid = ListInstances().FirstOrDefault(i => string.Equals(i.Solution, sln, StringComparison.OrdinalIgnoreCase))?.Pid ?? 0; } catch { }
                 return InstanceInfo;
             }
-            catch (Exception ex) { last = ex; }
+            catch (Exception ex)
+            {
+                last = ex;
+                try { dte?.Quit(); } catch { }   // do not leave a hidden IDE behind
+            }
         }
         throw new Exception("Could not create the solution: " + (last?.Message ?? "no matching ProgID registered"));
     }
