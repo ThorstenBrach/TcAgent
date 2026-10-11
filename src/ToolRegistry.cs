@@ -11,7 +11,7 @@ using TwinCAT.TypeSystem;
 
 namespace TcAgent;
 
-public sealed class ToolRegistry
+public sealed partial class ToolRegistry
 {
     sealed record Tool(string Name, string Description, JsonObject Schema, Func<JsonObject, string> Handler);
 
@@ -175,6 +175,8 @@ public sealed class ToolRegistry
                    P("subType", "integer", "raw: TwinCAT-Subtyp fuer CreateChild"),
                    P("dryRun", "boolean", "Nur zeigen, was angelegt wuerde")),
             a => tc.Sta.Run(() => IoAdd(a)));
+
+        RegisterIoScan();
 
         // ---------------------------------------------------------- I/O-Verknuepfungen
         Add("tc_link", "Verknuepft Variablen (PLC-Variable mit I/O-Kanal). Einzeln mit source/target oder viele auf einmal mit pairs. " +
@@ -1236,7 +1238,8 @@ public sealed class ToolRegistry
     {
         "ads_write" => Str(a, "netId"),
         "tc_activate" when !string.IsNullOrEmpty(Str(a, "netId")) => Str(a, "netId"),
-        "tc_activate" or "tc_plc_online" => tc.Sta.Run(() => (string)((dynamic)tc.RequireSysMan()).GetTargetNetId()),
+        "tc_runtime_mode" when !string.IsNullOrEmpty(Str(a, "netId")) => Str(a, "netId"),
+        "tc_activate" or "tc_plc_online" or "tc_runtime_mode" => tc.Sta.Run(() => (string)((dynamic)tc.RequireSysMan()).GetTargetNetId()),
         _ => null
     };
 

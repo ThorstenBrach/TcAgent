@@ -85,6 +85,9 @@ public static class Confirm
                 return $"PLC {S("plcProjectPath")}: {string.Join(", ", cmds)}{on}.";
             case "ads_write":
                 return $"Variable {S("symbol")} := {S("value")} schreiben{(string.IsNullOrEmpty(target) ? " (lokale PLC)" : on)}, Port {S("port") ?? "851"}.";
+            case "tc_runtime_mode":
+                return S("mode") == "config" ? $"TwinCAT{on} in den Config-Modus schalten - laufende PLC-Programme werden gestoppt."
+                                             : $"TwinCAT{on} mit der aktiven Konfiguration im Run-Modus neu starten.";
             case "tc_runtime_startup":
                 return $"Startmodus der lokalen TwinCAT-Runtime auf '{S("mode")}' setzen (gilt ab dem naechsten Hochfahren).";
             default:

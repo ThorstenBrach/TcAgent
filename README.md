@@ -28,12 +28,12 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Library APIs** | Full interfaces of referenced libraries – also compiled libraries – so the agent never invents an API | `tc_lib_signatures`, `tc_plc_references` |
 | **Check & build** | "Check all objects" without generating code; real build before activation; compiler vs. runtime messages separated | `tc_check`, `tc_build`, `tc_errors` |
 | **Tests** | Evaluate TcUnit results | `tc_test_results` |
-| **I/O & system** | Add EtherCAT master, couplers and terminals, link variables in bulk, tasks, boot project, licenses (read) | `tc_io_add`, `tc_io_vars`, `tc_link`, `tc_task`, `tc_boot_project` |
+| **I/O & system** | Scan EtherCAT and assign adapters, add masters, couplers and terminals offline, link variables in bulk, tasks, boot project, config/run mode, licenses (read) | `tc_io_scan`, `tc_io_add`, `tc_link`, `tc_task`, `tc_runtime_mode` |
 | **Runtime** | Activate, login/start/stop, read/write variables via ADS – only on allowed targets | `tc_activate`, `tc_plc_online`, `ads_read`, `ads_write` |
 | **Your rules** | Coding rules per project/person/company; "remember that I want X" becomes a rule | `tc_coding_rules`, `tc_coding_rules_add` |
 | **Documentation** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 
-All 46 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 49 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 ## In your CI pipeline
 

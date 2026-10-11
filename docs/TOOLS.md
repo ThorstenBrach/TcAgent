@@ -148,6 +148,26 @@ Creates I/O configuration: EtherCAT master under TIID, below it couplers and ter
 | `subType` | integer |  | `raw` only: TwinCAT subtype |
 | `dryRun` | boolean |  | Only show what would be created |
 
+### `tc_io_scan`
+
+Searches the I/O devices of the target (network adapters with EtherCAT, fieldbus cards ...) – read only. Needs config mode (`tc_runtime_mode mode=config`). Take one over with `tc_io_scan_add`.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `raw` | boolean |  | Also show the XML of the devices found |
+
+### `tc_io_scan_add`
+
+Takes over a device found by `tc_io_scan`: creates it, or – with `devicePath` – assigns its adapter to an existing device (like *Adapter > Search* in the IDE). Then scans the boxes/terminals behind it. With terminals configured offline TwinCAT may ask – TcAgent then reports the dialog.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `index` | integer | yes | Number of the device from `tc_io_scan` |
+| `devicePath` | string |  | Existing device to assign the adapter to, e.g. `TIID^Device 1 (EtherCAT)` (empty = create new) |
+| `name` | string |  | Name of a new device |
+| `scanBoxes` | boolean |  | Scan boxes/terminals (default true) |
+| `dryRun` | boolean |  | Only show what would happen |
+
 ### `tc_link`
 
 Links PLC variables to I/O channels, one at a time or many at once. PLC variables only appear after `tc_build` if declared with `AT %I*`/`AT %Q*`.
@@ -336,6 +356,16 @@ Reads the IDE error list, split into compiler/project messages and PLC runtime/T
 Returns the result of the last TcUnit run (suites, tests, passes, failures with test names and messages) from the PLC runtime messages.
 
 ## Runtime (enabled targets only)
+
+### `tc_runtime_mode`
+
+Switches the TwinCAT runtime of the target to config mode (needed for the I/O scan, stops the PLC) or restarts it in run mode with the active configuration. Allowed targets only, with confirmation. Current state: `tc_plc_state port=10000`.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `mode` | string | yes | `config` or `run` |
+| `netId` | string |  | AmsNetId (empty = target of the project) |
+
 
 ### `tc_task`
 
