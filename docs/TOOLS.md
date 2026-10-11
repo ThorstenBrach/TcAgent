@@ -537,6 +537,71 @@ TwinCAT Scope: list (measurement projects and their elements), properties / set 
 | `file` | string |  | export: target file |
 | `chartType` | integer |  | add_chart: 0 = YT (default), 1 = XY, 2 = array, 3 = bar |
 
+## TwinCAT HMI (TE2000, file based)
+
+### `tc_hmi`
+
+TwinCAT HMI project (file based): info (pages, startup view, ADS runtimes, mapped symbols), read (a view/content file), controls (available control types and their attributes from the installed control package), build (via Visual Studio). Create the HMI project once in Visual Studio; pages/controls/symbols then with tc_hmi_page, tc_hmi_control, tc_hmi_symbol.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | info, read, controls or build |
+| `project` | string |  | Path of the .hmiproj or its name (empty = the only HMI project of the solution) |
+| `file` | string |  | read: file relative to the project, e.g. Desktop.view or Content/Main.content |
+| `filter` | string |  | controls: only types containing this text, e.g. Button |
+
+### `tc_hmi_page`
+
+Creates a view (.view) or content (.content) in the HMI project and registers it in the .hmiproj and tchmiconfig.json. Contents are shown in a TcHmiRegion (tc_hmi_control type=TcHmiRegion attributes={"target-content":"Content/X.content"}).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Name without extension, e.g. Overview |
+| `kind` | string |  | view or content (default content) |
+| `folder` | string |  | Folder relative to the project (default: views in the root, contents in Content) |
+| `width` | integer |  | content: width in px (default 1024) |
+| `height` | integer |  | content: height in px (default 600) |
+| `startup` | boolean |  | view: make it the start view |
+| `project` | string |  | HMI project (empty = the only one) |
+| `dryRun` | boolean |  | Only show what would be created |
+
+### `tc_hmi_control`
+
+Adds, changes or removes a control in a view/content. Attributes without the data-tchmi- prefix, e.g. {"text":"Start","state-symbol":"%s%PLC1.MAIN.bStart%/s%"}; bindings %s%<mapped symbol>%/s%, two-way: %s%PLC1.MAIN.x|BindingMode=TwoWay%/s%. Object values (colors ...) as JSON objects. Events: writeSymbol/writeValue for a button press, or events = trigger JSON array. Check attribute names with tc_hmi action=controls.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | add, update or remove |
+| `file` | string | yes | View/content relative to the project, e.g. Desktop.view |
+| `id` | string | yes | Unique control id, e.g. btnStart |
+| `type` | string |  | add: control type, e.g. TcHmiButton, TcHmiTextblock, TcHmiCheckbox, TcHmiRegion or full TcHmi.Controls.Beckhoff.TcHmiButton |
+| `left` | number |  | Position/size in px |
+| `top` | number |  |  |
+| `width` | number |  |  |
+| `height` | number |  |  |
+| `attributes` | object |  | Further attributes {name: value}; null removes an attribute |
+| `parent` | string |  | add: id of a container control to insert into (default: the root) |
+| `writeSymbol` | string |  | Shortcut: on press write writeValue to this symbol, e.g. %s%PLC1.MAIN.bStart%/s% or PLC1.MAIN.bStart |
+| `writeValue` | string |  | Value for writeSymbol (true/false/number/text, default true) |
+| `events` | array |  | Trigger list as in the file: [{"event":"<id>.onPressed","actions":[...]}] (replaces existing) |
+| `project` | string |  | HMI project (empty = the only one) |
+| `dryRun` | boolean |  | Only show the resulting HTML |
+
+### `tc_hmi_symbol`
+
+Server symbols of the HMI: list, map (PLC variables -> HMI symbols in TcHmiSrv.Config.default.json, type read via ADS if not given), unmap, runtimes (ADS runtimes PLC1 ...), add_runtime. Alternative without mapping by hand: PLC attribute {attribute 'TcHmiSymbol.AddSymbol'} + 'Map Automap Symbols' in Visual Studio. Best edit while the HMI project is not open.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | list, map, unmap, runtimes or add_runtime |
+| `symbols` | string |  | map/unmap: PLC variables separated by ',' e.g. MAIN.bStart,MAIN.nSpeed (optionally with type: MAIN.nSpeed:INT) |
+| `runtime` | string |  | ADS runtime name (default PLC1) |
+| `type` | string |  | map: data type for all symbols without own type, e.g. BOOL, INT, LREAL, STRING(80) |
+| `netId` | string |  | add_runtime: AmsNetId (default 127.0.0.1.1.1) |
+| `port` | integer |  | add_runtime: ADS port (default 851) |
+| `project` | string |  | HMI project (empty = the only one) |
+| `dryRun` | boolean |  | Only show what would change |
+
 ## Motion
 
 ### `tc_motion`
