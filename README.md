@@ -32,12 +32,13 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Projects & files** | New solutions and PLC projects, PLCopen/XTI export and import, libraries (references, placeholders, repositories, save as library), mapping export/import, archive, TwinCAT version, target platform, variants | `tc_new_solution`, `tc_plc_project_add`, `tc_export`, `tc_import`, `tc_library`, `tc_library_save` |
 | **Quality** | Static analysis (TE1200) with SARIF export | `tc_static_analysis` |
 | **Network** | ADS broadcast search, add routes, TcCOM module instances | `tc_route_search`, `tc_route_add`, `tc_tccom` |
+| **Scope** | Scope configurations: charts, channels on PLC variables, record, export CSV/SVDX – also from the pipeline | `tc_scope_new`, `tc_scope` |
 | **Motion** | NC tasks and axes (first step of the motion configuration) | `tc_motion`, `tc_motion_add` |
 | **Runtime** | Activate, login/start/stop, read/write variables via ADS – only on allowed targets | `tc_activate`, `tc_plc_online`, `ads_read`, `ads_write` |
 | **Your rules** | Coding rules per project/person/company; "remember that I want X" becomes a rule | `tc_coding_rules`, `tc_coding_rules_add` |
 | **Documentation** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 
-All 67 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 69 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 ## In your CI pipeline
 
@@ -168,8 +169,8 @@ docs/                   installation, tool reference, CI pipelines (docs/pipelin
 
 ## Roadmap
 
-SIL/HIL test runs (simulated I/O, test PLCs on the network), and later TwinSAFE (read, analyze, propose – never
-download), TwinCAT HMI, Scope projects and motion configuration.
+SIL/HIL test runs (simulated I/O, test PLCs on the network), motion drive links and parameters, and later TwinSAFE
+(read, analyze, propose – never download) and TwinCAT HMI.
 
 ## Known limitations
 

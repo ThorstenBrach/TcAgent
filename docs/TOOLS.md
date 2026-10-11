@@ -507,6 +507,36 @@ TcCOM module instances: list, or add an instance of a module class (class id GUI
 | `taskPath` | string |  | add: task that calls the module, e.g. TIRT^Task 1 |
 | `dryRun` | boolean |  | Only show what would happen |
 
+## Scope (TE130x Scope View)
+
+### `tc_scope_new`
+
+Adds a TwinCAT Scope configuration (Measurement project, TE130x Scope View) to the solution. Then add charts and channels with tc_scope.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Name of the measurement project |
+| `template` | string |  | Path of a .tcmproj template (default: 'TwinCAT Scope Project' of the Scope installation) |
+| `folder` | string |  | Folder (default: next to the solution) |
+
+### `tc_scope`
+
+TwinCAT Scope: list (measurement projects and their elements), properties / set (settings of an element, e.g. record time), add_chart, add_axis, add_channel (channel for a PLC variable incl. acquisition), record_start, record_stop, export (file by extension: .csv, .svdx/.svd, .bin, .tdms, .dat - TDMS/DAT need a Scope license), disconnect. Paths: '<project>/<scope>/<chart>/<axis>/<channel>' by name.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | list, properties, set, add_chart, add_axis, add_channel, record_start, record_stop, export, disconnect |
+| `path` | string |  | Element path, e.g. 'Measurement/Scope Project/Chart 1' (empty = the only scope) |
+| `name` | string |  | add_*: name of the new element |
+| `property` | string |  | set: property name (as shown by properties; a unique part of it is enough) |
+| `value` | string |  | set: new value |
+| `symbol` | string |  | add_channel: PLC variable, e.g. MAIN.fSine |
+| `netId` | string |  | add_channel: AmsNetId (default: local) |
+| `port` | integer |  | add_channel: ADS port (default 851) |
+| `sampleTimeMs` | number |  | add_channel: sample time in ms (default 1) |
+| `file` | string |  | export: target file |
+| `chartType` | integer |  | add_chart: 0 = YT (default), 1 = XY, 2 = array, 3 = bar |
+
 ## Motion
 
 ### `tc_motion`

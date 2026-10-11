@@ -20,11 +20,12 @@ public static class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "analyze" or "library" or "archive" or "help" or "--help" or "-h" or "/?" or "version" or "--version";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "analyze" or "library" or "archive" or "scope" or "help" or "--help" or "-h" or "/?" or "version" or "--version";
 
     sealed class Options
     {
-        public string Command, Solution, Attach, Junit, Target, ProgId, Out, Sarif, Settings;
+        public string Command, Solution, Attach, Junit, Target, ProgId, Out, Sarif, Settings, ScopePath;
+        public int Seconds = 10;
         public bool Install;
         public readonly List<string> Plc = new();
         public bool Visible, KeepOpen, Rebuild, CheckAll, WarningsAsErrors, NoBuild, NoBootProject;
@@ -79,6 +80,7 @@ public static class Cli
                 "analyze" => Analyze(o, tc),
                 "library" => SaveLibrary(o, tc),
                 "archive" => Archive(o, tc),
+                "scope" => ScopeRecord(o, tc),
                 "build" => Build(o, tc),
                 "test" => Test(o, tc, ownIde),
                 _ => Usage
@@ -153,6 +155,32 @@ public static class Cli
         }, o.TimeoutSec * 1000);
         if (!File.Exists(file)) { Say("LIBRARY FAILED: no file written"); return Failed; }
         Say($"LIBRARY OK: {file} ({new FileInfo(file).Length / 1024} KB){(o.Install ? ", installed" : "")}");
+        return Ok;
+    }
+
+    /// <summary>Records with a Scope configuration of the solution for N seconds and exports the data (e.g. CSV as artifact).
+    /// The PLC must be running (e.g. after "test" or an activation).</summary>
+    static int ScopeRecord(Options o, TwinCatSession tc)
+    {
+        var tools = new ToolRegistry(tc);
+        string Run(string action, JsonObject extra = null)
+        {
+            var args = new JsonObject { ["action"] = action };
+            if (o.ScopePath != null) args["path"] = o.ScopePath;
+            if (extra != null) foreach (var kv in extra) args[kv.Key] = kv.Value?.DeepClone();
+            var r = tools.Call("tc_scope", args);
+            var text = r["content"]?[0]?["text"]?.ToString() ?? "";
+            if (r["isError"]?.GetValue<bool>() == true) throw new Exception(text);
+            return text;
+        }
+        Say(Run("record_start"));
+        Say($"recording {o.Seconds} s ...");
+        Thread.Sleep(TimeSpan.FromSeconds(o.Seconds));
+        Say(Run("record_stop"));
+        var file = Path.GetFullPath(o.Out);
+        Say(Run("export", new JsonObject { ["file"] = file }));
+        if (!File.Exists(file)) { Say("SCOPE FAILED: no file written"); return Failed; }
+        Say($"SCOPE OK: {file}");
         return Ok;
     }
 
@@ -491,6 +519,8 @@ public static class Cli
                 case "--sarif": o.Sarif = Val(); break;
                 case "--settings": o.Settings = Val(); break;
                 case "--install": o.Install = true; break;
+                case "--scope": o.ScopePath = Val(); break;
+                case "--seconds": o.Seconds = int.Parse(Val()); break;
                 case "--target": o.Target = Val(); break;
                 case "--plc": o.Plc.AddRange(Val().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)); break;
                 case "--timeout": o.TimeoutSec = int.Parse(Val()); break;
@@ -514,7 +544,7 @@ public static class Cli
         if (o.Solution != null && o.Attach != null) throw new Exception("use either --solution or --attach");
         if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception("Solution not found: " + o.Solution);
         if (o.TimeoutSec < 10) throw new Exception("--timeout is in seconds (min. 10)");
-        if (o.Command is "library" or "archive" && o.Out == null) throw new Exception($"{o.Command} needs --out <file>");
+        if (o.Command is "library" or "archive" or "scope" && o.Out == null) throw new Exception($"{o.Command} needs --out <file>");
         return o;
     }
 
@@ -534,6 +564,9 @@ public static class Cli
 
   TcAgent.exe archive --solution <sln> --out <file.tszip>
       Saves the whole solution as archive.
+
+  TcAgent.exe scope --solution <sln> --out <file.csv|.svdx> [--scope <project/scope>] [--seconds <n>]
+      Records with a Scope configuration of the solution (TE130x) for n seconds (default 10) and exports the data.
 
   TcAgent.exe test --solution <sln> [--target <AmsNetId>] [--plc <names>] [--timeout <s>] [--junit <file>]
       Builds, activates the configuration on the test target, starts the PLC via boot project with autostart,
@@ -559,6 +592,8 @@ Options
   --sarif <file>           analyze: SARIF output
   --settings <file.csa>    analyze: static analysis settings to load first
   --install                library: also install into the library repository
+  --scope <path>           scope: '<measurement project>/<scope>' (default: the only one)
+  --seconds <n>            scope: recording time (default 10)
   --keep-dialogs           do not close dialogs of the IDE (default: closed like Cancel/X and logged - they block the IDE)
   --progid <id>            COM ProgID of the IDE, e.g. TcXaeShell.DTE.17.0 (default: VS 2022, then TcXaeShell)
 
