@@ -6,7 +6,7 @@
 //                                        complex values and events as <script data-tchmi-target-attribute=".." type="application/json">
 //   Server\ADS\ADS.Config.default.json   ADS runtimes (PLC1 -> NETID/PORT)
 //   Server\TcHmiSrv\TcHmiSrv.Config.default.json   mapped symbols (SYMBOLS) - bindings use %s%<name>%/s%
-// The tools edit these files in place (only the parts they touch). Create the HMI project itself once in Visual Studio
+// The tools edit these files in place (only the parts they touch; backups in %LOCALAPPDATA%\TcAgent\backup\hmi). Create the HMI project itself once in Visual Studio
 // (Add > New Project > TwinCAT HMI Project); afterwards the agent builds pages, controls and symbol mappings.
 // Formats from Beckhoff's TE2000 documentation and sample projects (github.com/Beckhoff/TE2000_Client_Samples).
 //
@@ -123,13 +123,22 @@ public sealed partial class ToolRegistry
     static JsonObject ReadJson(string file) =>
         JsonNode.Parse(File.ReadAllText(file), documentOptions: JsonRead)?.AsObject() ?? throw new Exception("empty JSON: " + file);
 
+    /// <summary>Backup before every change - outside the project, so it does not end up in the HMI build or in Git.</summary>
+    static void Backup(string file)
+    {
+        if (!File.Exists(file)) return;
+        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backup", "hmi");
+        Directory.CreateDirectory(dir);
+        File.Copy(file, Path.Combine(dir, $"{DateTime.Now:yyyyMMdd-HHmmss-fff}_{Path.GetFileName(file)}"), true);
+    }
+
     static void WriteJson(string file, JsonNode node)
     {
-        File.Copy(file, file + ".bak", true);   // one backup per file, overwritten each time
+        Backup(file);
         File.WriteAllText(file, node.ToJsonString(JsonWrite), new UTF8Encoding(true));
     }
 
-    static void WriteText(string file, string text) => File.WriteAllText(file, text, new UTF8Encoding(true));
+    static void WriteText(string file, string text) { Backup(file); File.WriteAllText(file, text, new UTF8Encoding(true)); }
 
     /// <summary>Adds &lt;Content Include="rel"&gt; to the .hmiproj if missing (the HMI build only sees Content items).</summary>
     static bool RegisterContent(HmiProject p, string rel)
@@ -141,7 +150,7 @@ public sealed partial class ToolRegistry
         var group = doc.Root.Elements(ns + "ItemGroup").FirstOrDefault(g => g.Elements(ns + "Content").Any());
         if (group == null) { group = new XElement(ns + "ItemGroup"); doc.Root.Add(group); }
         group.Add(new XElement(ns + "Content", new XAttribute("Include", rel), new XElement(ns + "SubType", "Content")));
-        File.Copy(p.ProjFile, p.ProjFile + ".bak", true);
+        Backup(p.ProjFile);
         doc.Save(p.ProjFile);
         return true;
     }
