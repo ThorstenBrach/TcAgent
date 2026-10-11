@@ -303,7 +303,7 @@ public sealed partial class ToolRegistry
     /// <summary>Start index and end index (exclusive) of the &lt;div id="id"&gt; element, counting nested divs.</summary>
     static (int start, int end) FindElement(string html, string id)
     {
-        var m = Regex.Match(html, $@"<div\s[^>]*\bid=""{Regex.Escape(id)}""[^>]*>", RegexOptions.IgnoreCase);
+        var m = Regex.Match(html, $@"<div\b[^>]*\sid=""{Regex.Escape(id)}""[^>]*>", RegexOptions.IgnoreCase);
         if (!m.Success) return (-1, -1);
         int depth = 0, i = m.Index;
         var tag = new Regex(@"<div\b|</div\s*>|<script\b[\s\S]*?</script\s*>", RegexOptions.IgnoreCase);
@@ -316,7 +316,22 @@ public sealed partial class ToolRegistry
         throw new Exception($"element {id}: closing </div> not found");
     }
 
-    static string RootId(string html) => Regex.Match(html, @"<div\s[^>]*\bid=""([^""]+)""").Groups[1].Value;
+    static string RootId(string html) => Regex.Match(html, @"<div\b[^>]*\sid=""([^""]+)""").Groups[1].Value;
+
+    /// <summary>The element's own &lt;script data-tchmi-target-attribute="data-tchmi-name"&gt; in its body - not the one of a nested control.</summary>
+    static System.Text.RegularExpressions.Match OwnScript(string body, string name)
+    {
+        int depth = 0;
+        var tag = new Regex($@"(?<own><script\s+data-tchmi-target-attribute=""data-tchmi-{Regex.Escape(name)}""[\s\S]*?</script>\s*)|<div\b|</div\s*>|<script\b[\s\S]*?</script\s*>", RegexOptions.IgnoreCase);
+        for (var t = tag.Match(body); t.Success; t = t.NextMatch())
+        {
+            if (t.Groups["own"].Success) { if (depth == 0) return t; }
+            else if (t.Value.StartsWith("<script", StringComparison.OrdinalIgnoreCase)) continue;
+            else if (t.Value.StartsWith("</", StringComparison.Ordinal)) depth--;
+            else depth++;
+        }
+        return null;
+    }
 
     static string ValueText(JsonNode v) => v is JsonValue jv && jv.TryGetValue<string>(out var s) ? s : v?.ToJsonString() ?? "";
 
@@ -409,17 +424,19 @@ public sealed partial class ToolRegistry
             foreach (var (n, v) in plain)
             {
                 var rx = new Regex($@"\sdata-tchmi-{Regex.Escape(n)}=""[^""]*""");
-                open = rx.IsMatch(open) ? rx.Replace(open, $" data-tchmi-{n}=\"{Attr(v)}\"", 1) : open.Insert(open.Length - 1, $" data-tchmi-{n}=\"{Attr(v)}\"");
+                var repl = $" data-tchmi-{n}=\"{Attr(v)}\"";   // evaluator: '$' in values is no substitution
+                open = rx.IsMatch(open) ? rx.Replace(open, _ => repl, 1) : open.Insert(open.Length - 1, repl);
             }
             foreach (var n in removeAttrs)
             {
                 open = Regex.Replace(open, $@"\sdata-tchmi-{Regex.Escape(n)}(-unit)?=""[^""]*""", "");
-                body = Regex.Replace(body, $@"<script\s+data-tchmi-target-attribute=""data-tchmi-{Regex.Escape(n)}""[\s\S]*?</script>\s*", "");
+                var own = OwnScript(body, n);
+                if (own != null) body = body.Remove(own.Index, own.Length);
             }
             foreach (var s in scripts)
             {
-                var rx = new Regex($@"<script\s+data-tchmi-target-attribute=""data-tchmi-{Regex.Escape(s.name)}""[\s\S]*?</script>\s*");
-                body = rx.IsMatch(body) ? rx.Replace(body, Script(s).Replace("$", "$$"), 1) : "\r\n" + Script(s) + body.TrimStart('\r', '\n');
+                var own = OwnScript(body, s.name);
+                body = own != null ? body[..own.Index] + Script(s) + body[(own.Index + own.Length)..] : "\r\n" + Script(s) + body.TrimStart('\r', '\n');
             }
             result = html[..start] + open + body + html[end..];
         }
