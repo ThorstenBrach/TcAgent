@@ -227,6 +227,60 @@ public sealed class TwinCatSession
         throw new Exception("Could not start an IDE: " + (last?.Message ?? "no matching ProgID registered"));
     }
 
+    /// <summary>Starts an IDE, creates a new solution with a TwinCAT XAE project from the Beckhoff project template and connects to it.</summary>
+    public string NewSolution(string folder, string name, bool visible, string progId, string template)
+    {
+        template = string.IsNullOrEmpty(template) ? FindTemplate(@"Base\PrjTemplate\TwinCAT Project.tsproj") : template;
+        if (template == null || !File.Exists(template))
+            throw new Exception("TwinCAT project template not found (TwinCAT Project.tsproj) - pass template=<path>.");
+        var dir = Path.Combine(folder, name);
+        var sln = Path.Combine(dir, name + ".sln");
+        if (File.Exists(sln)) throw new Exception("Solution already exists: " + sln + " - open it with tc_open.");
+        var ids = string.IsNullOrEmpty(progId) ? ProgIds : new[] { progId };
+        Exception last = null;
+        foreach (var id in ids)
+        {
+            var t = Type.GetTypeFromProgID(id);
+            if (t == null) continue;
+            try
+            {
+                var dte = (DTE2)Activator.CreateInstance(t);
+                dte.SuppressUI = !visible;
+                dte.MainWindow.Visible = visible;
+                dte.UserControl = visible;
+                Directory.CreateDirectory(dir);
+                dte.Solution.Create(folder, name);
+                dte.Solution.SaveAs(sln);
+                dte.Solution.AddFromTemplate(template, dir, name, false);
+                dte.Solution.SaveAs(sln);
+                Bind(dte, $"{id} (new solution) | {sln}");
+                AttachedPid = 0;
+                try { AttachedPid = ListInstances().FirstOrDefault(i => string.Equals(i.Solution, sln, StringComparison.OrdinalIgnoreCase))?.Pid ?? 0; } catch { }
+                return InstanceInfo;
+            }
+            catch (Exception ex) { last = ex; }
+        }
+        throw new Exception("Could not create the solution: " + (last?.Message ?? "no matching ProgID registered"));
+    }
+
+    /// <summary>Beckhoff template below ...\TwinCAT\3.1\Components\ (TWINCAT3DIR, C:\TwinCAT, Program Files (x86)).</summary>
+    public static string FindTemplate(string relative)
+    {
+        var roots = new List<string>();
+        var env = Environment.GetEnvironmentVariable("TWINCAT3DIR");
+        if (!string.IsNullOrEmpty(env)) roots.Add(Path.Combine(env, "Components"));
+        roots.Add(@"C:\TwinCAT\3.1\Components");
+        roots.Add(@"C:\Program Files (x86)\Beckhoff\TwinCAT\3.1\Components");
+        return roots.Select(r => Path.Combine(r, relative)).FirstOrDefault(File.Exists);
+    }
+
+    public void Save()
+    {
+        var dte = RequireDte();
+        foreach (Project p in dte.Solution.Projects) { try { p.Save(); } catch { } }
+        try { dte.Solution.SaveAs(dte.Solution.FullName); } catch { }
+    }
+
     /// <summary>After tc_open/CLI: wait until the solution is loaded and the TwinCAT project is reachable.</summary>
     public void WaitForTwinCat(int timeoutSec)
     {

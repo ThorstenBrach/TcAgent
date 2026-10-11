@@ -90,12 +90,14 @@ public static class Confirm
             case "tc_runtime_mode":
                 return S("mode") == "config" ? $"Switch TwinCAT{on} to Config mode - running PLC programs will be stopped."
                                              : $"Restart TwinCAT{on} in Run mode with the active configuration.";
+            case "tc_route_add":
+                return $"Add ADS route '{S("name")}' to {S("netId")} ({S("ip") ?? S("host")}) - also stored on the target system.";
             case "tc_runtime_startup":
                 return $"Set the start mode of the local TwinCAT runtime to '{S("mode")}' (takes effect from the next boot).";
             default:
                 var args = a == null ? "" : string.Join(", ", a.Where(p => p.Value is JsonValue).Select(p =>
                 {
-                    var v = p.Value!.ToString();
+                    var v = p.Key.Contains("password", StringComparison.OrdinalIgnoreCase) ? "***" : p.Value!.ToString();
                     return $"{p.Key}={(v.Length > 80 ? v[..80] + "..." : v)}";
                 }));
                 return $"{tool}({args}){on}";

@@ -8,6 +8,9 @@ exit code, JUnit XML and inline annotations.
 |---|---|---|
 | `TcAgent.exe check --solution X.sln` | "Check all objects" of every PLC project – compiler errors, also in unused POUs; no code is generated | every push / pull request |
 | `TcAgent.exe build --solution X.sln` | builds the solution | before packaging |
+| `TcAgent.exe analyze --solution X.sln --sarif sa.sarif` | static analysis (TE1200 license) – rule violations as annotations, SARIF for GitHub code scanning (4026.20+) | pull requests |
+| `TcAgent.exe library --solution X.sln --out MyLib.library` | builds and saves the PLC project as library | releases of your own libraries |
+| `TcAgent.exe archive --solution X.sln --out X.tszip` | archive of the whole solution | releases, support |
 | `TcAgent.exe test --solution X.sln` | builds, activates on the test target, starts the PLC, waits for TcUnit, collects the results | every push to `main`, nightly |
 
 ```powershell

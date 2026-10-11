@@ -20,11 +20,12 @@ public static class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "help" or "--help" or "-h" or "/?" or "version" or "--version";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "analyze" or "library" or "archive" or "help" or "--help" or "-h" or "/?" or "version" or "--version";
 
     sealed class Options
     {
-        public string Command, Solution, Attach, Junit, Target, ProgId;
+        public string Command, Solution, Attach, Junit, Target, ProgId, Out, Sarif, Settings;
+        public bool Install;
         public readonly List<string> Plc = new();
         public bool Visible, KeepOpen, Rebuild, CheckAll, WarningsAsErrors, NoBuild, NoBootProject;
         public bool? DisableIo;
@@ -75,6 +76,9 @@ public static class Cli
             return o.Command switch
             {
                 "check" => Check(o, tc),
+                "analyze" => Analyze(o, tc),
+                "library" => SaveLibrary(o, tc),
+                "archive" => Archive(o, tc),
                 "build" => Build(o, tc),
                 "test" => Test(o, tc, ownIde),
                 _ => Usage
@@ -92,6 +96,74 @@ public static class Cli
             Say(System.FormattableString.Invariant($"Total {total.Elapsed.TotalSeconds:0.0} s"));
             sta.Dispose();
         }
+    }
+
+    // ------------------------------------------------------------------ analyze / library / archive
+    static List<TCatSysManagerLib.ITcSmTreeItem> SelectedPlcs(Options o, TwinCatSession tc)
+    {
+        var all = tc.PlcProjects();
+        var sel = o.Plc.Count == 0 ? all : all.Where(p => o.Plc.Any(n => p.Name.Equals(n, StringComparison.OrdinalIgnoreCase) ||
+                                                                        p.PathName.Split('^').Skip(1).FirstOrDefault()?.Equals(n, StringComparison.OrdinalIgnoreCase) == true)).ToList();
+        if (sel.Count == 0) throw new Exception("No (matching) PLC project" + (o.Plc.Count > 0 ? " for --plc " + string.Join(",", o.Plc) : "") + ".");
+        return sel;
+    }
+
+    /// <summary>Static analysis (TE1200): results like compiler messages, optionally SARIF (4026.20+).</summary>
+    static int Analyze(Options o, TwinCatSession tc)
+    {
+        var sw = Stopwatch.StartNew();
+        var (compile, names) = tc.Sta.Run(() =>
+        {
+            var plcs = SelectedPlcs(o, tc);
+            foreach (var plc in plcs)
+            {
+                if (o.Settings != null) ComCall.Invoke(plc, "LoadStaticAnalysisSettings", Path.GetFullPath(o.Settings));
+                if (o.Sarif != null)
+                {
+                    var f = plcs.Count == 1 ? Path.GetFullPath(o.Sarif)
+                          : Path.GetFullPath(Path.Combine(Path.GetDirectoryName(o.Sarif) ?? "", $"{Path.GetFileNameWithoutExtension(o.Sarif)}.{plc.Name}{Path.GetExtension(o.Sarif)}"));
+                    Directory.CreateDirectory(Path.GetDirectoryName(f)!);
+                    ComCall.Invoke(plc, "ExportToSarif", f);
+                    Say("SARIF: " + f);
+                }
+                else ComCall.Invoke(plc, "RunStaticAnalysis", false);
+            }
+            return (tc.ReadErrorList(5000).compile, plcs.Select(p => p.Name).ToList());
+        }, o.TimeoutSec * 1000);
+        return ReportCompile(o, "analyze", string.Join(", ", names), compile, sw.Elapsed.TotalSeconds);
+    }
+
+    /// <summary>Saves the PLC project as .library (artifact), optionally installs it.</summary>
+    static int SaveLibrary(Options o, TwinCatSession tc)
+    {
+        if (!o.NoBuild)
+        {
+            var (failed, compile) = tc.Sta.Run(() => BuildSolution(tc, o), o.TimeoutSec * 1000);
+            if (failed > 0 || compile.Any(e => e.Level == "ERROR"))
+                return ReportCompile(o, "library", "build", compile, 0);
+        }
+        var file = Path.GetFullPath(o.Out);
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        tc.Sta.Run(() =>
+        {
+            var plcs = SelectedPlcs(o, tc);
+            if (plcs.Count > 1) throw new Exception("Several PLC projects - choose one with --plc.");
+            ComCall.Invoke(plcs[0], "SaveAsLibrary", file, o.Install);
+            return 0;
+        }, o.TimeoutSec * 1000);
+        if (!File.Exists(file)) { Say("LIBRARY FAILED: no file written"); return Failed; }
+        Say($"LIBRARY OK: {file} ({new FileInfo(file).Length / 1024} KB){(o.Install ? ", installed" : "")}");
+        return Ok;
+    }
+
+    static int Archive(Options o, TwinCatSession tc)
+    {
+        var file = Path.GetFullPath(o.Out);
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        tc.Sta.Run(() => { ComCall.Invoke(tc.RequireSysMan(), "SaveAsArchive", file); return 0; }, o.TimeoutSec * 1000);
+        if (!File.Exists(file)) { Say("ARCHIVE FAILED: no file written"); return Failed; }
+        Say($"ARCHIVE OK: {file} ({new FileInfo(file).Length / 1024} KB)");
+        return Ok;
     }
 
     // ------------------------------------------------------------------ check / build
@@ -415,6 +487,10 @@ public static class Cli
                 case "--solution": case "-s": o.Solution = Val(); break;
                 case "--attach": o.Attach = i + 1 < args.Length && !args[i + 1].StartsWith("--") ? args[++i] : ""; break;
                 case "--junit": case "-o": o.Junit = Val(); break;
+                case "--out": o.Out = Val(); break;
+                case "--sarif": o.Sarif = Val(); break;
+                case "--settings": o.Settings = Val(); break;
+                case "--install": o.Install = true; break;
                 case "--target": o.Target = Val(); break;
                 case "--plc": o.Plc.AddRange(Val().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)); break;
                 case "--timeout": o.TimeoutSec = int.Parse(Val()); break;
@@ -438,6 +514,7 @@ public static class Cli
         if (o.Solution != null && o.Attach != null) throw new Exception("use either --solution or --attach");
         if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception("Solution not found: " + o.Solution);
         if (o.TimeoutSec < 10) throw new Exception("--timeout is in seconds (min. 10)");
+        if (o.Command is "library" or "archive" && o.Out == null) throw new Exception($"{o.Command} needs --out <file>");
         return o;
     }
 
@@ -448,6 +525,15 @@ public static class Cli
 
   TcAgent.exe build --solution <sln> [--rebuild] [--check-all] [--junit <file>] [--warnings-as-errors]
       Builds the solution.
+
+  TcAgent.exe analyze --solution <sln> [--plc <names>] [--settings <file.csa>] [--sarif <file>] [--junit <file>]
+      Static analysis (TE1200 license): rule violations like compiler messages; SARIF for code scanning (4026.20+).
+
+  TcAgent.exe library --solution <sln> --out <file.library> [--plc <name>] [--install] [--no-build]
+      Builds and saves the PLC project as library - e.g. as pipeline artifact.
+
+  TcAgent.exe archive --solution <sln> --out <file.tszip>
+      Saves the whole solution as archive.
 
   TcAgent.exe test --solution <sln> [--target <AmsNetId>] [--plc <names>] [--timeout <s>] [--junit <file>]
       Builds, activates the configuration on the test target, starts the PLC via boot project with autostart,
@@ -469,6 +555,10 @@ Options
   --no-build               test: use the existing build
   --no-boot-project        test: do not create a boot project (PLC must start by itself)
   --disable-io / --keep-io test: disable all I/O devices (default: only in a Visual Studio started by TcAgent)
+  --out <file>             library/archive: output file
+  --sarif <file>           analyze: SARIF output
+  --settings <file.csa>    analyze: static analysis settings to load first
+  --install                library: also install into the library repository
   --keep-dialogs           do not close dialogs of the IDE (default: closed like Cancel/X and logged - they block the IDE)
   --progid <id>            COM ProgID of the IDE, e.g. TcXaeShell.DTE.17.0 (default: VS 2022, then TcXaeShell)
 

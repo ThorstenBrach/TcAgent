@@ -325,6 +325,188 @@ Adds a library reference to a PLC.
 | `version` | string |  | Version or * (default) |
 | `vendor` | string |  | Vendor, e.g. Beckhoff Automation GmbH |
 
+## Projects, export/import, libraries, analysis, mapping, routes, TcCOM
+
+### `tc_new_solution`
+
+Starts Visual Studio/XAE and creates a new solution with a TwinCAT XAE project (Beckhoff project template), then connects to it. Add a PLC project with tc_plc_project_add.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `folder` | string | yes | Parent folder; the solution goes to <folder>\<name>\<name>.sln |
+| `name` | string | yes | Name of the solution and the TwinCAT project |
+| `visible` | boolean |  | Show the IDE (default true) |
+| `template` | string |  | Path of a .tsproj template (default: TwinCAT Project.tsproj of the installation) |
+| `progId` | string |  | e.g. VisualStudio.DTE.17.0 or TcXaeShell.DTE.17.0 |
+
+### `tc_plc_project_add`
+
+Adds a PLC project: new from a template (default 'Standard PLC Template') or an existing .plcproj/.tpzip (file). The PLC instance and its task appear below TIPC; check with tc_tree path=TIPC.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Name of the PLC project (ignored with fileMode=original) |
+| `template` | string |  | Template name or path, e.g. 'Standard PLC Template' or 'Empty PLC Template' |
+| `file` | string |  | Existing .plcproj or .tpzip instead of a template |
+| `fileMode` | string |  | with file: copy (default, into the solution folder), move or original (keep location) |
+| `dryRun` | boolean |  | Only show what would happen |
+
+### `tc_export`
+
+Exports to a file: kind=plcopen (PLC objects as PLCopen XML, selection like 'POUs.MAIN;DUTs.ST_Data') or kind=item (any tree item with all children as .xti - I/O device, box, task, axis ...; a PLC project path TIPC^<Plc> as .tpzip).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `kind` | string | yes | plcopen or item |
+| `file` | string | yes | Target file (.xml, .xti, .tpzip) |
+| `selection` | string |  | plcopen: objects relative to the PLC project, folders with dots, several with ';' |
+| `plcProjectPath` | string |  | plcopen: PLC project, e.g. TIPC^MyPlc^MyPlc Project (empty = the only one) |
+| `path` | string |  | item: tree path of the item to export, e.g. 'TIID^Device 1 (EtherCAT)^Term 1 (EK1100)' |
+
+### `tc_import`
+
+Imports from files: kind=plcopen (PLCopen XML into a PLC project), kind=item (.xti below parentPath, e.g. an I/O device under TIID or an axis under TINC^...^Axes; variables are re-linked by name) or kind=pou_files (.TcPOU/.TcDUT/.TcGVL files).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `kind` | string | yes | plcopen, item or pou_files |
+| `file` | string | yes | File; pou_files: several separated by ';' |
+| `plcProjectPath` | string |  | plcopen/pou_files: PLC project (empty = the only one); pou_files may also name a folder of it |
+| `existing` | string |  | plcopen: what to do with existing objects: none (default), rename, replace or skip |
+| `selection` | string |  | plcopen: only these objects |
+| `parentPath` | string |  | item: parent tree item (e.g. TIID) |
+| `name` | string |  | item / pou_files (single file): name of the new item |
+| `before` | string |  | item: insert before this child |
+| `reconnect` | boolean |  | item: re-link variables by name (default true) |
+| `dryRun` | boolean |  | Only show what would happen |
+
+### `tc_library`
+
+Library management of a PLC project: list (references), add, add_placeholder, remove, resolve (effective version of a placeholder), freeze (placeholder versions), repositories, add_repository, remove_repository, install, uninstall, scan (all installed libraries).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | list, add, add_placeholder, remove, resolve, freeze, repositories, add_repository, remove_repository, install, uninstall, scan |
+| `plcProjectPath` | string |  | PLC project (empty = the only one) |
+| `name` | string |  | Library or placeholder name, e.g. Tc2_Standard; also 'Tc2_Math, * (Beckhoff Automation GmbH)' |
+| `version` | string |  | Version, '*' = newest (default) |
+| `company` | string |  | Distributor, e.g. Beckhoff Automation GmbH |
+| `library` | string |  | resolve / add_placeholder: library name the placeholder points to |
+| `repository` | string |  | Repository name (install/uninstall/add_repository/remove_repository) |
+| `path` | string |  | install: .library/.compiled-library file; add_repository: root folder |
+| `index` | integer |  | add_repository: position (default 0) |
+| `overwrite` | boolean |  | install: overwrite an installed version (default false) |
+| `filter` | string |  | scan: only libraries containing this text |
+
+### `tc_library_save`
+
+Saves a PLC project as library (.library) and optionally installs it into the default repository - e.g. as a pipeline artifact.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `file` | string | yes | Target .library file |
+| `plcProjectPath` | string |  | PLC project (empty = the only one) |
+| `install` | boolean |  | Also install into the repository (default false) |
+
+### `tc_static_analysis`
+
+Static code analysis (TE1200 license): coding rules, naming conventions, metrics. Results appear in the error list (tc_errors). Optional: load settings (.csa) first, export results as SARIF (TwinCAT 4026.20+).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `plcProjectPath` | string |  | PLC project (empty = all) |
+| `settingsFile` | string |  | Load static analysis settings (.csa) before the run (4026+) |
+| `sarifFile` | string |  | Export the results as SARIF file (4026.20+) |
+| `metricsFile` | string |  | Export the standard metrics as CSV (4026.4+) |
+
+### `tc_mapping_export`
+
+Exports all variable links (mapping) of the configuration as XML - to a file or as text.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `file` | string |  | Target file (empty = return the XML, shortened) |
+
+### `tc_mapping_import`
+
+Imports variable links from an XML file made with tc_mapping_export (optionally removes all existing links first). clearOnly=true only removes all links.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `file` | string |  | Mapping XML file |
+| `clearFirst` | boolean |  | Remove all existing links first (default false) |
+| `clearOnly` | boolean |  | Only remove all links |
+| `dryRun` | boolean |  | Only show what would happen |
+
+### `tc_twincat_version`
+
+Shows or selects the TwinCAT version (Remote Manager) the solution is built with - for several installed TwinCAT builds.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `version` | string |  | Version to select, e.g. 3.1.4026.19 (empty = show) |
+
+### `tc_platform`
+
+Shows or sets the target platform of the solution, e.g. 'TwinCAT RT (x64)' or 'TwinCAT RT (x86)'.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `platform` | string |  | Platform to set (empty = show the current one and the available ones) |
+
+### `tc_archive`
+
+Saves the whole solution as archive (.tszip) - e.g. as pipeline artifact or for support.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `file` | string | yes | Target .tszip file |
+
+### `tc_variant`
+
+Project variants: shows the current variant and the variant configuration, selects a variant (current, '[Group]' for a group) or replaces the variant configuration XML (config).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `current` | string |  | Variant to select, e.g. Variant1 or [Group1] |
+| `config` | string |  | New variant configuration XML (<ProjectVariants>...) |
+
+### `tc_route_search`
+
+Searches ADS target systems: broadcast search in the local network, or a direct search by host name/IP (4020.10+). Read only.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `host` | string |  | Host name or IP for a direct search (empty = broadcast) |
+
+### `tc_route_add`
+
+Adds an ADS route to a target system (on the target and locally), optionally also as project route. Needs the target's user name and password - ask the user for them, never guess. Runtime action with confirmation.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | Route name, e.g. CX-12345 |
+| `netId` | string | yes | AmsNetId of the target |
+| `ip` | string |  | IP address of the target |
+| `host` | string |  | Host name instead of the IP |
+| `user` | string |  | User name on the target (e.g. Administrator) |
+| `password` | string |  | Password on the target |
+| `projectRoute` | boolean |  | Also add as project route (default false) |
+| `noEncryption` | boolean |  | Route without encryption (older targets) |
+
+### `tc_tccom`
+
+TcCOM module instances: list, or add an instance of a module class (class id GUID or module name) and optionally let a task call it (taskPath). Parameters afterwards with tc_xml_get/tc_xml_set.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | list or add |
+| `classId` | string |  | add: class id (GUID) of the module |
+| `module` | string |  | add: module name instead of the class id |
+| `name` | string |  | add: instance name |
+| `taskPath` | string |  | add: task that calls the module, e.g. TIRT^Task 1 |
+| `dryRun` | boolean |  | Only show what would happen |
+
 ## Motion
 
 ### `tc_motion`

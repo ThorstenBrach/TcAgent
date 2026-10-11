@@ -27,6 +27,10 @@ public sealed class Policy
         ["tc_plc_library_add"] = ToolClass.ProjectWrite, ["tc_save"] = ToolClass.ProjectWrite,
         ["tc_coding_rules_add"] = ToolClass.ProjectWrite, ["tc_docs_add"] = ToolClass.ProjectWrite, ["tc_io_add"] = ToolClass.ProjectWrite, ["tc_task"] = ToolClass.ProjectWrite, ["tc_boot_project"] = ToolClass.ProjectWrite, ["tc_dialogs"] = ToolClass.Read,
         ["tc_runtime_startup"] = ToolClass.RuntimeWrite, ["tc_runtime_mode"] = ToolClass.RuntimeWrite, ["tc_io_scan_add"] = ToolClass.ProjectWrite, ["tc_motion_add"] = ToolClass.ProjectWrite,
+        ["tc_new_solution"] = ToolClass.ProjectWrite, ["tc_plc_project_add"] = ToolClass.ProjectWrite, ["tc_import"] = ToolClass.ProjectWrite,
+        ["tc_library"] = ToolClass.ProjectWrite, ["tc_library_save"] = ToolClass.ProjectWrite, ["tc_mapping_import"] = ToolClass.ProjectWrite,
+        ["tc_twincat_version"] = ToolClass.ProjectWrite, ["tc_platform"] = ToolClass.ProjectWrite, ["tc_variant"] = ToolClass.ProjectWrite,
+        ["tc_tccom"] = ToolClass.ProjectWrite, ["tc_route_add"] = ToolClass.RuntimeWrite,
         ["tc_activate"] = ToolClass.RuntimeWrite, ["tc_plc_online"] = ToolClass.RuntimeWrite,
         ["ads_write"] = ToolClass.RuntimeWrite,
     };
@@ -99,8 +103,9 @@ public sealed class Policy
         try
         {
             var a = args.DeepClone().AsObject();
-            foreach (var k in a.Select(p => p.Key).ToList())   // shorten long texts (code, XML)
-                if (a[k] is JsonValue v && v.ToString().Length > 300) a[k] = v.ToString()[..300] + "...";
+            foreach (var k in a.Select(p => p.Key).ToList())   // shorten long texts (code, XML), never log secrets
+                if (k.Contains("password", StringComparison.OrdinalIgnoreCase) || k.Contains("secret", StringComparison.OrdinalIgnoreCase)) a[k] = "***";
+                else if (a[k] is JsonValue v && v.ToString().Length > 300) a[k] = v.ToString()[..300] + "...";
             var line = new JsonObject
             {
                 ["time"] = DateTime.Now.ToString("o"), ["tool"] = tool, ["class"] = ClassOf(tool).ToString(),
