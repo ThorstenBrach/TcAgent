@@ -50,6 +50,8 @@ public static class Confirm
                 var r = BridgeClient.Call(idePid, "confirm", new JsonObject { ["title"] = "TcAgent - " + tool, ["text"] = what }, 15 * 60_000);
                 return r["confirmed"]?.GetValue<bool>() == true;
             }
+            // no answer within the time limit (dialog still open / user away) = no - never run the action unconfirmed
+            catch (TimeoutException ex) { Log.Error("Confirmation via the bridge: " + ex.Message); return false; }
             catch (Exception ex) { Log.Error("Confirmation via the bridge: " + ex.Message); }
         }
         if (Mcp.CanElicit)

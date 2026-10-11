@@ -67,8 +67,12 @@ public sealed partial class ToolRegistry
                 return tc.Sta.Run(() =>
                 {
                     dynamic sm = tc.RequireSysMan();
-                    if (!string.Equals((string)sm.GetTargetNetId(), net, StringComparison.OrdinalIgnoreCase)) sm.SetTargetNetId(net);
-                    sm.StartRestartTwinCAT();
+                    // restart on the requested target without retargeting the project permanently
+                    string original = (string)sm.GetTargetNetId();
+                    bool other = !string.Equals(original, net, StringComparison.OrdinalIgnoreCase);
+                    if (other) sm.SetTargetNetId(net);
+                    try { sm.StartRestartTwinCAT(); }
+                    finally { if (other) sm.SetTargetNetId(original); }
                     return $"{net}: TwinCAT is being restarted in Run mode with the active configuration.";
                 });
             default:
