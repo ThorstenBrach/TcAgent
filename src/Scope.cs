@@ -162,9 +162,15 @@ public sealed partial class ToolRegistry
     static object ScopeCreateChild(object scopeObj, string name, int elementType)
     {
         dynamic d = scopeObj;
-        object child;
-        d.CreateChild(out child, name ?? "", elementType);
-        return child;
+        object child = null;
+        try { d.CreateChild(out child, name ?? "", elementType); }
+        catch (Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
+        {
+            // older Scope versions: CreateChild(out child) only, then rename
+            d.CreateChild(out child);
+            if (!string.IsNullOrEmpty(name)) { try { ((dynamic)((ProjectItem)child).Object).ChangeName(name); } catch { } }
+        }
+        return child as ProjectItem ?? throw new Exception("CreateChild returned no project item (" + (child?.GetType().Name ?? "null") + ")");
     }
 
     // ------------------------------------------------------------------ tools
