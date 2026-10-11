@@ -1,0 +1,41 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>TcAgent</AssemblyName>
+    <RootNamespace>TcAgent</RootNamespace>
+    <PlatformTarget>x64</PlatformTarget>
+    <InvariantGlobalization>true</InvariantGlobalization>
+    <NoWarn>CA1416;CS8632</NoWarn>
+    <!-- false beim VSIX-Build: Interop wird nicht mitverteilt, sondern auf dem Zielrechner erzeugt (InteropResolver.cs) -->
+    <InteropPrivate Condition="'$(InteropPrivate)'==''">true</InteropPrivate>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- VS-Erweiterung wird separat mit vsbridge\build.ps1 gebaut (.NET Framework) -->
+    <Compile Remove="vsbridge\**" />
+    <Compile Remove="bin\**;obj\**" />
+  </ItemGroup>
+  <ItemGroup>
+    <!-- Interop fuer das TwinCAT Automation Interface; wird von build.ps1 per tlbimp aus TCatSysManager.tlb erzeugt -->
+    <Reference Include="Interop.TCatSysManagerLib">
+      <HintPath>lib\Interop.TCatSysManagerLib.dll</HintPath>
+      <EmbedInteropTypes>false</EmbedInteropTypes>
+      <Private>$(InteropPrivate)</Private>
+    </Reference>
+    <PackageReference Include="EnvDTE" Version="17.0.32112.339" />
+    <PackageReference Include="EnvDTE80" Version="17.0.32112.339" />
+    <PackageReference Include="Beckhoff.TwinCAT.Ads" Version="6.1.*" />
+    <!-- PDF-Text fuer tc_docs (Apache-2.0) -->
+    <PackageReference Include="PdfPig" Version="0.1.*" />
+  </ItemGroup>
+  <!-- VSIX build (InteropPrivate=false): Visual Studio automation assemblies may not be redistributed (Microsoft license) -
+       they are loaded at runtime from the user's Visual Studio installation (InteropResolver.cs). -->
+  <Target Name="ExcludeVsAssembliesFromVsix" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(InteropPrivate)' == 'false'">
+    <ItemGroup>
+      <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
+        Condition="'%(Filename)' == 'envdte' Or '%(Filename)' == 'envdte80' Or '%(Filename)' == 'Microsoft.VisualStudio.Interop' Or $([System.String]::Copy('%(Filename)').StartsWith('Interop.'))" />
+    </ItemGroup>
+  </Target>
+</Project>

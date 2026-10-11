@@ -1,0 +1,52 @@
+# TwinCAT check + TcUnit tests with TcAgent on a self-hosted Windows runner.
+# Copy to .github/workflows/twincat.yml in your PLC repository and adjust SOLUTION and TCAGENT.
+# The runner needs Visual Studio 2022/XAE with TwinCAT 3.1, the runtime for tests, and must run as a user (see docs/PIPELINE.md).
+name: TwinCAT
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  SOLUTION: MyMachine.sln                              # path of the solution in the repository
+  TCAGENT: C:\Tools\TcAgent\TcAgent.exe                # where TcAgent is installed on the runner
+  TCAGENT_ALLOW_TARGETS: local                         # only this PC may be activated
+
+defaults:
+  run:
+    shell: powershell                                  # Windows PowerShell is always installed on the runner
+
+# A self-hosted runner runs one job at a time - install only one runner per TwinCAT machine.
+
+jobs:
+  check:
+    runs-on: [self-hosted, windows, twincat]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check all objects
+        run: '& $env:TCAGENT check --solution $env:SOLUTION --junit results/check.xml'
+      - name: Publish compiler results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-results
+          path: results/
+
+  test:
+    needs: check
+    runs-on: [self-hosted, windows, twincat]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build, activate and run TcUnit
+        run: '& $env:TCAGENT test --solution $env:SOLUTION --junit results/tests.xml --timeout 900'
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: results/
+      # Optional: show the results as a check run (third-party action, review it before use)
+      # - uses: dorny/test-reporter@v1
+      #   if: always()
+      #   with: { name: TcUnit, path: results/tests.xml, reporter: java-junit }

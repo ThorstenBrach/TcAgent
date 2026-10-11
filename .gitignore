@@ -1,0 +1,24 @@
+# Build-Ausgaben
+bin/
+obj/
+vsbridge/bin/
+*.user
+.vs/
+
+# Aus der lokalen TwinCAT-Installation erzeugt - nicht weitergeben
+lib/
+
+# Lokale Laufzeitdaten
+feedback/
+build.log
+test.out.log
+test.stderr.log
+*.bak-*
+src_v*.txt
+vsbridge/source.extension.vsixmanifest
+vsbridge/obj/
+bin/vsix/
+build-vsix.log
+vsbridge/LICENSE.txt
+vsbridge/icon.png
+vsbridge/tcagent/

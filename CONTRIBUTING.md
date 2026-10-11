@@ -1,0 +1,25 @@
+# Contributing
+
+Contributions are welcome – bug reports, experience with other TwinCAT versions, new tools.
+Docs and issues are in English; issues and pull requests in German are welcome too.
+
+## Reporting bugs
+
+* TwinCAT version (e.g. 3.1.4026.19), Visual Studio version, AI client.
+* What was called (tool, arguments), what came back, what was expected.
+* Helpful: an excerpt from `%LOCALAPPDATA%\TcAgent\audit.jsonl` or `bridge\bridge.log` (without confidential content).
+
+## Agent feedback
+
+Agents report problems themselves via `tc_feedback` to `feedback/feedback.jsonl`. If you like, submit
+anonymized entries as an issue – they show where tools or descriptions need improvement.
+
+## Development
+
+* **One language:** C#. `src/` is .NET 8, `vsbridge/` is .NET Framework 4.8 (Visual Studio extension).
+* **New tool:** register it in `src/ToolRegistry.cs` with `Add(...)`; classify write tools in `src/Policy.cs`
+  as `ProjectWrite` or `RuntimeWrite` so guardrails and audit apply.
+* **Descriptions are part of the interface:** agents read them. Short, precise, with an example path.
+* **Keep docs in sync:** `agents/TCAGENT_GUIDE.md` and `SKILL.md` (same content), `docs/TOOLS.md`.
+* No Beckhoff binaries and no generated interop assemblies in the repository.
+* Test against a project without connected hardware.

@@ -1,0 +1,20 @@
+[$RootKey$\InstalledProducts\TcAgentBridge]
+@="TcAgentBridge"
+"PID"="0.13.0"
+"ProductDetails"="TcAgent - TwinCAT 3 for AI coding agents"
+[$RootKey$\Packages\{86c8609c-4aac-4e7e-95e6-6b96179a3c4f}]
+@="TcAgentBridge.BridgePackage"
+"InprocServer32"="$WinDir$\SYSTEM32\MSCOREE.DLL"
+"Class"="TcAgentBridge.BridgePackage"
+"CodeBase"="$PackageFolder$\TcAgentBridge.dll"
+"AllowsBackgroundLoad"=dword:00000001
+[$RootKey$\AutoLoadPackages\{adfc4e64-0397-11d1-9f4e-00a0c911004f}]
+"{86c8609c-4aac-4e7e-95e6-6b96179a3c4f}"=dword:00000002
+[$RootKey$\AutoLoadPackages\{f1536ef8-92ec-443c-9ed7-fdadf150da82}]
+"{86c8609c-4aac-4e7e-95e6-6b96179a3c4f}"=dword:00000002
+[$RootKey$\ToolWindows\{e5e9685c-14eb-4e4d-b470-61f48dba2b20}]
+@="{86c8609c-4aac-4e7e-95e6-6b96179a3c4f}"
+"Name"="TcAgentBridge.ChatPane"
+"Orientation"="Right"
+"Style"="Tabbed"
+"Window"="{3AE79031-E1BC-11D0-8F78-00A0C9110057}"

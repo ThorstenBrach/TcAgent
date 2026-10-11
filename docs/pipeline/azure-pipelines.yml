@@ -1,0 +1,30 @@
+# TwinCAT check + TcUnit tests with TcAgent on a self-hosted Windows agent (pool with Visual Studio/XAE and TwinCAT runtime).
+# The agent must run as a user, one job at a time per machine (see docs/PIPELINE.md).
+trigger:
+  branches: { include: [main] }
+pr:
+  branches: { include: ['*'] }
+
+pool:
+  name: TwinCAT                                        # your self-hosted pool
+
+variables:
+  SOLUTION: MyMachine.sln
+  TCAGENT: C:\Tools\TcAgent\TcAgent.exe
+  TCAGENT_ALLOW_TARGETS: local
+
+steps:
+  - checkout: self
+
+  - powershell: '& "$(TCAGENT)" check --solution "$(SOLUTION)" --junit "$(Build.ArtifactStagingDirectory)\check.xml"'
+    displayName: Check all objects
+
+  - powershell: '& "$(TCAGENT)" test --solution "$(SOLUTION)" --junit "$(Build.ArtifactStagingDirectory)\tests.xml" --timeout 900'
+    displayName: Build, activate and run TcUnit
+
+  - task: PublishTestResults@2
+    condition: always()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: '$(Build.ArtifactStagingDirectory)\*.xml'
+      testRunTitle: TwinCAT

@@ -1,0 +1,25 @@
+<PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
+  <Metadata>
+    <Identity Id="TcAgentBridge.86c8609c" Version="0.13.0" Language="en-US" Publisher="TcAgent" />
+    <DisplayName>TcAgent - TwinCAT 3 for AI coding agents</DisplayName>
+    <Description xml:space="preserve">Lets AI coding agents (Claude, GitHub Copilot, Gemini, Codex) work in the TwinCAT 3 IDE: read and write PLC code, check and build, navigate, look up library APIs, configure I/O and tasks, control the runtime. Includes an in-IDE chat window and inline questions (Ctrl+Shift+Q).</Description>
+    <MoreInfo>https://github.com/ThorstenBrach/TcAgent</MoreInfo>
+    <License>LICENSE.txt</License>
+    <Icon>icon.png</Icon>
+    <Tags>TwinCAT, Beckhoff, PLC, MCP, AI, Agent, Claude, Copilot</Tags>
+  </Metadata>
+  <Installation AllUsers="false">
+    <InstallationTarget Version="[17.0,18.0)" Id="Microsoft.VisualStudio.Community"><ProductArchitecture>amd64</ProductArchitecture></InstallationTarget>
+    <InstallationTarget Version="[17.0,18.0)" Id="Microsoft.VisualStudio.Pro"><ProductArchitecture>amd64</ProductArchitecture></InstallationTarget>
+    <InstallationTarget Version="[17.0,18.0)" Id="Microsoft.VisualStudio.Enterprise"><ProductArchitecture>amd64</ProductArchitecture></InstallationTarget>
+  </Installation>
+  <Dependencies>
+    <Dependency Id="Microsoft.Framework.NDP" DisplayName="Microsoft .NET Framework" Version="[4.7.2,)" />
+  </Dependencies>
+  <Prerequisites>
+    <Prerequisite Id="Microsoft.VisualStudio.Component.CoreEditor" Version="[17.0,18.0)" DisplayName="Visual Studio core editor" />
+  </Prerequisites>
+  <Assets>
+    <Asset Type="Microsoft.VisualStudio.VsPackage" Path="TcAgentBridge.pkgdef" />
+  </Assets>
+</PackageManifest>

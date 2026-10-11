@@ -1,0 +1,27 @@
+# TwinCAT check + TcUnit tests with TcAgent on a Windows shell runner (tag "twincat"), running as a user,
+# concurrent = 1 on that machine (see docs/PIPELINE.md). Copy to .gitlab-ci.yml.
+variables:
+  SOLUTION: MyMachine.sln
+  TCAGENT: C:\Tools\TcAgent\TcAgent.exe
+  TCAGENT_ALLOW_TARGETS: local
+
+stages: [check, test]
+
+check:
+  stage: check
+  tags: [twincat]
+  script:
+    - '& $env:TCAGENT check --solution $env:SOLUTION --junit results/check.xml; exit $LASTEXITCODE'
+  artifacts:
+    when: always
+    reports: { junit: results/check.xml }
+
+test:
+  stage: test
+  tags: [twincat]
+  resource_group: twincat-runtime
+  script:
+    - '& $env:TCAGENT test --solution $env:SOLUTION --junit results/tests.xml --timeout 900; exit $LASTEXITCODE'
+  artifacts:
+    when: always
+    reports: { junit: results/tests.xml }

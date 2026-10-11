@@ -1,0 +1,22 @@
+// TwinCAT check + TcUnit tests with TcAgent. Agent label "twincat": Windows with Visual Studio/XAE and TwinCAT runtime,
+// running as a user, one executor (see docs/PIPELINE.md). The JUnit plugin shows the results.
+pipeline {
+    agent { label 'twincat' }
+    options { disableConcurrentBuilds() }
+    environment {
+        SOLUTION = 'MyMachine.sln'
+        TCAGENT = 'C:\\Tools\\TcAgent\\TcAgent.exe'
+        TCAGENT_ALLOW_TARGETS = 'local'
+    }
+    stages {
+        stage('Check') {
+            steps { bat '"%TCAGENT%" check --solution "%SOLUTION%" --junit results\\check.xml' }
+        }
+        stage('Test') {
+            steps { bat '"%TCAGENT%" test --solution "%SOLUTION%" --junit results\\tests.xml --timeout 900' }
+        }
+    }
+    post {
+        always { junit allowEmptyResults: true, testResults: 'results/*.xml' }
+    }
+}

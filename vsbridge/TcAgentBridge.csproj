@@ -1,0 +1,49 @@
+<Project>
+  <Import Project="Sdk.props" Sdk="Microsoft.NET.Sdk" />
+  <!-- Builds the installable VSIX with the Visual Studio SDK build tools (used by build-vsix.ps1 via Visual Studio's MSBuild).
+       vsbridge\build.ps1 (csc) remains for quick developer builds. -->
+  <PropertyGroup>
+    <TargetFramework>net48</TargetFramework>
+    <AssemblyName>TcAgentBridge</AssemblyName>
+    <RootNamespace>TcAgentBridge</RootNamespace>
+    <LangVersion>latest</LangVersion>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <EnableDefaultItems>false</EnableDefaultItems>
+    <GenerateAssemblyInfo>false</GenerateAssemblyInfo>
+    <NoWarn>$(NoWarn);VSTHRD010;VSTHRD001;VSTHRD002;VSTHRD100;VSTHRD110;VSTHRD200;VSSDK006;CS0618</NoWarn>
+    <!-- VSIX: the VS SDK build targets are only imported for projects with the VSIX project type -->
+    <ProjectTypeGuids>{82b43b9b-a64c-4715-b499-d71e9ca2bd60};{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}</ProjectTypeGuids>
+    <GeneratePkgDefFile>false</GeneratePkgDefFile>
+    <CreateVsixContainer>true</CreateVsixContainer>
+    <DeployExtension>false</DeployExtension>
+    <IncludeAssemblyInVSIXContainer>true</IncludeAssemblyInVSIXContainer>
+    <IncludeDebugSymbolsInVSIXContainer>false</IncludeDebugSymbolsInVSIXContainer>
+    <IncludeDebugSymbolsInLocalVSIXDeployment>false</IncludeDebugSymbolsInLocalVSIXDeployment>
+    <TargetVsixContainerName>TcAgent.vsix</TargetVsixContainerName>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="*.cs" />
+    <!-- the VS SDK requires this file name; build-vsix.ps1 copies it from extension.vsixmanifest (the single source) -->
+    <None Include="source.extension.vsixmanifest"><SubType>Designer</SubType></None>
+    <Content Include="TcAgentBridge.pkgdef" IncludeInVSIX="true" />
+    <!-- copied into this folder by build-vsix.ps1 (linked files lose their target name in the VSIX) -->
+    <Content Include="LICENSE.txt" IncludeInVSIX="true" />
+    <Content Include="icon.png" IncludeInVSIX="true" />
+    <!-- TcAgent itself (self-contained), staged by build-vsix.ps1 -->
+    <Content Include="tcagent\**\*" IncludeInVSIX="true" />
+  </ItemGroup>
+  <ItemGroup>
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Design" />
+    <PackageReference Include="Microsoft.VisualStudio.SDK" Version="17.0.32112.339" ExcludeAssets="runtime" />
+    <PackageReference Include="Microsoft.VSSDK.BuildTools" Version="17.0.5232" PrivateAssets="all" />
+  </ItemGroup>
+  <Import Project="Sdk.targets" Sdk="Microsoft.NET.Sdk" />
+  <!-- VS SDK targets (create the .vsix): from the Microsoft.VSSDK.BuildTools package, else from a VS SDK installation -->
+  <Import Project="$(VsSDKInstall)\Microsoft.VsSDK.targets" Condition="'$(VsSDKInstall)' != '' And Exists('$(VsSDKInstall)\Microsoft.VsSDK.targets')" />
+  <Import Project="$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets" Condition="('$(VsSDKInstall)' == '' Or !Exists('$(VsSDKInstall)\Microsoft.VsSDK.targets')) And '$(VSToolsPath)' != '' And Exists('$(VSToolsPath)\VSSDK\Microsoft.VsSDK.targets')" />
+  <Target Name="TcAgentVsixDiag" AfterTargets="Build">
+    <Message Importance="high" Text="VsSDKInstall=$(VsSDKInstall) VSToolsPath=$(VSToolsPath) CreateVsixContainer=$(CreateVsixContainer) TargetVsixContainer=$(TargetVsixContainer)" />
+  </Target>
+</Project>
