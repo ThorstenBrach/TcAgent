@@ -233,6 +233,7 @@ public sealed class TwinCatSession
         template = string.IsNullOrEmpty(template) ? FindTemplate(@"Base\PrjTemplate\TwinCAT Project.tsproj") : template;
         if (template == null || !File.Exists(template))
             throw new Exception("TwinCAT project template not found (TwinCAT Project.tsproj) - pass template=<path>.");
+        folder = Path.GetFullPath(folder);   // the IDE resolves relative paths against its own working directory
         var dir = Path.Combine(folder, name);
         var sln = Path.Combine(dir, name + ".sln");
         if (File.Exists(sln)) throw new Exception("Solution already exists: " + sln + " - open it with tc_open.");

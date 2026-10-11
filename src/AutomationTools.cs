@@ -296,7 +296,7 @@ public sealed partial class ToolRegistry
     {
         var action = (Str(a, "action") ?? "").ToLowerInvariant();
         var plc = PlcProject(Str(a, "plcProjectPath"));
-        var refs = TwinCatSession.Children(plc).FirstOrDefault(c => c.ItemType == 617)   // References
+        var refs = TwinCatSession.Children(plc).FirstOrDefault(c => c is ITcPlcLibraryManager)   // References (like PlcReferences)
                    ?? tc.Item(plc.PathName + "^References");
         string name = Str(a, "name"), version = Str(a, "version") ?? "*", company = Str(a, "company") ?? "";
         string Need(string v, string what) => !string.IsNullOrEmpty(v) ? v : throw new Exception(what + " is required");
@@ -373,6 +373,7 @@ public sealed partial class ToolRegistry
             if (!string.IsNullOrEmpty(sarif))
             {
                 var f = Path.GetFullPath(plcs.Count > 1 ? Path.Combine(Path.GetDirectoryName(sarif) ?? "", $"{Path.GetFileNameWithoutExtension(sarif)}.{plc.Name}{Path.GetExtension(sarif)}") : sarif);
+                Directory.CreateDirectory(Path.GetDirectoryName(f)!);
                 ComCall.Invoke(plc, "ExportToSarif", f);   // runs the analysis itself
                 o.AppendLine($"{plc.Name}: static analysis run, SARIF: {f}");
             }
