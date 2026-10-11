@@ -298,7 +298,8 @@ public sealed partial class ToolRegistry
             ? "TcHmi.Controls.System." + t : "TcHmi.Controls.Beckhoff." + t;
     }
 
-    static string Attr(string s) => System.Net.WebUtility.HtmlEncode(s ?? "").Replace("&#39;", "'");
+    // only what HTML attributes need - umlauts stay readable
+    static string Attr(string s) => (s ?? "").Replace("&", "&amp;").Replace("\"", "&quot;").Replace("<", "&lt;").Replace(">", "&gt;");
 
     /// <summary>Start index and end index (exclusive) of the &lt;div id="id"&gt; element, counting nested divs.</summary>
     static (int start, int end) FindElement(string html, string id)
