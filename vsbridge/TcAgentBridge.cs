@@ -1,10 +1,10 @@
-// TcAgentBridge - VS-2022-Erweiterung: Bruecke zwischen TcAgent (MCP-Server, eigener Prozess) und dem IDE-Prozess.
-// Laeuft im Prozess von Visual Studio und kommt damit an das heran, was ueber DTE/Automation Interface nicht geht:
-// - Cursor und Selektion im TwinCAT-Editor
-// - Signaturen aus (compiled) libraries aus der IDE
-// Protokoll: Named Pipe "TcAgentBridge.<pid>", je Verbindung eine JSON-Zeile hin, eine JSON-Zeile zurueck.
-// Alle IDE-Zugriffe laufen auf dem UI-Thread.
-// Log und Ausgaben: %LOCALAPPDATA%\TcAgent\bridge\ ; Bibliotheks-Cache: %LOCALAPPDATA%\TcAgent\libcache\
+// TcAgentBridge - VS 2022 extension: bridge between TcAgent (MCP server, separate process) and the IDE process.
+// Runs inside the Visual Studio process and can therefore reach what is not accessible via DTE/Automation Interface:
+// - Cursor and selection in the TwinCAT editor
+// - Signatures from (compiled) libraries via the IDE
+// Protocol: named pipe "TcAgentBridge.<pid>", one JSON line in and one JSON line out per connection.
+// All IDE access runs on the UI thread.
+// Log and output: %LOCALAPPDATA%\TcAgent\bridge\ ; library cache: %LOCALAPPDATA%\TcAgent\libcache\
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -42,25 +42,25 @@ namespace TcAgentBridge
                 dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "bridge");
                 Directory.CreateDirectory(dir);
                 ui = System.Windows.Application.Current?.Dispatcher;
-                Log($"==== TcAgentBridge {BridgeVersion} gestartet, pid={System.Diagnostics.Process.GetCurrentProcess().Id}, 64bit={Environment.Is64BitProcess}");
+                Log($"==== TcAgentBridge {BridgeVersion} started, pid={System.Diagnostics.Process.GetCurrentProcess().Id}, 64bit={Environment.Is64BitProcess}");
                 server = new Thread(ServerLoop) { IsBackground = true, Name = "TcAgentBridge" };
                 server.Start();
                 Instance = this;
-                // Tastenkuerzel "aus dem Code fragen" (Standard Strg+Umschalt+Q, "askHotkey" in chat-backends.json)
+                // Hotkey "ask from code" (default Ctrl+Shift+Q, "askHotkey" in chat-backends.json)
                 ui?.BeginInvoke(new Action(InstallHotkey), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-                // VSIX-Installation: TcAgent bereitstellen, Interop erzeugen, KI-Clients einrichten (erstes Mal nach Rueckfrage)
+                // VSIX installation: deploy TcAgent, generate interop, set up AI clients (first time after confirmation)
                 ui?.BeginInvoke(new Action(() =>
                 {
                     try { Installer.OnStartup(Log, Notify); } catch (Exception ex) { Log("Installer: " + ex.Message); }
                 }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
-                // Chat-Fenster beim Start zeigen (abschaltbar: "showOnStartup": false in chat-backends.json)
+                // Show chat window on startup (can be disabled: "showOnStartup": false in chat-backends.json)
                 if (ShowChatOnStartup() && ui != null)
                     ui.BeginInvoke(new Action(() =>
                     {
-                        try { ShowChat(); } catch (Exception ex) { Log("Chat-Fenster: " + ex.Message); }
+                        try { ShowChat(); } catch (Exception ex) { Log("Chat window: " + ex.Message); }
                     }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
             }
-            catch (Exception ex) { Log("Init-Fehler: " + ex); }
+            catch (Exception ex) { Log("Init error: " + ex); }
             return System.Threading.Tasks.Task.FromResult(0);
         }
 
@@ -71,7 +71,7 @@ namespace TcAgentBridge
             base.Dispose(disposing);
         }
 
-        // ------------------------------------------------------------------ Pipe-Server
+        // ------------------------------------------------------------------ Pipe server
         void ServerLoop()
         {
             string name = "TcAgentBridge." + System.Diagnostics.Process.GetCurrentProcess().Id;
@@ -97,7 +97,7 @@ namespace TcAgentBridge
                         try { pipe.WaitForPipeDrain(); } catch { }
                     }
                 }
-                catch (Exception ex) { Log("Pipe-Fehler: " + ex.Message); Thread.Sleep(500); }
+                catch (Exception ex) { Log("Pipe error: " + ex.Message); Thread.Sleep(500); }
             }
         }
 
@@ -125,7 +125,7 @@ namespace TcAgentBridge
                         case "xref": return Xref(Str(req, "name"), int.TryParse(Str(req, "max"), out var xm) ? xm : 300);
                         case "lm_call": return LmCall(Str(req, "target"), Str(req, "method"), req.TryGetValue("args", out var ar) ? ar as ArrayList ?? new ArrayList((ar as object[]) ?? new object[0]) : new ArrayList());
                         case "lm_export": return LmExport(Str(req, "library"), int.TryParse(Str(req, "max"), out var mx) ? mx : 100000);
-                        default: throw new Exception("Unbekannter Befehl: " + cmd);
+                        default: throw new Exception("Unknown command: " + cmd);
                     }
                 }));
             CurrentOp = null;
@@ -135,28 +135,28 @@ namespace TcAgentBridge
             return r;
         }
 
-        // ------------------------------------------------------------------ Rueckfrage vor Laufzeit-Aktionen
-        // TcAgent fragt vor Aktivieren, PLC-Start/Stop, ADS-Schreiben ... nach (TCAGENT_CONFIRM). Standard ist "Nein".
+        // ------------------------------------------------------------------ Confirmation before runtime actions
+        // TcAgent asks before activating, PLC start/stop, ADS writes ... (TCAGENT_CONFIRM). Default is "No".
         Dictionary<string, object> ConfirmAction(string title, string text)
         {
             System.Windows.MessageBoxResult r;
             var owner = System.Windows.Application.Current?.MainWindow;
-            var msg = (text ?? "") + "\n\nAusfuehren?";
+            var msg = (text ?? "") + "\n\nExecute?";
             r = owner != null
                 ? System.Windows.MessageBox.Show(owner, msg, title ?? "TcAgent", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning, System.Windows.MessageBoxResult.No)
                 : System.Windows.MessageBox.Show(msg, title ?? "TcAgent", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning, System.Windows.MessageBoxResult.No);
             bool ok = r == System.Windows.MessageBoxResult.Yes;
-            Log("Rueckfrage '" + text + "': " + (ok ? "ja" : "nein"));
-            try { ChatControl.Instance?.Notice(ok ? "Bestaetigt: " + text : "Abgelehnt: " + text); } catch { }
+            Log("Confirmation '" + text + "': " + (ok ? "yes" : "no"));
+            try { ChatControl.Instance?.Notice(ok ? "Confirmed: " + text : "Declined: " + text); } catch { }
             return new Dictionary<string, object> { ["confirmed"] = ok };
         }
 
-        // ------------------------------------------------------------------ Chat-Fenster
+        // ------------------------------------------------------------------ Chat window
         internal Dictionary<string, object> ContextForChat() => Context();
 
         IVsWindowFrame chatFrame;
 
-        // Meldung im Chat-Fenster (aus beliebigem Thread)
+        // Message in the chat window (from any thread)
         internal void Notify(string msg)
         {
             Log(msg);
@@ -166,7 +166,7 @@ namespace TcAgentBridge
             }));
         }
 
-        // ------------------------------------------------------------------ Tastenkuerzel: aus dem Code-Fenster fragen
+        // ------------------------------------------------------------------ Hotkey: ask from the code window
         System.Windows.Forms.Keys hotKey = System.Windows.Forms.Keys.Q;
         System.Windows.Forms.Keys hotMods = System.Windows.Forms.Keys.Control | System.Windows.Forms.Keys.Shift;
         IVsWindowFrame returnFrame;
@@ -175,10 +175,10 @@ namespace TcAgentBridge
         {
             try
             {
-                statusWatch = !(ChatSetting("statusLog") is bool sw0 && !sw0);   // vorerst standardmaessig an (Diagnose)
+                statusWatch = !(ChatSetting("statusLog") is bool sw0 && !sw0);   // on by default for now (diagnostics)
                 StartStallMonitor();
                 var spec = ChatSetting("askHotkey") as string ?? "Ctrl+Shift+Q";
-                if (spec.Trim().Length == 0 || spec.Equals("off", StringComparison.OrdinalIgnoreCase)) { Log("Tastenkuerzel abgeschaltet"); return; }
+                if (spec.Trim().Length == 0 || spec.Equals("off", StringComparison.OrdinalIgnoreCase)) { Log("Hotkey disabled"); return; }
                 System.Windows.Forms.Keys mods = 0, key = 0;
                 foreach (var part in spec.Split('+').Select(x => x.Trim()))
                 {
@@ -189,19 +189,19 @@ namespace TcAgentBridge
                     else key = (System.Windows.Forms.Keys)Enum.Parse(typeof(System.Windows.Forms.Keys), part, true);
                 }
                 if (key != 0) { hotKey = key; hotMods = mods; }
-                // Tastatur-Hook nur fuer den UI-Thread von VS: sieht die Taste, bevor VS/TwinCAT-Editor sie verarbeiten
-                // (ComponentDispatcher bekommt die Tasten des WinForms-Editors nicht zu sehen - getestet).
+                // Keyboard hook only for the VS UI thread: sees the key before VS/the TwinCAT editor process it
+                // (ComponentDispatcher does not see the keys of the WinForms editor - tested).
                 keyHook = OnKeyHook;
                 hookHandle = SetWindowsHookEx(2 /* WH_KEYBOARD */, keyHook, IntPtr.Zero, GetCurrentThreadId());
-                Log($"Tastenkuerzel fuer den Chat: {spec}" + (hookHandle == IntPtr.Zero ? $" - Hook FEHLGESCHLAGEN ({Marshal.GetLastWin32Error()})" : ""));
+                Log($"Chat hotkey: {spec}" + (hookHandle == IntPtr.Zero ? $" - hook FAILED ({Marshal.GetLastWin32Error()})" : ""));
             }
-            catch (Exception ex) { Log("Tastenkuerzel: " + Inner(ex)); }
+            catch (Exception ex) { Log("Hotkey: " + Inner(ex)); }
         }
 
-        // Diagnose: misst, wie lange der UI-Thread von VS blockiert ist (Ticks alle 50 ms). Haenger > 150 ms landen im Log,
-        // zusammen mit dem, was die Bruecke gerade tat - so laesst sich trennen: TcAgent, TwinCAT selbst oder etwas anderes.
+        // Diagnostics: measures how long the VS UI thread is blocked (ticks every 50 ms). Stalls > 150 ms are logged,
+        // together with what the bridge was doing - this separates the causes: TcAgent, TwinCAT itself or something else.
         internal static volatile string CurrentOp;
-        // Statusleisten-Wechsel mitschreiben ("statusLog": true in chat-backends.json) - zur Diagnose von Haengern
+        // Log status bar changes ("statusLog": true in chat-backends.json) - for diagnosing stalls
         bool statusWatch;
         void StartStallMonitor()
         {
@@ -222,13 +222,13 @@ namespace TcAgentBridge
                         if (busy.Count > 0) agent = string.Join(",", busy);
                     }
                     catch { }
-                    Log($"UI blockiert {ms} ms (TcAgent-Werkzeug: {agent}, Bruecke: {CurrentOp ?? "-"}, Fokus: {fg}, Statusleiste: \"{StatusText()}\")");
+                    Log($"UI blocked {ms} ms (TcAgent tool: {agent}, bridge: {CurrentOp ?? "-"}, focus: {fg}, status bar: \"{StatusText()}\")");
                 }
                 if (statusWatch)
                 {
                     var st = StatusText();
                     if (st != lastStatus && !string.IsNullOrWhiteSpace(st) && !System.Text.RegularExpressions.Regex.IsMatch(st, "^(Bereit|Ready)$"))
-                        Log("Statusleiste: " + st);
+                        Log("Status bar: " + st);
                     lastStatus = st;
                 }
                 last.Restart();
@@ -236,7 +236,7 @@ namespace TcAgentBridge
             t.Start();
         }
 
-        // Text der VS-Statusleiste - zeigt oft, was TwinCAT/VS gerade im Hintergrund tut
+        // Text of the VS status bar - often shows what TwinCAT/VS is doing in the background
         string lastStatus;
         string StatusText()
         {
@@ -249,7 +249,7 @@ namespace TcAgentBridge
         [DllImport("user32.dll")] static extern bool UnhookWindowsHookEx(IntPtr hhk);
         [DllImport("user32.dll")] static extern IntPtr CallNextHookEx(IntPtr hhk, int code, IntPtr wParam, IntPtr lParam);
         [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
-        HookProc keyHook;          // Feld haelt den Delegaten am Leben (sonst sammelt ihn der GC ein)
+        HookProc keyHook;          // field keeps the delegate alive (otherwise the GC collects it)
         IntPtr hookHandle;
 
         IntPtr OnKeyHook(int code, IntPtr wParam, IntPtr lParam)
@@ -263,17 +263,17 @@ namespace TcAgentBridge
                     if (!repeat)
                         ui.BeginInvoke(new Action(() =>
                         {
-                            Log("Tastenkuerzel gedrueckt");
-                            try { AskFromEditor(); } catch (Exception ex) { Log("Fragen aus dem Editor: " + Inner(ex)); }
+                            Log("Hotkey pressed");
+                            try { AskFromEditor(); } catch (Exception ex) { Log("Ask from editor: " + Inner(ex)); }
                         }));
-                    return (IntPtr)1;   // Taste verschlucken, damit sie nicht im Code landet
+                    return (IntPtr)1;   // swallow the key so it does not end up in the code
                 }
             }
             catch { }
             return CallNextHookEx(hookHandle, code, wParam, lParam);
         }
 
-        // Aus dem Code fragen: kleines Eingabefeld an der Cursorzeile (InlineAsk). Steht der Fokus schon im Chat, nur dorthin.
+        // Ask from code: small input box at the cursor line (InlineAsk). If the focus is already in the chat, just go there.
         internal void AskFromEditor()
         {
             try
@@ -283,19 +283,19 @@ namespace TcAgentBridge
             }
             catch { }
             if (ChatControl.Instance != null && ChatControl.Instance.IsKeyboardFocusWithin) { ChatControl.Instance.FocusInput(); return; }
-            // Kontext jetzt erfassen - der Editor hat in diesem Moment noch den Fokus
+            // Capture context now - the editor still has the focus at this moment
             string ctx = null;
-            try { ctx = ChatControl.FormatContext(Context()); } catch (Exception ex) { Log("Kontext: " + Inner(ex)); }
+            try { ctx = ChatControl.FormatContext(Context()); } catch (Exception ex) { Log("Context: " + Inner(ex)); }
             InlineAsk.Open(ctx, ChatControl.Instance?.IsBusy == true, ChatControl.DefaultBackendName());
         }
 
-        // Frage aus dem Inline-Feld: Chat sichtbar machen (ohne Fokuswechsel) und abschicken
+        // Question from the inline box: make the chat visible (without changing focus) and send it
         internal void SendInline(string text, string ctx)
         {
-            try { ShowChat(false); } catch (Exception ex) { Log("Chat-Fenster: " + Inner(ex)); }
+            try { ShowChat(false); } catch (Exception ex) { Log("Chat window: " + Inner(ex)); }
             ui.BeginInvoke(new Action(() =>
             {
-                if (ChatControl.Instance == null) { Log("Inline-Frage: Chat-Fenster nicht verfuegbar"); return; }
+                if (ChatControl.Instance == null) { Log("Inline question: chat window not available"); return; }
                 ChatControl.Instance.SendExternal(text, ctx);
             }), System.Windows.Threading.DispatcherPriority.Background);
         }
@@ -319,26 +319,26 @@ namespace TcAgentBridge
 
         void ShowChat() => ShowChat(true);
 
-        // activate=false: Fenster sichtbar machen, ohne den Fokus aus dem Code zu nehmen (Inline-Frage)
+        // activate=false: make the window visible without taking the focus away from the code (inline question)
         internal void ShowChat(bool activate)
         {
             if (chatFrame != null && (activate ? chatFrame.Show() : chatFrame.ShowNoActivate()) == 0) return;
-            // 1) Standardweg (braucht die ToolWindow-Registrierung, die sonst das VS-SDK erzeugt)
+            // 1) Standard way (needs the ToolWindow registration that the VS SDK would normally generate)
             try
             {
                 var w = FindToolWindow(typeof(ChatPane), 0, true);
                 if (w?.Frame is IVsWindowFrame f) { chatFrame = f; Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(activate ? f.Show() : f.ShowNoActivate()); return; }
             }
-            catch (Exception ex) { Log("FindToolWindow: " + Inner(ex) + " - lege Fenster direkt an"); }
-            // 2) Direkt ueber die VS-Shell anlegen
-            var shell = (IVsUIShell)GetService(typeof(SVsUIShell)) ?? throw new Exception("SVsUIShell nicht verfuegbar");
+            catch (Exception ex) { Log("FindToolWindow: " + Inner(ex) + " - creating window directly"); }
+            // 2) Create directly via the VS shell
+            var shell = (IVsUIShell)GetService(typeof(SVsUIShell)) ?? throw new Exception("SVsUIShell not available");
             var pane = new ChatPane();
             Guid empty = Guid.Empty, persist = typeof(ChatPane).GUID, auto = Guid.Empty;
             Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(shell.CreateToolWindow(
                 (uint)__VSCREATETOOLWIN.CTW_fInitNew, 0, pane, ref empty, ref persist, ref auto, null, "TcAgent Chat", null, out var frame));
             chatFrame = frame;
             Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(activate ? frame.Show() : frame.ShowNoActivate());
-            Log("Chat-Fenster angelegt (IVsUIShell)");
+            Log("Chat window created (IVsUIShell)");
         }
 
         static bool ShowChatOnStartup()
@@ -353,11 +353,11 @@ namespace TcAgentBridge
             catch { return true; }
         }
 
-        // ------------------------------------------------------------------ IDE-Umgebung
+        // ------------------------------------------------------------------ IDE environment
         object exporter;
         Type apEnv;
 
-        // Zugang zu den IDE-Diensten herstellen
+        // Establish access to the IDE services
         Type Env(StringBuilder trace = null)
         {
             if (apEnv != null) return apEnv;
@@ -367,9 +367,9 @@ namespace TcAgentBridge
                     exporter = TryCreate(cm, ExportTypeGuid, trace);
                     if (exporter != null) break;
                 }
-            if (exporter == null) throw new Exception("Export-Komponente nicht verfuegbar - ist ein PLC-Projekt geladen?");
+            if (exporter == null) throw new Exception("Export component not available - is a PLC project loaded?");
             apEnv = SafeTypes(exporter.GetType().Assembly).FirstOrDefault(t => t.Name == "APEnvironment");
-            if (apEnv == null) throw new Exception("Umgebung der Export-Komponente nicht gefunden");
+            if (apEnv == null) throw new Exception("Environment of the export component not found");
             return apEnv;
         }
 
@@ -379,11 +379,11 @@ namespace TcAgentBridge
             return p?.GetValue(null, null);
         }
 
-        // ------------------------------------------------------------------ Editor-Kontext
+        // ------------------------------------------------------------------ Editor context
         Dictionary<string, object> Context()
         {
             var r = new Dictionary<string, object>();
-            // 1) VS-Sicht: aktives Dokumentfenster
+            // 1) VS view: active document window
             object docView = null;
             try
             {
@@ -399,7 +399,7 @@ namespace TcAgentBridge
             }
             catch (Exception ex) { r["vsError"] = Inner(ex); }
 
-            // 2) Editor-Sicht: aktive Editoransicht
+            // 2) Editor view: active editor view
             var candidates = new List<KeyValuePair<string, object>>();
             try
             {
@@ -429,7 +429,7 @@ namespace TcAgentBridge
             foreach (var c in candidates)
                 if (TryGetSelection(c.Value, r)) { r["selectionSource"] = c.Key; break; }
 
-            // Editor-Sicht: Auswahl der Editoransicht - unabhaengig vom Tastaturfokus in VS
+            // Editor view: selection of the editor view - independent of the keyboard focus in VS
             try
             {
                 var gs = cdsViewObj == null ? null : AllMethods(cdsViewObj.GetType()).FirstOrDefault(m => m.Name == "GetSelection" && m.GetParameters().Length == 0);
@@ -454,12 +454,12 @@ namespace TcAgentBridge
             }
             catch (Exception ex) { r["cdsSelectionError"] = Inner(ex); }
 
-            // Beide Haelften (Deklaration/Implementierung) einzeln: jede hat ihr eigenes Editor-Control mit Cursor und
-            // Markierung - unabhaengig davon, welches Fenster in VS gerade den Fokus hat (getestet, s. Konzept Spike 4)
+            // Both halves (declaration/implementation) separately: each has its own editor control with cursor and
+            // selection - regardless of which window in VS currently has the focus (tested, see concept spike 4)
             try
             {
                 var panes = new List<Dictionary<string, object>>();
-                foreach (var part in new[] { new[] { "InterfaceEditorView", "Deklaration" }, new[] { "ImplementationEditorView", "Implementierung" } })
+                foreach (var part in new[] { new[] { "InterfaceEditorView", "declaration" }, new[] { "ImplementationEditorView", "implementation" } })
                 {
                     if (!(SafeGet(cdsViewObj, part[0]) is System.Windows.Forms.Control ctl)) continue;
                     var syn = ctl.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0 ? ctl
@@ -470,11 +470,11 @@ namespace TcAgentBridge
                     int selCount = SafeGet(syn, "SelectionCount") is int sc ? sc : 0;
                     var selText = SafeGet(syn, "SelectedText") as string;
                     var text = SafeGet(syn, "Text") as string ?? "";
-                    // Spalte = Zeichenposition minus Beginn der Zeile (Zeilenende \r\n oder \n)
+                    // Column = character position minus start of line (line ending \r\n or \n)
                     int nl = text.Contains("\r\n") ? 2 : 1, start = 0;
                     var lines = text.Replace("\r\n", "\n").Split('\n');
                     for (int i = 0; i < line && i < lines.Length; i++) start += lines[i].Length + nl;
-                    // Codeausschnitt um den Cursor (+-6 Zeilen) - spart dem Agenten einen Werkzeugaufruf
+                    // Code excerpt around the cursor (+-6 lines) - saves the agent a tool call
                     var exc = new StringBuilder();
                     for (int i = Math.Max(0, line - 6); i <= Math.Min(lines.Length - 1, line + 6); i++)
                         exc.Append(i == line ? ">" : " ").Append((i + 1).ToString().PadLeft(4)).Append(": ").Append(lines[i]).Append('\n');
@@ -489,7 +489,7 @@ namespace TcAgentBridge
                 if (panes.Count > 0)
                 {
                     r["panes"] = panes;
-                    // Aktive Haelfte: Fokus > Markierung > Cursor abseits von Zeile 1/Spalte 1
+                    // Active half: focus > selection > cursor away from line 1/column 1
                     var act = panes.FirstOrDefault(p => (bool)p["focused"])
                            ?? (panes.Count(p => (int)p["selectionCount"] > 0) == 1 ? panes.First(p => (int)p["selectionCount"] > 0) : null)
                            ?? (panes.Count(p => (int)p["line"] > 1 || (int)p["column"] > 1) == 1 ? panes.First(p => (int)p["line"] > 1 || (int)p["column"] > 1) : null);
@@ -498,7 +498,7 @@ namespace TcAgentBridge
             }
             catch (Exception ex) { r["panesError"] = Inner(ex); }
 
-            // VS-Sicht: TwinCATs VSEditor implementiert IVsTextView -> Cursor, Selektion, markierter Text
+            // VS view: TwinCAT's VSEditor implements IVsTextView -> cursor, selection, selected text
             if (docView != null)
             {
                 int hr;
@@ -514,19 +514,19 @@ namespace TcAgentBridge
                 var a1 = new object[1];
                 if (TryInvoke(docView, "GetSelectedText", a1, out hr) && a1[0] is string st && st.Length > 0)
                     r["selectedText"] = st.Length > 8000 ? st.Substring(0, 8000) + "..." : st;
-                // Welcher Teil hat den Cursor: Deklaration oder Implementierung?
+                // Which part has the cursor: declaration or implementation?
                 try
                 {
                     var active = SafeCall(docView, "GetActiveSynEdControl", SafeGet(docView, "EditorView")) as System.Windows.Forms.Control;
                     r["activeEditorControl"] = active?.GetType().FullName;
-                    foreach (var part in new[] { new[] { "InterfaceEditorView", "Deklaration" }, new[] { "ImplementationEditorView", "Implementierung" } })
+                    foreach (var part in new[] { new[] { "InterfaceEditorView", "declaration" }, new[] { "ImplementationEditorView", "implementation" } })
                         if (active != null && SafeGet(cdsViewObj, part[0]) is System.Windows.Forms.Control pc && (pc == active || pc.Contains(active)))
                             r["part"] = part[1];
                 }
                 catch (Exception ex) { r["partError"] = Inner(ex); }
             }
 
-            // 3) Fokussiertes WinForms-Control (TwinCAT-Editoren) + WPF-Fokus
+            // 3) Focused WinForms control (TwinCAT editors) + WPF focus
             try
             {
                 var chain = new List<string>();
@@ -548,8 +548,8 @@ namespace TcAgentBridge
             }
             catch (Exception ex) { r["focusError"] = Inner(ex); }
 
-            // Hat keine Haelfte den Fokus (z. B. weil gerade im Chat-Fenster getippt wird) und ist sie auch sonst nicht
-            // eindeutig: ueber die durchgehende VS-Zeilennummer (Deklaration + Implementierung) entscheiden.
+            // If neither half has the focus (e.g. because the user is typing in the chat window) and the active half is not
+            // otherwise unambiguous: decide by the continuous VS line number (declaration + implementation).
             try
             {
                 if (!r.ContainsKey("active") && r.TryGetValue("panes", out var po) && po is List<Dictionary<string, object>> ps && ps.Count == 2
@@ -569,7 +569,7 @@ namespace TcAgentBridge
             foreach (System.Windows.Forms.Control k in c.Controls) { yield return k; foreach (var g in Descendants(k)) yield return g; }
         }
 
-        // Eigenschaften UND Felder (auch nicht oeffentliche), deren Name zum Muster passt - fuer die Diagnose
+        // Properties AND fields (including non-public ones) whose name matches the pattern - for diagnostics
         static Dictionary<string, object> Members(object o, string pattern)
         {
             var d = new Dictionary<string, object>();
@@ -582,7 +582,7 @@ namespace TcAgentBridge
                 if (Simple(v)) return v is Enum || v is Guid ? v.ToString() : v;
                 var s = v.ToString(); var tn = v.GetType().FullName ?? "";
                 if (s != tn) return Short(s, 200);
-                // ein Level tiefer fuer Strukturen (z. B. Caret/Range): einfache Felder/Eigenschaften
+                // one level deeper for structures (e.g. Caret/Range): simple fields/properties
                 var sub = new Dictionary<string, object>();
                 foreach (var f in v.GetType().GetFields(bf)) { try { var x = f.GetValue(v); if (x != null && Simple(x)) sub[f.Name] = x.ToString(); } catch { } }
                 foreach (var p in v.GetType().GetProperties(bf)) { if (p.GetIndexParameters().Length > 0) continue; try { var x = p.GetValue(v, null); if (x != null && Simple(x)) sub[p.Name] = x.ToString(); } catch { } }
@@ -599,7 +599,7 @@ namespace TcAgentBridge
             return d;
         }
 
-        // Position in Zeile und Spalte zerlegen
+        // Split position into line and column
         static object[] SplitPos(long pos)
         {
             foreach (var t in AppDomain.CurrentDomain.GetAssemblies().Where(x => Rx(x.GetName().Name, "Utilities|_3S|CoDeSys|^Core$")).SelectMany(SafeTypes).Where(t => t.Name == "PositionHelper"))
@@ -611,7 +611,7 @@ namespace TcAgentBridge
             return null;
         }
 
-        // Methode mit ausschliesslich by-ref-Parametern aufrufen (COM-Stil, HRESULT-Rueckgabe)
+        // Call a method that has only by-ref parameters (COM style, HRESULT return)
         static bool TryInvoke(object target, string name, object[] args, out int hr)
         {
             hr = 0;
@@ -626,7 +626,7 @@ namespace TcAgentBridge
             catch (Exception ex) { hr = ex.HResult; return false; }
         }
 
-        // Auswahl lesen
+        // Read selection
         bool TryGetSelection(object view, Dictionary<string, object> r)
         {
             var m = AllMethods(view.GetType()).FirstOrDefault(x => x.Name == "GetSelection" && x.GetParameters().Length == 5 && x.GetParameters().All(p => p.ParameterType.IsByRef));
@@ -636,7 +636,7 @@ namespace TcAgentBridge
             catch (Exception ex) { r["selectionError"] = Inner(ex); return false; }
             r["online"] = args[0]; r["projectHandle"] = args[1]; r["objectGuid"] = args[2]?.ToString();
             long pos = Convert.ToInt64(args[3]); r["position"] = pos; r["length"] = args[4];
-            // Position zerlegen
+            // Split position
             foreach (var t in AppDomain.CurrentDomain.GetAssemblies().Where(a => Rx(a.GetName().Name, "^Core$|_3S|CoDeSys|Objects")).SelectMany(SafeTypes).Where(t => t.Name == "PositionHelper"))
             {
                 var split = t.GetMethods(BindingFlags.Public | BindingFlags.Static).FirstOrDefault(x => x.Name == "SplitPosition" && x.GetParameters().Length == 3);
@@ -650,7 +650,7 @@ namespace TcAgentBridge
                 catch (Exception ex) { r["splitError"] = Inner(ex); }
                 break;
             }
-            // Objektname und Pfad aus dem ObjectManager
+            // Object name and path from the ObjectManager
             try
             {
                 var om = EnvProp("ObjectMgr");
@@ -668,10 +668,10 @@ namespace TcAgentBridge
             return true;
         }
 
-        // ------------------------------------------------------------------ Bibliotheken
+        // ------------------------------------------------------------------ Libraries
         Dictionary<string, object> Libs()
         {
-            var mgr = EnvProp("ManagedLibraryMgr") ?? throw new Exception("ManagedLibraryMgr nicht verfuegbar");
+            var mgr = EnvProp("ManagedLibraryMgr") ?? throw new Exception("ManagedLibraryMgr not available");
             var list = new List<object>();
             foreach (var lib in (IEnumerable)Call(mgr, "GetAllLibraries", true))
                 list.Add(new Dictionary<string, object>
@@ -685,16 +685,16 @@ namespace TcAgentBridge
 
         Dictionary<string, object> LibExport(string title, string version, bool refresh)
         {
-            if (string.IsNullOrEmpty(title)) throw new Exception("library fehlt");
-            var mgr = EnvProp("ManagedLibraryMgr") ?? throw new Exception("ManagedLibraryMgr nicht verfuegbar");
+            if (string.IsNullOrEmpty(title)) throw new Exception("library missing");
+            var mgr = EnvProp("ManagedLibraryMgr") ?? throw new Exception("ManagedLibraryMgr not available");
             var hits = ((IEnumerable)Call(mgr, "GetAllLibraries", true)).Cast<object>()
                 .Where(l => string.Equals(Convert.ToString(Get(l, "Title")), title, StringComparison.OrdinalIgnoreCase))
                 .ToList();
-            if (hits.Count == 0) throw new Exception($"Bibliothek '{title}' ist nicht im Repository installiert");
+            if (hits.Count == 0) throw new Exception($"Library '{title}' is not installed in the repository");
             object lib = string.IsNullOrEmpty(version) || version == "*"
                 ? hits.OrderByDescending(l => (Version)Get(l, "Version")).First()
                 : hits.FirstOrDefault(l => Convert.ToString(Get(l, "Version")) == version)
-                  ?? throw new Exception($"Version {version} von '{title}' nicht installiert; vorhanden: " + string.Join(", ", hits.Select(l => Get(l, "Version"))));
+                  ?? throw new Exception($"Version {version} of '{title}' not installed; available: " + string.Join(", ", hits.Select(l => Get(l, "Version"))));
             string ver = Convert.ToString(Get(lib, "Version"));
             string path = Convert.ToString(Call(mgr, "GetFilePath", lib));
             string cacheDir = Path.Combine(Path.GetDirectoryName(dir), "libcache");
@@ -713,14 +713,14 @@ namespace TcAgentBridge
                 catch (Exception ex) { tried.Add($"GetExportInformationJson({itemType}): {Inner(ex)}"); }
             }
             r["tried"] = tried;
-            if (string.IsNullOrEmpty(result)) throw new Exception("Export lieferte nichts: " + string.Join(" | ", tried));
+            if (string.IsNullOrEmpty(result)) throw new Exception("Export returned nothing: " + string.Join(" | ", tried));
             File.WriteAllText(file, result, new UTF8Encoding(false));
             r["cached"] = false; r["chars"] = result.Length;
             return r;
         }
 
-        // ------------------------------------------------------------------ Navigation: Gehe zu Definition / Querverweise
-        // Aktuelles Objekt im Editor (fuer Namensaufloesung im richtigen Gueltigkeitsbereich)
+        // ------------------------------------------------------------------ Navigation: go to definition / cross references
+        // Current object in the editor (for name resolution in the correct scope)
         (int ph, Guid obj) ActiveObject()
         {
             var view = SafeGet(SafeGet(EnvProp("Engine"), "Frame"), "ActiveView");
@@ -764,14 +764,14 @@ namespace TcAgentBridge
 
         Dictionary<string, object> Goto(string name)
         {
-            if (string.IsNullOrWhiteSpace(name)) throw new Exception("name fehlt");
+            if (string.IsNullOrWhiteSpace(name)) throw new Exception("name missing");
             var lm = EnvProp("LanguageModelMgr");
             var (ph, obj) = ActiveObject();
             var r = new Dictionary<string, object> { ["name"] = name, ["context"] = ObjectPath(ph, obj), ["projectHandle"] = ph };
             var parts = name.Split('.');
             var first = parts[0];
 
-            // 1) Variable des aktuellen Objekts bzw. seines FBs (Methode -> Elternobjekt), inkl. Basisklassen
+            // 1) Variable of the current object or its FB (method -> parent object), including base classes
             object FindSig(Guid g) { var a = new object[] { g, null }; try { return AllMethods(lm.GetType()).First(m => m.Name == "FindSignature" && m.GetParameters().Length == 2).Invoke(lm, a); } catch { return null; } }
             var scopes = new List<object>();
             var cur = FindSig(obj);
@@ -798,7 +798,7 @@ namespace TcAgentBridge
                     ["name"] = Convert.ToString(SafeGet(v, "OrgName")), ["type"] = type, ["flags"] = Convert.ToString(SafeGet(v, "Flags")),
                     ["doc"] = Convert.ToString(SafeGet(v, "DocuComment")), ["declaredIn"] = SigInfo(sc, ph)
                 };
-                // Typ der Variablen aufloesen (ohne ARRAY/POINTER/REFERENCE-Praefix)
+                // Resolve the variable's type (without ARRAY/POINTER/REFERENCE prefix)
                 var bare = System.Text.RegularExpressions.Regex.Replace(type ?? "", @"^(ARRAY\s*\[.*?\]\s*OF\s+|POINTER\s+TO\s+|REFERENCE\s+TO\s+)+", "", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
                 bare = bare.Split('(')[0].Trim();
                 var ts = FindByName(lm, ph, obj, bare).FirstOrDefault();
@@ -806,14 +806,14 @@ namespace TcAgentBridge
                 break;
             }
 
-            // 2) Typ / FB / Funktion / GVL mit diesem Namen (Projekt und Bibliotheken)
+            // 2) Type / FB / function / GVL with this name (project and libraries)
             if (!r.ContainsKey("variable"))
             {
                 var hits = FindByName(lm, ph, obj, first).Take(10).Select(x => (object)SigInfo(x, ph)).ToList();
                 if (hits.Count == 0 && parts.Length > 1) hits = FindByName(lm, ph, obj, parts[parts.Length - 1]).Take(10).Select(x => (object)SigInfo(x, ph)).ToList();
                 r["signatures"] = hits;
             }
-            // 3) Punktierte Namen (GVL.Variable, instanz.Eingang, a.b.c): Glied fuer Glied ueber die Typen weiterreichen
+            // 3) Dotted names (GVL.Variable, instance.input, a.b.c): resolve member by member through the types
             if (parts.Length > 1)
             {
                 object owner = null;
@@ -823,7 +823,7 @@ namespace TcAgentBridge
                 for (int i = 1; i < parts.Length && owner != null; i++)
                 {
                     object hitVar = null, hitSig = owner;
-                    // auch in Basisklassen suchen
+                    // also search in base classes
                     for (int depth = 0; depth < 8 && hitSig != null && hitVar == null; depth++)
                     {
                         hitVar = Vars(hitSig).FirstOrDefault(x => string.Equals(Convert.ToString(SafeGet(x, "OrgName") ?? SafeGet(x, "Name")), parts[i], StringComparison.OrdinalIgnoreCase));
@@ -858,7 +858,7 @@ namespace TcAgentBridge
 
         Dictionary<string, object> Xref(string name, int max)
         {
-            if (string.IsNullOrWhiteSpace(name)) throw new Exception("name fehlt");
+            if (string.IsNullOrWhiteSpace(name)) throw new Exception("name missing");
             var lm = EnvProp("LanguageModelMgr");
             var (ph, _) = ActiveObject();
             var rx = new System.Text.RegularExpressions.Regex("^" + System.Text.RegularExpressions.Regex.Escape(name) + "$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -875,15 +875,15 @@ namespace TcAgentBridge
                             if (refs.Count >= max) break;
                             var d = Serialize(x, 1);
                             foreach (var kv in Members(x, "(?i)pos|line|offset|object|guid|sign")) if (!d.ContainsKey(kv.Key)) d[kv.Key] = kv.Value;
-                            // Ort aufloesen: Objekt, in dem der Zugriff steht
+                            // Resolve location: object containing the access
                             Guid locGuid = Guid.Empty;
                             if (d.TryGetValue("Position", out var pv) && pv is Dictionary<string, object> pd)
                             {
                                 if (pd.TryGetValue("ObjectGuid", out var og)) Guid.TryParse(Convert.ToString(og), out locGuid);
                                 if (pd.TryGetValue("Position", out var pp) && long.TryParse(Convert.ToString(pp), out var praw))
                                 {
-                                    const long DeclFlag = 1L << 47;   // gesetzt = Deklarationsteil
-                                    d["part"] = (praw & DeclFlag) != 0 ? "Deklaration" : "Implementierung";
+                                    const long DeclFlag = 1L << 47;   // set = declaration part
+                                    d["part"] = (praw & DeclFlag) != 0 ? "declaration" : "implementation";
                                     d["lineId"] = praw & (DeclFlag - 1);
                                 }
                                 if (pd.TryGetValue("PositionOffset", out var po)) d["column"] = Convert.ToInt32(po) + 1;
@@ -904,10 +904,10 @@ namespace TcAgentBridge
             return new Dictionary<string, object> { ["resultType"] = res?.GetType().FullName, ["entries"] = list };
         }
 
-        // Erkundung: nur lesende Methoden (Get/Find/All/Is) der IDE-Dienste aufrufen
+        // Exploration: call only read-only methods (Get/Find/All/Is) of the IDE services
         Dictionary<string, object> LmCall(string target, string method, ArrayList args)
         {
-            if (string.IsNullOrEmpty(method) || !System.Text.RegularExpressions.Regex.IsMatch(method, "^(Get|Find|All|Is)")) throw new Exception("nur Methoden mit Get/Find/All/Is erlaubt");
+            if (string.IsNullOrEmpty(method) || !System.Text.RegularExpressions.Regex.IsMatch(method, "^(Get|Find|All|Is)")) throw new Exception("only methods starting with Get/Find/All/Is are allowed");
             object t = (target ?? "lm") switch { "om" => EnvProp("ObjectMgr"), "engine" => EnvProp("Engine"), "view" => SafeGet(SafeGet(EnvProp("Engine"), "Frame"), "ActiveView"), _ => EnvProp("LanguageModelMgr") };
             var (ph, obj) = ActiveObject();
             foreach (var m in AllMethods(t.GetType()).Where(m => m.Name == method && m.GetParameters().Length == args.Count))
@@ -949,14 +949,14 @@ namespace TcAgentBridge
                 return r;
             }
             var cands = AllMethods(t.GetType()).Where(m => m.Name == method).Select(Sig).Distinct().ToList();
-            throw new Exception($"Kein passender Aufruf {method}/{args.Count}. Kandidaten: " + string.Join(" | ", cands));
+            throw new Exception($"No matching call {method}/{args.Count}. Candidates: " + string.Join(" | ", cands));
         }
 
-        // ------------------------------------------------------------------ Projektmodell
+        // ------------------------------------------------------------------ Project model
         Dictionary<string, object> LmExport(string library, int max)
         {
-            if (string.IsNullOrEmpty(library)) throw new Exception("library fehlt");
-            var lm = EnvProp("LanguageModelMgr") ?? throw new Exception("Projektmodell nicht verfuegbar");
+            if (string.IsNullOrEmpty(library)) throw new Exception("library missing");
+            var lm = EnvProp("LanguageModelMgr") ?? throw new Exception("Project model not available");
             var infos = new List<object>();
             object hit = null, exact = null;
             foreach (var ctx in (IEnumerable)Call(lm, "AllPreCompileContexts", false, true))
@@ -969,7 +969,7 @@ namespace TcAgentBridge
                 }
                 var info = string.Join("; ", strings);
                 infos.Add(info);
-                // exakter Treffer "titel, version" vor Teilstring (RobotLibrary darf nicht RobotLibrarySysDep treffen)
+                // exact match "title, version" before substring (RobotLibrary must not match RobotLibrarySysDep)
                 if (exact == null && info.IndexOf(library + ",", StringComparison.OrdinalIgnoreCase) >= 0) exact = ctx;
                 if (hit == null && info.IndexOf(library, StringComparison.OrdinalIgnoreCase) >= 0) hit = ctx;
             }
@@ -977,8 +977,8 @@ namespace TcAgentBridge
             var r = new Dictionary<string, object> { ["contexts"] = infos };
             if (hit == null) { r["found"] = false; return r; }
 
-            // Signaturliste des Kontexts finden: alle Eigenschaften/parameterlosen Methoden mit "Signature" im Namen
-            // auswerten und die laengste Liste nehmen (z. B. AllSignatures statt leerer Serialisierungs-Listen)
+            // Find the context's signature list: evaluate all properties/parameterless methods with "Signature" in the name
+            // and take the longest list (e.g. AllSignatures instead of empty serialization lists)
             IEnumerable sigs = null; string via = null; int best = -1;
             var cands = new List<string>();
             void Consider(string label, Func<object> get)
@@ -1017,7 +1017,7 @@ namespace TcAgentBridge
 
         static bool Simple(object v) => v is string || v is Guid || v is Enum || v is DateTime || v is Version || v.GetType().IsPrimitive || v is decimal;
 
-        // Generische Abbildung eines Projektmodell-Objekts (Signatur, Variable ...) - Tiefe begrenzt
+        // Generic mapping of a project model object (signature, variable ...) - limited depth
         Dictionary<string, object> Serialize(object o, int depth)
         {
             var d = new Dictionary<string, object> { ["_type"] = o.GetType().Name };
@@ -1039,7 +1039,7 @@ namespace TcAgentBridge
             return d;
         }
 
-        // ------------------------------------------------------------------ Probe: was ist technisch erreichbar?
+        // ------------------------------------------------------------------ Probe: what is technically reachable?
         Dictionary<string, object> Probe()
         {
             var sb = new StringBuilder($"TcAgentBridge {BridgeVersion} Probe {DateTime.Now:s}  pid={System.Diagnostics.Process.GetCurrentProcess().Id} 64bit={Environment.Is64BitProcess}\n");
@@ -1050,9 +1050,9 @@ namespace TcAgentBridge
             sb.AppendLine($"\n## Assemblies: {asms.Length}, IDE: {cds.Count}");
             foreach (var a in cds) sb.AppendLine("  " + a.FullName);
 
-            sb.AppendLine("\n## Komponenten");
+            sb.AppendLine("\n## Components");
             try { Env(sb); summary["exporter"] = exporter.GetType().FullName; sb.AppendLine("OK " + exporter.GetType().AssemblyQualifiedName); }
-            catch (Exception ex) { summary["exporter"] = "FEHLER: " + Inner(ex); sb.AppendLine("FEHLER " + Inner(ex)); }
+            catch (Exception ex) { summary["exporter"] = "ERROR: " + Inner(ex); sb.AppendLine("ERROR " + Inner(ex)); }
 
             if (apEnv != null)
             {
@@ -1062,7 +1062,7 @@ namespace TcAgentBridge
                     object v = null; string err = null;
                     try { v = p.GetValue(null, null); } catch (Exception ex) { err = Inner(ex); }
                     sb.AppendLine($"  {p.Name} : {p.PropertyType.Name} = {(err ?? v?.GetType().FullName ?? "null")}");
-                    summary["env." + p.Name] = err == null ? (v == null ? "null" : "ok") : "Fehler";
+                    summary["env." + p.Name] = err == null ? (v == null ? "null" : "ok") : "error";
                 }
                 DumpMembers(sb, "Engine", EnvProp("Engine"));
                 var frame = SafeGet(EnvProp("Engine"), "Frame");
@@ -1070,7 +1070,7 @@ namespace TcAgentBridge
                 var view = SafeGet(frame, "ActiveView");
                 summary["cdsActiveView"] = view?.GetType().FullName ?? "null";
                 DumpMembers(sb, "Engine.Frame.ActiveView", view);
-                DumpMembers(sb, "Projektmodell", EnvProp("LanguageModelMgr"));
+                DumpMembers(sb, "Project model", EnvProp("LanguageModelMgr"));
                 var projects = SafeGet(SafeGet(EnvProp("Engine"), "Projects"), "Projects") as IEnumerable;
                 if (projects != null)
                 {
@@ -1079,10 +1079,10 @@ namespace TcAgentBridge
                 }
             }
 
-            sb.AppendLine("\n## Editor-Kontext");
+            sb.AppendLine("\n## Editor context");
             var ctx = Context();
             foreach (var kv in ctx) sb.AppendLine($"  {kv.Key} = {(kv.Value is IEnumerable e && !(kv.Value is string) ? string.Join("\n      ", e.Cast<object>()) : kv.Value)}");
-            summary["selectionSource"] = ctx.ContainsKey("selectionSource") ? ctx["selectionSource"] : "keine";
+            summary["selectionSource"] = ctx.ContainsKey("selectionSource") ? ctx["selectionSource"] : "none";
             try
             {
                 var mon = (IVsMonitorSelection)Package.GetGlobalService(typeof(SVsShellMonitorSelection));
@@ -1092,7 +1092,7 @@ namespace TcAgentBridge
             }
             catch (Exception ex) { sb.AppendLine("DocView: " + Inner(ex)); }
             var fc = System.Windows.Forms.Control.FromChildHandle(GetFocus());
-            for (int i = 0; fc != null && i < 3; i++, fc = fc.Parent) DumpMembers(sb, "Fokus[" + i + "]", fc);
+            for (int i = 0; fc != null && i < 3; i++, fc = fc.Parent) DumpMembers(sb, "Focus[" + i + "]", fc);
 
             sb.AppendLine("\n## PositionHelper");
             foreach (var t in asms.SelectMany(SafeTypes).Where(t => t.Name == "PositionHelper"))
@@ -1114,14 +1114,14 @@ namespace TcAgentBridge
             {
                 string val = "";
                 if (p.GetIndexParameters().Length == 0 && (p.PropertyType.IsPrimitive || p.PropertyType == typeof(string) || p.PropertyType == typeof(Guid) || p.PropertyType.IsEnum))
-                    try { val = " = " + Short(p.GetValue(o, null), 120); } catch { val = " = (Fehler)"; }
+                    try { val = " = " + Short(p.GetValue(o, null), 120); } catch { val = " = (error)"; }
                 sb.AppendLine($"  prop {p.PropertyType.Name} {p.Name}{val}");
             }
             foreach (var m in AllMethods(t).Where(m => !m.IsSpecialName).Select(Sig).Distinct().OrderBy(s => s).Take(250))
                 sb.AppendLine("  " + m);
         }
 
-        // ------------------------------------------------------------------ Komponenten
+        // ------------------------------------------------------------------ Components
         IEnumerable<object> FindComponentManagers(StringBuilder trace)
         {
             var seen = new HashSet<Type>();
@@ -1166,7 +1166,7 @@ namespace TcAgentBridge
             return null;
         }
 
-        // ------------------------------------------------------------------ Hilfsfunktionen
+        // ------------------------------------------------------------------ Helpers
         [DllImport("user32.dll")] static extern IntPtr GetFocus();
 
         static IEnumerable<MethodInfo> AllMethods(Type t) =>
@@ -1174,7 +1174,7 @@ namespace TcAgentBridge
 
         static object Call(object target, string name, params object[] args)
         {
-            if (target == null) throw new NullReferenceException("Ziel fuer " + name + " ist null");
+            if (target == null) throw new NullReferenceException("Target for " + name + " is null");
             foreach (var m in AllMethods(target.GetType()).Where(x => x.Name == name))
             {
                 var ps = m.GetParameters();

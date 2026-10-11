@@ -1,5 +1,5 @@
-// TcAgent - MCP-Server zur Fernsteuerung von TwinCAT 3 (XAE in Visual Studio 2022 / TcXaeShell)
-// Transport: MCP ueber stdio (JSON-RPC 2.0, eine Nachricht pro Zeile). Log -> stderr.
+// TcAgent - MCP server for remote control of TwinCAT 3 (XAE in Visual Studio 2022 / TcXaeShell)
+// Transport: MCP over stdio (JSON-RPC 2.0, one message per line). Log -> stderr.
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -9,15 +9,15 @@ namespace TcAgent;
 public static class Program
 {
     public const string ServerVersion = "0.13.0";
-    public static string ClientName = "unbekannt";
+    public static string ClientName = "unknown";
 
     public static int Main(string[] args)
     {
         Console.InputEncoding = new UTF8Encoding(false);
-        // Kommandozeile fuer CI-Pipelines (check/build/test) - ohne Argumente MCP-Server
+        // Command line for CI pipelines (check/build/test) - without arguments: MCP server
         if (Cli.IsCommand(args)) { Console.OutputEncoding = new UTF8Encoding(false); return Cli.Run(args); }
         Mcp.Start();
-        Log.Info($"TcAgent {ServerVersion} gestartet (pid {Environment.ProcessId})");
+        Log.Info($"TcAgent {ServerVersion} started (pid {Environment.ProcessId})");
 
         var sta = new StaWorker();
         var tools = new ToolRegistry(new TwinCatSession(sta));
@@ -28,12 +28,12 @@ public static class Program
             if (string.IsNullOrWhiteSpace(line)) continue;
             JsonObject req;
             try { req = JsonNode.Parse(line)!.AsObject(); }
-            catch (Exception ex) { Log.Error("Ungueltiges JSON: " + ex.Message); continue; }
+            catch (Exception ex) { Log.Error("Invalid JSON: " + ex.Message); continue; }
 
             var id = req["id"]?.DeepClone();
             var method = req["method"]?.GetValue<string>();
             var prm = req["params"] as JsonObject ?? new JsonObject();
-            if (id == null) continue; // Notification (z. B. notifications/initialized)
+            if (id == null) continue; // Notification (e.g. notifications/initialized)
 
             JsonNode result = null; JsonObject error = null;
             try
@@ -48,10 +48,10 @@ public static class Program
                             ["protocolVersion"] = prm["protocolVersion"]?.GetValue<string>() ?? "2025-06-18",
                             ["capabilities"] = new JsonObject { ["tools"] = new JsonObject() },
                             ["serverInfo"] = new JsonObject { ["name"] = "tcagent", ["version"] = ServerVersion },
-                            ["instructions"] = "Steuert TwinCAT 3 ueber das Automation Interface. Zuerst tc_attach (laufende Instanz) oder tc_open aufrufen. " +
-                                               "Baumpfade sind TwinCAT-Pfade mit ^ als Trenner, z. B. 'TIPC^MyPlc^MyPlc Project^POUs^MAIN'. " +
-                                               "Vor dem ersten Schreiben von Code tc_coding_rules aufrufen (Codierrichtlinien des Projekts) und einhalten. " +
-                                               "Wenn ein Werkzeug fehlschlaegt, unerwartet reagiert oder fehlt: tc_feedback aufrufen."
+                            ["instructions"] = "Controls TwinCAT 3 via the Automation Interface. Call tc_attach (running instance) or tc_open first. " +
+                                               "Tree paths are TwinCAT paths with ^ as separator, e.g. 'TIPC^MyPlc^MyPlc Project^POUs^MAIN'. " +
+                                               "Before writing code for the first time, call tc_coding_rules (the project's coding guidelines) and follow them. " +
+                                               "If a tool fails, behaves unexpectedly or is missing: call tc_feedback."
                         };
                         break;
                     case "ping":
@@ -64,7 +64,7 @@ public static class Program
                         result = tools.Call(prm["name"]!.GetValue<string>(), prm["arguments"] as JsonObject ?? new JsonObject());
                         break;
                     default:
-                        error = new JsonObject { ["code"] = -32601, ["message"] = "Methode unbekannt: " + method };
+                        error = new JsonObject { ["code"] = -32601, ["message"] = "Unknown method: " + method };
                         break;
                 }
             }
@@ -82,8 +82,8 @@ public static class Program
     }
 }
 
-/// <summary>stdio-Transport. Eigener Lesethread, damit ein Werkzeug waehrend seiner Ausfuehrung den Client fragen kann
-/// (MCP-Elicitation, z. B. Auswahl der IDE-Instanz); dabei eintreffende andere Nachrichten werden fuer die Hauptschleife zurueckgelegt.</summary>
+/// <summary>stdio transport. Separate reader thread so that a tool can ask the client during its execution
+/// (MCP elicitation, e.g. selecting the IDE instance); other messages arriving meanwhile are set aside for the main loop.</summary>
 public static class Mcp
 {
     static readonly System.Collections.Concurrent.BlockingCollection<string> inbox = new();
@@ -112,7 +112,7 @@ public static class Mcp
 
     public static void Send(JsonObject msg) { lock (writeLock) stdout.WriteLine(msg.ToJsonString()); }
 
-    /// <summary>Fragt den Benutzer ueber den Client (elicitation/create). null = nicht unterstuetzt, abgelehnt oder keine Antwort.</summary>
+    /// <summary>Asks the user via the client (elicitation/create). null = not supported, declined or no answer.</summary>
     public static JsonObject Elicit(string message, JsonObject schema, int timeoutMs = 300_000)
     {
         if (!CanElicit) return null;
@@ -130,13 +130,13 @@ public static class Mcp
             try { m = JsonNode.Parse(l) as JsonObject; } catch { }
             if (m != null && m["method"] == null && m["id"]?.ToString() == id)
             {
-                if (m["error"] != null) { Log.Info("Elicitation abgelehnt: " + m["error"]?.ToJsonString()); return null; }
+                if (m["error"] != null) { Log.Info("Elicitation declined: " + m["error"]?.ToJsonString()); return null; }
                 var r = m["result"] as JsonObject;
                 return r?["action"]?.ToString() == "accept" ? r["content"] as JsonObject : null;
             }
             lock (deferred) deferred.Enqueue(l);
         }
-        Log.Info("Elicitation ohne Antwort");
+        Log.Info("Elicitation without answer");
         return null;
     }
 }
@@ -144,5 +144,5 @@ public static class Mcp
 public static class Log
 {
     public static void Info(string m) => Console.Error.WriteLine($"[tcagent {DateTime.Now:HH:mm:ss}] {m}");
-    public static void Error(string m) => Console.Error.WriteLine($"[tcagent {DateTime.Now:HH:mm:ss}] FEHLER {m}");
+    public static void Error(string m) => Console.Error.WriteLine($"[tcagent {DateTime.Now:HH:mm:ss}] ERROR {m}");
 }

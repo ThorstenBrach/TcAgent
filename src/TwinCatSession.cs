@@ -1,5 +1,5 @@
-// Verbindung zu Visual Studio 2022 / TcXaeShell und Zugriff auf das TwinCAT Automation Interface.
-// Alle Methoden hier werden ueber StaWorker.Run auf dem STA-Thread ausgefuehrt.
+// Connection to Visual Studio 2022 / TcXaeShell and access to the TwinCAT Automation Interface.
+// All methods here are executed on the STA thread via StaWorker.Run.
 using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.ComTypes;
 using System.Text;
@@ -14,16 +14,16 @@ public sealed class TwinCatSession
     public readonly StaWorker Sta;
     public DTE2 Dte { get; private set; }
     public ITcSysManager SysMan { get; private set; }
-    public string InstanceInfo { get; private set; } = "nicht verbunden";
-    /// <summary>Prozess-ID der verbundenen IDE (0 = unbekannt, z. B. nach tc_open) - fuer die VS-Erweiterung TcAgentBridge.</summary>
+    public string InstanceInfo { get; private set; } = "not connected";
+    /// <summary>Process ID of the connected IDE (0 = unknown, e.g. after tc_open) - for the VS extension TcAgentBridge.</summary>
     public int AttachedPid { get; private set; }
 
-    // ProgIDs in der Reihenfolge, in der neue Instanzen gestartet werden
+    // ProgIDs in the order in which new instances are started
     static readonly string[] ProgIds = { "VisualStudio.DTE.17.0", "TcXaeShell.DTE.17.0", "TcXaeShell.DTE.15.0" };
 
     public TwinCatSession(StaWorker sta) { Sta = sta; }
 
-    // ------------------------------------------------------------------ Instanzen
+    // ------------------------------------------------------------------ Instances
     public record DteInstance(string Moniker, int Pid, string Solution, object Dte);
 
     public List<DteInstance> ListInstances()
@@ -49,12 +49,12 @@ public sealed class TwinCatSession
     public string Attach(string solutionHint, int pid)
     {
         var inst = ListInstances();
-        if (inst.Count == 0) throw new Exception("Keine laufende Visual-Studio-/XAE-Instanz gefunden. tc_open startet eine neue.");
-        // Auswahlregel: pid > Solution-Hinweis > eigene IDE (TcAgent-Chat / Terminal in VS) > TCAGENT_SOLUTION
-        //               > einzige Instanz mit Solution > Auswahl durch den Benutzer. Es wird NICHT geraten.
+        if (inst.Count == 0) throw new Exception("No running Visual Studio/XAE instance found. tc_open starts a new one.");
+        // Selection rule: pid > solution hint > own IDE (TcAgent chat / terminal in VS) > TCAGENT_SOLUTION
+        //                 > only instance with a solution > selection by the user. There is NO guessing.
         DteInstance pick = null;
         if (pid > 0)
-            pick = inst.FirstOrDefault(i => i.Pid == pid) ?? throw new Exception($"Keine IDE mit pid {pid}.\n" + Describe(inst));
+            pick = inst.FirstOrDefault(i => i.Pid == pid) ?? throw new Exception($"No IDE with pid {pid}.\n" + Describe(inst));
         else if (!string.IsNullOrEmpty(solutionHint))
             pick = BySolution(inst, solutionHint);
         else
@@ -64,15 +64,15 @@ public sealed class TwinCatSession
             if (pick == null && !string.IsNullOrEmpty(envSln))
             {
                 var hits = inst.Where(i => i.Solution.IndexOf(envSln, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
-                if (hits.Count == 1) pick = hits[0];   // passt TCAGENT_SOLUTION nicht (mehr), normal weiter auswaehlen
+                if (hits.Count == 1) pick = hits[0];   // if TCAGENT_SOLUTION does not match (any more), continue with normal selection
             }
             if (pick == null)
             {
                 var withSln = inst.Where(i => !string.IsNullOrEmpty(i.Solution)).ToList();
                 if (withSln.Count == 1) pick = withSln[0];
                 else pick = AskUser(withSln.Count > 1 ? withSln : inst)
-                     ?? throw new Exception((withSln.Count > 1 ? $"{withSln.Count} TwinCAT-Projekte sind geoeffnet." : "Keine Instanz hat eine Solution geoeffnet.") +
-                                            " Bitte den Benutzer fragen, welches gemeint ist, und tc_attach mit pid aufrufen (Auswahl wird fuer diese Sitzung gemerkt).\n" + Describe(inst));
+                     ?? throw new Exception((withSln.Count > 1 ? $"{withSln.Count} TwinCAT projects are open." : "No instance has a solution open.") +
+                                            " Ask the user which one is meant and call tc_attach with pid (the choice is remembered for this session).\n" + Describe(inst));
             }
         }
         Bind((DTE2)pick.Dte, $"{pick.Moniker} | {pick.Solution}");
@@ -84,12 +84,12 @@ public sealed class TwinCatSession
     static DteInstance BySolution(List<DteInstance> inst, string hint)
     {
         var hits = inst.Where(i => i.Solution.IndexOf(hint, StringComparison.OrdinalIgnoreCase) >= 0).ToList();
-        if (hits.Count != 1) throw new Exception($"'{hint}' passt auf {hits.Count} Instanzen - bitte genauer angeben.\n" + Describe(inst));
+        if (hits.Count != 1) throw new Exception($"'{hint}' matches {hits.Count} instances - please be more specific.\n" + Describe(inst));
         return hits[0];
     }
 
-    /// <summary>Die IDE, aus der TcAgent (indirekt) gestartet wurde: TcAgent-Chat (TCAGENT_VS_PID) oder Terminal/Prozess innerhalb von VS
-    /// (devenv ist ein Vorfahre dieses Prozesses). Damit braucht der Chat nie einen Projektnamen.</summary>
+    /// <summary>The IDE from which TcAgent was (indirectly) started: TcAgent chat (TCAGENT_VS_PID) or terminal/process inside VS
+    /// (devenv is an ancestor of this process). This way the chat never needs a project name.</summary>
     static DteInstance HostIde(List<DteInstance> inst)
     {
         if (int.TryParse(Environment.GetEnvironmentVariable("TCAGENT_VS_PID"), out var vsPid))
@@ -117,7 +117,7 @@ public sealed class TwinCatSession
     [DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr OpenProcess(int access, bool inherit, int pid);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
 
-    /// <summary>true, wenn dieser Prozess (indirekt) von Prozess pid gestartet wurde - z. B. aus dem TcAgent-Chat dieser IDE.</summary>
+    /// <summary>true if this process was (indirectly) started by process pid - e.g. from the TcAgent chat of this IDE.</summary>
     public static bool StartedFrom(int pid)
     {
         if (pid <= 0) return false;
@@ -146,7 +146,7 @@ public sealed class TwinCatSession
         finally { CloseHandle(h); }
     }
 
-    /// <summary>Auswahlliste im Client (MCP-Elicitation), falls der Client das unterstuetzt.</summary>
+    /// <summary>Selection list in the client (MCP elicitation), if the client supports it.</summary>
     static DteInstance AskUser(List<DteInstance> cands)
     {
         if (cands.Count == 0) return null;
@@ -155,7 +155,7 @@ public sealed class TwinCatSession
         foreach (var i in cands)
         {
             enumVals.Add(i.Pid.ToString());
-            enumNames.Add(string.IsNullOrEmpty(i.Solution) ? $"(keine Solution) - pid {i.Pid}" : $"{Path.GetFileNameWithoutExtension(i.Solution)}  -  {i.Solution}");
+            enumNames.Add(string.IsNullOrEmpty(i.Solution) ? $"(no solution) - pid {i.Pid}" : $"{Path.GetFileNameWithoutExtension(i.Solution)}  -  {i.Solution}");
         }
         var schema = new System.Text.Json.Nodes.JsonObject
         {
@@ -164,46 +164,46 @@ public sealed class TwinCatSession
             {
                 ["instance"] = new System.Text.Json.Nodes.JsonObject
                 {
-                    ["type"] = "string", ["title"] = "TwinCAT-Projekt",
-                    ["description"] = "In welcher Visual-Studio-Instanz soll TcAgent arbeiten?",
+                    ["type"] = "string", ["title"] = "TwinCAT project",
+                    ["description"] = "Which Visual Studio instance should TcAgent work in?",
                     ["enum"] = enumVals, ["enumNames"] = enumNames
                 }
             },
             ["required"] = new System.Text.Json.Nodes.JsonArray("instance")
         };
-        var answer = Mcp.Elicit("Mehrere TwinCAT-Projekte sind geoeffnet - mit welchem soll TcAgent arbeiten?", schema);
+        var answer = Mcp.Elicit("Several TwinCAT projects are open - which one should TcAgent work with?", schema);
         var sel = answer?["instance"]?.ToString();
         return int.TryParse(sel, out var pid) ? cands.FirstOrDefault(i => i.Pid == pid) : null;
     }
 
     string lastSolution;
 
-    // Verbindung pruefen und bei Bedarf automatisch (wieder) herstellen:
-    // nach Server-Neustart (noch nie verbunden) oder wenn die IDE neu gestartet wurde (COM-Objekt tot).
+    // Check the connection and (re)establish it automatically if needed:
+    // after a server restart (never connected) or when the IDE was restarted (COM object dead).
     void EnsureConnected()
     {
         if (Dte != null)
         {
             try { _ = Dte.Solution.FullName; return; }
-            catch { Log.Info("Verbindung zur IDE verloren - verbinde neu"); Dte = null; SysMan = null; InstanceInfo = "nicht verbunden"; }
+            catch { Log.Info("Connection to the IDE lost - reconnecting"); Dte = null; SysMan = null; InstanceInfo = "not connected"; }
         }
         try
         {
             Attach(string.IsNullOrEmpty(lastSolution) ? null : lastSolution, 0);
-            Log.Info("Automatisch verbunden: " + InstanceInfo);
+            Log.Info("Connected automatically: " + InstanceInfo);
         }
         catch (Exception ex)
         {
-            throw new Exception("Nicht verbunden, automatisches Verbinden nicht moeglich - tc_attach mit solution oder pid aufrufen.\n" + ex.Message);
+            throw new Exception("Not connected, automatic connection not possible - call tc_attach with solution or pid.\n" + ex.Message);
         }
     }
 
     static string Describe(List<DteInstance> inst) =>
-        "Laufende Instanzen:\n" + string.Join("\n", inst.Select(i => $"  pid={i.Pid}  {i.Solution}"));
+        "Running instances:\n" + string.Join("\n", inst.Select(i => $"  pid={i.Pid}  {i.Solution}"));
 
     public string Open(string solutionPath, bool visible, string progId)
     {
-        if (!File.Exists(solutionPath)) throw new FileNotFoundException("Solution nicht gefunden", solutionPath);
+        if (!File.Exists(solutionPath)) throw new FileNotFoundException("Solution not found", solutionPath);
         var ids = string.IsNullOrEmpty(progId) ? ProgIds : new[] { progId };
         Exception last = null;
         foreach (var id in ids)
@@ -217,21 +217,21 @@ public sealed class TwinCatSession
                 dte.MainWindow.Visible = visible;
                 dte.UserControl = visible;
                 dte.Solution.Open(solutionPath);
-                Bind(dte, $"{id} (neu gestartet) | {solutionPath}");
+                Bind(dte, $"{id} (started) | {solutionPath}");
                 AttachedPid = 0;
                 try { AttachedPid = ListInstances().FirstOrDefault(i => string.Equals(i.Solution, solutionPath, StringComparison.OrdinalIgnoreCase))?.Pid ?? 0; } catch { }
                 return InstanceInfo;
             }
             catch (Exception ex) { last = ex; }
         }
-        throw new Exception("Konnte keine IDE starten: " + (last?.Message ?? "keine passende ProgID registriert"));
+        throw new Exception("Could not start an IDE: " + (last?.Message ?? "no matching ProgID registered"));
     }
 
-    /// <summary>Nach tc_open/CLI: warten, bis die Solution geladen ist und das TwinCAT-Projekt erreichbar ist.</summary>
+    /// <summary>After tc_open/CLI: wait until the solution is loaded and the TwinCAT project is reachable.</summary>
     public void WaitForTwinCat(int timeoutSec)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        var info = InstanceInfo.Split(" | TwinCAT-Projekt")[0].Split(" | WARNUNG")[0];
+        var info = InstanceInfo.Split(" | TwinCAT project")[0].Split(" | WARNING")[0];
         while (true)
         {
             try
@@ -242,19 +242,19 @@ public sealed class TwinCatSession
                     if (SysMan != null) return;
                 }
             }
-            catch { /* IDE noch beschaeftigt */ }
-            if (sw.Elapsed.TotalSeconds > timeoutSec) throw new Exception($"TwinCAT-Projekt nach {timeoutSec} s nicht geladen: {InstanceInfo}");
+            catch { /* IDE still busy */ }
+            if (sw.Elapsed.TotalSeconds > timeoutSec) throw new Exception($"TwinCAT project not loaded after {timeoutSec} s: {InstanceInfo}");
             System.Threading.Thread.Sleep(1000);
         }
     }
 
-    /// <summary>Selbst gestartete IDE ohne Speichern schliessen (CLI).</summary>
+    /// <summary>Close a self-started IDE without saving (CLI).</summary>
     public void CloseIde()
     {
         if (Dte == null) return;
         try { Dte.Solution.Close(false); } catch { }
         try { Dte.Quit(); } catch { }
-        Dte = null; SysMan = null; InstanceInfo = "nicht verbunden";
+        Dte = null; SysMan = null; InstanceInfo = "not connected";
     }
 
     void Bind(DTE2 dte, string info)
@@ -263,24 +263,24 @@ public sealed class TwinCatSession
         SysMan = null;
         foreach (Project p in dte.Solution.Projects)
         {
-            try { if (p.Object is ITcSysManager sm) { SysMan = sm; info += $" | TwinCAT-Projekt: {p.Name}"; break; } } catch { }
+            try { if (p.Object is ITcSysManager sm) { SysMan = sm; info += $" | TwinCAT project: {p.Name}"; break; } } catch { }
         }
-        InstanceInfo = info + (SysMan == null ? " | WARNUNG: kein TwinCAT-Projekt in der Solution" : "");
+        InstanceInfo = info + (SysMan == null ? " | WARNING: no TwinCAT project in the solution" : "");
     }
 
     public ITcSysManager RequireSysMan()
     {
         EnsureConnected();
-        return SysMan ?? throw new Exception("Die verbundene Solution enthaelt kein TwinCAT-Projekt - tc_attach auf eine andere Solution.");
+        return SysMan ?? throw new Exception("The connected solution contains no TwinCAT project - tc_attach to a different solution.");
     }
 
     public DTE2 RequireDte() { EnsureConnected(); return Dte; }
 
-    // ------------------------------------------------------------------ Baum
+    // ------------------------------------------------------------------ Tree
     public ITcSmTreeItem Item(string path)
     {
         try { return RequireSysMan().LookupTreeItem(path); }
-        catch (COMException) { throw new Exception($"Baumelement nicht gefunden: '{path}'"); }
+        catch (COMException) { throw new Exception($"Tree item not found: '{path}'"); }
     }
 
     public static IEnumerable<ITcSmTreeItem> Children(ITcSmTreeItem item)
@@ -309,7 +309,7 @@ public sealed class TwinCatSession
         return sb.ToString();
     }
 
-    // ------------------------------------------------------------------ Build / Fehlerliste
+    // ------------------------------------------------------------------ Build / error list
     public string Build(string projectHint, bool rebuild, bool checkAll = true)
     {
         var dte = RequireDte();
@@ -319,48 +319,48 @@ public sealed class TwinCatSession
         sb.Build(true);
         var tBuild = sw.Elapsed.TotalSeconds;
         var failed = sb.LastBuildInfo;
-        // TwinCAT uebersetzt nur verwendete POUs - "Alle Objekte pruefen" findet Fehler auch in unbenutztem Code
+        // TwinCAT only compiles POUs that are used - "Check all objects" also finds errors in unused code
         var checkedInfo = "";
         if (checkAll)
             foreach (var plc in PlcProjects())
-                checkedInfo += CheckAllObjects(plc) ? $"Alle Objekte geprueft: {plc.Name}\n" : $"Alle Objekte pruefen nicht verfuegbar: {plc.Name}\n";
+                checkedInfo += CheckAllObjects(plc) ? $"All objects checked: {plc.Name}\n" : $"Check all objects not available: {plc.Name}\n";
         var tCheck = sw.Elapsed.TotalSeconds - tBuild;
         var (compile, runtime) = ReadErrorList(1000);
         int errs = compile.Count(e => e.Level == "ERROR"), warns = compile.Count(e => e.Level == "WARN");
-        var o = new StringBuilder($"Build {(failed == 0 && errs == 0 ? "ERFOLGREICH" : "FEHLGESCHLAGEN")}: " +
-                                  $"{failed} fehlgeschlagene Projekte, {errs} Compilerfehler, {warns} Warnungen\n");
+        var o = new StringBuilder($"Build {(failed == 0 && errs == 0 ? "SUCCEEDED" : "FAILED")}: " +
+                                  $"{failed} failed projects, {errs} compiler errors, {warns} warnings\n");
         o.Append(checkedInfo);
-        o.AppendLine(System.FormattableString.Invariant($"Dauer: {sw.Elapsed.TotalSeconds:0.0} s (Build {tBuild:0.0} s") +
-                     (checkAll ? System.FormattableString.Invariant($", Alle Objekte pruefen {tCheck:0.0} s)") : ")"));
+        o.AppendLine(System.FormattableString.Invariant($"Duration: {sw.Elapsed.TotalSeconds:0.0} s (build {tBuild:0.0} s") +
+                     (checkAll ? System.FormattableString.Invariant($", check all objects {tCheck:0.0} s)") : ")"));
         foreach (var e in compile) o.AppendLine(e.ToString());
         if (runtime.Count > 0)
-            o.AppendLine($"({runtime.Count} Laufzeit-/TcUnit-Meldungen ausgeblendet - siehe tc_errors kind=runtime oder tc_test_results)");
+            o.AppendLine($"({runtime.Count} runtime/TcUnit messages hidden - see tc_errors kind=runtime or tc_test_results)");
         return o.ToString();
     }
 
-    // Nur "Alle Objekte pruefen": Compilerfehler ohne Build (kein ausfuehrbarer Code, keine Dateien)
+    // Only "Check all objects": compiler errors without a build (no executable code, no files)
     public string Check()
     {
         RequireDte();
         var sw = System.Diagnostics.Stopwatch.StartNew();
         var info = new StringBuilder();
         var plcs = PlcProjects();
-        if (plcs.Count == 0) return "Kein PLC-Projekt gefunden.";
+        if (plcs.Count == 0) return "No PLC project found.";
         foreach (var plc in plcs)
-            if (!CheckAllObjects(plc)) info.AppendLine($"Alle Objekte pruefen nicht verfuegbar: {plc.Name} - stattdessen tc_build nehmen");
+            if (!CheckAllObjects(plc)) info.AppendLine($"Check all objects not available: {plc.Name} - use tc_build instead");
         var (compile, runtime) = ReadErrorList(1000);
         int errs = compile.Count(e => e.Level == "ERROR"), warns = compile.Count(e => e.Level == "WARN");
-        var o = new StringBuilder($"Pruefung {(errs == 0 ? "OK" : "FEHLER")}: {errs} Compilerfehler, {warns} Warnungen " +
+        var o = new StringBuilder($"Check {(errs == 0 ? "OK" : "ERRORS")}: {errs} compiler errors, {warns} warnings " +
                                   $"({string.Join(", ", plcs.Select(p => p.Name))}; " +
                                   System.FormattableString.Invariant($"{sw.Elapsed.TotalSeconds:0.0} s)") + "\n");
         o.Append(info);
         foreach (var e in compile) o.AppendLine(e.ToString());
         if (runtime.Count > 0)
-            o.AppendLine($"({runtime.Count} Laufzeit-/TcUnit-Meldungen ausgeblendet - siehe tc_errors kind=runtime oder tc_test_results)");
+            o.AppendLine($"({runtime.Count} runtime/TcUnit messages hidden - see tc_errors kind=runtime or tc_test_results)");
         return o.ToString();
     }
 
-    // PLC-Projekte (Typ 600) unter TIPC
+    // PLC projects (type 600) under TIPC
     public List<ITcSmTreeItem> PlcProjects()
     {
         var list = new List<ITcSmTreeItem>();
@@ -370,7 +370,7 @@ public sealed class TwinCatSession
         return list;
     }
 
-    // Alle PLC-Objekte unterhalb der PLC-Projekte (oder eines Startknotens), ohne Bibliotheksreferenzen
+    // All PLC objects below the PLC projects (or a start node), without library references
     public IEnumerable<ITcSmTreeItem> PlcObjects(ITcSmTreeItem root = null)
     {
         var roots = root != null ? new List<ITcSmTreeItem> { root } : PlcProjects();
@@ -390,8 +390,8 @@ public sealed class TwinCatSession
         }
     }
 
-    // ------------------------------------------------------------------ Editor-Kontext
-    // Was der Nutzer gerade in der IDE offen/markiert hat. Cursor/Selektion nur, soweit der Editor sie ueber DTE preisgibt.
+    // ------------------------------------------------------------------ Editor context
+    // What the user currently has open/selected in the IDE. Cursor/selection only as far as the editor exposes them via DTE.
     public string EditorContext()
     {
         var dte = RequireDte();
@@ -399,17 +399,17 @@ public sealed class TwinCatSession
         static string S(Func<string> f) { try { return f() ?? ""; } catch (Exception ex) { return "(" + ex.Message + ")"; } }
 
         var caption = S(() => dte.ActiveWindow.Caption);
-        o.AppendLine("Aktives Fenster: " + caption);
+        o.AppendLine("Active window: " + caption);
         Document doc = null;
         try { doc = dte.ActiveDocument; } catch { }
         var names = new List<string> { caption };
         if (doc != null)
         {
-            o.AppendLine("Aktives Dokument: " + S(() => doc.FullName));
+            o.AppendLine("Active document: " + S(() => doc.FullName));
             names.Add(S(() => doc.Name));
-            // Methoden/Properties oeffnet TwinCAT als "<Pfad>\\FB.TcPOU@Methode" -> qualifizierter Name "FB.Methode".
-            // Wichtig, weil die Fensterbeschriftung bei Fokus im Chat- oder einem anderen Werkzeugfenster fehlt
-            // und ein reiner Name wie "Start" in mehreren FBs vorkommen kann.
+            // TwinCAT opens methods/properties as "<path>\\FB.TcPOU@Method" -> qualified name "FB.Method".
+            // Important because the window caption is missing when the chat or another tool window has focus
+            // and a plain name like "Start" can occur in several FBs.
             var full = S(() => doc.FullName);
             var at = full.LastIndexOf('@');
             if (at > 0)
@@ -424,28 +424,28 @@ public sealed class TwinCatSession
             if (ts == null) try { ts = (doc.Object("TextDocument") as TextDocument)?.Selection; } catch { }
             if (ts != null)
             {
-                o.AppendLine($"Cursor: Zeile {S(() => ts.ActivePoint.Line.ToString())}, Spalte {S(() => ts.ActivePoint.LineCharOffset.ToString())}");
+                o.AppendLine($"Cursor: line {S(() => ts.ActivePoint.Line.ToString())}, column {S(() => ts.ActivePoint.LineCharOffset.ToString())}");
                 var sel = S(() => ts.Text);
-                if (sel.Length > 0) o.AppendLine("Selektion:\n" + (sel.Length > 4000 ? sel[..4000] + "..." : sel));
+                if (sel.Length > 0) o.AppendLine("Selection:\n" + (sel.Length > 4000 ? sel[..4000] + "..." : sel));
                 var line = S(() => { var ep = ts.ActivePoint.CreateEditPoint(); ep.StartOfLine(); return ep.GetLines(ep.Line, ep.Line + 1); });
-                if (line.Length > 0) o.AppendLine("Aktuelle Zeile: " + line.TrimEnd());
+                if (line.Length > 0) o.AppendLine("Current line: " + line.TrimEnd());
             }
-            else o.AppendLine("Cursor/Selektion: vom TwinCAT-Editor nicht ueber DTE verfuegbar (kommt mit der VSIX-Erweiterung)");
+            else o.AppendLine("Cursor/selection: not available from the TwinCAT editor via DTE (provided by the TcAgentBridge extension)");
         }
-        else o.AppendLine("Kein Dokument aktiv");
+        else o.AppendLine("No active document");
 
         var selected = new List<string>();
         try { foreach (SelectedItem si in dte.SelectedItems) { var n = S(() => si.Name); if (n.Length > 0) selected.Add(n); } } catch { }
-        if (selected.Count > 0) { o.AppendLine("Markiert im Projektmappen-Explorer: " + string.Join(", ", selected)); names.AddRange(selected); }
+        if (selected.Count > 0) { o.AppendLine("Selected in Solution Explorer: " + string.Join(", ", selected)); names.AddRange(selected); }
 
-        // Fenster-/Dokumentnamen auf TwinCAT-Baumpfade abbilden, damit tc_plc_read direkt nutzbar ist
+        // Map window/document names to TwinCAT tree paths so that tc_plc_read can be used directly
         var paths = ResolvePlcPaths(names);
-        o.AppendLine(paths.Count > 0 ? "Baumpfad(e):\n  " + string.Join("\n  ", paths) : "Baumpfad: nicht eindeutig ermittelbar");
+        o.AppendLine(paths.Count > 0 ? "Tree path(s):\n  " + string.Join("\n  ", paths) : "Tree path: cannot be determined unambiguously");
         return o.ToString();
     }
 
-    // Namen + Pfade aller PLC-Objekte, kurz zwischengespeichert. Jeder COM-Zugriff laeuft im UI-Thread von VS -
-    // ein voller Baumdurchlauf bei jeder Kontextabfrage laesst die IDE (auch das Chat-Fenster) haken.
+    // Names + paths of all PLC objects, cached briefly. Every COM access runs on the VS UI thread -
+    // a full tree walk on every context query makes the IDE (including the chat window) stutter.
     List<(string Name, string Path)> plcIndex;
     DateTime plcIndexAt;
     public void InvalidatePlcIndex() => plcIndex = null;
@@ -485,13 +485,13 @@ public sealed class TwinCatSession
                 if (hit && w.Length > 1 && !qualified.Contains(path)) qualified.Add(path);
             }
         }
-        // qualifizierte Treffer (FB.Methode) sind eindeutig und schlagen reine Namenstreffer
+        // qualified hits (FB.Method) are unambiguous and beat plain name hits
         if (qualified.Count > 0) found = qualified;
-        // spezifischste Treffer (Methode vor FB) zuerst
+        // most specific hits (method before FB) first
         return found.OrderByDescending(p => p.Count(c => c == '^')).ToList();
     }
 
-    // Ruft CheckAllObjects ueber das passende Automation-Interface (ITcPlcIECProject*) auf
+    // Calls CheckAllObjects via the matching Automation Interface (ITcPlcIECProject*)
     public bool CheckAllObjects(ITcSmTreeItem plcProject)
     {
         foreach (var t in typeof(ITcSysManager).Assembly.GetTypes().Where(t => t.IsInterface).OrderByDescending(t => t.Name))
@@ -504,15 +504,15 @@ public sealed class TwinCatSession
         return false;
     }
 
-    /// <param name="Stamp">Zeitstempel einer Laufzeitmeldung (lokale Zeit), sonst null</param>
+    /// <param name="Stamp">Timestamp of a runtime message (local time), otherwise null</param>
     public record ErrorEntry(string Level, string Project, string File, int Line, int Column, string Text, bool Runtime, DateTime? Stamp = null)
     {
         public override string ToString() => $"{Level}\t{Project}\t{File}:{Line}:{Column}\t{Text}";
     }
 
-    // Laufzeitmeldungen der PLC (z. B. TcUnit, ADSLOGSTR) erscheinen ebenfalls in der Fehlerliste:
-    // ohne Datei, Text beginnt mit Zeitstempel und "| 'Task' (Port):".
-    // Datumsformat je nach Sprache der IDE: 11.10.2026 / 10/11/2026 / 2026-10-11, Uhrzeit ggf. mit AM/PM.
+    // PLC runtime messages (e.g. TcUnit, ADSLOGSTR) also appear in the error list:
+    // without a file, the text starts with a timestamp and "| 'Task' (Port):".
+    // Date format depends on the IDE language: 11.10.2026 / 10/11/2026 / 2026-10-11, time possibly with AM/PM.
     static readonly System.Text.RegularExpressions.Regex RuntimeMsg =
         new(@"^(?<ts>\d{1,4}[./-]\d{1,2}[./-]\d{1,4} \d{1,2}:\d{2}:\d{2}(?:\s?[AaPp][Mm])?)(?:\s+(?<ms>\d{1,3})\s*ms)?.*?\|\s*'[^']*'\s*\(\d+\):\s*", System.Text.RegularExpressions.RegexOptions.Compiled);
 
@@ -548,8 +548,8 @@ public sealed class TwinCatSession
         return (compile, runtime);
     }
 
-    /// <summary>Laufzeitmeldungen in zeitlicher Reihenfolge (die Fehlerliste ist nicht zuverlaessig sortiert;
-    /// gleiche Zeitstempel behalten ihre Reihenfolge in der Liste, in deren Richtung).</summary>
+    /// <summary>Runtime messages in chronological order (the error list is not reliably sorted;
+    /// equal timestamps keep their order in the list, following the list's direction).</summary>
     public static List<ErrorEntry> Chronological(List<ErrorEntry> entries)
     {
         var withStamp = entries.Where(e => e.Stamp != null).ToList();
@@ -566,18 +566,18 @@ public sealed class TwinCatSession
         var o = new StringBuilder();
         if (kind != "runtime")
         {
-            o.AppendLine($"Compiler/Projekt: {compile.Count} Eintraege ({compile.Count(e => e.Level == "ERROR")} Fehler, {compile.Count(e => e.Level == "WARN")} Warnungen)");
+            o.AppendLine($"Compiler/project: {compile.Count} entries ({compile.Count(e => e.Level == "ERROR")} errors, {compile.Count(e => e.Level == "WARN")} warnings)");
             foreach (var e in compile) o.AppendLine(e.ToString());
         }
         if (kind != "compile")
         {
-            o.AppendLine($"Laufzeit/TcUnit: {runtime.Count} Meldungen (neueste zuerst)");
+            o.AppendLine($"Runtime/TcUnit: {runtime.Count} messages (newest first)");
             foreach (var e in runtime) o.AppendLine(e.Text);
         }
         return o.ToString();
     }
 
-    // TcUnit-Ergebnis aus den Laufzeitmeldungen: Zusammenfassung + fehlgeschlagene Tests (gleicher Parser wie TcAgent.exe test)
+    // TcUnit result from the runtime messages: summary + failed tests (same parser as TcAgent.exe test)
     public string TestResults()
     {
         var (_, runtime) = ReadErrorList(20000);
@@ -585,13 +585,13 @@ public sealed class TwinCatSession
         var o = new StringBuilder();
         if (r.Finished)
             o.AppendLine(System.FormattableString.Invariant(
-                $"TcUnit: {r.TotalCount} Tests in {r.SuiteCount ?? r.Suites.Count} Suites, {r.FailedCount} fehlgeschlagen, Dauer {r.Duration ?? 0:0.000} s"));
-        else o.AppendLine("Kein abgeschlossener TcUnit-Lauf in den Laufzeitmeldungen gefunden (Tests laufen noch oder PLC nicht gestartet).");
+                $"TcUnit: {r.TotalCount} tests in {r.SuiteCount ?? r.Suites.Count} suites, {r.FailedCount} failed, duration {r.Duration ?? 0:0.000} s"));
+        else o.AppendLine("No completed TcUnit run found in the runtime messages (tests still running or PLC not started).");
         foreach (var s in r.Suites)
         {
             var failed = s.Cases.Where(c => c.Failed).ToList();
-            o.AppendLine($"  {s.Name}: {Math.Max(s.Tests ?? 0, s.Cases.Count)} Tests, {failed.Count} fehlgeschlagen");
-            foreach (var c in failed) o.AppendLine($"    FEHLER {c.Name}: {c.Failure ?? c.Status}");
+            o.AppendLine($"  {s.Name}: {Math.Max(s.Tests ?? 0, s.Cases.Count)} tests, {failed.Count} failed");
+            foreach (var c in failed) o.AppendLine($"    FAILED {c.Name}: {c.Failure ?? c.Status}");
         }
         return o.ToString();
     }

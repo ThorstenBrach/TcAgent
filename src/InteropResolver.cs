@@ -1,6 +1,6 @@
-// Laedt die Interop-Assembly des TwinCAT Automation Interface zur Laufzeit.
-// Sie wird nicht mitverteilt (sie entsteht aus Beckhoffs Typbibliothek): bei Entwickler-Builds liegt sie neben TcAgent.exe,
-// bei der VSIX-Installation erzeugt die VS-Erweiterung sie beim ersten Start aus der lokalen TwinCAT-Installation in
+// Loads the interop assembly of the TwinCAT Automation Interface at runtime.
+// It is not redistributed (it is generated from Beckhoff's type library): in developer builds it sits next to TcAgent.exe;
+// with the VSIX installation the VS extension generates it on first start from the local TwinCAT installation in
 // %LOCALAPPDATA%\TcAgent\lib\.
 using System.Reflection;
 using System.Runtime.CompilerServices;
@@ -10,7 +10,7 @@ namespace TcAgent;
 
 static class InteropResolver
 {
-    // Visual-Studio-Automationsassemblies (EnvDTE) aus der installierten VS 2022 laden - sie werden nicht mitverteilt
+    // Load the Visual Studio automation assemblies (EnvDTE) from the installed VS 2022 - they are not redistributed
     static List<string> vsDirs;
     static IEnumerable<string> VsAssemblyDirs()
     {
@@ -60,11 +60,11 @@ static class InteropResolver
             }
             if (vs)
             {
-                Console.Error.WriteLine($"[TcAgent] {n}.dll nicht in der Visual-Studio-Installation gefunden.");
+                Console.Error.WriteLine($"[TcAgent] {n}.dll not found in the Visual Studio installation.");
                 return null;
             }
-            Console.Error.WriteLine($"[TcAgent] {name.Name}.dll nicht gefunden - Visual Studio mit der TcAgent-Erweiterung einmal starten " +
-                                    "(erzeugt sie aus der TwinCAT-Installation) oder build.ps1 ausfuehren.");
+            Console.Error.WriteLine($"[TcAgent] {name.Name}.dll not found - start Visual Studio with the TcAgent extension once " +
+                                    "(it generates the DLL from the TwinCAT installation) or run build.ps1.");
             return null;
         };
     }

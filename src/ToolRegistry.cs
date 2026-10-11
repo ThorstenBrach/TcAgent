@@ -1,4 +1,4 @@
-// Werkzeuge, die der KI ueber MCP angeboten werden.
+// Tools offered to the AI via MCP.
 using System.Globalization;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -19,7 +19,7 @@ public sealed partial class ToolRegistry
     readonly TwinCatSession tc;
     readonly Policy policy = new();
 
-    // TwinCAT-Subtypen fuer CreateChild (PLC)
+    // TwinCAT subtypes for CreateChild (PLC)
     static readonly Dictionary<string, int> PlcKinds = new(StringComparer.OrdinalIgnoreCase)
     {
         ["folder"] = 601, ["program"] = 602, ["function"] = 603, ["function_block"] = 604,
@@ -35,63 +35,63 @@ public sealed partial class ToolRegistry
     {
         tc = session;
 
-        // ---------------------------------------------------------- Verbindung
-        Add("tc_instances", "Listet laufende Visual-Studio-2022-/TcXaeShell-Instanzen mit geoeffneter Solution.",
+        // ---------------------------------------------------------- Connection
+        Add("tc_instances", "Lists running Visual Studio 2022 / TcXaeShell instances with an open solution.",
             Schema(), a => tc.Sta.Run(() => string.Join("\n",
-                tc.ListInstances().Select(i => $"pid={i.Pid}\t{i.Moniker}\t{i.Solution}")) is var s && s.Length > 0 ? s : "keine Instanz"));
+                tc.ListInstances().Select(i => $"pid={i.Pid}\t{i.Moniker}\t{i.Solution}")) is var s && s.Length > 0 ? s : "no instance"));
 
-        Add("tc_attach", "Verbindet mit einer laufenden IDE-Instanz (geschieht beim ersten Werkzeugaufruf auch automatisch, wenn die Auswahl eindeutig ist). Auswahl per pid oder Teil des Solution-Pfads. Ohne Angabe: die IDE, aus der TcAgent gestartet wurde (TcAgent-Chat), sonst TCAGENT_SOLUTION, sonst die einzige Instanz mit Solution. Sind mehrere offen, zeigt der Client eine Auswahlliste (falls unterstuetzt); sonst kommt eine Liste zurueck - dann den Benutzer fragen und mit pid aufrufen.",
-            Schema(P("solution", "string", "Teil des Solution-Pfads zur Auswahl"), P("pid", "integer", "Prozess-ID der IDE")),
+        Add("tc_attach", "Connects to a running IDE instance (also happens automatically on the first tool call if the choice is unambiguous). Select by pid or part of the solution path. Without arguments: the IDE TcAgent was started from (TcAgent chat), otherwise TCAGENT_SOLUTION, otherwise the only instance with a solution. If several are open, the client shows a selection list (if supported); otherwise a list is returned - then ask the user and call again with pid.",
+            Schema(P("solution", "string", "Part of the solution path for selection"), P("pid", "integer", "Process ID of the IDE")),
             a => tc.Sta.Run(() => tc.Attach(Str(a, "solution"), Int(a, "pid", 0))));
 
-        Add("tc_open", "Startet Visual Studio 2022 (bzw. TcXaeShell) und oeffnet eine Solution.",
-            Schema(Req(P("solutionPath", "string", "Vollstaendiger Pfad zur .sln")),
-                   P("visible", "boolean", "IDE sichtbar starten (Standard true)"),
-                   P("progId", "string", "z. B. VisualStudio.DTE.17.0 oder TcXaeShell.DTE.17.0")),
+        Add("tc_open", "Starts Visual Studio 2022 (or TcXaeShell) and opens a solution.",
+            Schema(Req(P("solutionPath", "string", "Full path to the .sln")),
+                   P("visible", "boolean", "Start the IDE visible (default true)"),
+                   P("progId", "string", "e.g. VisualStudio.DTE.17.0 or TcXaeShell.DTE.17.0")),
             a => tc.Sta.Run(() => tc.Open(Str(a, "solutionPath"), Bool(a, "visible", true), Str(a, "progId"))));
 
-        Add("tc_status", "Zeigt die aktuelle Verbindung, Solution und Ziel-NetId.",
+        Add("tc_status", "Shows the current connection, solution and target NetId.",
             Schema(), a => tc.Sta.Run(() =>
             {
-                var s = tc.InstanceInfo + $"\nModus: {policy.Mode}";
-                if (tc.SysMan != null) try { s += "\nZiel-NetId: " + (string)((dynamic)tc.SysMan).GetTargetNetId(); } catch { }
+                var s = tc.InstanceInfo + $"\nMode: {policy.Mode}";
+                if (tc.SysMan != null) try { s += "\nTarget NetId: " + (string)((dynamic)tc.SysMan).GetTargetNetId(); } catch { }
                 return s;
             }));
 
-        Add("tc_coding_rules", "Liefert die Codierrichtlinien dieses Projekts (Namenskonventionen, Kommentare, Aufbau ...). VOR dem ersten " +
-                               "Schreiben oder Anlegen von Code aufrufen und alle Aenderungen daran ausrichten.",
+        Add("tc_coding_rules", "Returns this project's coding guidelines (naming conventions, comments, structure ...). Call BEFORE first " +
+                               "writing or creating code and align all changes with them.",
             Schema(), a =>
             {
                 var dir = SolutionDir();
                 rulesSeen = true;
                 return CodingRules.Text(dir) is { } t
-                    ? "Codierrichtlinien (spaetere Abschnitte gehen bei Widerspruechen vor):\n\n" + t
-                    : "Keine Codierrichtlinien hinterlegt - allgemein uebliche TwinCAT-Konventionen und den Stil des vorhandenen Codes verwenden.\n" + CodingRules.Where(dir);
+                    ? "Coding guidelines (later sections take precedence in case of conflict):\n\n" + t
+                    : "No coding guidelines defined - use common TwinCAT conventions and the style of the existing code.\n" + CodingRules.Where(dir);
             });
 
-        Add("tc_coding_rules_add", "Nimmt eine Regel in die Codierrichtlinien auf - wenn der Nutzer sagt 'merke dir ...', 'ab jetzt immer ...', " +
-                                   "'so will ich das haben'. Die Regel selbst knapp, eindeutig und allgemein formulieren (ein Satz, mit Beispiel " +
-                                   "wenn noetig), dem Nutzer nennen und eintragen. Gilt ab sofort und fuer alle kuenftigen Sitzungen/Agenten.",
-            Schema(Req(P("rule", "string", "die Regel als ein Satz, z. B. 'Interne Variablen beginnen mit _ (z. B. _nState).'")),
-                   P("scope", "string", "project (Standard: Solution\\.tcagent\\coding-rules.md, in Git fuers Team) oder personal (nur dieser Nutzer)"),
-                   P("section", "string", "Ueberschrift, unter der die Regel steht, z. B. Namen, Aufbau, Formatierung (Standard: Ergaenzungen)"),
-                   P("dryRun", "boolean", "Nur zeigen, was eingetragen wuerde")),
+        Add("tc_coding_rules_add", "Adds a rule to the coding guidelines - when the user says 'remember ...', 'from now on always ...', " +
+                                   "'this is how I want it'. Phrase the rule itself concisely, unambiguously and generally (one sentence, with an example " +
+                                   "if needed), tell the user and add it. Applies immediately and to all future sessions/agents.",
+            Schema(Req(P("rule", "string", "the rule as one sentence, e.g. 'Internal variables start with _ (e.g. _nState).'")),
+                   P("scope", "string", "project (default: Solution\\.tcagent\\coding-rules.md, in Git for the team) or personal (this user only)"),
+                   P("section", "string", "Heading under which the rule is placed, e.g. Names, Structure, Formatting (default: Additions)"),
+                   P("dryRun", "boolean", "Only show what would be added")),
             a =>
             {
                 var (file, res) = CodingRules.Add(SolutionDir(), Str(a, "scope"), Str(a, "rule"), Str(a, "section"), DryRun(a));
                 rulesSeen = true;
-                return $"{res}\nDatei: {file}";
+                return $"{res}\nFile: {file}";
             });
 
-        Add("tc_docs", "Dokumentation nachschlagen - nur lesend: Beckhoff InfoSys, weitere freigegebene URLs, Dokumente im Projektordner " +
-                       ".tcagent\\docs bzw. %LOCALAPPDATA%\\TcAgent\\docs und eingetragene Ordner/Netzlaufwerke (PDF, Word, HTML, Markdown, Text). " +
-                       "action=search (query) durchsucht lokale Dokumente und bereits gelesene Seiten; action=read (url oder Pfad) liefert den Text " +
-                       "(lange Texte seitenweise per offset); action=sources zeigt die Quellen. Bei Fragen zu Klemmen, Parametern, Fehlercodes, " +
-                       "TwinCAT-Funktionen erst hier nachschlagen statt zu raten, und die Quelle nennen.",
-            Schema(P("action", "string", "search (Standard), read oder sources"),
-                   P("query", "string", "search: Suchbegriffe, z. B. 'EL6001 Baudrate'"),
-                   P("url", "string", "read: URL (InfoSys oder freigegebene Domain) oder Dateipfad in einer freigegebenen Quelle"),
-                   P("offset", "integer", "read: ab Zeichen (fuer lange Dokumente)"), P("max", "integer", "read: max. Zeichen (Standard 12000)")),
+        Add("tc_docs", "Look up documentation - read-only: Beckhoff InfoSys, other approved URLs, documents in the project folder " +
+                       ".tcagent\\docs or %LOCALAPPDATA%\\TcAgent\\docs and registered folders/network drives (PDF, Word, HTML, Markdown, text). " +
+                       "action=search (query) searches local documents and pages already read; action=read (url or path) returns the text " +
+                       "(long texts page by page via offset); action=sources shows the sources. For questions about terminals, parameters, error codes, " +
+                       "TwinCAT functions, look it up here first instead of guessing, and cite the source.",
+            Schema(P("action", "string", "search (default), read or sources"),
+                   P("query", "string", "search: search terms, e.g. 'EL6001 baud rate'"),
+                   P("url", "string", "read: URL (InfoSys or approved domain) or file path in an approved source"),
+                   P("offset", "integer", "read: start at character (for long documents)"), P("max", "integer", "read: max. characters (default 12000)")),
             a =>
             {
                 var dir = SolutionDir();
@@ -103,28 +103,28 @@ public sealed partial class ToolRegistry
                 };
             });
 
-        Add("tc_docs_add", "Traegt eine Wissensquelle ein (URL bzw. Domain, Ordner oder Netzlaufwerk) - nur nach Wunsch des Nutzers. " +
-                           "TcAgent liest Quellen ausschliesslich, schreibt dort nie.",
-            Schema(Req(P("source", "string", "z. B. https://infosys.beckhoff.com/content/1031/tf6340_tc3_serial_communication/ oder \\\\server\\Handbuecher")),
-                   P("scope", "string", "project (Standard, .tcagent\\knowledge.md in der Solution) oder personal"),
-                   P("note", "string", "kurzer Kommentar, wofuer die Quelle gut ist")),
+        Add("tc_docs_add", "Registers a knowledge source (URL or domain, folder or network drive) - only at the user's request. " +
+                           "TcAgent only reads sources, never writes to them.",
+            Schema(Req(P("source", "string", "e.g. https://infosys.beckhoff.com/content/1031/tf6340_tc3_serial_communication/ or \\\\server\\Manuals")),
+                   P("scope", "string", "project (default, .tcagent\\knowledge.md in the solution) or personal"),
+                   P("note", "string", "short comment on what the source is good for")),
             a =>
             {
                 var (file, res) = Knowledge.Add(SolutionDir(), Str(a, "scope"), Str(a, "source"), Str(a, "note"));
-                return $"{res}\nDatei: {file}";
+                return $"{res}\nFile: {file}";
             });
 
-        Add("tc_policy", "Zeigt die Leitplanken: freigegebene Zielsysteme fuer Laufzeit-Eingriffe, Nur-Lese-Modus, Pfad des Audit-Logs.",
+        Add("tc_policy", "Shows the guardrails: approved target systems for runtime operations, read-only mode, path of the audit log.",
             Schema(), a => policy.Describe());
 
-        Add("tc_feedback", "Meldet ein Problem, eine fehlende Funktion oder einen Verbesserungsvorschlag an die TcAgent-Entwicklung. " +
-                           "Bitte immer nutzen, wenn ein Werkzeug fehlschlaegt, unerwartet reagiert, eine Aufgabe nur per Umweg loesbar war oder ein Werkzeug fehlt.",
+        Add("tc_feedback", "Reports a problem, a missing feature or a suggestion for improvement to the TcAgent developers. " +
+                           "Please always use it when a tool fails, behaves unexpectedly, a task could only be solved via a workaround, or a tool is missing.",
             Schema(Req(P("type", "string", "bug | missing_feature | usability | docs")),
-                   Req(P("summary", "string", "Ein Satz: was ist das Problem / was fehlt")),
-                   P("tool", "string", "Betroffenes Werkzeug, z. B. tc_plc_create"),
-                   P("details", "string", "Aufruf/Argumente, Fehlermeldung, Kontext (TwinCAT-Version, Projektart)"),
-                   P("expected", "string", "Was haette passieren sollen"),
-                   P("workaround", "string", "Wie die Aufgabe trotzdem geloest wurde (falls ueberhaupt)"),
+                   Req(P("summary", "string", "One sentence: what is the problem / what is missing")),
+                   P("tool", "string", "Affected tool, e.g. tc_plc_create"),
+                   P("details", "string", "Call/arguments, error message, context (TwinCAT version, project type)"),
+                   P("expected", "string", "What should have happened"),
+                   P("workaround", "string", "How the task was solved anyway (if at all)"),
                    P("severity", "string", "blocker | major | minor")),
             a =>
             {
@@ -140,74 +140,74 @@ public sealed partial class ToolRegistry
                     if (Str(a, k) != null) entry[k] = Str(a, k);
                 File.AppendAllText(path, entry.ToJsonString(new System.Text.Json.JsonSerializerOptions
                     { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + Environment.NewLine);
-                return "Danke - Rueckmeldung gespeichert in " + path;
+                return "Thanks - feedback saved to " + path;
             });
 
-        Add("tc_version", "Zeigt die Version des TcAgent-Servers.", Schema(), a => $"TcAgent {Program.ServerVersion}");
+        Add("tc_version", "Shows the version of the TcAgent server.", Schema(), a => $"TcAgent {Program.ServerVersion}");
 
-        // ---------------------------------------------------------- Baum / XML
-        Add("tc_tree", "Zeigt den TwinCAT-Projektbaum (Name, Typ, Pfad). Ohne path: alle Wurzeln (TIPC=PLC, TIID=I/O, TIRT=Tasks ...).",
-            Schema(P("path", "string", "Startpfad, z. B. TIPC oder TIID^Device 1 (EtherCAT)"), P("depth", "integer", "Tiefe (Standard 2)")),
+        // ---------------------------------------------------------- Tree / XML
+        Add("tc_tree", "Shows the TwinCAT project tree (name, type, path). Without path: all roots (TIPC=PLC, TIID=I/O, TIRT=tasks ...).",
+            Schema(P("path", "string", "Start path, e.g. TIPC or TIID^Device 1 (EtherCAT)"), P("depth", "integer", "Depth (default 2)")),
             a => tc.Sta.Run(() => tc.Tree(Str(a, "path"), Int(a, "depth", 2))));
 
-        Add("tc_xml_get", "Liest die XML-Beschreibung eines Baumelements (ProduceXml): Parameter, I/O-Konfiguration, Task-Einstellungen, Online-Settings ...",
-            Schema(Req(P("path", "string", "Baumpfad")), P("recursive", "boolean", "Kinder einschliessen")),
+        Add("tc_xml_get", "Reads the XML description of a tree item (ProduceXml): parameters, I/O configuration, task settings, online settings ...",
+            Schema(Req(P("path", "string", "Tree path")), P("recursive", "boolean", "Include children")),
             a => tc.Sta.Run(() => (string)((dynamic)tc.Item(Str(a, "path"))).ProduceXml(Bool(a, "recursive", false))));
 
-        Add("tc_xml_set", "Schreibt XML in ein Baumelement (ConsumeXml) - aendert Konfiguration. Vorher mit tc_xml_get das Format lesen.",
-            Schema(Req(P("path", "string", "Baumpfad")), Req(P("xml", "string", "XML im Format von ProduceXml (nur zu aendernde Teile)"))),
+        Add("tc_xml_set", "Writes XML into a tree item (ConsumeXml) - changes configuration. Read the format with tc_xml_get first.",
+            Schema(Req(P("path", "string", "Tree path")), Req(P("xml", "string", "XML in the format of ProduceXml (only the parts to change)"))),
             a => tc.Sta.Run(() => { ((dynamic)tc.Item(Str(a, "path"))).ConsumeXml(Str(a, "xml")); return "OK"; }));
 
-        Add("tc_delete", "Loescht ein Kind-Element im Baum.",
-            Schema(Req(P("parentPath", "string", "Pfad des Elternelements")), Req(P("name", "string", "Name des Kindes"))),
-            a => tc.Sta.Run(() => { ((dynamic)tc.Item(Str(a, "parentPath"))).DeleteChild(Str(a, "name")); return "geloescht"; }));
+        Add("tc_delete", "Deletes a child item in the tree.",
+            Schema(Req(P("parentPath", "string", "Path of the parent item")), Req(P("name", "string", "Name of the child"))),
+            a => tc.Sta.Run(() => { ((dynamic)tc.Item(Str(a, "parentPath"))).DeleteChild(Str(a, "name")); return "deleted"; }));
 
-        // ---------------------------------------------------------- I/O-Geraete anlegen
-        Add("tc_io_add", "Legt I/O-Konfiguration an: Geraete unter TIID (z. B. EtherCAT-Master), darunter Boxen/Koppler/Klemmen per " +
-                         "Produktbezeichnung (EK1100, EL6001, EL1008 ...). Mit 'children' entsteht eine ganze Station in einem Aufruf, " +
-                         "z. B. kind=box product=EK1100 children=EL1008,EL2008,EL6001. Danach Parameter mit tc_xml_get/tc_xml_set, " +
-                         "Prozessdaten mit tc_link. Ohne angeschlossene Hardware wird offline konfiguriert (spaeter per Scan pruefen).",
-            Schema(Req(P("kind", "string", "ethercat_master (Geraet unter TIID), box (EtherCAT-Koppler/-Klemme/-Box, braucht product) oder raw (subType angeben)")),
-                   P("parentPath", "string", "Elternelement: TIID fuer Geraete (Standard), z. B. 'TIID^Device 1 (EtherCAT)' fuer Boxen, '...^Term 1 (EK1100)' fuer Klemmen"),
-                   P("product", "string", "box: Produktbezeichnung, z. B. EK1100 oder mit Revision EL6001-0000-0020"),
-                   P("children", "string", "box: weitere Klemmen unter dem neuen Element, komma-getrennt in Steckreihenfolge, z. B. EL1008,EL2008,EL6001"),
-                   P("name", "string", "Name im Baum (leer = TwinCAT-uebliche Benennung, z. B. 'Term 1 (EK1100)')"),
-                   P("subType", "integer", "raw: TwinCAT-Subtyp fuer CreateChild"),
-                   P("dryRun", "boolean", "Nur zeigen, was angelegt wuerde")),
+        // ---------------------------------------------------------- Create I/O devices
+        Add("tc_io_add", "Creates I/O configuration: devices under TIID (e.g. EtherCAT master), below them boxes/couplers/terminals by " +
+                         "product name (EK1100, EL6001, EL1008 ...). With 'children' a whole station is created in one call, " +
+                         "e.g. kind=box product=EK1100 children=EL1008,EL2008,EL6001. Then parameters with tc_xml_get/tc_xml_set, " +
+                         "process data with tc_link. Without connected hardware it is configured offline (check later via scan).",
+            Schema(Req(P("kind", "string", "ethercat_master (device under TIID), box (EtherCAT coupler/terminal/box, needs product) or raw (specify subType)")),
+                   P("parentPath", "string", "Parent item: TIID for devices (default), e.g. 'TIID^Device 1 (EtherCAT)' for boxes, '...^Term 1 (EK1100)' for terminals"),
+                   P("product", "string", "box: product name, e.g. EK1100 or with revision EL6001-0000-0020"),
+                   P("children", "string", "box: further terminals below the new item, comma-separated in slot order, e.g. EL1008,EL2008,EL6001"),
+                   P("name", "string", "Name in the tree (empty = usual TwinCAT naming, e.g. 'Term 1 (EK1100)')"),
+                   P("subType", "integer", "raw: TwinCAT subtype for CreateChild"),
+                   P("dryRun", "boolean", "Only show what would be created")),
             a => tc.Sta.Run(() => IoAdd(a)));
 
         RegisterIoScan();
 
-        // ---------------------------------------------------------- I/O-Verknuepfungen
-        Add("tc_link", "Verknuepft Variablen (PLC-Variable mit I/O-Kanal). Einzeln mit source/target oder viele auf einmal mit pairs. " +
-                       "Pfade wie im Baum, z. B. 'TIPC^MyPlc^MyPlc Instance^PlcTask Inputs^MAIN.bIn' und " +
-                       "'TIID^Device 1 (EtherCAT)^Term 2 (EL1008)^Channel 1^Input'. Pfade vorher mit tc_io_vars ermitteln. " +
-                       "PLC-Variablen erscheinen erst nach einem echten Build (tc_build, nicht tc_check), wenn sie mit AT %I*/%Q* deklariert sind.",
-            Schema(P("source", "string", "Erster Variablenpfad"), P("target", "string", "Zweiter Variablenpfad"),
-                   P("pairs", "string", "Mehrere Verknuepfungen, eine je Zeile: '<pfad> => <pfad>'"),
-                   P("dryRun", "boolean", "Nur pruefen, ob alle Pfade existieren")),
+        // ---------------------------------------------------------- I/O links
+        Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +
+                       "Paths as in the tree, e.g. 'TIPC^MyPlc^MyPlc Instance^PlcTask Inputs^MAIN.bIn' and " +
+                       "'TIID^Device 1 (EtherCAT)^Term 2 (EL1008)^Channel 1^Input'. Determine paths with tc_io_vars first. " +
+                       "PLC variables only appear after a real build (tc_build, not tc_check), if they are declared with AT %I*/%Q*.",
+            Schema(P("source", "string", "First variable path"), P("target", "string", "Second variable path"),
+                   P("pairs", "string", "Multiple links, one per line: '<path> => <path>'"),
+                   P("dryRun", "boolean", "Only check whether all paths exist")),
             a => tc.Sta.Run(() => Link(a)));
 
-        Add("tc_io_vars", "Listet verknuepfbare Variablen unter einem Baumelement mit Typ - z. B. alle Kanaele einer Klemme " +
-                          "('TIID^Device 1 (EtherCAT)^Term 2 (EL1008)') oder das Prozessabbild der PLC ('TIPC^MyPlc^MyPlc Instance'). " +
-                          "Liefert die exakten Pfade fuer tc_link.",
-            Schema(Req(P("path", "string", "Baumelement, z. B. eine Klemme, ein Geraet oder die PLC-Instanz")),
-                   P("filter", "string", "nur Pfade, die diesen Text enthalten"), P("max", "integer", "max. Eintraege (Standard 300)")),
+        Add("tc_io_vars", "Lists linkable variables below a tree item with type - e.g. all channels of a terminal " +
+                          "('TIID^Device 1 (EtherCAT)^Term 2 (EL1008)') or the process image of the PLC ('TIPC^MyPlc^MyPlc Instance'). " +
+                          "Returns the exact paths for tc_link.",
+            Schema(Req(P("path", "string", "Tree item, e.g. a terminal, a device or the PLC instance")),
+                   P("filter", "string", "only paths containing this text"), P("max", "integer", "max. entries (default 300)")),
             a => tc.Sta.Run(() => IoVars(Str(a, "path"), Str(a, "filter"), Int(a, "max", 300))));
 
-        Add("tc_unlink", "Loest Verknuepfungen einer Variablen (optional nur zu target).",
-            Schema(Req(P("source", "string", "Variablenpfad")), P("target", "string", "Gegenstelle (leer = alle)")),
-            a => tc.Sta.Run(() => { ((dynamic)tc.RequireSysMan()).UnlinkVariables(Str(a, "source"), Str(a, "target") ?? ""); return "geloest"; }));
+        Add("tc_unlink", "Removes links of a variable (optionally only to target).",
+            Schema(Req(P("source", "string", "Variable path")), P("target", "string", "Counterpart (empty = all)")),
+            a => tc.Sta.Run(() => { ((dynamic)tc.RequireSysMan()).UnlinkVariables(Str(a, "source"), Str(a, "target") ?? ""); return "unlinked"; }));
 
-        // ---------------------------------------------------------- PLC-Code
-        Add("tc_plc_read", "Liest Deklaration und Implementierung eines PLC-Objekts (POU, Methode, Property, DUT, GVL) samt Unterobjekten.",
-            Schema(Req(P("path", "string", "z. B. TIPC^MyPlc^MyPlc Project^POUs^FB_Axis"))),
+        // ---------------------------------------------------------- PLC code
+        Add("tc_plc_read", "Reads declaration and implementation of a PLC object (POU, method, property, DUT, GVL) including sub-objects.",
+            Schema(Req(P("path", "string", "e.g. TIPC^MyPlc^MyPlc Project^POUs^FB_Axis"))),
             a => tc.Sta.Run(() => PlcRead(Str(a, "path"))));
 
-        Add("tc_plc_write", "Ueberschreibt Deklaration und/oder Implementierung eines PLC-Objekts (ST-Text). Mit dryRun=true (im Modus 'propose' immer) wird nichts geschrieben, sondern ein Diff geliefert.",
-            Schema(Req(P("path", "string", "Baumpfad des Objekts")), P("declaration", "string", "kompletter Deklarationsteil"),
-                   P("implementation", "string", "kompletter Implementierungsteil"),
-                   P("dryRun", "boolean", "Nur Diff zeigen, nichts aendern")),
+        Add("tc_plc_write", "Overwrites declaration and/or implementation of a PLC object (ST text). With dryRun=true (always in 'propose' mode) nothing is written; a diff is returned instead.",
+            Schema(Req(P("path", "string", "Tree path of the object")), P("declaration", "string", "complete declaration part"),
+                   P("implementation", "string", "complete implementation part"),
+                   P("dryRun", "boolean", "Only show diff, change nothing")),
             a => tc.Sta.Run(() =>
             {
                 var item = tc.Item(Str(a, "path"));
@@ -215,152 +215,152 @@ public sealed partial class ToolRegistry
                                  : PlcWrite(item, Str(a, "declaration"), Str(a, "implementation"));
             }));
 
-        Add("tc_plc_create", "Legt ein PLC-Objekt an und setzt optional Deklaration/Implementierung. kind: " + string.Join(", ", PlcKinds.Keys),
-            Schema(Req(P("parentPath", "string", "Elternordner/-POU, z. B. ...^POUs oder ...^POUs^FB_Axis fuer Methoden")),
-                   Req(P("name", "string", "Objektname")), Req(P("kind", "string", "Objekttyp")),
-                   P("language", "string", "ST (Standard), IL, SFC, FBD, CFC, LD"),
-                   P("returnType", "string", "Rueckgabetyp bei function/method/property"),
-                   P("declaration", "string", "kompletter Deklarationsteil"), P("implementation", "string", "Implementierungsteil (bei property: der Get-Accessor)"),
-                   P("implements", "string", "nur function_block: Interface(s), komma-getrennt - legt IMPLEMENTS und alle Methoden/Properties " +
-                                              "des Interfaces (inkl. EXTENDS) als Stubs an, wie der TwinCAT-Dialog. Projekt- und Bibliotheks-Interfaces."),
-                   P("getImplementation", "string", "property: Code des Get-Accessors"), P("setImplementation", "string", "property: Code des Set-Accessors"),
-                   P("dryRun", "boolean", "Nur zeigen, was angelegt wuerde")),
+        Add("tc_plc_create", "Creates a PLC object and optionally sets declaration/implementation. kind: " + string.Join(", ", PlcKinds.Keys),
+            Schema(Req(P("parentPath", "string", "Parent folder/POU, e.g. ...^POUs or ...^POUs^FB_Axis for methods")),
+                   Req(P("name", "string", "Object name")), Req(P("kind", "string", "Object type")),
+                   P("language", "string", "ST (default), IL, SFC, FBD, CFC, LD"),
+                   P("returnType", "string", "Return type for function/method/property"),
+                   P("declaration", "string", "complete declaration part"), P("implementation", "string", "implementation part (for property: the Get accessor)"),
+                   P("implements", "string", "function_block only: interface(s), comma-separated - creates IMPLEMENTS and all methods/properties " +
+                                              "of the interface (incl. EXTENDS) as stubs, like the TwinCAT dialog. Project and library interfaces."),
+                   P("getImplementation", "string", "property: code of the Get accessor"), P("setImplementation", "string", "property: code of the Set accessor"),
+                   P("dryRun", "boolean", "Only show what would be created")),
             a => tc.Sta.Run(() => PlcCreate(a)));
 
-        Add("tc_plc_search", "Durchsucht Deklarationen und Implementierungen aller PLC-Objekte (Volltext oder Regex). Treffer mit Baumpfad, Teil und Zeile - z. B. um Verwendungen eines FBs, einer Variablen oder eines Aufrufs zu finden.",
-            Schema(Req(P("pattern", "string", "Suchtext oder regulaerer Ausdruck")),
-                   P("regex", "boolean", "pattern als Regex (Standard false)"),
-                   P("caseSensitive", "boolean", "Gross-/Kleinschreibung beachten (Standard false)"),
-                   P("part", "string", "decl, impl oder all (Standard)"),
-                   P("path", "string", "Nur unterhalb dieses Baumpfads suchen (Standard: alle PLC-Projekte)"),
-                   P("max", "integer", "Max. Treffer (Standard 200)")),
+        Add("tc_plc_search", "Searches declarations and implementations of all PLC objects (full text or regex). Hits with tree path, part and line - e.g. to find usages of an FB, a variable or a call.",
+            Schema(Req(P("pattern", "string", "Search text or regular expression")),
+                   P("regex", "boolean", "pattern as regex (default false)"),
+                   P("caseSensitive", "boolean", "Case-sensitive (default false)"),
+                   P("part", "string", "decl, impl or all (default)"),
+                   P("path", "string", "Only search below this tree path (default: all PLC projects)"),
+                   P("max", "integer", "Max. hits (default 200)")),
             a => tc.Sta.Run(() => PlcSearch(a)));
 
-        Add("tc_plc_references", "Listet die Bibliotheksreferenzen der PLC-Projekte mit aufgeloester Version und Hersteller (auch Platzhalter). Mit installed=true zusaetzlich die im Repository installierten Bibliotheken.",
-            Schema(P("plcProjectPath", "string", "Pfad des PLC-Projekts (Standard: alle)"),
-                   P("installed", "boolean", "Installierte Bibliotheken mit auflisten")),
+        Add("tc_plc_references", "Lists the library references of the PLC projects with resolved version and vendor (including placeholders). With installed=true also the libraries installed in the repository.",
+            Schema(P("plcProjectPath", "string", "Path of the PLC project (default: all)"),
+                   P("installed", "boolean", "Also list installed libraries")),
             a => tc.Sta.Run(() => PlcReferences(Str(a, "plcProjectPath"), Bool(a, "installed", false))));
 
-        Add("tc_editor_context", "Zeigt, woran der Nutzer gerade in der IDE arbeitet: aktives Fenster/Dokument, markierte Elemente, daraus ermittelte Baumpfade (direkt fuer tc_plc_read nutzbar) und - mit der VS-Erweiterung TcAgentBridge - Cursor und Selektion. Nutzen, wenn der Nutzer von 'hier', 'diesem FB' oder 'der Methode' spricht.",
+        Add("tc_editor_context", "Shows what the user is currently working on in the IDE: active window/document, selected items, tree paths derived from them (directly usable with tc_plc_read) and - with the VS extension TcAgentBridge - cursor and selection. Use when the user talks about 'here', 'this FB' or 'the method'.",
             Schema(), a =>
             {
                 var (text, pid) = tc.Sta.Run(() => (tc.EditorContext(), tc.AttachedPid));
-                if (!BridgeClient.Available(pid)) return text + "(VS-Erweiterung TcAgentBridge nicht aktiv - Cursor/Selektion nicht verfuegbar)\n";
-                // Cursor/Selektion kommen aus der Bruecke -> den DTE-Hinweis "nicht verfuegbar" weglassen (widerspruechlich)
-                try { return string.Join("\n", text.Split('\n').Where(l => !l.StartsWith("Cursor/Selektion: vom TwinCAT-Editor"))) + BridgeContext(BridgeClient.Call(pid, "context"), text); }
+                if (!BridgeClient.Available(pid)) return text + "(VS extension TcAgentBridge not active - cursor/selection not available)\n";
+                // Cursor/selection come from the bridge -> omit the DTE hint "not available" (contradictory)
+                try { return string.Join("\n", text.Split('\n').Where(l => !l.StartsWith("Cursor/selection: not available from the TwinCAT editor"))) + BridgeContext(BridgeClient.Call(pid, "context"), text); }
                 catch (Exception ex) { return text + "\nTcAgentBridge: " + ex.Message + "\n"; }
             });
 
-        Add("tc_goto_definition", "Gehe zu Definition: loest einen Namen so auf wie TwinCAT selbst - im Gueltigkeitsbereich des im Editor offenen Objekts. Ohne symbol wird das Wort am Cursor (bzw. die Markierung) genommen. Liefert bei Variablen Typ, Deklarationsort und den aufgeloesten Typ; bei Typen/POUs den Ort im Projekt (Baumpfad) oder die Bibliothek. Braucht die VS-Erweiterung TcAgentBridge.",
-            Schema(P("symbol", "string", "Name, z. B. _startTime, MC_MoveLinearAbsoluteFB, GVL_Progress.Progress (leer = Wort am Cursor)")),
+        Add("tc_goto_definition", "Go to definition: resolves a name the way TwinCAT itself does - in the scope of the object open in the editor. Without symbol the word at the cursor (or the selection) is used. For variables returns type, declaration location and the resolved type; for types/POUs the location in the project (tree path) or the library. Requires the VS extension TcAgentBridge.",
+            Schema(P("symbol", "string", "Name, e.g. _startTime, MC_MoveLinearAbsoluteFB, GVL_Progress.Progress (empty = word at cursor)")),
             a => GotoDefinition(a));
 
-        Add("tc_find_references", "Findet alle Verwendungen eines Symbols: Querverweise wie in TwinCATs Kreuzreferenzliste plus Textsuche nach dem ganzen Wort als Gegenprobe.",
-            Schema(Req(P("symbol", "string", "Name des Symbols (Variable, FB, Methode, Typ)")), P("max", "integer", "Max. Treffer je Quelle (Standard 300)")),
+        Add("tc_find_references", "Finds all usages of a symbol: cross references as in TwinCAT's cross reference list plus a whole-word text search as a cross-check.",
+            Schema(Req(P("symbol", "string", "Name of the symbol (variable, FB, method, type)")), P("max", "integer", "Max. hits per source (default 300)")),
             a => FindReferences(a));
 
-        Add("tc_ide", "Experimentell: direkte Abfrage der VS-Erweiterung TcAgentBridge im IDE-Prozess. command: ping (laeuft sie?), context (Editor-Kontext roh), libs (installierte Bibliotheken im Repository), probe (Diagnose: was ist im IDE-Prozess erreichbar; schreibt probe.txt).",
-            Schema(Req(P("command", "string", "ping | context | libs | probe | lm_call | chat_show (Chat-Fenster in TwinCAT oeffnen)")),
-                   P("target", "string", "lm_call (Diagnose): Abfrageziel lm (Standard), om, engine oder view"),
-                   P("method", "string", "lm_call: nur lesende Methode (Get*/Find*/All*/Is*)"),
-                   P("args", "string", "lm_call: Argumente durch | getrennt; $ph = Projekt-Handle, $obj = Objekt im Editor")),
+        Add("tc_ide", "Experimental: direct query of the VS extension TcAgentBridge in the IDE process. command: ping (is it running?), context (raw editor context), libs (installed libraries in the repository), probe (diagnostics: what is reachable in the IDE process; writes probe.txt).",
+            Schema(Req(P("command", "string", "ping | context | libs | probe | lm_call | chat_show (open chat window in TwinCAT)")),
+                   P("target", "string", "lm_call (diagnostics): query target lm (default), om, engine or view"),
+                   P("method", "string", "lm_call: read-only method only (Get*/Find*/All*/Is*)"),
+                   P("args", "string", "lm_call: arguments separated by |; $ph = project handle, $obj = object in the editor")),
             a =>
             {
                 var cmd = Str(a, "command");
-                if (cmd is not ("ping" or "context" or "libs" or "probe" or "lm_call" or "chat_show")) throw new Exception("command muss ping, context, libs, probe, lm_call oder chat_show sein");
+                if (cmd is not ("ping" or "context" or "libs" or "probe" or "lm_call" or "chat_show")) throw new Exception("command must be ping, context, libs, probe, lm_call or chat_show");
                 var pid = tc.Sta.Run(() => { try { tc.RequireDte(); } catch { } return tc.AttachedPid; });
                 JsonObject args = null;
                 if (cmd == "lm_call")
                     args = new JsonObject { ["target"] = Str(a, "target") ?? "lm", ["method"] = Str(a, "method"),
                         ["args"] = new JsonArray((Str(a, "args") ?? "").Split('|', StringSplitOptions.None).Where((x, i) => !(i == 0 && x.Length == 0 && (Str(a, "args") ?? "").Length == 0)).Select(x => (JsonNode)JsonValue.Create(x)).ToArray()) };
                 var res = Pretty(BridgeClient.Call(pid, cmd, args, cmd == "probe" || cmd == "lm_call" ? 120000 : 30000));
-                return res.Length > 60000 ? res[..60000] + "\n... (abgeschnitten)" : res;
+                return res.Length > 60000 ? res[..60000] + "\n... (truncated)" : res;
             });
 
-        Add("tc_lib_signatures", "Signaturen einer Bibliothek - auch aus compiled libraries von Fremdherstellern - (VS-Erweiterung TcAgentBridge noetig). Ohne symbol: Gliederung (eine Zeile je FB/Funktion/Typ, mit EXTENDS und Anzahl Ein-/Ausgaenge). Mit symbol: Schnittstelle als ST-Deklaration inkl. geerbter Ein-/Ausgaenge, Methoden und Doku-Kommentaren. Ergebnis wird je Bibliotheksversion zwischengespeichert.",
-            Schema(Req(P("library", "string", "Bibliothekstitel, z. B. RobotLibrary oder Tc2_Standard")),
-                   P("version", "string", "Version (Standard: die im Projekt aufgeloeste, sonst die neueste installierte)"),
-                   P("symbol", "string", "Name eines FB, einer Funktion, eines Typs; Methode als FB.Methode"),
-                   P("filter", "string", "Gliederung nur fuer Namen, die diesen Text enthalten (z. B. MC_ oder FB)"),
-                   P("source", "string", "lm (Standard: mit EXTENDS, Methoden, Originalschreibweise) oder doc (alternativer Export, Rueckfall)"),
-                   P("refresh", "boolean", "Zwischenspeicher neu erzeugen")),
+        Add("tc_lib_signatures", "Signatures of a library - also from third-party compiled libraries - (requires the VS extension TcAgentBridge). Without symbol: outline (one line per FB/function/type, with EXTENDS and number of inputs/outputs). With symbol: interface as ST declaration incl. inherited inputs/outputs, methods and doc comments. The result is cached per library version.",
+            Schema(Req(P("library", "string", "Library title, e.g. RobotLibrary or Tc2_Standard")),
+                   P("version", "string", "Version (default: the one resolved in the project, otherwise the newest installed)"),
+                   P("symbol", "string", "Name of an FB, a function, a type; method as FB.Method"),
+                   P("filter", "string", "Outline only for names containing this text (e.g. MC_ or FB)"),
+                   P("source", "string", "lm (default: with EXTENDS, methods, original spelling) or doc (alternative export, fallback)"),
+                   P("refresh", "boolean", "Regenerate the cache")),
             a => LibSignatures(a));
 
-        Add("tc_plc_library_add", "Fuegt einer PLC eine Bibliotheksreferenz hinzu.",
-            Schema(Req(P("referencesPath", "string", "Pfad des References-Knotens, z. B. TIPC^MyPlc^MyPlc Project^References")),
-                   Req(P("library", "string", "Bibliotheksname")), P("version", "string", "Version oder * (Standard)"),
-                   P("vendor", "string", "Hersteller, z. B. Beckhoff Automation GmbH")),
+        Add("tc_plc_library_add", "Adds a library reference to a PLC.",
+            Schema(Req(P("referencesPath", "string", "Path of the References node, e.g. TIPC^MyPlc^MyPlc Project^References")),
+                   Req(P("library", "string", "Library name")), P("version", "string", "Version or * (default)"),
+                   P("vendor", "string", "Vendor, e.g. Beckhoff Automation GmbH")),
             a => tc.Sta.Run(() =>
             {
                 var lm = (ITcPlcLibraryManager)tc.Item(Str(a, "referencesPath"));
                 lm.AddLibrary(Str(a, "library"), Str(a, "version") ?? "*", Str(a, "vendor") ?? "");
-                return "Bibliothek hinzugefuegt";
+                return "Library added";
             }));
 
-        Add("tc_dialogs", "Zeigt offene modale Dialoge der IDE (Titel, Text, Knoepfe) - solange einer offen ist, warten alle TwinCAT-Aufrufe. " +
-                          "action=close schliesst sie wie das X bzw. Abbrechen (nie Ja/OK/Ueberschreiben). Normalerweise den Benutzer schliessen lassen.",
-            Schema(P("action", "string", "list (Standard) oder close")),
+        Add("tc_dialogs", "Shows open modal dialogs of the IDE (title, text, buttons) - while one is open, all TwinCAT calls wait. " +
+                          "action=close closes them like the X or Cancel (never Yes/OK/Overwrite). Normally let the user close them.",
+            Schema(P("action", "string", "list (default) or close")),
             a =>
             {
                 var d = IdeDialogs.Find(tc.AttachedPid);
-                if (d.Count == 0) return tc.AttachedPid > 0 ? "Kein Dialog offen." : "Nicht mit einer IDE verbunden.";
-                if ((Str(a, "action") ?? "list") != "close") return "Offene Dialoge:\n  " + string.Join("\n  ", d);
+                if (d.Count == 0) return tc.AttachedPid > 0 ? "No dialog open." : "Not connected to an IDE.";
+                if ((Str(a, "action") ?? "list") != "close") return "Open dialogs:\n  " + string.Join("\n  ", d);
                 foreach (var x in d) IdeDialogs.Close(x);
-                return "Geschlossen (Abbrechen/X):\n  " + string.Join("\n  ", d);
+                return "Closed (Cancel/X):\n  " + string.Join("\n  ", d);
             });
 
-        Add("tc_save", "Speichert alle geaenderten Dateien der Solution auf die Platte (wie Strg+Shift+S). Aenderungen per Werkzeug sind sonst nur in der IDE.",
-            Schema(), a => tc.Sta.Run(() => { tc.RequireDte().ExecuteCommand("File.SaveAll"); return "alles gespeichert"; }));
+        Add("tc_save", "Saves all modified files of the solution to disk (like Ctrl+Shift+S). Otherwise changes made by tools exist only in the IDE.",
+            Schema(), a => tc.Sta.Run(() => { tc.RequireDte().ExecuteCommand("File.SaveAll"); return "all saved"; }));
 
-        // ---------------------------------------------------------- Build / Aktivieren / Online
-        Add("tc_check", "Prueft alle PLC-Objekte auf Compilerfehler (\"Alle Objekte pruefen\", auch unbenutzte POUs) - ohne Build, " +
-                        "erzeugt also keinen ausfuehrbaren Code und keine Dateien. Der Standard nach Code-Aenderungen. Liefert Fehler/Warnungen mit Datei und Zeile.",
+        // ---------------------------------------------------------- Build / Activate / Online
+        Add("tc_check", "Checks all PLC objects for compiler errors (\"Check all objects\", including unused POUs) - without a build, " +
+                        "so it produces no executable code and no files. The default after code changes. Returns errors/warnings with file and line.",
             Schema(), a => tc.Sta.Run(() => tc.Check()));
 
-        Add("tc_build", "Baut die Solution (erzeugt ausfuehrbaren Code und Dateien) und liefert Compilerfehler/Warnungen. Nur noetig vor dem " +
-                        "Aktivieren/Laden oder wenn der Nutzer es verlangt - zum Pruefen auf Compilerfehler tc_check nehmen.",
-            Schema(P("rebuild", "boolean", "Vorher bereinigen"), P("checkAll", "boolean", "Zusaetzlich alle Objekte pruefen (Standard false)")),
+        Add("tc_build", "Builds the solution (produces executable code and files) and returns compiler errors/warnings. Only needed before " +
+                        "activating/downloading or when the user asks for it - to check for compiler errors use tc_check.",
+            Schema(P("rebuild", "boolean", "Clean first"), P("checkAll", "boolean", "Additionally check all objects (default false)")),
             a => tc.Sta.Run(() => tc.Build(null, Bool(a, "rebuild", false), Bool(a, "checkAll", false))));
 
-        Add("tc_errors", "Liest die Fehlerliste der IDE, getrennt nach Compiler-/Projektmeldungen und Laufzeit-/TcUnit-Meldungen der PLC.",
-            Schema(P("kind", "string", "compile, runtime oder all (Standard)"), P("max", "integer", "Max. Eintraege (Standard 500)")),
+        Add("tc_errors", "Reads the IDE error list, separated into compiler/project messages and runtime/TcUnit messages of the PLC.",
+            Schema(P("kind", "string", "compile, runtime or all (default)"), P("max", "integer", "Max. entries (default 500)")),
             a => tc.Sta.Run(() => tc.ErrorList(Int(a, "max", 500), Str(a, "kind") ?? "all")));
 
-        Add("tc_test_results", "Liefert das Ergebnis des letzten TcUnit-Laufs (Suites, Tests, Erfolge, Fehlschlaege mit Testnamen und Meldung) aus den PLC-Laufzeitmeldungen.",
+        Add("tc_test_results", "Returns the result of the last TcUnit run (suites, tests, successes, failures with test name and message) from the PLC runtime messages.",
             Schema(), a => tc.Sta.Run(() => tc.TestResults()));
 
-        // ---------------------------------------------------------- Tasks, Bootprojekt, Startmodus, Lizenzen
-        Add("tc_task", "Echtzeit-Tasks: list, create (name, cycleUs, priority, withImage) oder set (path, cycleUs, priority, autoStart). " +
-                       "Wirkt erst nach tc_activate. Die PLC-Task-Zuordnung steht in der PLC-Instanz (tc_tree/tc_xml_get).",
-            Schema(Req(P("action", "string", "list, create oder set")),
-                   P("name", "string", "create: Taskname"), P("path", "string", "set: Baumpfad der Task, z. B. TIRT^PlcTask"),
-                   P("cycleUs", "integer", "Zykluszeit in Mikrosekunden, z. B. 1000 = 1 ms"),
-                   P("priority", "integer", "Prioritaet (kleiner = hoeher)"), P("autoStart", "boolean", "Task automatisch starten"),
-                   P("withImage", "boolean", "create: Task mit Prozessabbild (Standard false)"),
-                   P("dryRun", "boolean", "Nur zeigen, was geaendert wuerde")),
+        // ---------------------------------------------------------- Tasks, boot project, startup mode, licenses
+        Add("tc_task", "Real-time tasks: list, create (name, cycleUs, priority, withImage) or set (path, cycleUs, priority, autoStart). " +
+                       "Takes effect only after tc_activate. The PLC task assignment is in the PLC instance (tc_tree/tc_xml_get).",
+            Schema(Req(P("action", "string", "list, create or set")),
+                   P("name", "string", "create: task name"), P("path", "string", "set: tree path of the task, e.g. TIRT^PlcTask"),
+                   P("cycleUs", "integer", "Cycle time in microseconds, e.g. 1000 = 1 ms"),
+                   P("priority", "integer", "Priority (lower = higher)"), P("autoStart", "boolean", "Start task automatically"),
+                   P("withImage", "boolean", "create: task with process image (default false)"),
+                   P("dryRun", "boolean", "Only show what would be changed")),
             a => tc.Sta.Run(() => Task(a)));
 
-        Add("tc_boot_project", "PLC-Bootprojekt: Autostart ein/aus (autostart) und/oder Bootprojekt erzeugen (generate). " +
-                               "Ohne Parameter: aktuellen Stand zeigen.",
-            Schema(P("plcPath", "string", "PLC-Projekt, z. B. TIPC^MyPlc (leer = das einzige/erste)"),
-                   P("autostart", "boolean", "Bootprojekt beim Start der Runtime automatisch starten"),
-                   P("generate", "boolean", "Bootprojekt jetzt erzeugen (auf dem aktuellen Ziel)"),
-                   P("dryRun", "boolean", "Nur zeigen, was geaendert wuerde")),
+        Add("tc_boot_project", "PLC boot project: autostart on/off (autostart) and/or generate boot project (generate). " +
+                               "Without parameters: show current state.",
+            Schema(P("plcPath", "string", "PLC project, e.g. TIPC^MyPlc (empty = the only/first one)"),
+                   P("autostart", "boolean", "Start the boot project automatically when the runtime starts"),
+                   P("generate", "boolean", "Generate the boot project now (on the current target)"),
+                   P("dryRun", "boolean", "Only show what would be changed")),
             a => tc.Sta.Run(() => BootProject(a)));
 
-        Add("tc_runtime_startup", "Startmodus der TwinCAT-Runtime nach dem Hochfahren des Rechners: run oder config. " +
-                                  "Ohne mode: aktuellen Stand zeigen. Bisher nur fuer das lokale Zielsystem (Registry, braucht Administratorrechte).",
-            Schema(P("mode", "string", "run oder config (leer = nur anzeigen)")),
+        Add("tc_runtime_startup", "Startup mode of the TwinCAT runtime after the computer boots: run or config. " +
+                                  "Without mode: show current state. Currently only for the local target system (registry, requires administrator rights).",
+            Schema(P("mode", "string", "run or config (empty = only show)")),
             a => RuntimeStartup(Str(a, "mode")));
 
-        Add("tc_licenses", "Zeigt den Lizenz-Knoten der Solution (benoetigte/ausgewaehlte Lizenzen) als XML. Aendern mit tc_xml_set " +
-                           "im gezeigten Format. 7-Tage-Testlizenzen kann nur der Nutzer selbst aktivieren (TwinCAT verlangt dafuer " +
-                           "die Eingabe eines Sicherheitscodes) - dann den Nutzer darum bitten.",
+        Add("tc_licenses", "Shows the license node of the solution (required/selected licenses) as XML. Change with tc_xml_set " +
+                           "in the format shown. 7-day trial licenses can only be activated by the user (TwinCAT requires " +
+                           "entering a security code for that) - then ask the user to do it.",
             Schema(), a => tc.Sta.Run(() => Licenses()));
 
-        Add("tc_activate", "Setzt optional die Ziel-NetId, aktiviert die Konfiguration und startet TwinCAT im Run-Modus neu.",
-            Schema(P("netId", "string", "AmsNetId des Ziels, z. B. 5.12.34.56.1.1 (leer = aktuelles Ziel)"),
-                   P("restart", "boolean", "TwinCAT neu starten (Standard true)")),
+        Add("tc_activate", "Optionally sets the target NetId, activates the configuration and restarts TwinCAT in run mode.",
+            Schema(P("netId", "string", "AmsNetId of the target, e.g. 5.12.34.56.1.1 (empty = current target)"),
+                   P("restart", "boolean", "Restart TwinCAT (default true)")),
             a => tc.Sta.Run(() =>
             {
                 dynamic sm = tc.RequireSysMan();
@@ -368,15 +368,15 @@ public sealed partial class ToolRegistry
                 if (!string.IsNullOrEmpty(net)) sm.SetTargetNetId(net);
                 sm.ActivateConfiguration();
                 if (Bool(a, "restart", true)) sm.StartRestartTwinCAT();
-                return "aktiviert auf " + (string)sm.GetTargetNetId();
+                return "activated on " + (string)sm.GetTargetNetId();
             }));
 
-        Add("tc_plc_online", "PLC-Online-Befehle ueber das PLC-Projekt: login, download/Online Change, start, stop, logout.",
-            Schema(Req(P("plcProjectPath", "string", "Pfad des PLC-Projekts, z. B. TIPC^MyPlc^MyPlc Project")),
+        Add("tc_plc_online", "PLC online commands via the PLC project: login, download/online change, start, stop, logout.",
+            Schema(Req(P("plcProjectPath", "string", "Path of the PLC project, e.g. TIPC^MyPlc^MyPlc Project")),
                    P("login", "boolean", ""), P("start", "boolean", ""), P("stop", "boolean", ""), P("logout", "boolean", "")),
             a =>
             {
-                // Befehle einzeln und nacheinander senden - Login und Start in einem XML wird von TwinCAT nicht zuverlaessig ausgefuehrt
+                // Send commands individually one after another - TwinCAT does not reliably execute login and start in one XML
                 var done = new List<string>();
                 foreach (var (k, tag) in new[] { ("login", "LoginCmd"), ("stop", "StopCmd"), ("start", "StartCmd"), ("logout", "LogoutCmd") })
                 {
@@ -387,22 +387,22 @@ public sealed partial class ToolRegistry
                     Thread.Sleep(k == "login" ? 3000 : 1000);
                 }
                 string state;
-                try { using var c = Connect(a); state = c.ReadState().AdsState.ToString(); } catch (Exception ex) { state = "unbekannt (" + ex.Message + ")"; }
-                return $"ausgefuehrt: {string.Join(", ", done)}; PLC-Zustand (ADS): {state}";
+                try { using var c = Connect(a); state = c.ReadState().AdsState.ToString(); } catch (Exception ex) { state = "unknown (" + ex.Message + ")"; }
+                return $"executed: {string.Join(", ", done)}; PLC state (ADS): {state}";
             });
 
-        Add("tc_plc_state", "Liest den Laufzeitzustand der PLC per ADS (Run, Stop, Config ...).",
-            Schema(P("netId", "string", "AmsNetId (leer = lokal)"), P("port", "integer", "ADS-Port (Standard 851)")),
+        Add("tc_plc_state", "Reads the runtime state of the PLC via ADS (Run, Stop, Config ...).",
+            Schema(P("netId", "string", "AmsNetId (empty = local)"), P("port", "integer", "ADS port (default 851)")),
             a => { using var c = Connect(a); var s = c.ReadState(); return $"AdsState={s.AdsState} DeviceState={s.DeviceState}"; });
 
-        // ---------------------------------------------------------- ADS (Laufzeit)
-        Add("ads_read", "Liest eine Variable zur Laufzeit per ADS (z. B. MAIN.nCounter).",
-            Schema(Req(P("symbol", "string", "Symbolpfad")), P("netId", "string", "AmsNetId (leer = lokal)"), P("port", "integer", "ADS-Port (Standard 851)")),
+        // ---------------------------------------------------------- ADS (runtime)
+        Add("ads_read", "Reads a variable at runtime via ADS (e.g. MAIN.nCounter).",
+            Schema(Req(P("symbol", "string", "Symbol path")), P("netId", "string", "AmsNetId (empty = local)"), P("port", "integer", "ADS port (default 851)")),
             a => Ads(a, (sym) => Format(sym.ReadValue())));
 
-        Add("ads_write", "Schreibt eine Variable zur Laufzeit per ADS.",
-            Schema(Req(P("symbol", "string", "Symbolpfad")), Req(P("value", "string", "Neuer Wert (Text, wird in den Variablentyp konvertiert)")),
-                   P("netId", "string", "AmsNetId (leer = lokal)"), P("port", "integer", "ADS-Port (Standard 851)")),
+        Add("ads_write", "Writes a variable at runtime via ADS.",
+            Schema(Req(P("symbol", "string", "Symbol path")), Req(P("value", "string", "New value (text, converted to the variable type)")),
+                   P("netId", "string", "AmsNetId (empty = local)"), P("port", "integer", "ADS port (default 851)")),
             a => Ads(a, (sym) =>
             {
                 var current = sym.ReadValue();
@@ -413,8 +413,8 @@ public sealed partial class ToolRegistry
                 return $"{Format(current)} -> {Format(sym.ReadValue())}";
             }));
 
-        Add("ads_symbols", "Listet Laufzeitsymbole per ADS (optional gefiltert).",
-            Schema(P("filter", "string", "Teilstring, z. B. MAIN."), P("netId", "string", "AmsNetId"), P("port", "integer", "ADS-Port (851)")),
+        Add("ads_symbols", "Lists runtime symbols via ADS (optionally filtered).",
+            Schema(P("filter", "string", "Substring, e.g. MAIN."), P("netId", "string", "AmsNetId"), P("port", "integer", "ADS port (851)")),
             a =>
             {
                 using var c = Connect(a);
@@ -429,22 +429,22 @@ public sealed partial class ToolRegistry
                     foreach (ISymbol sub in s.SubSymbols) Walk(sub, lvl + 1);
                 }
                 foreach (ISymbol s in loader.Symbols) Walk(s, 0);
-                return sb.Length > 0 ? sb.ToString() : "keine Symbole";
+                return sb.Length > 0 ? sb.ToString() : "no symbols";
             });
     }
 
-    // ------------------------------------------------------------------ PLC-Helfer
+    // ------------------------------------------------------------------ PLC helpers
     string PlcRead(string path)
     {
         var item = tc.Item(path);
         var sb = new StringBuilder($"# {item.Name}  [sub={item.ItemSubType}]\n");
-        if (item is ITcPlcDeclaration d) sb.Append("## Deklaration\n").Append(d.DeclarationText).Append('\n');
-        if (item is ITcPlcImplementation i) sb.Append("## Implementierung\n").Append(i.ImplementationText).Append('\n');
+        if (item is ITcPlcDeclaration d) sb.Append("## Declaration\n").Append(d.DeclarationText).Append('\n');
+        if (item is ITcPlcImplementation i) sb.Append("## Implementation\n").Append(i.ImplementationText).Append('\n');
         foreach (var c in TwinCatSession.Children(item))
         {
             sb.Append($"\n### {c.Name}  [sub={c.ItemSubType}]  {c.PathName}\n");
             if (c is ITcPlcDeclaration cd) sb.Append(cd.DeclarationText).Append('\n');
-            if (c is ITcPlcImplementation ci) sb.Append("--- Implementierung ---\n").Append(ci.ImplementationText).Append('\n');
+            if (c is ITcPlcImplementation ci) sb.Append("--- Implementation ---\n").Append(ci.ImplementationText).Append('\n');
         }
         return sb.ToString();
     }
@@ -454,15 +454,15 @@ public sealed partial class ToolRegistry
         var done = new List<string>();
         if (decl != null)
         {
-            if (item is not ITcPlcDeclaration d) throw new Exception("Objekt hat keinen Deklarationsteil");
-            d.DeclarationText = decl; done.Add("Deklaration");
+            if (item is not ITcPlcDeclaration d) throw new Exception("Object has no declaration part");
+            d.DeclarationText = decl; done.Add("declaration");
         }
         if (impl != null)
         {
-            if (item is not ITcPlcImplementation i) throw new Exception("Objekt hat keinen Implementierungsteil");
-            i.ImplementationText = impl; done.Add("Implementierung");
+            if (item is not ITcPlcImplementation i) throw new Exception("Object has no implementation part");
+            i.ImplementationText = impl; done.Add("implementation");
         }
-        return done.Count == 0 ? "nichts geaendert" : string.Join(" + ", done) + " geschrieben";
+        return done.Count == 0 ? "nothing changed" : string.Join(" + ", done) + " written";
     }
 
     static string Pretty(JsonObject o) => o.ToJsonString(new System.Text.Json.JsonSerializerOptions
@@ -481,26 +481,26 @@ public sealed partial class ToolRegistry
         var source = Str(a, "source") ?? "lm";
         if (source == "lm")
         {
-            // Projektmodell: kompakt je Bibliotheksversion zwischengespeichert
+            // Project model: cached compactly per library version
             var cacheDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "libcache");
             Directory.CreateDirectory(cacheDir);
             var apiFile = Path.Combine(cacheDir, $"{lib}_{(string.IsNullOrEmpty(version) ? "aktuell" : version)}.api.json");
             LibApi api = null; string origin;
-            if (File.Exists(apiFile) && !Bool(a, "refresh", false)) { api = LibApi.Load(apiFile); origin = "aus Zwischenspeicher"; }
+            if (File.Exists(apiFile) && !Bool(a, "refresh", false)) { api = LibApi.Load(apiFile); origin = "from cache"; }
             else
             {
                 var lr = BridgeClient.Call(pid, "lm_export", new JsonObject { ["library"] = lib }, 300000);
                 if (lr["found"]?.GetValue<bool>() != true || lr["file"] == null)
-                    return $"Kein Language-Model-Kontext fuer '{lib}' gefunden (Bibliothek im Projekt referenziert?). Kontexte:\n" +
+                    return $"No project model context found for '{lib}' (is the library referenced in the project?). Contexts:\n" +
                            string.Join("\n", (lr["contexts"] as JsonArray ?? new JsonArray()).Select(x => "  " + x));
                 var raw = lr["file"]!.ToString();
                 api = LibApi.FromLm(File.ReadAllText(raw), lib);
                 var libIds = api.Symbols.Select(x => x.LibraryId).Where(x => x != null).Distinct().ToList();
                 if (libIds.Count > 0 && !libIds.Any(x => x.StartsWith(lib + ",", StringComparison.OrdinalIgnoreCase)))
-                    return $"Falscher Kontext erwischt ({string.Join("; ", libIds)}) - bitte mit source=doc abfragen und tc_feedback melden.";
+                    return $"Wrong context picked up ({string.Join("; ", libIds)}) - please query with source=doc and report via tc_feedback.";
                 api.Save(apiFile);
                 try { File.Delete(raw); } catch { }
-                origin = $"neu aus der IDE gelesen ({libIds.FirstOrDefault()})";
+                origin = $"freshly read from the IDE ({libIds.FirstOrDefault()})";
             }
             var s0 = Str(a, "symbol");
             return $"{lib} {version} - {origin}\n" + (string.IsNullOrEmpty(s0) ? api.Outline(Str(a, "filter")) : api.Describe(s0));
@@ -509,12 +509,12 @@ public sealed partial class ToolRegistry
         var r = BridgeClient.Call(pid, "lib_export", args, 300000);
         var file = r["file"]!.ToString();
         var json = File.ReadAllText(file);
-        var head = $"{r["title"]} {r["version"]} ({r["company"]}) - {(r["cached"]?.GetValue<bool>() == true ? "aus Zwischenspeicher" : "neu exportiert")}, {json.Length} Zeichen, {file}\n";
+        var head = $"{r["title"]} {r["version"]} ({r["company"]}) - {(r["cached"]?.GetValue<bool>() == true ? "from cache" : "freshly exported")}, {json.Length} characters, {file}\n";
         var sym = Str(a, "symbol");
         return head + (string.IsNullOrEmpty(sym) ? LibJson.Outline(json, Str(a, "filter")) : LibJson.Find(json, sym));
     }
 
-    // Im Projekt aufgeloeste Version einer referenzierten Bibliothek (Platzhalter beruecksichtigt)
+    // Version of a referenced library as resolved in the project (placeholders taken into account)
     string ReferencedVersion(string library)
     {
         foreach (var plc in tc.PlcProjects())
@@ -523,7 +523,7 @@ public sealed partial class ToolRegistry
                 if (c is not ITcPlcLibraryManager lm) continue;
                 foreach (object r in (System.Collections.IEnumerable)((dynamic)lm).References)
                 {
-                    var d = DescribeLib(r);   // "Platzhalter X -> Name, Version (Hersteller)" bzw. "Name, Version (Hersteller)"
+                    var d = DescribeLib(r);   // "Placeholder X -> Name, Version (Vendor)" or "Name, Version (Vendor)"
                     var lib = d.Contains(" -> ") ? d[(d.IndexOf(" -> ") + 4)..] : d;
                     var parts = lib.Split(',', 2);
                     if (parts.Length == 2 && parts[0].Trim().Equals(library, StringComparison.OrdinalIgnoreCase))
@@ -533,10 +533,10 @@ public sealed partial class ToolRegistry
         return null;
     }
 
-    // ------------------------------------------------------------------ Editor-Cursor (aus der Bruecke) auswerten
+    // ------------------------------------------------------------------ Evaluate editor cursor (from the bridge)
     sealed record Cursor(string Path, string Part, int Line, int Col, string[] Code, string Selected, string SelText);
 
-    // TwinCAT zaehlt die Zeilen ueber Deklaration + Implementierung durch -> auf den Teil umrechnen
+    // TwinCAT counts lines continuously across declaration + implementation -> convert to the part
     Cursor AnalyzeCursor(JsonObject b, string dteText)
     {
         string V(string k) => b[k]?.ToString();
@@ -554,52 +554,52 @@ public sealed partial class ToolRegistry
             catch { }
         string[] Lines(string t) { if (t == null) return Array.Empty<string>(); t = t.Replace("\r\n", "\n"); if (t.EndsWith("\n")) t = t[..^1]; return t.Split('\n'); }
         var dl = Lines(decl); var il = Lines(impl);
-        // Bevorzugt: Cursor direkt aus dem Editor-Control der aktiven Haelfte (unabhaengig vom VS-Fokus)
+        // Preferred: cursor directly from the editor control of the active half (independent of VS focus)
         if (b["active"] is JsonObject act && int.TryParse(act["line"]?.ToString(), out var al))
         {
             var ap = act["part"]?.ToString();
             int.TryParse(act["column"]?.ToString(), out var acol);
             var st = act["selectedText"]?.ToString();
-            return new Cursor(path, ap, al, Math.Max(1, acol), ap == "Implementierung" ? il : dl,
-                              string.IsNullOrEmpty(st) ? null : $"{ap}, Zeile {al}", string.IsNullOrEmpty(st) ? null : st);
+            return new Cursor(path, ap, al, Math.Max(1, acol), ap == "implementation" ? il : dl,
+                              string.IsNullOrEmpty(st) ? null : $"{ap}, line {al}", string.IsNullOrEmpty(st) ? null : st);
         }
         int offset = dl.Length;
         var selFirst = (V("selectedText") ?? "").Replace("\r\n", "\n").Split('\n')[0].Trim();
         if (selFirst.Length > 0 && int.TryParse(V("selStartLine"), out var sl))
-            foreach (var k in new[] { dl.Length, dl.Length + 1, dl.Length - 1 })   // Plausibilitaet: markierter Text muss in der Zeile stehen
+            foreach (var k in new[] { dl.Length, dl.Length + 1, dl.Length - 1 })   // Plausibility: the selected text must be on that line
             {
                 var src = sl > k ? il : dl; var idx = sl > k ? sl - k : sl;
                 if (idx >= 1 && idx <= src.Length && src[idx - 1].Contains(selFirst)) { offset = k; break; }
             }
         if (!int.TryParse(V("caretLine"), out var cl)) return new Cursor(path, null, 0, 0, null, null, V("selectedText"));
-        var part = cl > offset ? "Implementierung" : "Deklaration";
+        var part = cl > offset ? "implementation" : "declaration";
         var line = cl > offset ? cl - offset : cl;
         string sel = null;
         if (int.TryParse(V("selStartLine"), out var s1) && int.TryParse(V("selEndLine"), out var s2) && (s1 != s2 || V("selStartColumn") != V("selEndColumn")))
-            sel = $"{(s1 > offset ? "Implementierung" : "Deklaration")}, Zeile {(s1 > offset ? s1 - offset : s1)}:{V("selStartColumn")} bis {(s2 > offset ? s2 - offset : s2)}:{V("selEndColumn")}";
-        return new Cursor(path, part, line, int.TryParse(V("caretColumn"), out var cc) ? cc : 1, part == "Implementierung" ? il : dl, sel, V("selectedText"));
+            sel = $"{(s1 > offset ? "implementation" : "declaration")}, line {(s1 > offset ? s1 - offset : s1)}:{V("selStartColumn")} to {(s2 > offset ? s2 - offset : s2)}:{V("selEndColumn")}";
+        return new Cursor(path, part, line, int.TryParse(V("caretColumn"), out var cc) ? cc : 1, part == "implementation" ? il : dl, sel, V("selectedText"));
     }
 
     string BridgeContext(JsonObject b, string dteText)
     {
-        var o = new StringBuilder("\n--- aus der IDE (TcAgentBridge) ---\n");
+        var o = new StringBuilder("\n--- from the IDE (TcAgentBridge) ---\n");
         var c = AnalyzeCursor(b, dteText);
-        if (c.Part == null) return o.AppendLine("Cursor nicht verfuegbar. Roh: " + Pretty(b)).ToString();
-        o.AppendLine($"Cursor: {c.Part}, Zeile {c.Line}, Spalte {c.Col}");
+        if (c.Part == null) return o.AppendLine("Cursor not available. Raw: " + Pretty(b)).ToString();
+        o.AppendLine($"Cursor: {c.Part}, line {c.Line}, column {c.Col}");
         var w = WordAt(c);
-        if (w != null) o.AppendLine("Wort am Cursor: " + w);
-        if (c.Selected != null) o.AppendLine("Selektion: " + c.Selected);
-        if (c.SelText != null) o.AppendLine("Markierter Text:\n" + c.SelText);
+        if (w != null) o.AppendLine("Word at cursor: " + w);
+        if (c.Selected != null) o.AppendLine("Selection: " + c.Selected);
+        if (c.SelText != null) o.AppendLine("Selected text:\n" + c.SelText);
         if (c.Path != null && c.Code.Length > 0)
         {
-            o.AppendLine($"Code um den Cursor ({c.Path}, {c.Part}):");
+            o.AppendLine($"Code around the cursor ({c.Path}, {c.Part}):");
             for (int i = Math.Max(1, c.Line - 3); i <= Math.Min(c.Code.Length, c.Line + 3); i++)
                 o.AppendLine($"{(i == c.Line ? ">" : " ")}{i,5}: {c.Code[i - 1]}");
         }
         return o.ToString();
     }
 
-    // Bezeichner (mit Punkt-Pfad, z. B. GVL_Progress.Progress) an der Cursorposition
+    // Identifier (with dotted path, e.g. GVL_Progress.Progress) at the cursor position
     static string WordAt(Cursor c)
     {
         if (c.Code == null || c.Line < 1 || c.Line > c.Code.Length) return null;
@@ -614,7 +614,7 @@ public sealed partial class ToolRegistry
         return word.Length == 0 || char.IsDigit(word[0]) ? null : word;
     }
 
-    // Gehe zu Definition: Name (oder Wort am Cursor) wie TwinCAT im Gueltigkeitsbereich des offenen Objekts aufloesen
+    // Go to definition: resolve a name (or the word at the cursor) like TwinCAT does, in the scope of the open object
     string GotoDefinition(JsonObject a)
     {
         var (text, pid) = tc.Sta.Run(() => (tc.EditorContext(), tc.AttachedPid));
@@ -622,46 +622,46 @@ public sealed partial class ToolRegistry
         if (string.IsNullOrWhiteSpace(name))
         {
             var c = AnalyzeCursor(BridgeClient.Call(pid, "context"), text);
-            // Markierung: erster Bezeichner darin (z. B. "_startTime := TIME();" -> _startTime), sonst Wort am Cursor
+            // Selection: first identifier in it (e.g. "_startTime := TIME();" -> _startTime), otherwise word at cursor
             var m = Regex.Match(c.SelText ?? "", @"[A-Za-z_][A-Za-z0-9_]*(\.[A-Za-z_][A-Za-z0-9_]*)*");
             name = m.Success ? m.Value : WordAt(c);
-            if (string.IsNullOrEmpty(name)) return "Kein Bezeichner am Cursor - symbol angeben oder im Editor auf einen Namen klicken.";
+            if (string.IsNullOrEmpty(name)) return "No identifier at the cursor - specify symbol or click on a name in the editor.";
         }
         var r = BridgeClient.Call(pid, "goto", new JsonObject { ["name"] = name });
-        var o = new StringBuilder($"'{name}' (aufgeloest im Kontext {r["context"]}):\n");
+        var o = new StringBuilder($"'{name}' (resolved in context {r["context"]}):\n");
         string Where(JsonNode s)
         {
             if (s == null) return "?";
             if (s["isLibrary"]?.ToString() == "true" || s["isLibrary"]?.ToString() == "True")
-                return $"Bibliothek {s["library"]} -> tc_lib_signatures library={s["library"]?.ToString().Split(',')[0]} symbol={s["name"]}";
+                return $"Library {s["library"]} -> tc_lib_signatures library={s["library"]?.ToString().Split(',')[0]} symbol={s["name"]}";
             var op = s["objectPath"]?.ToString();
             var paths = string.IsNullOrEmpty(op) ? new List<string>() : tc.Sta.Run(() => tc.ResolvePlcPathsPublic(op));
-            return paths.Count > 0 ? "Projekt: " + string.Join(" | ", paths) + "  (tc_plc_read)" : "Projekt: " + op;
+            return paths.Count > 0 ? "Project: " + string.Join(" | ", paths) + "  (tc_plc_read)" : "Project: " + op;
         }
         if (r["variable"] is JsonObject v)
         {
             o.AppendLine($"Variable {v["name"]} : {v["type"]}  [{v["flags"]}]" + (string.IsNullOrWhiteSpace(v["doc"]?.ToString()) ? "" : $"  // {v["doc"]?.ToString().Trim()}"));
-            o.AppendLine($"  deklariert in {v["declaredIn"]?["kind"]} {v["declaredIn"]?["name"]}: {Where(v["declaredIn"])}");
+            o.AppendLine($"  declared in {v["declaredIn"]?["kind"]} {v["declaredIn"]?["name"]}: {Where(v["declaredIn"])}");
             if (r["type"] is JsonObject t)
-                o.AppendLine($"  Typ {t["name"]} ({t["kind"]}{(string.IsNullOrEmpty(t["extends"]?.ToString()) ? "" : " EXTENDS " + t["extends"])}): {Where(t)}");
+                o.AppendLine($"  Type {t["name"]} ({t["kind"]}{(string.IsNullOrEmpty(t["extends"]?.ToString()) ? "" : " EXTENDS " + t["extends"])}): {Where(t)}");
         }
         else if (r["signatures"] is JsonArray sigs && sigs.Count > 0)
             foreach (var s in sigs)
                 o.AppendLine($"{s?["kind"]} {s?["name"]}{(string.IsNullOrEmpty(s?["extends"]?.ToString()) ? "" : " EXTENDS " + s?["extends"])}: {Where(s)}");
-        else o.AppendLine("Nicht gefunden (weder Variable im aktuellen Objekt noch Typ/POU). Fuer Textsuche: tc_plc_search.");
+        else o.AppendLine("Not found (neither a variable in the current object nor a type/POU). For text search: tc_plc_search.");
         if (r["members"] is JsonArray mem)
             foreach (var mm in mem)
             {
-                if (mm?["notFoundIn"] != null) { o.AppendLine($"  .{mm["name"]}: nicht gefunden in {mm["notFoundIn"]?["name"]}"); continue; }
+                if (mm?["notFoundIn"] != null) { o.AppendLine($"  .{mm["name"]}: not found in {mm["notFoundIn"]?["name"]}"); continue; }
                 o.AppendLine($"  .{mm?["name"]} : {mm?["type"]}  [{mm?["flags"]}]" + (string.IsNullOrWhiteSpace(mm?["doc"]?.ToString()) ? "" : $"  // {mm?["doc"]?.ToString().Trim()}"));
-                o.AppendLine($"      deklariert in {mm?["declaredIn"]?["kind"]} {mm?["declaredIn"]?["name"]}: {Where(mm?["declaredIn"])}");
+                o.AppendLine($"      declared in {mm?["declaredIn"]?["kind"]} {mm?["declaredIn"]?["name"]}: {Where(mm?["declaredIn"])}");
             }
         if (r["memberType"] is JsonObject mt)
-            o.AppendLine($"  Typ {mt["name"]} ({mt["kind"]}{(string.IsNullOrEmpty(mt["extends"]?.ToString()) ? "" : " EXTENDS " + mt["extends"])}): {Where(mt)}");
+            o.AppendLine($"  Type {mt["name"]} ({mt["kind"]}{(string.IsNullOrEmpty(mt["extends"]?.ToString()) ? "" : " EXTENDS " + mt["extends"])}): {Where(mt)}");
         return o.ToString();
     }
 
-    // Querverweise: semantisch aus dem Projektmodell (mit Zugriffsart), Zeile/Code ueber die Textsuche im selben Objekt
+    // Cross references: semantically from the project model (with access type), line/code via text search in the same object
     sealed record Hit(string Path, string Part, int Line, string Text);
 
     List<Hit> WordHits(string word, int max) => tc.Sta.Run(() =>
@@ -680,8 +680,8 @@ public sealed partial class ToolRegistry
                 for (int n = 0; n < lines.Length && hits.Count < max; n++)
                     if (rx.IsMatch(lines[n])) hits.Add(new Hit(path, part, n + 1, lines[n]));
             }
-            try { if (it is ITcPlcDeclaration d) Scan("Deklaration", d.DeclarationText); } catch { }
-            try { if (it is ITcPlcImplementation i) Scan("Implementierung", i.ImplementationText); } catch { }
+            try { if (it is ITcPlcDeclaration d) Scan("declaration", d.DeclarationText); } catch { }
+            try { if (it is ITcPlcImplementation i) Scan("implementation", i.ImplementationText); } catch { }
         }
         return hits;
     });
@@ -691,17 +691,17 @@ public sealed partial class ToolRegistry
         var name = Str(a, "symbol");
         int max = Int(a, "max", 300);
         var plain = name.Contains('.') ? name[(name.LastIndexOf('.') + 1)..] : name;
-        var hits = WordHits(plain, Math.Max(2000, max * 10));   // Textsuche breiter als die Anzeige, damit jede Fundstelle ihre Zeile bekommt
+        var hits = WordHits(plain, Math.Max(2000, max * 10));   // Text search wider than the display, so every reference gets its line
         var used = new HashSet<Hit>();
         var pid = tc.Sta.Run(() => { try { tc.RequireDte(); } catch { } return tc.AttachedPid; });
         var o = new StringBuilder();
-        static string Access(string acc) => acc switch { "Declarative" => "Deklaration", "Read" => "Lesen", "Write" => "Schreiben", "ReadWrite" => "Lesen+Schreiben", "Call" => "Aufruf", _ => acc };
+        static string Access(string acc) => acc switch { "Declarative" => "declaration", "Read" => "read", "Write" => "write", "ReadWrite" => "read+write", "Call" => "call", _ => acc };
         try
         {
             var r = BridgeClient.Call(pid, "xref", new JsonObject { ["name"] = name, ["max"] = max }, 120000);
             var entries = r["entries"] as JsonArray ?? new JsonArray();
             int total = entries.Sum(e => (e?["refs"] as JsonArray)?.Count ?? 0);
-            o.AppendLine($"Querverweise auf '{name}' (wie TwinCATs Kreuzreferenzliste): {total}");
+            o.AppendLine($"Cross references to '{name}' (like TwinCAT's cross reference list): {total}");
             foreach (var e in entries)
                 foreach (var x in (e?["refs"] as JsonArray ?? new JsonArray()).Take(max))
                 {
@@ -710,21 +710,21 @@ public sealed partial class ToolRegistry
                     var path = paths.FirstOrDefault();
                     var part = x?["part"]?.ToString();
                     int.TryParse(x?["column"]?.ToString(), out var col);
-                    // passende Textzeile im selben Objekt/Teil, deren Fundstelle am naechsten an der Spalte liegt
+                    // matching text line in the same object/part whose hit is closest to the column
                     var cand = hits.Where(h => !used.Contains(h) && h.Path == path && (part == null || h.Part == part))
                                    .OrderBy(h => Math.Abs(h.Text.IndexOf(plain, StringComparison.OrdinalIgnoreCase) + 1 - col)).FirstOrDefault();
                     if (cand != null) used.Add(cand);
-                    o.AppendLine($"  {Access(x?["Access"]?.ToString()),-15} {path ?? loc ?? "(Ort unbekannt)"}" +
-                                 (part != null ? $"  [{part}{(cand != null ? $" Zeile {cand.Line}" : "")}]" : "") +
+                    o.AppendLine($"  {Access(x?["Access"]?.ToString()),-15} {path ?? loc ?? "(location unknown)"}" +
+                                 (part != null ? $"  [{part}{(cand != null ? $" line {cand.Line}" : "")}]" : "") +
                                  (cand != null ? "  " + cand.Text.Trim() : ""));
                 }
         }
-        catch (Exception ex) { o.AppendLine("Querverweise nicht verfuegbar: " + ex.Message + " - nur Textsuche:"); }
+        catch (Exception ex) { o.AppendLine("Cross references not available: " + ex.Message + " - text search only:"); }
         var rest = hits.Where(h => !used.Contains(h)).Take(max).ToList();
         if (rest.Count > 0)
         {
-            o.AppendLine($"\nNur in der Textsuche ({rest.Count}, z. B. Kommentare, gleichnamige andere Symbole oder nicht kompilierter Code):");
-            foreach (var h in rest) o.AppendLine($"  {h.Path}  [{h.Part} Zeile {h.Line}]  {h.Text.Trim()}");
+            o.AppendLine($"\nOnly in the text search ({rest.Count}, e.g. comments, other symbols with the same name or code that is not compiled):");
+            foreach (var h in rest) o.AppendLine($"  {h.Path}  [{h.Part} line {h.Line}]  {h.Text.Trim()}");
         }
         return o.ToString();
     }
@@ -733,16 +733,16 @@ public sealed partial class ToolRegistry
 
     static string PlcDiff(ITcSmTreeItem item, string decl, string impl)
     {
-        var o = new StringBuilder($"VORSCHLAG fuer {item.PathName} (nichts geschrieben):\n");
+        var o = new StringBuilder($"PROPOSAL for {item.PathName} (nothing written):\n");
         if (decl != null)
         {
-            if (item is not ITcPlcDeclaration d) throw new Exception("Objekt hat keinen Deklarationsteil");
-            o.Append(LineDiff.Unified(d.DeclarationText, decl, "Deklaration"));
+            if (item is not ITcPlcDeclaration d) throw new Exception("Object has no declaration part");
+            o.Append(LineDiff.Unified(d.DeclarationText, decl, "declaration"));
         }
         if (impl != null)
         {
-            if (item is not ITcPlcImplementation i) throw new Exception("Objekt hat keinen Implementierungsteil");
-            o.Append(LineDiff.Unified(i.ImplementationText, impl, "Implementierung"));
+            if (item is not ITcPlcImplementation i) throw new Exception("Object has no implementation part");
+            o.Append(LineDiff.Unified(i.ImplementationText, impl, "implementation"));
         }
         return o.ToString();
     }
@@ -769,11 +769,11 @@ public sealed partial class ToolRegistry
             string path = null;
             try { path = it.PathName; } catch { continue; }
             bool any = false;
-            if (part != "impl" && it is ITcPlcDeclaration d) { any = true; try { Scan(path, "Dekl", d.DeclarationText); } catch { } }
+            if (part != "impl" && it is ITcPlcDeclaration d) { any = true; try { Scan(path, "Decl", d.DeclarationText); } catch { } }
             if (part != "decl" && it is ITcPlcImplementation i) { any = true; try { Scan(path, "Impl", i.ImplementationText); } catch { } }
             if (any) objects++;
         }
-        var head = $"{hits} Treffer in {objects} durchsuchten Objekten" + (hits >= max ? $" (abgeschnitten bei max={max})" : "") + "\n";
+        var head = $"{hits} hits in {objects} searched objects" + (hits >= max ? $" (truncated at max={max})" : "") + "\n";
         return head + o;
     }
 
@@ -789,11 +789,11 @@ public sealed partial class ToolRegistry
                 foreach (object r in (System.Collections.IEnumerable)((dynamic)lm).References) o.AppendLine("  " + DescribeLib(r));
                 if (installed)
                 {
-                    o.AppendLine("  -- installiert im Repository --");
+                    o.AppendLine("  -- installed in the repository --");
                     foreach (object r in (System.Collections.IEnumerable)((dynamic)lm).ScanLibraries()) o.AppendLine("  " + DescribeLib(r));
                 }
             }
-        return o.Length > 0 ? o.ToString() : "keine Bibliotheksreferenzen gefunden";
+        return o.Length > 0 ? o.ToString() : "no library references found";
     }
 
     static string DescribeLib(object r)
@@ -813,7 +813,7 @@ public sealed partial class ToolRegistry
             try { eff = d.EffectiveResolution; } catch { }
             try { def = d.DefaultResolution; } catch { }
             object res = eff ?? def;
-            return $"Platzhalter {ph} -> {Lib(res)}";
+            return $"Placeholder {ph} -> {Lib(res)}";
         }
         return Lib(r);
     }
@@ -821,14 +821,14 @@ public sealed partial class ToolRegistry
     string PlcCreate(JsonObject a)
     {
         var kind = Str(a, "kind");
-        if (!PlcKinds.TryGetValue(kind, out var sub)) throw new Exception("Unbekannter kind: " + kind);
+        if (!PlcKinds.TryGetValue(kind, out var sub)) throw new Exception("Unknown kind: " + kind);
         var impls = (Str(a, "implements") ?? "").Split(',').Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
-        if (impls.Count > 0 && sub != 604) throw new Exception("implements gibt es nur bei kind=function_block");
+        if (impls.Count > 0 && sub != 604) throw new Exception("implements is only available with kind=function_block");
         var name = Str(a, "name");
         var decl = Str(a, "declaration");
         if (impls.Count > 0 && decl == null)
             decl = $"FUNCTION_BLOCK {name} IMPLEMENTS {string.Join(", ", impls)}\nVAR_INPUT\nEND_VAR\nVAR_OUTPUT\nEND_VAR\nVAR\nEND_VAR\n";
-        // Interface-Mitglieder vorab ermitteln (auch fuer dryRun)
+        // Determine interface members up front (also for dryRun)
         var members = new List<(string Iface, LibApi.Member M)>();
         var missing = new List<string>();
         foreach (var i in impls)
@@ -837,13 +837,13 @@ public sealed partial class ToolRegistry
             if (ms == null) missing.Add(i); else members.AddRange(ms.Select(m => (i, m)));
         }
         if (missing.Count > 0)
-            throw new Exception($"Interface nicht gefunden: {string.Join(", ", missing)}. Projekt-Interfaces werden direkt gelesen; bei Bibliotheks-" +
-                                "Interfaces einmal tc_lib_signatures library=<Bibliothek> aufrufen (fuellt den Zwischenspeicher), dann erneut.");
+            throw new Exception($"Interface not found: {string.Join(", ", missing)}. Project interfaces are read directly; for library " +
+                                "interfaces call tc_lib_signatures library=<library> once (fills the cache), then try again.");
         if (DryRun(a))
-            return $"VORSCHLAG (nichts angelegt): {kind} '{name}' unter {tc.Item(Str(a, "parentPath")).PathName}" +
-                   (decl is { } dd ? "\n--- Deklaration ---\n" + dd : "") +
-                   (Str(a, "implementation") is { } ii ? "\n--- Implementierung ---\n" + ii : "") +
-                   (members.Count > 0 ? "\n--- Stubs aus " + string.Join(", ", impls) + " ---\n" +
+            return $"PROPOSAL (nothing created): {kind} '{name}' under {tc.Item(Str(a, "parentPath")).PathName}" +
+                   (decl is { } dd ? "\n--- Declaration ---\n" + dd : "") +
+                   (Str(a, "implementation") is { } ii ? "\n--- Implementation ---\n" + ii : "") +
+                   (members.Count > 0 ? "\n--- Stubs from " + string.Join(", ", impls) + " ---\n" +
                                         string.Join("\n", members.Select(m => m.M.IsProperty ? $"PROPERTY {m.M.Name} : {m.M.ReturnType} (Get/Set)" : m.M.Declaration.Split('\n').First(ln => !ln.StartsWith("///")))) : "");
         var lang = Languages.TryGetValue(Str(a, "language") ?? "ST", out var l) ? l : 1;
         var ret = Str(a, "returnType");
@@ -859,18 +859,18 @@ public sealed partial class ToolRegistry
         string w;
         if (sub is 611 or 612)
         {
-            // Properties brauchen Get/Set-Accessoren - CreateChild legt sie nicht von selbst an
+            // Properties need Get/Set accessors - CreateChild does not create them by itself
             w = PlcWrite(item, decl, null);
             var acc = EnsureAccessors(item, lang, Str(a, "getImplementation") ?? Str(a, "implementation"), Str(a, "setImplementation"));
             w += "; " + acc;
         }
         else w = PlcWrite(item, decl, Str(a, "implementation"));
-        var o = new StringBuilder($"angelegt: {item.PathName}; {w}");
-        // Stubs fuer die Interface-Mitglieder
+        var o = new StringBuilder($"created: {item.PathName}; {w}");
+        // Stubs for the interface members
         var existing = TwinCatSession.Children(item).Select(c => c.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var (iface, m) in members)
         {
-            if (existing.Contains(m.Name)) { o.Append($"\n  {m.Name}: schon vorhanden"); continue; }
+            if (existing.Contains(m.Name)) { o.Append($"\n  {m.Name}: already exists"); continue; }
             try
             {
                 if (m.IsProperty)
@@ -885,13 +885,13 @@ public sealed partial class ToolRegistry
                     o.Append($"\n  METHOD {m.Name}{(m.ReturnType != null ? " : " + m.ReturnType : "")} ({iface})");
                 }
             }
-            catch (Exception ex) { o.Append($"\n  {m.Name}: FEHLER {ex.Message}"); }
+            catch (Exception ex) { o.Append($"\n  {m.Name}: ERROR {ex.Message}"); }
         }
-        if (members.Count > 0) o.Append("\nStubs sind leer - Implementierung mit tc_plc_write ergaenzen, dann tc_check.");
+        if (members.Count > 0) o.Append("\nStubs are empty - add the implementation with tc_plc_write, then tc_check.");
         return o.ToString();
     }
 
-    // Get/Set unter einer Property sicherstellen (TwinCAT-Subtypen 613/614)
+    // Ensure Get/Set below a property (TwinCAT subtypes 613/614)
     static string EnsureAccessors(ITcSmTreeItem prop, int lang, string getImpl, string setImpl)
     {
         var notes = new List<string>();
@@ -906,19 +906,19 @@ public sealed partial class ToolRegistry
                     try { child = (ITcSmTreeItem)((dynamic)prop).CreateChild(nm, st, "", vi); break; }
                     catch (Exception ex) { last = ex; }
                 }
-                if (child == null) { notes.Add($"{nm} NICHT anlegbar ({last?.Message})"); continue; }
-                notes.Add(nm + " angelegt");
+                if (child == null) { notes.Add($"{nm} could NOT be created ({last?.Message})"); continue; }
+                notes.Add(nm + " created");
             }
             if (impl != null)
             {
-                if (child is ITcPlcImplementation ci) { ci.ImplementationText = impl; notes.Add(nm + "-Code geschrieben"); }
-                else notes.Add(nm + " hat keinen Implementierungsteil");
+                if (child is ITcPlcImplementation ci) { ci.ImplementationText = impl; notes.Add(nm + " code written"); }
+                else notes.Add(nm + " has no implementation part");
             }
         }
         return string.Join(", ", notes);
     }
 
-    // Mitglieder eines Interfaces: zuerst im Projekt, dann in den zwischengespeicherten Bibliotheksschnittstellen
+    // Members of an interface: first in the project, then in the cached library interfaces
     List<LibApi.Member> InterfaceMembersFor(string iface)
     {
         var list = new List<LibApi.Member>();
@@ -965,7 +965,7 @@ public sealed partial class ToolRegistry
                 list.Add(new LibApi.Member(c.Name, false, m.Success ? m.Groups[1].Value : null, cd.TrimEnd()));
             }
         }
-        // EXTENDS weiterer Interfaces (Projekt oder Bibliothek)
+        // EXTENDS of further interfaces (project or library)
         var ext = Regex.Match(d, @"INTERFACE\s+\w+\s+EXTENDS\s+([\w\s,.]+)", RegexOptions.IgnoreCase);
         if (ext.Success)
             foreach (var e in ext.Groups[1].Value.Split(',').Select(x => x.Trim().Split('.').Last()).Where(x => x.Length > 0))
@@ -974,7 +974,7 @@ public sealed partial class ToolRegistry
         return true;
     }
 
-    // ------------------------------------------------------------------ I/O anlegen
+    // ------------------------------------------------------------------ Create I/O
     const int IoEtherCatMaster = 111, IoBox = 9099;
 
     string IoAdd(JsonObject a)
@@ -988,28 +988,28 @@ public sealed partial class ToolRegistry
             "ethercat_master" => IoEtherCatMaster,
             "box" or "terminal" or "coupler" => IoBox,
             "raw" => Int(a, "subType", -1),
-            _ => throw new Exception("kind: ethercat_master, box oder raw")
+            _ => throw new Exception("kind: ethercat_master, box or raw")
         };
-        if (sub < 0) throw new Exception("raw braucht subType");
-        if (sub == IoBox && string.IsNullOrEmpty(product)) throw new Exception("box braucht product, z. B. EK1100");
+        if (sub < 0) throw new Exception("raw requires subType");
+        if (sub == IoBox && string.IsNullOrEmpty(product)) throw new Exception("box requires product, e.g. EK1100");
         var parent = tc.Item(parentPath);
         if (DryRun(a))
-            return $"VORSCHLAG (nichts angelegt): unter {parent.PathName}: {(sub == IoBox ? product : kind)}" +
-                   (kids.Count > 0 ? "\n  darunter: " + string.Join(", ", kids) : "");
+            return $"PROPOSAL (nothing created): under {parent.PathName}: {(sub == IoBox ? product : kind)}" +
+                   (kids.Count > 0 ? "\n  below it: " + string.Join(", ", kids) : "");
         var o = new StringBuilder();
         var item = CreateIo(parent, sub, product, Str(a, "name"));
-        o.Append("angelegt: ").Append(item.PathName);
+        o.Append("created: ").Append(item.PathName);
         foreach (var k in kids)
         {
             try { o.Append("\n  + ").Append(CreateIo(item, IoBox, k, null).PathName); }
-            catch (Exception ex) { o.Append($"\n  {k}: FEHLER {ex.InnerException?.Message ?? ex.Message}"); }
+            catch (Exception ex) { o.Append($"\n  {k}: ERROR {ex.InnerException?.Message ?? ex.Message}"); }
         }
-        o.Append("\nUnterelemente/Prozessdaten mit tc_tree pruefen; Parameter mit tc_xml_get/tc_xml_set.");
-        if (sub == IoEtherCatMaster) o.Append(" Netzwerkadapter des Masters ist noch nicht zugewiesen (in der IDE: Adapter > Search, oder per tc_xml_set).");
+        o.Append("\nCheck sub-items/process data with tc_tree; parameters with tc_xml_get/tc_xml_set.");
+        if (sub == IoEtherCatMaster) o.Append(" The master's network adapter is not assigned yet (in the IDE: Adapter > Search, or via tc_xml_set).");
         return o.ToString();
     }
 
-    // Name nach TwinCAT-Art: Geraete "Device n (EtherCAT)", Boxen "Term n (EL1008)" mit laufender Nummer im ganzen Geraet
+    // Name in TwinCAT style: devices "Device n (EtherCAT)", boxes "Term n (EL1008)" with a running number across the whole device
     ITcSmTreeItem CreateIo(ITcSmTreeItem parent, int sub, string product, string name)
     {
         if (string.IsNullOrEmpty(name))
@@ -1018,7 +1018,7 @@ public sealed partial class ToolRegistry
                 name = $"Device {TwinCatSession.Children(parent).Count() + 1} (EtherCAT)";
             else
             {
-                // zum Geraet (TIID^Device n ...) gehen und alle Boxen darunter zaehlen
+                // go to the device (TIID^Device n ...) and count all boxes below it
                 var segs = parent.PathName.Split('^');
                 var dev = segs.Length >= 2 ? tc.Item(segs[0] + "^" + segs[1]) : parent;
                 int n = Descendants(dev).Count(x => Regex.IsMatch(x.Name, @"^(Term|Box) \d+ \(")) + 1;
@@ -1030,8 +1030,8 @@ public sealed partial class ToolRegistry
         try { return (ITcSmTreeItem)((dynamic)parent).CreateChild(name, sub, "", vInfo); }
         catch (Exception ex) when (sub == IoBox && !product.Contains('-'))
         {
-            throw new Exception($"{product} nicht anlegbar ({ex.InnerException?.Message ?? ex.Message}). Ggf. mit Revision angeben, " +
-                                $"z. B. {product}-0000-0017, und pruefen, ob die ESI-Beschreibung in TwinCAT installiert ist.");
+            throw new Exception($"{product} could not be created ({ex.InnerException?.Message ?? ex.Message}). If necessary, specify it with revision, " +
+                                $"e.g. {product}-0000-0017, and check whether the ESI description is installed in TwinCAT.");
         }
     }
 
@@ -1040,7 +1040,7 @@ public sealed partial class ToolRegistry
         foreach (var c in TwinCatSession.Children(it)) { yield return c; foreach (var d in Descendants(c)) yield return d; }
     }
 
-    // ------------------------------------------------------------------ Verknuepfen
+    // ------------------------------------------------------------------ Linking
     string Link(JsonObject a)
     {
         var list = new List<(string S, string T)>();
@@ -1050,10 +1050,10 @@ public sealed partial class ToolRegistry
             var l = line.Trim();
             if (l.Length == 0) continue;
             var parts = l.Split(new[] { "=>", "<=>", "->" }, StringSplitOptions.None);
-            if (parts.Length != 2) throw new Exception("Zeile nicht im Format '<pfad> => <pfad>': " + l);
+            if (parts.Length != 2) throw new Exception("Line not in the format '<path> => <path>': " + l);
             list.Add((parts[0].Trim(), parts[1].Trim()));
         }
-        if (list.Count == 0) throw new Exception("source+target oder pairs angeben");
+        if (list.Count == 0) throw new Exception("specify source+target or pairs");
         var sm = (dynamic)tc.RequireSysMan();
         var o = new StringBuilder();
         int ok = 0;
@@ -1061,19 +1061,19 @@ public sealed partial class ToolRegistry
         {
             try
             {
-                // Existenz pruefen - gibt klare Fehlermeldung statt eines COM-Fehlers
+                // Check existence - gives a clear error message instead of a COM error
                 foreach (var p in new[] { src, dst })
-                    try { tc.Item(p); } catch { throw new Exception("Pfad nicht gefunden: " + p); }
+                    try { tc.Item(p); } catch { throw new Exception("Path not found: " + p); }
                 if (!DryRun(a)) sm.LinkVariables(src, dst);
                 ok++;
-                o.AppendLine($"{(DryRun(a) ? "OK (dryRun)" : "verknuepft")}: {src} <=> {dst}");
+                o.AppendLine($"{(DryRun(a) ? "OK (dryRun)" : "linked")}: {src} <=> {dst}");
             }
-            catch (Exception ex) { o.AppendLine($"FEHLER: {src} <=> {dst}: {ex.InnerException?.Message ?? ex.Message}"); }
+            catch (Exception ex) { o.AppendLine($"ERROR: {src} <=> {dst}: {ex.InnerException?.Message ?? ex.Message}"); }
         }
-        return $"{ok}/{list.Count} {(DryRun(a) ? "pruefbar" : "verknuepft")}\n" + o;
+        return $"{ok}/{list.Count} {(DryRun(a) ? "checkable" : "linked")}\n" + o;
     }
 
-    // Blaetter unter einem Element = Variablen/Kanaele; Typ und Groesse aus ProduceXml, soweit vorhanden
+    // Leaves below an item = variables/channels; type and size from ProduceXml where available
     string IoVars(string path, string filter, int max)
     {
         var root = tc.Item(path);
@@ -1081,24 +1081,24 @@ public sealed partial class ToolRegistry
         int n = 0;
         foreach (var it in Descendants(root).Prepend(root))
         {
-            if (TwinCatSession.Children(it).Any()) continue;   // nur Blaetter
+            if (TwinCatSession.Children(it).Any()) continue;   // leaves only
             var p = it.PathName;
             if (!string.IsNullOrEmpty(filter) && p.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
-            if (++n > max) { o.AppendLine($"... (abgeschnitten nach {max} - filter nutzen)"); break; }
+            if (++n > max) { o.AppendLine($"... (truncated after {max} - use filter)"); break; }
             string type = "";
             try
             {
                 var x = (string)((dynamic)it).ProduceXml(false);
                 var m = Regex.Match(x, @"<VarType[^>]*>([^<]+)</VarType>");
                 if (m.Success) type = m.Groups[1].Value;
-                if (Regex.IsMatch(x, @"<Link[s ]|<LinkInfo", RegexOptions.IgnoreCase)) type += " [verknuepft?]";
+                if (Regex.IsMatch(x, @"<Link[s ]|<LinkInfo", RegexOptions.IgnoreCase)) type += " [linked?]";
             }
             catch { }
             o.Append(p);
             if (type.Length > 0) o.Append("  : ").Append(type);
             o.AppendLine();
         }
-        return n == 0 ? $"Keine Variablen unter {root.PathName} gefunden (PLC-Prozessabbild erscheint erst nach tc_build)." : o.ToString();
+        return n == 0 ? $"No variables found under {root.PathName} (the PLC process image only appears after tc_build)." : o.ToString();
     }
 
     // ------------------------------------------------------------------ Tasks
@@ -1115,21 +1115,21 @@ public sealed partial class ToolRegistry
                 string V(string tag) { var m = Regex.Match(x, $@"<{tag}[^>]*>([^<]*)</{tag}>", RegexOptions.IgnoreCase); return m.Success ? m.Groups[1].Value : "?"; }
                 var ct = V("CycleTime");
                 var us = long.TryParse(ct, out var ticks) ? $"{ticks / 10.0:0.###} us" : ct;
-                o.AppendLine($"{t.PathName}  Zyklus {us}, Prioritaet {V("Priority")}, AutoStart {V("AutoStart")}");
+                o.AppendLine($"{t.PathName}  cycle {us}, priority {V("Priority")}, AutoStart {V("AutoStart")}");
             }
-            return o.Length == 0 ? "Keine Tasks unter TIRT." : o.ToString();
+            return o.Length == 0 ? "No tasks under TIRT." : o.ToString();
         }
         ITcSmTreeItem task;
         if (action == "create")
         {
-            var name = Str(a, "name") ?? throw new Exception("name fehlt");
-            if (DryRun(a)) return $"VORSCHLAG: Task '{name}' unter TIRT ({(Bool(a, "withImage", false) ? "mit" : "ohne")} Prozessabbild)";
+            var name = Str(a, "name") ?? throw new Exception("name missing");
+            if (DryRun(a)) return $"PROPOSAL: task '{name}' under TIRT ({(Bool(a, "withImage", false) ? "with" : "without")} process image)";
             task = (ITcSmTreeItem)((dynamic)rt).CreateChild(name, Bool(a, "withImage", false) ? 0 : 1, null, null);
         }
-        else if (action == "set") task = tc.Item(Str(a, "path") ?? throw new Exception("path fehlt"));
-        else throw new Exception("action: list, create oder set");
-        var res = $"{(action == "create" ? "angelegt" : "Task")}: {task.PathName}";
-        // Werte im eigenen XML der Task ersetzen - so stimmen die Tag-Namen garantiert
+        else if (action == "set") task = tc.Item(Str(a, "path") ?? throw new Exception("path missing"));
+        else throw new Exception("action: list, create or set");
+        var res = $"{(action == "create" ? "created" : "Task")}: {task.PathName}";
+        // Replace values in the task's own XML - this guarantees the tag names are correct
         var changes = new List<(string Tag, string Val)>();
         if (a["cycleUs"] != null) changes.Add(("CycleTime", (Int(a, "cycleUs", 1000) * 10L).ToString()));
         if (a["priority"] != null) changes.Add(("Priority", Int(a, "priority", 20).ToString()));
@@ -1140,57 +1140,57 @@ public sealed partial class ToolRegistry
         foreach (var (tag, val) in changes)
         {
             var re = new Regex($@"(<{tag}(\s[^>]*)?>)([^<]*)(</{tag}>)", RegexOptions.IgnoreCase);
-            if (!re.IsMatch(xml)) { notes.Add($"{tag}: nicht im Task-XML gefunden"); continue; }
+            if (!re.IsMatch(xml)) { notes.Add($"{tag}: not found in the task XML"); continue; }
             xml = re.Replace(xml, m => m.Groups[1].Value + val + m.Groups[4].Value, 1);
             notes.Add($"{tag}={val}");
         }
-        if (DryRun(a)) return res + " - VORSCHLAG: " + string.Join(", ", notes);
+        if (DryRun(a)) return res + " - PROPOSAL: " + string.Join(", ", notes);
         ((dynamic)task).ConsumeXml(xml);
-        return res + " - gesetzt: " + string.Join(", ", notes) + " (CycleTime in 100-ns-Schritten). Wirkt nach tc_activate.";
+        return res + " - set: " + string.Join(", ", notes) + " (CycleTime in 100 ns steps). Takes effect after tc_activate.";
     }
 
-    // ------------------------------------------------------------------ Bootprojekt
+    // ------------------------------------------------------------------ Boot project
     string BootProject(JsonObject a)
     {
         ITcSmTreeItem plc = !string.IsNullOrEmpty(Str(a, "plcPath")) ? tc.Item(Str(a, "plcPath"))
-                          : TwinCatSession.Children(tc.Item("TIPC")).FirstOrDefault() ?? throw new Exception("Kein PLC-Projekt unter TIPC");
+                          : TwinCatSession.Children(tc.Item("TIPC")).FirstOrDefault() ?? throw new Exception("No PLC project under TIPC");
         dynamic d = plc;
-        string Now() { try { return ((bool)d.BootProjectAutostart) ? "an" : "aus"; } catch (Exception ex) { return "nicht lesbar (" + ex.Message + ")"; } }
-        var o = new StringBuilder($"{plc.PathName}: Autostart Bootprojekt {Now()}");
-        if (DryRun(a)) return o + (a["autostart"] != null ? $"\nVORSCHLAG: Autostart {(Bool(a, "autostart", true) ? "an" : "aus")}" : "") +
-                              (Bool(a, "generate", false) ? "\nVORSCHLAG: Bootprojekt erzeugen" : "");
+        string Now() { try { return ((bool)d.BootProjectAutostart) ? "on" : "off"; } catch (Exception ex) { return "not readable (" + ex.Message + ")"; } }
+        var o = new StringBuilder($"{plc.PathName}: boot project autostart {Now()}");
+        if (DryRun(a)) return o + (a["autostart"] != null ? $"\nPROPOSAL: autostart {(Bool(a, "autostart", true) ? "on" : "off")}" : "") +
+                              (Bool(a, "generate", false) ? "\nPROPOSAL: generate boot project" : "");
         if (a["autostart"] != null)
         {
-            try { d.BootProjectAutostart = Bool(a, "autostart", true); o.Append($" -> jetzt {Now()}"); }
-            catch (Exception ex) { o.Append($"\nAutostart nicht setzbar: {ex.InnerException?.Message ?? ex.Message}"); }
+            try { d.BootProjectAutostart = Bool(a, "autostart", true); o.Append($" -> now {Now()}"); }
+            catch (Exception ex) { o.Append($"\nAutostart could not be set: {ex.InnerException?.Message ?? ex.Message}"); }
         }
         if (Bool(a, "generate", false))
         {
-            try { d.GenerateBootProject(true); o.Append("\nBootprojekt erzeugt."); }
-            catch (Exception ex) { o.Append($"\nBootprojekt nicht erzeugt: {ex.InnerException?.Message ?? ex.Message}"); }
+            try { d.GenerateBootProject(true); o.Append("\nBoot project generated."); }
+            catch (Exception ex) { o.Append($"\nBoot project not generated: {ex.InnerException?.Message ?? ex.Message}"); }
         }
         return o.ToString();
     }
 
-    // ------------------------------------------------------------------ Startmodus der Runtime (lokal, Registry)
+    // ------------------------------------------------------------------ Runtime startup mode (local, registry)
     static string RuntimeStartup(string mode)
     {
         const string key = @"SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3\System";
         using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(key, writable: !string.IsNullOrEmpty(mode));
-        if (k == null) return "TwinCAT-Registry nicht gefunden (HKLM\\" + key + ").";
-        string Show(object v) => v is int i ? (i == 5 ? "run" : i == 15 ? "config" : $"Wert {i}") : "nicht gesetzt";
+        if (k == null) return "TwinCAT registry not found (HKLM\\" + key + ").";
+        string Show(object v) => v is int i ? (i == 5 ? "run" : i == 15 ? "config" : $"value {i}") : "not set";
         var cur = Show(k.GetValue("SysStartupState"));
-        if (string.IsNullOrEmpty(mode)) return $"Startmodus lokal: {cur}";
+        if (string.IsNullOrEmpty(mode)) return $"Local startup mode: {cur}";
         int val = mode.Equals("run", StringComparison.OrdinalIgnoreCase) ? 5 : mode.Equals("config", StringComparison.OrdinalIgnoreCase) ? 15
-                : throw new Exception("mode: run oder config");
+                : throw new Exception("mode: run or config");
         k.SetValue("SysStartupState", val, Microsoft.Win32.RegistryValueKind.DWord);
-        return $"Startmodus lokal: {cur} -> {Show(val)} (gilt ab dem naechsten Hochfahren)";
+        return $"Local startup mode: {cur} -> {Show(val)} (applies from the next boot)";
     }
 
-    // ------------------------------------------------------------------ Lizenzen
+    // ------------------------------------------------------------------ Licenses
     string Licenses()
     {
-        // Der Lizenz-Knoten haengt unter SYSTEM; Namen je nach Sprache/Version
+        // The license node is located under SYSTEM; its name depends on language/version
         foreach (var p in new[] { "TIRC^License", "TIRC^Lizenz", "TIRC^Licence" })
             try { var it = tc.Item(p); return it.PathName + "\n" + (string)((dynamic)it).ProduceXml(false); } catch { }
         foreach (var root in new[] { "TIRC", "TIRS" })
@@ -1201,10 +1201,10 @@ public sealed partial class ToolRegistry
                         return c.PathName + "\n" + (string)((dynamic)c).ProduceXml(false);
             }
             catch { }
-        return "Lizenz-Knoten nicht gefunden - mit tc_tree path=TIRC suchen und tc_feedback melden.";
+        return "License node not found - search with tc_tree path=TIRC and report via tc_feedback.";
     }
 
-    // ------------------------------------------------------------------ ADS-Helfer
+    // ------------------------------------------------------------------ ADS helpers
     static AdsClient Connect(JsonObject a)
     {
         var c = new AdsClient();
@@ -1218,7 +1218,7 @@ public sealed partial class ToolRegistry
         using var c = Connect(a);
         var loader = SymbolLoaderFactory.Create(c, new SymbolLoaderSettings(SymbolsLoadMode.VirtualTree));
         if (!loader.Symbols.TryGetInstance(Str(a, "symbol"), out var s) || s is not IValueSymbol vs)
-            throw new Exception("Symbol nicht gefunden: " + Str(a, "symbol"));
+            throw new Exception("Symbol not found: " + Str(a, "symbol"));
         return f(vs);
     }
 
@@ -1233,7 +1233,7 @@ public sealed partial class ToolRegistry
     // ------------------------------------------------------------------ Registry / Schema
     void Add(string name, string desc, JsonObject schema, Func<JsonObject, string> h) => tools.Add(new Tool(name, desc, schema, h));
 
-    // Zielsystem eines Laufzeit-Eingriffs: explizite netId oder aktuelles Ziel der Solution
+    // Target system of a runtime operation: explicit netId or the solution's current target
     string TargetOf(string tool, JsonObject a) => tool switch
     {
         "ads_write" => Str(a, "netId"),
@@ -1257,9 +1257,9 @@ public sealed partial class ToolRegistry
 
     public JsonObject Call(string name, JsonObject args)
     {
-        var t = tools.FirstOrDefault(x => x.Name == name) ?? throw new Exception("Unbekanntes Tool: " + name);
-        // Sicherheitsnetz: gibt es Codierrichtlinien und hat der Agent sie noch nicht gelesen, wird der erste schreibende
-        // Code-Aufruf nicht ausgefuehrt, sondern die Richtlinien zurueckgegeben (einmal je Sitzung).
+        var t = tools.FirstOrDefault(x => x.Name == name) ?? throw new Exception("Unknown tool: " + name);
+        // Safety net: if there are coding guidelines and the agent has not read them yet, the first writing
+        // code call is not executed; the guidelines are returned instead (once per session).
         if (!rulesSeen && (name is "tc_plc_write" or "tc_plc_create") && !DryRun(args)
             && Environment.GetEnvironmentVariable("TCAGENT_RULES_GATE") != "0")
         {
@@ -1268,14 +1268,14 @@ public sealed partial class ToolRegistry
                 return new JsonObject
                 {
                     ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] =
-                        "NICHT ausgefuehrt: Fuer dieses Projekt gelten Codierrichtlinien, die noch nicht gelesen wurden. " +
-                        "Code daran ausrichten und den Aufruf dann wiederholen (naechstes Mal vorher tc_coding_rules aufrufen).\n\n" + rt }),
+                        "NOT executed: this project has coding guidelines that have not been read yet. " +
+                        "Align the code with them and then repeat the call (next time call tc_coding_rules first).\n\n" + rt }),
                     ["isError"] = true
                 };
         }
         string text; bool isError = false;
         var sw = System.Diagnostics.Stopwatch.StartNew();
-        // Fuer die Haenger-Diagnose der Bruecke: welches Werkzeug laeuft gerade (eine Datei je TcAgent-Prozess)
+        // For the bridge's hang diagnostics: which tool is currently running (one file per TcAgent process)
         var busy = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", $"busy.{Environment.ProcessId}.txt");
         try { File.WriteAllText(busy, name); } catch { }
         try
@@ -1287,12 +1287,12 @@ public sealed partial class ToolRegistry
                 try { target = TargetOf(name, args); } catch { }
                 var what = Confirm.Describe(name, args, target);
                 var ok = Confirm.Ask(name, what, tc.AttachedPid);
-                if (ok == false) throw new OperationCanceledException("Vom Benutzer abgelehnt: " + what + " - nicht erneut versuchen, ohne nachzufragen.");
-                if (ok == null) Log.Info("Keine Rueckfrage moeglich (kein Kanal) - " + what);
+                if (ok == false) throw new OperationCanceledException("Rejected by the user: " + what + " - do not retry without asking.");
+                if (ok == null) Log.Info("No confirmation possible (no channel) - " + what);
             }
             text = RunWatchingDialogs(name, () => t.Handler(args));
         }
-        catch (Exception ex) { text = "Fehler: " + (ex.InnerException?.Message ?? ex.Message); isError = true; Log.Error($"{name}: {ex}"); }
+        catch (Exception ex) { text = "Error: " + (ex.InnerException?.Message ?? ex.Message); isError = true; Log.Error($"{name}: {ex}"); }
         finally { try { File.Delete(busy); } catch { } }
         if (Policy.ClassOf(name) != ToolClass.Read || isError) policy.Audit(name, args, !isError, text, sw.ElapsedMilliseconds);
         if (Policy.ClassOf(name) != ToolClass.Read && !isError) tc.InvalidatePlcIndex();
@@ -1303,9 +1303,9 @@ public sealed partial class ToolRegistry
         };
     }
 
-    /// <summary>Fuehrt ein Werkzeug aus; oeffnet die IDE dabei einen modalen Dialog, wartet jeder Automation-Interface-Aufruf
-    /// bis zu dessen Schliessen. Dann sofort mit dem Dialogtext zurueckkehren, statt minutenlang zu haengen
-    /// (der Aufruf selbst laeuft weiter und wird fertig, sobald der Dialog zu ist).</summary>
+    /// <summary>Runs a tool; if the IDE opens a modal dialog meanwhile, every automation interface call waits
+    /// until it is closed. In that case return immediately with the dialog text instead of hanging for minutes
+    /// (the call itself keeps running and completes as soon as the dialog is closed).</summary>
     string RunWatchingDialogs(string name, Func<string> handler)
     {
         if (name == "tc_dialogs") return handler();
@@ -1317,11 +1317,11 @@ public sealed partial class ToolRegistry
             try { dialogs = IdeDialogs.Find(tc.AttachedPid); } catch { dialogs = new(); }
             seen = dialogs.Count > 0 ? seen + 1 : 0;
             if (seen < 3) continue;
-            task.ContinueWith(x => Log.Info($"{name} nach Dialog beendet: " + (x.IsFaulted ? x.Exception?.InnerException?.Message : "ok")));
-            throw new Exception("Die IDE zeigt einen Dialog und wartet auf eine Eingabe - " + name + " wird erst danach fertig:\n  " +
+            task.ContinueWith(x => Log.Info($"{name} finished after dialog: " + (x.IsFaulted ? x.Exception?.InnerException?.Message : "ok")));
+            throw new Exception("The IDE is showing a dialog and waiting for input - " + name + " will only complete afterwards:\n  " +
                                 string.Join("\n  ", dialogs) +
-                                "\nDen Benutzer bitten, den Dialog zu lesen und zu schliessen (oder tc_dialogs action=close, das entspricht Abbrechen/X). " +
-                                "Weitere TwinCAT-Aufrufe warten bis dahin.");
+                                "\nAsk the user to read and close the dialog (or tc_dialogs action=close, which corresponds to Cancel/X). " +
+                                "Further TwinCAT calls wait until then.");
         }
         return task.GetAwaiter().GetResult();
     }

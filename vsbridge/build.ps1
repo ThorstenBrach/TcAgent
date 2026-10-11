@@ -1,15 +1,15 @@
-﻿# Baut TcAgentBridge.dll fuer Visual Studio 2022 mit dem Roslyn-Compiler aus der VS-Installation (normaler User).
+﻿# Builds TcAgentBridge.dll for Visual Studio 2022 with the Roslyn compiler from the VS installation (normal user).
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 $fw   = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
 $vs = & $vswhere -version '[17.0,18.0)' -latest -property installationPath
-if (-not $vs) { throw "Visual Studio 2022 nicht gefunden" }
+if (-not $vs) { throw "Visual Studio 2022 not found" }
 $csc = Join-Path $vs 'MSBuild\Current\Bin\Roslyn\csc.exe'
-if (-not (Test-Path $csc)) { throw "Roslyn-Compiler nicht gefunden: $csc" }
+if (-not (Test-Path $csc)) { throw "Roslyn compiler not found: $csc" }
 Write-Host "VS 2022: $vs"
 
-# Index: Assembly-Name -> Pfad (VS-Assemblies zuerst, dann Framework)
+# Index: assembly name -> path (VS assemblies first, then the framework)
 $index = @{}
 $roots = @("$vs\Common7\IDE\PublicAssemblies", "$vs\Common7\IDE\PrivateAssemblies", "$vs\Common7\IDE",
            "$vs\Common7\IDE\CommonExtensions\Microsoft", $fw, "$fw\WPF")
@@ -21,7 +21,7 @@ foreach ($r in $roots) {
             $n = [IO.Path]::GetFileNameWithoutExtension($_.Name)
             if (-not $index.ContainsKey($n)) { $index[$n] = $_.FullName }
             else {
-                # mehrfach vorhanden (z. B. Microsoft.VisualStudio.Threading 15.8 und 17.x): hoechste Assembly-Version nehmen
+                # present more than once (e.g. Microsoft.VisualStudio.Threading 15.8 and 17.x): take the highest assembly version
                 try {
                     $vNew = [Reflection.AssemblyName]::GetAssemblyName($_.FullName).Version
                     $vOld = [Reflection.AssemblyName]::GetAssemblyName($index[$n]).Version
@@ -37,7 +37,7 @@ foreach ($n in 'Microsoft.VisualStudio.Shell.15.0', 'Microsoft.VisualStudio.Shel
                'Microsoft.VisualStudio.Shell.Interop', 'Microsoft.VisualStudio.OLE.Interop', 'Microsoft.VisualStudio.Threading',
                'Microsoft.VisualStudio.Validation', 'PresentationFramework', 'PresentationCore', 'WindowsBase', 'System.Xaml',
                'System.Web.Extensions', 'System.Windows.Forms', 'System.Drawing', 'System.Core') {
-    if ($index.ContainsKey($n)) { $refs.Add($index[$n]) } else { Write-Host "  (nicht gefunden: $n)" -ForegroundColor Yellow }
+    if ($index.ContainsKey($n)) { $refs.Add($index[$n]) } else { Write-Host "  (not found: $n)" -ForegroundColor Yellow }
 }
 
 $out = Join-Path $here 'bin'
@@ -50,13 +50,13 @@ for ($i = 1; $i -le 25; $i++) {
     $missing = [regex]::Matches($output, 'CS0012[^\r\n]*?["''„“]([A-Za-z0-9_.]+), Version=') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique
     $added = 0
     foreach ($m in $missing) {
-        if ($index.ContainsKey($m) -and -not $refs.Contains($index[$m])) { $refs.Add($index[$m]); $added++; Write-Host "  + Referenz $m" }
-        elseif (-not $index.ContainsKey($m)) { Write-Host "  ! nicht im Index: $m" -ForegroundColor Yellow }
+        if ($index.ContainsKey($m) -and -not $refs.Contains($index[$m])) { $refs.Add($index[$m]); $added++; Write-Host "  + reference $m" }
+        elseif (-not $index.ContainsKey($m)) { Write-Host "  ! not in index: $m" -ForegroundColor Yellow }
     }
-    if ($added -eq 0) { Write-Host $output -ForegroundColor Red; throw "Build fehlgeschlagen" }
+    if ($added -eq 0) { Write-Host $output -ForegroundColor Red; throw "Build failed" }
 }
-if (-not (Test-Path "$out\TcAgentBridge.dll")) { throw "Build fehlgeschlagen" }
+if (-not (Test-Path "$out\TcAgentBridge.dll")) { throw "Build failed" }
 Copy-Item "$here\TcAgentBridge.pkgdef", "$here\extension.vsixmanifest" $out -Force
 Copy-Item "$here\..\LICENSE" "$out\LICENSE.txt" -Force
 Copy-Item "$here\..\docs\img\icon.png" "$out\icon.png" -Force
-Write-Host "OK: $out\TcAgentBridge.dll  ($($refs.Count) Referenzen)" -ForegroundColor Green
+Write-Host "OK: $out\TcAgentBridge.dll  ($($refs.Count) references)" -ForegroundColor Green

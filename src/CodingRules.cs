@@ -1,9 +1,9 @@
-// Codierrichtlinien: Markdown-Dateien, die TcAgent den Agenten vor dem ersten Schreiben von Code vorlegt.
-//   1. TCAGENT_RULES                         Dateien/Ordner, ';'-getrennt (z. B. Firmenvorgaben auf einem Netzlaufwerk)
-//   2. %LOCALAPPDATA%\TcAgent\coding-rules.md  persoenliche Vorgaben
-//   3. <Solution>\.tcagent\coding-rules.md      Projektvorgaben (mit Git versioniert)
-//   4. <Solution>\.tcagent\rules\*.md           weitere Projektdateien
-// Spaetere Quellen stehen weiter unten und gehen bei Widerspruechen vor.
+// Coding rules: Markdown files that TcAgent presents to the agent before it writes code for the first time.
+//   1. TCAGENT_RULES                         files/folders, ';'-separated (e.g. company rules on a network drive)
+//   2. %LOCALAPPDATA%\TcAgent\coding-rules.md  personal rules
+//   3. <Solution>\.tcagent\coding-rules.md      project rules (versioned with Git)
+//   4. <Solution>\.tcagent\rules\*.md           further project files
+// Later sources appear further down and take precedence in case of conflicts.
 using System.Text;
 
 namespace TcAgent;
@@ -30,7 +30,7 @@ public static class CodingRules
         return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
 
-    /// <summary>Alle Richtlinien als ein Text, oder null, wenn keine hinterlegt sind.</summary>
+    /// <summary>All rules as one text, or null if none are defined.</summary>
     public static string Text(string solutionDir, int maxChars = 40000)
     {
         var files = Files(solutionDir);
@@ -39,30 +39,33 @@ public static class CodingRules
         foreach (var f in files)
         {
             string t;
-            try { t = File.ReadAllText(f).Trim(); } catch (Exception ex) { t = "(nicht lesbar: " + ex.Message + ")"; }
+            try { t = File.ReadAllText(f).Trim(); } catch (Exception ex) { t = "(not readable: " + ex.Message + ")"; }
             if (t.Length == 0) continue;
             sb.AppendLine($"===== {f} =====").AppendLine(t).AppendLine();
         }
         if (sb.Length == 0) return null;
-        return sb.Length <= maxChars ? sb.ToString() : sb.ToString(0, maxChars) + "\n... (gekuerzt - Richtlinien bitte straffen)";
+        return sb.Length <= maxChars ? sb.ToString() : sb.ToString(0, maxChars) + "\n... (truncated - please shorten the rules)";
     }
 
-    /// <summary>Datei, in die neue Regeln geschrieben werden: project = Solution\.tcagent\coding-rules.md, personal = %LOCALAPPDATA%.</summary>
+    /// <summary>File that new rules are written to: project = Solution\.tcagent\coding-rules.md, personal = %LOCALAPPDATA%.</summary>
     public static string TargetFile(string solutionDir, string scope) =>
         string.Equals(scope, "personal", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(solutionDir)
             ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "coding-rules.md")
             : Path.Combine(solutionDir, ".tcagent", "coding-rules.md");
 
-    /// <summary>Regel als Aufzaehlungspunkt unter einer Ueberschrift einfuegen (Standard "Ergaenzungen"). Gibt (Datei, Ergebnis) zurueck.</summary>
+    /// <summary>Inserts the rule as a bullet point under a heading (default "Additions"; an existing German "Ergaenzungen"
+    /// section of older rule files is reused). Returns (file, result).</summary>
     public static (string file, string result) Add(string solutionDir, string scope, string rule, string section, bool dryRun)
     {
         var file = TargetFile(solutionDir, scope);
         rule = string.Join(" ", (rule ?? "").Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(x => x.Trim())).Trim();
         if (rule.StartsWith("- ")) rule = rule[2..];
-        if (rule.Length == 0) throw new Exception("rule ist leer");
-        section = string.IsNullOrWhiteSpace(section) ? "Ergaenzungen" : section.Trim().TrimStart('#').Trim();
-        var text = File.Exists(file) ? File.ReadAllText(file).Replace("\r\n", "\n") : "# Codierrichtlinien\n";
-        if (text.Contains("- " + rule)) return (file, "schon vorhanden - nichts geaendert");
+        if (rule.Length == 0) throw new Exception("rule is empty");
+        var text = File.Exists(file) ? File.ReadAllText(file).Replace("\r\n", "\n") : "# Coding rules\n";
+        if (string.IsNullOrWhiteSpace(section))
+            section = text.Split('\n').Any(l => l.StartsWith("## ") && l[3..].Trim().Equals("Ergaenzungen", StringComparison.OrdinalIgnoreCase)) ? "Ergaenzungen" : "Additions";
+        else section = section.Trim().TrimStart('#').Trim();
+        if (text.Contains("- " + rule)) return (file, "already present - nothing changed");
         var lines = text.TrimEnd('\n').Split('\n').ToList();
         int head = lines.FindIndex(l => l.StartsWith("## ") && l[3..].Trim().Equals(section, StringComparison.OrdinalIgnoreCase));
         int insertAt;
@@ -84,10 +87,10 @@ public static class CodingRules
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             File.WriteAllText(file, result, new UTF8Encoding(false));
         }
-        return (file, (dryRun ? "VORSCHLAG (nicht geschrieben): " : "eingetragen: ") + $"## {section}\n- {rule}");
+        return (file, (dryRun ? "PROPOSAL (not written): " : "added: ") + $"## {section}\n- {rule}");
     }
 
     public static string Where(string solutionDir) =>
-        "Ablage: " + (string.IsNullOrEmpty(solutionDir) ? "<Solution-Ordner>" : solutionDir) + "\\.tcagent\\coding-rules.md (Projekt, in Git), " +
-        "%LOCALAPPDATA%\\TcAgent\\coding-rules.md (persoenlich) oder TCAGENT_RULES (Dateien/Ordner, ';'-getrennt).";
+        "Location: " + (string.IsNullOrEmpty(solutionDir) ? "<solution folder>" : solutionDir) + "\\.tcagent\\coding-rules.md (project, in Git), " +
+        "%LOCALAPPDATA%\\TcAgent\\coding-rules.md (personal) or TCAGENT_RULES (files/folders, ';'-separated).";
 }

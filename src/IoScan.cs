@@ -22,30 +22,30 @@ public sealed partial class ToolRegistry
 
     void RegisterIoScan()
     {
-        Add("tc_runtime_mode", "Schaltet die TwinCAT-Runtime des Zielsystems in den Config-Modus (noetig fuer den I/O-Scan, stoppt die PLC) " +
-                               "oder startet sie mit der aktiven Konfiguration im Run-Modus neu. Laufzeit-Eingriff: nur freigegebene Ziele, mit Rueckfrage. " +
-                               "Aktuellen Zustand liest tc_plc_state port=10000.",
-            Schema(Req(P("mode", "string", "config oder run")),
-                   P("netId", "string", "AmsNetId (leer = Ziel des Projekts)")),
+        Add("tc_runtime_mode", "Switches the TwinCAT runtime of the target system to Config mode (needed for the I/O scan, stops the PLC) " +
+                               "or restarts it in Run mode with the active configuration. Runtime action: allowed targets only, with confirmation. " +
+                               "tc_plc_state port=10000 reads the current state.",
+            Schema(Req(P("mode", "string", "config or run")),
+                   P("netId", "string", "AmsNetId (empty = target of the project)")),
             a => RuntimeMode(a));
 
-        Add("tc_io_scan", "Sucht I/O-Geraete am Zielsystem (Netzwerkadapter mit EtherCAT, Feldbuskarten ...) - nur lesen, aendert nichts. " +
-                          "Braucht den Config-Modus (tc_runtime_mode mode=config). Danach mit tc_io_scan_add uebernehmen.",
-            Schema(P("raw", "boolean", "Zusaetzlich das XML der gefundenen Geraete zeigen")),
+        Add("tc_io_scan", "Searches for I/O devices on the target system (network adapters with EtherCAT, fieldbus cards ...) - read only, changes nothing. " +
+                          "Needs Config mode (tc_runtime_mode mode=config). Then add them with tc_io_scan_add.",
+            Schema(P("raw", "boolean", "Also show the XML of the devices found")),
             a => tc.Sta.Run(() => IoScan(Bool(a, "raw", false))));
 
-        Add("tc_io_scan_add", "Uebernimmt ein mit tc_io_scan gefundenes Geraet: neu anlegen oder - mit devicePath - dessen Adapter einem vorhandenen " +
-                              "Geraet zuweisen (wie 'Adapter > Search' in der IDE). Danach werden die Boxen/Klemmen dahinter gescannt (scanBoxes). " +
-                              "Bei offline angelegten Klemmen kann TwinCAT dabei nachfragen - dann meldet TcAgent den Dialog.",
-            Schema(Req(P("index", "integer", "Nummer des Geraets aus tc_io_scan (1, 2, ...)")),
-                   P("devicePath", "string", "Vorhandenes Geraet, dem der Adapter zugewiesen wird, z. B. 'TIID^Device 1 (EtherCAT)' (leer = neu anlegen)"),
-                   P("name", "string", "Name des neuen Geraets (leer = 'Device n (EtherCAT)' bzw. Typname)"),
-                   P("scanBoxes", "boolean", "Boxen/Klemmen dahinter scannen (Standard true)"),
-                   P("dryRun", "boolean", "Nur zeigen, was passieren wuerde")),
+        Add("tc_io_scan_add", "Adds a device found with tc_io_scan: create it, or - with devicePath - assign its adapter to an existing " +
+                              "device (like 'Adapter > Search' in the IDE). Then the boxes/terminals behind it are scanned (scanBoxes). " +
+                              "If terminals were created offline, TwinCAT may ask a question - TcAgent then reports the dialog.",
+            Schema(Req(P("index", "integer", "Number of the device from tc_io_scan (1, 2, ...)")),
+                   P("devicePath", "string", "Existing device to assign the adapter to, e.g. 'TIID^Device 1 (EtherCAT)' (empty = create new)"),
+                   P("name", "string", "Name of the new device (empty = 'Device n (EtherCAT)' or the type name)"),
+                   P("scanBoxes", "boolean", "Scan the boxes/terminals behind it (default true)"),
+                   P("dryRun", "boolean", "Only show what would happen")),
             a => tc.Sta.Run(() => IoScanAdd(a), 300_000));
     }
 
-    // ------------------------------------------------------------------ Runtime-Modus
+    // ------------------------------------------------------------------ Runtime mode
     string RuntimeMode(JsonObject a)
     {
         var mode = (Str(a, "mode") ?? "").Trim().ToLowerInvariant();
@@ -58,10 +58,10 @@ public sealed partial class ToolRegistry
                 using var c = new AdsClient();
                 c.Connect(AmsNetId.Parse(net), SystemServicePort);
                 var before = c.ReadState().AdsState;
-                if (before == AdsState.Config) return $"{net}: bereits im Config-Modus.";
+                if (before == AdsState.Config) return $"{net}: already in Config mode.";
                 c.WriteControl(new StateInfo(AdsState.Reconfig, 0));
                 var state = WaitState(c, AdsState.Config, 30);
-                return $"{net}: {before} -> {state}" + (state == AdsState.Config ? "" : " (Config-Modus nicht erreicht - Zustand mit tc_plc_state port=10000 pruefen)");
+                return $"{net}: {before} -> {state}" + (state == AdsState.Config ? "" : " (Config mode not reached - check the state with tc_plc_state port=10000)");
             }
             case "run":
                 return tc.Sta.Run(() =>
@@ -69,10 +69,10 @@ public sealed partial class ToolRegistry
                     dynamic sm = tc.RequireSysMan();
                     if (!string.Equals((string)sm.GetTargetNetId(), net, StringComparison.OrdinalIgnoreCase)) sm.SetTargetNetId(net);
                     sm.StartRestartTwinCAT();
-                    return $"{net}: TwinCAT wird mit der aktiven Konfiguration im Run-Modus neu gestartet.";
+                    return $"{net}: TwinCAT is being restarted in Run mode with the active configuration.";
                 });
             default:
-                throw new Exception("mode: config oder run");
+                throw new Exception("mode: config or run");
         }
     }
 
@@ -82,7 +82,7 @@ public sealed partial class ToolRegistry
         AdsState s = AdsState.Invalid;
         while (DateTime.Now < end)
         {
-            try { s = c.ReadState().AdsState; if (s == want) return s; } catch { /* Dienst startet neu */ }
+            try { s = c.ReadState().AdsState; if (s == want) return s; } catch { /* service is restarting */ }
             Thread.Sleep(500);
         }
         return s;
@@ -119,24 +119,24 @@ public sealed partial class ToolRegistry
             using var c = new AdsClient();
             c.Connect(AmsNetId.Parse(net), SystemServicePort);
             var s = c.ReadState().AdsState;
-            return s == AdsState.Config ? "" : $"\nHinweis: Zielsystem {net} ist im Zustand {s} - der Scan braucht den Config-Modus (tc_runtime_mode mode=config).";
+            return s == AdsState.Config ? "" : $"\nNote: target system {net} is in state {s} - the scan needs Config mode (tc_runtime_mode mode=config).";
         }
-        catch (Exception ex) { return "\nZustand des Zielsystems nicht lesbar: " + (ex.InnerException?.Message ?? ex.Message); }
+        catch (Exception ex) { return "\nState of the target system not readable: " + (ex.InnerException?.Message ?? ex.Message); }
     }
 
     string IoScan(bool raw)
     {
         List<FoundDevice> found;
         try { found = ScanDevices(); }
-        catch (Exception ex) { return "Scan fehlgeschlagen: " + (ex.InnerException?.Message ?? ex.Message) + ConfigModeHint(); }
-        if (found.Count == 0) return "Keine I/O-Geraete gefunden." + ConfigModeHint();
-        var o = new StringBuilder($"{found.Count} Geraet(e) gefunden:\n");
+        catch (Exception ex) { return "Scan failed: " + (ex.InnerException?.Message ?? ex.Message) + ConfigModeHint(); }
+        if (found.Count == 0) return "No I/O devices found." + ConfigModeHint();
+        var o = new StringBuilder($"{found.Count} device(s) found:\n");
         foreach (var f in found)
         {
-            o.AppendLine($"  {f.Index}: {f.TypeName} (Subtyp {f.SubType}){(f.Summary.Length > 0 ? " - " + f.Summary : "")}");
+            o.AppendLine($"  {f.Index}: {f.TypeName} (subtype {f.SubType}){(f.Summary.Length > 0 ? " - " + f.Summary : "")}");
             if (raw) o.AppendLine("     " + f.Xml);
         }
-        o.Append("Uebernehmen: tc_io_scan_add index=<n> (neues Geraet) oder mit devicePath (Adapter eines vorhandenen Geraets setzen).");
+        o.Append("To add: tc_io_scan_add index=<n> (new device) or with devicePath (set the adapter of an existing device).");
         return o.ToString();
     }
 
@@ -145,16 +145,16 @@ public sealed partial class ToolRegistry
         var found = ScanDevices();
         int idx = Int(a, "index", 0);
         var f = found.FirstOrDefault(x => x.Index == idx)
-                ?? throw new Exception($"Kein gefundenes Geraet Nr. {idx} ({found.Count} gefunden).{ConfigModeHint()}");
-        if (f.Address == null) throw new Exception($"Geraet {idx} ({f.TypeName}) liefert keine Adressinformation.");
+                ?? throw new Exception($"No found device no. {idx} ({found.Count} found).{ConfigModeHint()}");
+        if (f.Address == null) throw new Exception($"Device {idx} ({f.TypeName}) provides no address information.");
         var devicePath = Str(a, "devicePath");
         bool scanBoxes = Bool(a, "scanBoxes", true);
         var addressXml = $"<TreeItem><DeviceDef>{f.Address.OuterXml}</DeviceDef></TreeItem>";
         if (DryRun(a))
-            return "VORSCHLAG (nichts geaendert): " + (string.IsNullOrEmpty(devicePath)
-                       ? $"neues Geraet {f.TypeName} unter TIID anlegen"
-                       : $"Adapter von {devicePath} auf {f.TypeName} ({f.Summary}) setzen") +
-                   (scanBoxes ? ", danach Boxen scannen." : ".");
+            return "PROPOSAL (nothing changed): " + (string.IsNullOrEmpty(devicePath)
+                       ? $"create new device {f.TypeName} under TIID"
+                       : $"set adapter of {devicePath} to {f.TypeName} ({f.Summary})") +
+                   (scanBoxes ? ", then scan boxes." : ".");
 
         var o = new StringBuilder();
         ITcSmTreeItem dev;
@@ -166,12 +166,12 @@ public sealed partial class ToolRegistry
                 name = f.SubType == IoEtherCatMaster ? $"Device {TwinCatSession.Children(tiid).Count() + 1} (EtherCAT)"
                                                      : $"Device {TwinCatSession.Children(tiid).Count() + 1} ({f.TypeName})";
             dev = (ITcSmTreeItem)((dynamic)tiid).CreateChild(name, f.SubType, "", null);
-            o.Append("angelegt: ").Append(dev.PathName);
+            o.Append("created: ").Append(dev.PathName);
         }
         else
         {
             dev = tc.Item(devicePath);
-            o.Append("Adapter gesetzt: ").Append(dev.PathName);
+            o.Append("adapter set: ").Append(dev.PathName);
         }
         ((dynamic)dev).ConsumeXml(addressXml);
         o.Append($" <- {f.TypeName}{(f.Summary.Length > 0 ? " (" + f.Summary + ")" : "")}");
@@ -183,12 +183,12 @@ public sealed partial class ToolRegistry
             {
                 ((dynamic)dev).ConsumeXml("<TreeItem><DeviceDef><ScanBoxes>1</ScanBoxes></DeviceDef></TreeItem>");
                 var boxes = Descendants(dev).Where(x => System.Text.RegularExpressions.Regex.IsMatch(x.Name, @"^(Term|Box) \d+ \(")).Select(x => x.Name).ToList();
-                o.Append($"\nBoxen gescannt: {boxes.Count} ({TwinCatSession.Children(dev).Count() - before} neue Elemente direkt unter dem Geraet)");
+                o.Append($"\nBoxes scanned: {boxes.Count} ({TwinCatSession.Children(dev).Count() - before} new items directly under the device)");
                 if (boxes.Count > 0) o.Append("\n  " + string.Join("\n  ", boxes.Take(60)) + (boxes.Count > 60 ? "\n  ..." : ""));
             }
-            catch (Exception ex) { o.Append("\nBoxen-Scan fehlgeschlagen: " + (ex.InnerException?.Message ?? ex.Message)); }
+            catch (Exception ex) { o.Append("\nBox scan failed: " + (ex.InnerException?.Message ?? ex.Message)); }
         }
-        o.Append("\nDanach: tc_tree pruefen, Prozessdaten mit tc_link verknuepfen, tc_activate (bzw. tc_runtime_mode mode=run).");
+        o.Append("\nNext: check tc_tree, link process data with tc_link, tc_activate (or tc_runtime_mode mode=run).");
         return o.ToString();
     }
 }

@@ -1,12 +1,13 @@
-// Leitplanken: Zielsystem-Whitelist fuer Laufzeit-Eingriffe, optionaler Nur-Lese-Modus und Audit-Log.
-// Konfiguration ueber Umgebungsvariablen (in der MCP-Konfiguration unter "env"):
-//   TCAGENT_ALLOW_TARGETS  Komma-Liste erlaubter AmsNetIds fuer Aktivieren/Online/ADS-Schreiben.
-//                          "local" (Standard) = nur dieser PC (127.0.0.1.1.1 bzw. eigene NetId).
-//   TCAGENT_MODE           agent (Standard) = alles im Rahmen der Whitelist
-//                          propose = nichts aendern; tc_plc_write/tc_plc_create liefern nur einen Diff (dryRun)
-//                          ask     = nur lesen (keine Projekt- und keine Laufzeitaenderungen)
-//   TCAGENT_READONLY       1/true = wie TCAGENT_MODE=ask (aeltere Schreibweise).
-//   TCAGENT_AUDIT          Pfad des Audit-Logs (Standard %LOCALAPPDATA%\TcAgent\audit.jsonl)
+// Guard rails: target system whitelist for runtime operations, optional read-only mode and audit log.
+// Configured via environment variables (in the MCP configuration under "env"):
+//   TCAGENT_ALLOW_TARGETS  Comma-separated list of AmsNetIds allowed for activate/online/ADS write.
+//                          "local" (default) = this PC only (127.0.0.1.1.1 or its own NetId).
+//   TCAGENT_MODE           agent (default) = everything within the whitelist
+//                          propose = change nothing; tc_plc_write/tc_plc_create only return a diff (dryRun)
+//                          ask     = read only (no project and no runtime changes)
+//                          (German aliases also accepted: vorschlag = propose, fragen = ask; read = ask)
+//   TCAGENT_READONLY       1/true = same as TCAGENT_MODE=ask (older spelling).
+//   TCAGENT_AUDIT          Path of the audit log (default %LOCALAPPDATA%\TcAgent\audit.jsonl)
 using System.Text.Json;
 using System.Text.Json.Nodes;
 using Microsoft.Win32;
@@ -56,40 +57,40 @@ public sealed class Policy
         auditPath = Environment.GetEnvironmentVariable("TCAGENT_AUDIT") ??
                     Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "audit.jsonl");
         Directory.CreateDirectory(Path.GetDirectoryName(auditPath)!);
-        Log.Info($"Policy: Ziele=[{string.Join(", ", allowedTargets)}] modus={Mode} audit={auditPath}");
+        Log.Info($"Policy: targets=[{string.Join(", ", allowedTargets)}] mode={Mode} audit={auditPath}");
     }
 
     public static ToolClass ClassOf(string tool) => Classes.TryGetValue(tool, out var c) ? c : ToolClass.Read;
 
     public string Describe() =>
-        $"Modus: {Mode} ({ModeText})\nErlaubte Zielsysteme: {string.Join(", ", allowedTargets)}\nAudit-Log: {auditPath}";
+        $"Mode: {Mode} ({ModeText})\nAllowed target systems: {string.Join(", ", allowedTargets)}\nAudit log: {auditPath}";
 
     string ModeText => Mode switch
     {
-        AgentMode.Ask => "nur lesen",
-        AgentMode.Propose => "nur Vorschlaege: tc_plc_write/tc_plc_create liefern einen Diff, nichts wird geaendert",
-        _ => "Aenderungen erlaubt, Laufzeit nur gegen freigegebene Ziele"
+        AgentMode.Ask => "read only",
+        AgentMode.Propose => "proposals only: tc_plc_write/tc_plc_create return a diff, nothing is changed",
+        _ => "changes allowed, runtime operations only against allowed targets"
     };
 
-    /// <summary>Im Vorschlagsmodus werden Code-Aenderungen nur als Diff geliefert.</summary>
+    /// <summary>In propose mode, code changes are only returned as a diff.</summary>
     public bool ForceDryRun => Mode == AgentMode.Propose;
 
-    /// <summary>Wirft eine Exception, wenn der Aufruf nicht erlaubt ist. targetNetId = Ziel bei Laufzeit-Eingriffen.</summary>
+    /// <summary>Throws an exception if the call is not allowed. targetNetId = target for runtime operations.</summary>
     public void Check(string tool, Func<string> targetNetId)
     {
         var cls = ClassOf(tool);
         if (cls != ToolClass.Read && Mode == AgentMode.Ask)
-            throw new UnauthorizedAccessException($"{tool} blockiert: TcAgent laeuft im Modus 'ask' (nur lesen).");
+            throw new UnauthorizedAccessException($"{tool} blocked: TcAgent is running in mode 'ask' (read only).");
         if (cls != ToolClass.Read && Mode == AgentMode.Propose && tool is not ("tc_plc_write" or "tc_plc_create"))
-            throw new UnauthorizedAccessException($"{tool} blockiert: TcAgent laeuft im Modus 'propose' - Aenderungen nur als Vorschlag ueber tc_plc_write/tc_plc_create (Diff).");
+            throw new UnauthorizedAccessException($"{tool} blocked: TcAgent is running in mode 'propose' - changes only as a proposal via tc_plc_write/tc_plc_create (diff).");
         if (cls == ToolClass.RuntimeWrite)
         {
             var target = targetNetId();
             if (string.IsNullOrEmpty(target) || target.Equals("local", StringComparison.OrdinalIgnoreCase)) target = "127.0.0.1.1.1";
             if (!allowedTargets.Contains(target))
                 throw new UnauthorizedAccessException(
-                    $"{tool} blockiert: Zielsystem {target} ist nicht freigegeben. Erlaubt: {string.Join(", ", allowedTargets)}. " +
-                    "Freigabe ueber TCAGENT_ALLOW_TARGETS in der MCP-Konfiguration.");
+                    $"{tool} blocked: target system {target} is not allowed. Allowed: {string.Join(", ", allowedTargets)}. " +
+                    "Allow it via TCAGENT_ALLOW_TARGETS in the MCP configuration.");
         }
     }
 
@@ -98,7 +99,7 @@ public sealed class Policy
         try
         {
             var a = args.DeepClone().AsObject();
-            foreach (var k in a.Select(p => p.Key).ToList())   // lange Texte (Code, XML) kuerzen
+            foreach (var k in a.Select(p => p.Key).ToList())   // shorten long texts (code, XML)
                 if (a[k] is JsonValue v && v.ToString().Length > 300) a[k] = v.ToString()[..300] + "...";
             var line = new JsonObject
             {
@@ -111,7 +112,7 @@ public sealed class Policy
         catch (Exception ex) { Log.Error("Audit: " + ex.Message); }
     }
 
-    // Eigene AmsNetId aus der TwinCAT-Registry (6 Bytes)
+    // Own AmsNetId from the TwinCAT registry (6 bytes)
     static string ReadLocalNetId()
     {
         foreach (var key in new[] { @"SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3\System", @"SOFTWARE\Beckhoff\TwinCAT3\System" })

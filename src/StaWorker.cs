@@ -1,5 +1,5 @@
-// Alle COM-Aufrufe an Visual Studio/TwinCAT laufen auf EINEM STA-Thread mit registriertem
-// OLE-Message-Filter (sonst RPC_E_CALL_REJECTED, wenn die IDE beschaeftigt ist).
+// All COM calls to Visual Studio/TwinCAT run on ONE STA thread with a registered
+// OLE message filter (otherwise RPC_E_CALL_REJECTED when the IDE is busy).
 using System.Collections.Concurrent;
 using System.Runtime.InteropServices;
 
@@ -29,8 +29,8 @@ public sealed class StaWorker : IDisposable
         T result = default; Exception err = null;
         using var done = new ManualResetEventSlim();
         queue.Add(() => { try { result = f(); } catch (Exception ex) { err = ex; } finally { done.Set(); } });
-        if (!done.Wait(timeoutMs)) throw new TimeoutException($"Zeitueberschreitung nach {timeoutMs / 1000}s");
-        if (err != null) throw err is COMException c ? new Exception($"COM-Fehler 0x{c.HResult:X8}: {c.Message}", c) : err;
+        if (!done.Wait(timeoutMs)) throw new TimeoutException($"Timeout after {timeoutMs / 1000}s");
+        if (err != null) throw err is COMException c ? new Exception($"COM error 0x{c.HResult:X8}: {c.Message}", c) : err;
         return result;
     }
 
@@ -50,7 +50,7 @@ sealed class MessageFilter : IOleMessageFilter
     public static void Register() => CoRegisterMessageFilter(new MessageFilter(), out _);
     public static void Revoke() => CoRegisterMessageFilter(null, out _);
     int IOleMessageFilter.HandleInComingCall(int a, IntPtr b, int c, IntPtr d) => 0;
-    // SERVERCALL_RETRYLATER -> nach 100 ms erneut versuchen (max. ~5 min)
+    // SERVERCALL_RETRYLATER -> retry after 100 ms (max. ~5 min)
     int IOleMessageFilter.RetryRejectedCall(IntPtr a, int tick, int type) => type == 2 && tick < 300_000 ? 100 : -1;
     int IOleMessageFilter.MessagePending(IntPtr a, int b, int c) => 2;
     [DllImport("ole32.dll")] static extern int CoRegisterMessageFilter(IOleMessageFilter newFilter, out IOleMessageFilter oldFilter);

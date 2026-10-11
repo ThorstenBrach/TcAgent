@@ -1,6 +1,6 @@
-// Kompaktes Schnittstellenmodell einer Bibliothek aus dem Projektmodell der IDE:
-// Originalschreibweise, EXTENDS, geerbte Ein-/Ausgaenge, Methoden je FB, Struct-Felder, Enum-Werte, Doku-Kommentare.
-// Ausgabe als ST-Deklarationen (wie Header-Dateien), damit Agenten keine APIs erfinden.
+// Compact interface model of a library from the IDE's project model:
+// original spelling, EXTENDS, inherited inputs/outputs, methods per FB, struct fields, enum values, doc comments.
+// Output as ST declarations (like header files) so that agents do not invent APIs.
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -15,7 +15,7 @@ public sealed class LibApi
     public string Library { get; init; }
     public List<Sym> Symbols { get; init; } = new();
 
-    // ------------------------------------------------------------------ Aufbau aus dem Roh-Export der Bruecke
+    // ------------------------------------------------------------------ Built from the bridge's raw export
     public static LibApi FromLm(string rawJson, string library)
     {
         var root = JsonNode.Parse(rawJson)!.AsObject();
@@ -43,7 +43,7 @@ public sealed class LibApi
     public void Save(string path) => File.WriteAllText(path, JsonSerializer.Serialize(this));
     public static LibApi Load(string path) => JsonSerializer.Deserialize<LibApi>(File.ReadAllText(path));
 
-    // ------------------------------------------------------------------ Abfragen
+    // ------------------------------------------------------------------ Queries
     Sym Parent(Sym s) => s.ParentId >= 0 ? Symbols.FirstOrDefault(x => x.Id == s.ParentId) : null;
     Sym ByName(string n) => Symbols.FirstOrDefault(x => x.ParentId < 0 && string.Equals(x.Name, n, StringComparison.OrdinalIgnoreCase));
     IEnumerable<Sym> Methods(Sym s) => Symbols.Where(x => x.ParentId == s.Id && s.Id >= 0);
@@ -54,23 +54,23 @@ public sealed class LibApi
     {
         var top = Symbols.Where(s => s.ParentId < 0).ToList();
         var kinds = string.Join(", ", top.GroupBy(s => s.Kind).OrderBy(g => g.Key).Select(g => $"{g.Key} {g.Count()}"));
-        var sb = new StringBuilder($"{top.Count} Symbole ({kinds}), dazu {Symbols.Count - top.Count} Methoden/Properties{(string.IsNullOrEmpty(filter) ? "" : $", Filter '{filter}'")}\n");
+        var sb = new StringBuilder($"{top.Count} symbols ({kinds}), plus {Symbols.Count - top.Count} methods/properties{(string.IsNullOrEmpty(filter) ? "" : $", Filter '{filter}'")}\n");
         int lines = 0;
         foreach (var s in top)
         {
             if (!string.IsNullOrEmpty(filter) && s.Name.IndexOf(filter, StringComparison.OrdinalIgnoreCase) < 0) continue;
-            if (++lines > maxLines) { sb.AppendLine($"... (abgeschnitten nach {maxLines} Zeilen - mit filter eingrenzen)"); break; }
+            if (++lines > maxLines) { sb.AppendLine($"... (truncated after {maxLines} lines - narrow down with filter)"); break; }
             sb.Append(s.Name).Append("  [").Append(s.Kind).Append(']');
             if (!string.IsNullOrEmpty(s.Extends)) sb.Append(" EXTENDS ").Append(s.Extends);
             int i = s.Vars.Count(v => Is(v, "Input")), o = s.Vars.Count(v => Is(v, "Output")), io = s.Vars.Count(v => Is(v, "Inout")), m = Methods(s).Count();
-            if (s.Kind is "FunctionBlock" or "Function" or "Program") sb.Append($"  in:{i} out:{o}{(io > 0 ? $" inout:{io}" : "")}{(m > 0 ? $" methoden:{m}" : "")}");
+            if (s.Kind is "FunctionBlock" or "Function" or "Program") sb.Append($"  in:{i} out:{o}{(io > 0 ? $" inout:{io}" : "")}{(m > 0 ? $" methods:{m}" : "")}");
             if (s.Doc != null) sb.Append("  // ").Append(s.Doc.Length > 100 ? s.Doc[..100] + "..." : s.Doc);
             sb.AppendLine();
         }
         return sb.ToString();
     }
 
-    /// <summary>Schnittstelle eines Symbols als ST-Deklaration. "FB.Methode" waehlt eine Methode.</summary>
+    /// <summary>Interface of a symbol as an ST declaration. "FB.Method" selects a method.</summary>
     public string Describe(string symbol)
     {
         Sym s;
@@ -80,16 +80,16 @@ public sealed class LibApi
             var owner = ByName(symbol[..dot]);
             s = owner == null ? null : Methods(owner).FirstOrDefault(x => string.Equals(x.Name, symbol[(dot + 1)..], StringComparison.OrdinalIgnoreCase));
             if (s == null && owner != null && Methods(owner).Any(x => string.Equals(PropName(x), symbol[(dot + 1)..], StringComparison.OrdinalIgnoreCase)))
-                return $"// Property von {owner.Name}\n" + PropMember(owner, symbol[(dot + 1)..]).Declaration;
+                return $"// Property of {owner.Name}\n" + PropMember(owner, symbol[(dot + 1)..]).Declaration;
         }
         else s = ByName(symbol) ?? Symbols.FirstOrDefault(x => string.Equals(x.Name, symbol, StringComparison.OrdinalIgnoreCase));
         if (s == null)
         {
             var near = Symbols.Where(x => x.Name.Contains(symbol, StringComparison.OrdinalIgnoreCase)).Take(15).Select(x => (Parent(x) is { } p ? p.Name + "." : "") + x.Name);
-            return $"Symbol '{symbol}' nicht gefunden. Aehnlich: {string.Join(", ", near)}";
+            return $"Symbol '{symbol}' not found. Similar: {string.Join(", ", near)}";
         }
         var sb = new StringBuilder();
-        if (Parent(s) is { } par) sb.AppendLine($"// Methode/Property von {par.Name}");
+        if (Parent(s) is { } par) sb.AppendLine($"// Method/property of {par.Name}");
         if (s.Doc != null) sb.AppendLine("/// " + s.Doc);
         switch (s.Kind)
         {
@@ -100,14 +100,14 @@ public sealed class LibApi
                 Section(sb, "VAR_INPUT", s.Vars.Where(v => Is(v, "Input")));
                 Section(sb, "VAR_OUTPUT", s.Vars.Where(v => Is(v, "Output")));
                 Section(sb, "VAR_IN_OUT", s.Vars.Where(v => Is(v, "Inout")));
-                // Geerbte Schnittstelle entlang der EXTENDS-Kette
+                // Inherited interface along the EXTENDS chain
                 var b = s; var seen = new HashSet<string>();
                 while (!string.IsNullOrEmpty(b.Extends) && seen.Add(b.Extends) && ByName(b.Extends) is { } bs)
                 {
                     var inh = bs.Vars.Where(v => Is(v, "Input") || Is(v, "Output") || Is(v, "Inout")).ToList();
                     if (inh.Count > 0)
                     {
-                        sb.AppendLine($"// geerbt von {bs.Name}:");
+                        sb.AppendLine($"// inherited from {bs.Name}:");
                         Section(sb, "VAR_INPUT", inh.Where(v => Is(v, "Input")));
                         Section(sb, "VAR_OUTPUT", inh.Where(v => Is(v, "Output")));
                         Section(sb, "VAR_IN_OUT", inh.Where(v => Is(v, "Inout")));
@@ -115,7 +115,7 @@ public sealed class LibApi
                     b = bs;
                 }
                 var locals = s.Vars.Count(v => Is(v, "Local"));
-                if (locals > 0) sb.AppendLine($"// {locals} interne Variablen (nicht Teil der Schnittstelle)");
+                if (locals > 0) sb.AppendLine($"// {locals} internal variables (not part of the interface)");
                 var ms = Methods(s).ToList();
                 b = s; seen.Clear();
                 while (!string.IsNullOrEmpty(b.Extends) && seen.Add(b.Extends) && ByName(b.Extends) is { } bs2)
@@ -125,13 +125,13 @@ public sealed class LibApi
                 }
                 if (ms.Count > 0)
                 {
-                    sb.AppendLine("// Methoden/Properties:");
-                    foreach (var m in ms) sb.AppendLine("//   " + MethodLine(m) + (Parent(m) != s ? $"   (von {Parent(m)?.Name})" : ""));
+                    sb.AppendLine("// Methods/properties:");
+                    foreach (var m in ms) sb.AppendLine("//   " + MethodLine(m) + (Parent(m) != s ? $"   (from {Parent(m)?.Name})" : ""));
                 }
                 sb.AppendLine($"END_{Keyword(s.Kind)}");
                 if (string.Equals(s.Kind, "Interface", StringComparison.OrdinalIgnoreCase) && InterfaceMembers(s.Name) is { Count: > 0 } im2)
                 {
-                    sb.AppendLine("\n// Vollstaendige Mitglieder (tc_plc_create kind=function_block implements=" + s.Name + " legt sie als Stubs an):");
+                    sb.AppendLine("\n// Complete members (tc_plc_create kind=function_block implements=" + s.Name + " creates them as stubs):");
                     foreach (var mm in im2) sb.AppendLine(mm.Declaration).AppendLine();
                 }
                 break;
@@ -163,7 +163,7 @@ public sealed class LibApi
                     sb.AppendLine("END_STRUCT\nEND_TYPE");
                 }
                 break;
-            default:   // VarGlobal u. a. - Enums erscheinen ebenfalls als VarGlobal
+            default:   // VarGlobal etc. - enums also appear as VarGlobal
                 if (s.Vars.Count > 0 && s.Vars.All(v => Is(v, "Enum")))
                 {
                     sb.AppendLine($"TYPE {s.Name} :\n(");
@@ -178,13 +178,13 @@ public sealed class LibApi
         return sb.ToString();
     }
 
-    // ------------------------------------------------------------------ Interface-Mitglieder (fuer tc_plc_create implements=...)
+    // ------------------------------------------------------------------ Interface members (for tc_plc_create implements=...)
     public sealed record Member(string Name, bool IsProperty, string ReturnType, string Declaration);
 
     static bool IsProp(Sym m) => m.Kind != null && m.Kind.IndexOf("prop", StringComparison.OrdinalIgnoreCase) >= 0;
     static Var RetVar(Sym m) => m.Vars.FirstOrDefault(v => Is(v, "Output") && v.Name.Equals(m.Name, StringComparison.OrdinalIgnoreCase));
 
-    /// <summary>Alle Methoden/Properties eines Interfaces inkl. EXTENDS-Kette; null, wenn es hier kein Interface dieses Namens gibt.</summary>
+    /// <summary>All methods/properties of an interface including the EXTENDS chain; null if there is no interface of this name here.</summary>
     public List<Member> InterfaceMembers(string iface)
     {
         var s = ByName(iface);
@@ -197,7 +197,7 @@ public sealed class LibApi
             if (!done.Add(b.Name)) continue;
             foreach (var m in Methods(b))
             {
-                // Properties erscheinen als Methoden __getX / __setX
+                // Properties appear as methods __getX / __setX
                 var pn = PropName(m);
                 if (pn != null) { if (seen.Add(pn)) list.Add(PropMember(b, pn)); continue; }
                 if (!m.Name.StartsWith("__") && seen.Add(m.Name)) list.Add(ToMember(m));
@@ -219,7 +219,7 @@ public sealed class LibApi
         var type = (get != null ? RetVar(get)?.Type : null)
                    ?? set?.Vars.FirstOrDefault(v => Is(v, "Input"))?.Type ?? "BOOL";
         var doc = get?.Doc ?? set?.Doc;
-        var acc = get != null && set != null ? "Get/Set" : get != null ? "nur Get" : "nur Set";
+        var acc = get != null && set != null ? "Get/Set" : get != null ? "Get only" : "Set only";
         return new Member(name, true, type, (doc != null ? "/// " + doc + "\n" : "") + $"PROPERTY {name} : {type}   // {acc}");
     }
 

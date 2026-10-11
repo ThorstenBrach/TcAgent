@@ -1,10 +1,10 @@
-// TcAgentBridge - Einrichtung bei Installation per VSIX (keine Skripte von Hand):
-//   1. TcAgent.exe aus der Erweiterung nach %LOCALAPPDATA%\TcAgent\app\<Version>\ kopieren (stabiler Pfad fuer die KI-Clients;
-//      der Erweiterungsordner von VS aendert sich bei jedem Update)
-//   2. Interop-Assembly fuer das Automation Interface aus der lokalen TwinCAT-Installation erzeugen (%LOCALAPPDATA%\TcAgent\lib\)
-//      - sie stammt aus Beckhoffs Typbibliothek und wird deshalb nicht mitverteilt
-//   3. KI-Clients einrichten (setup-clients.ps1) - beim ersten Mal nur nach Rueckfrage, bei Updates automatisch
-// Laeuft im Hintergrund; Ergebnis im Chat-Fenster und in %LOCALAPPDATA%\TcAgent\setup.log.
+// TcAgentBridge - setup when installed via VSIX (no manual scripts):
+//   1. Copy TcAgent.exe from the extension to %LOCALAPPDATA%\TcAgent\app\<version>\ (stable path for the AI clients;
+//      the VS extension folder changes with every update)
+//   2. Generate the interop assembly for the Automation Interface from the local TwinCAT installation (%LOCALAPPDATA%\TcAgent\lib\)
+//      - it is derived from Beckhoff's type library and is therefore not redistributed
+//   3. Set up the AI clients (setup-clients.ps1) - the first time only after asking, automatically on updates
+// Runs in the background; result in the chat window and in %LOCALAPPDATA%\TcAgent\setup.log.
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -24,14 +24,14 @@ namespace TcAgentBridge
         static readonly string StateFile = Path.Combine(Local, "setup-state.json");
         static readonly string SetupLog = Path.Combine(Local, "setup.log");
 
-        /// <summary>Quellordner "tcagent" in der installierten Erweiterung; null bei Entwickler-Installation per install.ps1.</summary>
+        /// <summary>Source folder "tcagent" in the installed extension; not present for a developer installation via install.ps1.</summary>
         static string Source => Path.Combine(Path.GetDirectoryName(typeof(Installer).Assembly.Location) ?? "", "tcagent");
 
         public static string AppDir => Path.Combine(Local, "app", BridgePackage.BridgeVersion);
         public static string Exe => Path.Combine(AppDir, "TcAgent.exe");
         public static bool IsVsixInstall => File.Exists(Path.Combine(Source, "TcAgent.exe"));
 
-        /// <summary>Beim Start der Erweiterung (UI-Thread, Leerlauf). Fragt beim allerersten Mal, ob die KI-Clients eingerichtet werden sollen.</summary>
+        /// <summary>On extension startup (UI thread, idle). On the very first run, asks whether the AI clients should be set up.</summary>
         public static void OnStartup(Action<string> log, Action<string> notify)
         {
             if (!IsVsixInstall) return;
@@ -53,7 +53,7 @@ namespace TcAgentBridge
             if (newVersion || !File.Exists(Exe)) Task.Run(() => Run(consent, log, notify));
         }
 
-        /// <summary>Kopieren, Interop erzeugen und (bei Zustimmung) Clients einrichten. Auch per Knopf im Chat-Fenster.</summary>
+        /// <summary>Copy, generate the interop and (with consent) set up the clients. Also via the button in the chat window.</summary>
         public static void Run(bool setupClients, Action<string> log, Action<string> notify)
         {
             try
@@ -88,7 +88,7 @@ namespace TcAgentBridge
                 Directory.CreateDirectory(Path.GetDirectoryName(dst));
                 File.Copy(f, dst, true);
             }
-            log("TcAgent kopiert nach " + AppDir);
+            log("TcAgent copied to " + AppDir);
         }
 
         static void CleanupOldVersions(Action<string> log)
@@ -97,8 +97,8 @@ namespace TcAgentBridge
             foreach (var d in Directory.GetDirectories(root))
             {
                 if (string.Equals(Path.GetFileName(d), BridgePackage.BridgeVersion, StringComparison.OrdinalIgnoreCase)) continue;
-                try { Directory.Delete(d, true); log("alte Version entfernt: " + d); }
-                catch { /* noch von einem Client benutzt - beim naechsten Mal */ }
+                try { Directory.Delete(d, true); log("old version removed: " + d); }
+                catch { /* still in use by a client - next time */ }
             }
         }
 
@@ -115,12 +115,12 @@ namespace TcAgentBridge
             {
                 var outTask = p.StandardOutput.ReadToEndAsync();
                 var errTask = p.StandardError.ReadToEndAsync();
-                if (!p.WaitForExit(120000)) { try { p.Kill(); } catch { } return (-1, "Zeitueberschreitung"); }
-                return (p.ExitCode, outTask.Result + (errTask.Result.Length > 0 ? "\n--- Fehler ---\n" + errTask.Result : ""));
+                if (!p.WaitForExit(120000)) { try { p.Kill(); } catch { } return (-1, "Timeout"); }
+                return (p.ExitCode, outTask.Result + (errTask.Result.Length > 0 ? "\n--- Errors ---\n" + errTask.Result : ""));
             }
         }
 
-        // ------------------------------------------------------------------ Interop aus der TwinCAT-Typbibliothek
+        // ------------------------------------------------------------------ Interop from the TwinCAT type library
         [DllImport("oleaut32.dll", CharSet = CharSet.Unicode, PreserveSig = false)]
         static extern void LoadTypeLibEx(string file, int regKind, [MarshalAs(UnmanagedType.Interface)] out object typeLib);
 
@@ -130,13 +130,13 @@ namespace TcAgentBridge
             var file = Path.Combine(dir, "Interop.TCatSysManagerLib.dll");
             if (File.Exists(file)) return file;
             var tlb = FindTlb();
-            if (tlb == null) { log("TCatSysManager.tlb nicht gefunden"); return null; }
+            if (tlb == null) { log("TCatSysManager.tlb not found"); return null; }
             Directory.CreateDirectory(dir);
             LoadTypeLibEx(tlb, 2 /* REGKIND_NONE */, out var typeLib);
             var sink = new Sink(dir, log);
             var ab = new TypeLibConverter().ConvertTypeLibToAssembly(typeLib, file, TypeLibImporterFlags.None, sink, null, null, "TCatSysManagerLib", null);
             ab.Save(Path.GetFileName(file));
-            log("Interop erzeugt: " + file + " aus " + tlb);
+            log("Interop generated: " + file + " from " + tlb);
             return file;
         }
 
@@ -166,7 +166,7 @@ namespace TcAgentBridge
             public void ReportEvent(ImporterEventKind kind, int code, string msg) { if (kind != ImporterEventKind.NOTIF_TYPECONVERTED) log("TypeLib: " + msg); }
             public Assembly ResolveRef(object typeLib)
             {
-                // abhaengige Typbibliotheken ebenfalls umwandeln (stdole kommt als PIA aus dem GAC)
+                // convert dependent type libraries as well (stdole comes as a PIA from the GAC)
                 var name = Marshal.GetTypeLibName((ITypeLib)typeLib);
                 var file = Path.Combine(dir, "Interop." + name + ".dll");
                 if (File.Exists(file)) return Assembly.LoadFrom(file);
@@ -176,7 +176,7 @@ namespace TcAgentBridge
             }
         }
 
-        // ------------------------------------------------------------------ Zustand
+        // ------------------------------------------------------------------ State
         static Dictionary<string, object> LoadState()
         {
             try { if (File.Exists(StateFile)) return new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(File.ReadAllText(StateFile)) ?? new Dictionary<string, object>(); }

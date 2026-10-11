@@ -1,22 +1,22 @@
-﻿# Traegt TcAgent als MCP-Server in allen vorhandenen KI-Clients ein und verteilt die Agenten-Anleitung.
+﻿# Registers TcAgent as an MCP server in all installed AI clients and distributes the agent guide.
 #   Claude Desktop, Claude Code, GitHub Copilot (Visual Studio + Copilot CLI), Gemini CLI, OpenAI Codex CLI (ChatGPT)
-# Aendert nur den Eintrag "tcagent" bzw. den markierten Abschnitt; vor jeder Aenderung wird eine Sicherung *.bak-<Zeit> angelegt.
+# Changes only the "tcagent" entry or the marked section; a backup *.bak-<time> is created before every change.
 #
 #   powershell -ExecutionPolicy Bypass -File .\setup-clients.ps1
-#   powershell -ExecutionPolicy Bypass -File .\setup-clients.ps1 -SolutionDir C:\Projekte\MeineMaschine
+#   powershell -ExecutionPolicy Bypass -File .\setup-clients.ps1 -SolutionDir C:\Projects\MyMachine
 #
-# -SolutionDir: legt zusaetzlich AGENTS.md, GEMINI.md, CLAUDE.md und .github\copilot-instructions.md im Projekt an (fuer Git/Team).
+# -SolutionDir: additionally creates AGENTS.md, GEMINI.md, CLAUDE.md and .github\copilot-instructions.md in the project (for Git/team).
 param(
     [string]$TcAgentExe = (Join-Path $PSScriptRoot 'bin\publish\TcAgent.exe'),
-    [string]$Solution = $null,        # TCAGENT_SOLUTION (Teil des Solution-Pfads) - nur noetig, wenn eine bestimmte Instanz fest vorgegeben werden soll
-    [string]$AllowTargets = $null,    # TCAGENT_ALLOW_TARGETS, leer = uebernehmen bzw. Standard "local"
+    [string]$Solution = $null,        # TCAGENT_SOLUTION (part of the solution path) - only needed to pin one specific instance
+    [string]$AllowTargets = $null,    # TCAGENT_ALLOW_TARGETS, empty = keep existing value or default "local"
     [string]$SolutionDir = $null,
-    [string]$Search = $null           # TCAGENT_SEARCH fuer tc_docs: searxng:<URL> oder google:<API-Key>:<Suchmaschinen-ID>
+    [string]$Search = $null           # TCAGENT_SEARCH for tc_docs: searxng:<URL> or google:<API key>:<search engine ID>
 )
 $ErrorActionPreference = 'Stop'
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $utf8 = New-Object System.Text.UTF8Encoding $false
-if (-not (Test-Path $TcAgentExe)) { throw "TcAgent.exe nicht gefunden: $TcAgentExe (erst build.ps1 ausfuehren)" }
+if (-not (Test-Path $TcAgentExe)) { throw "TcAgent.exe not found: $TcAgentExe (run build.ps1 first)" }
 $TcAgentExe = (Resolve-Path $TcAgentExe).Path
 $done = New-Object System.Collections.Generic.List[string]
 
@@ -38,7 +38,7 @@ function Set-Prop($obj, $name, $value) { $obj | Add-Member -NotePropertyName $na
 function Save-Json($path, $obj) { Save-Text $path ($obj | ConvertTo-Json -Depth 30) }
 function Has-Cmd($name) { return [bool](Get-Command $name -ErrorAction SilentlyContinue) }
 
-# ------------------------------------------------------------------ Umgebungsvariablen (aus vorhandener Claude-Konfiguration)
+# ------------------------------------------------------------------ Environment variables (from an existing Claude configuration)
 $claudeConfigs = @()
 $claudeConfigs += Get-ChildItem "$env:LOCALAPPDATA\Packages\Claude_*\LocalCache\Roaming\Claude\claude_desktop_config.json" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
 if (Test-Path "$env:APPDATA\Claude") { $claudeConfigs += "$env:APPDATA\Claude\claude_desktop_config.json" }
@@ -50,8 +50,8 @@ foreach ($c in $claudeConfigs) {
         $j.mcpServers.tcagent.env.PSObject.Properties | ForEach-Object { if (-not $envVars.Contains($_.Name)) { $envVars[$_.Name] = [string]$_.Value } }
     }
 }
-# TCAGENT_SOLUTION nicht uebernehmen: TcAgent findet die IDE selbst (eigene IDE im Chat, sonst einzige Instanz oder Auswahlliste).
-# Ein alter fester Wert wuerde in anderen Projekten zum falschen Ziel fuehren.
+# Do not carry over TCAGENT_SOLUTION: TcAgent finds the IDE itself (its own IDE in the chat, otherwise the only instance or a selection list).
+# An old fixed value would lead to the wrong target in other projects.
 if ($envVars.Contains('TCAGENT_SOLUTION')) { $envVars.Remove('TCAGENT_SOLUTION') }
 if ($Solution) { $envVars['TCAGENT_SOLUTION'] = $Solution }
 if ($AllowTargets) { $envVars['TCAGENT_ALLOW_TARGETS'] = $AllowTargets }
@@ -59,7 +59,7 @@ if ($Search) { $envVars['TCAGENT_SEARCH'] = $Search }
 $envObj = New-Object PSObject
 foreach ($k in $envVars.Keys) { Set-Prop $envObj $k $envVars[$k] }
 Write-Host "TcAgent: $TcAgentExe"
-Write-Host ("Umgebung: " + (($envVars.GetEnumerator() | ForEach-Object { if ($_.Key -eq 'TCAGENT_SEARCH') { "$($_.Key)=$(($_.Value -split ':')[0]):***" } else { "$($_.Key)=$($_.Value)" } }) -join '; '))
+Write-Host ("Environment: " + (($envVars.GetEnumerator() | ForEach-Object { if ($_.Key -eq 'TCAGENT_SEARCH') { "$($_.Key)=$(($_.Value -split ':')[0]):***" } else { "$($_.Key)=$($_.Value)" } }) -join '; '))
 
 # ------------------------------------------------------------------ Claude Desktop
 foreach ($c in ($claudeConfigs | Select-Object -Unique)) {
@@ -74,27 +74,27 @@ foreach ($c in ($claudeConfigs | Select-Object -Unique)) {
 # ------------------------------------------------------------------ Claude Code
 if (Has-Cmd 'claude') {
     $envArgs = @(); foreach ($k in $envVars.Keys) { $envArgs += @('-e', "$k=$($envVars[$k])") }
-    # Windows PowerShell 5.1 macht aus stderr nativer Programme bei 'Stop' einen Abbruch -> hier lokal lockern
+    # With 'Stop', Windows PowerShell 5.1 turns stderr of native programs into a terminating error -> relax it locally here
     $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
-        $null = & claude mcp remove tcagent -s user 2>&1   # "No MCP server named ..." beim ersten Mal ist normal
+        $null = & claude mcp remove tcagent -s user 2>&1   # "No MCP server named ..." is normal the first time
         $out = & claude mcp add tcagent -s user @envArgs -- $TcAgentExe 2>&1
-        if ($LASTEXITCODE -eq 0) { $done.Add("Claude Code: claude mcp add tcagent (Benutzer-Scope)") }
-        else { Write-Warning "Claude Code: 'claude mcp add' fehlgeschlagen: $out" }
+        if ($LASTEXITCODE -eq 0) { $done.Add("Claude Code: claude mcp add tcagent (user scope)") }
+        else { Write-Warning "Claude Code: 'claude mcp add' failed: $out" }
     } finally { $ErrorActionPreference = $eap }
 }
 
-# ------------------------------------------------------------------ GitHub Copilot in Visual Studio (ab 17.14, Agent-Modus)
+# ------------------------------------------------------------------ GitHub Copilot in Visual Studio (17.14 and later, agent mode)
 $vsMcp = Join-Path $env:USERPROFILE '.mcp.json'
 $j = Read-Json $vsMcp
 if (-not $j.servers) { Set-Prop $j 'servers' (New-Object PSObject) }
 $e = New-Object PSObject; Set-Prop $e 'type' 'stdio'; Set-Prop $e 'command' $TcAgentExe; Set-Prop $e 'args' @(); Set-Prop $e 'env' $envObj
 Set-Prop $j.servers 'tcagent' $e
-# Claude Code liest dieselbe Datei als Projektkonfiguration, wenn es im Benutzerordner gestartet wird,
-# und verlangt 'mcpServers'. Leerer Schluessel = gueltig fuer Claude, VS ignoriert ihn.
+# Claude Code reads the same file as project configuration when started in the user folder,
+# and requires 'mcpServers'. Empty key = valid for Claude, VS ignores it.
 if (-not $j.mcpServers) { Set-Prop $j 'mcpServers' (New-Object PSObject) }
 Save-Json $vsMcp $j
-$done.Add("Copilot in Visual Studio: $vsMcp (im Copilot-Chat Agent-Modus waehlen und tcagent-Werkzeuge aktivieren)")
+$done.Add("Copilot in Visual Studio: $vsMcp (select agent mode in Copilot Chat and enable the tcagent tools)")
 
 # ------------------------------------------------------------------ GitHub Copilot CLI
 $copilotDir = Join-Path $env:USERPROFILE '.copilot'
@@ -116,7 +116,7 @@ if ((Has-Cmd 'gemini') -or (Test-Path $geminiDir)) {
     $f = Join-Path $geminiDir 'settings.json'
     $j = Read-Json $f
     if (-not $j.mcpServers) { Set-Prop $j 'mcpServers' (New-Object PSObject) }
-    # trust=true: keine Rueckfrage pro tcagent-Werkzeug - die Leitplanken (Whitelist, Modi, Audit) sitzen in TcAgent selbst
+    # trust=true: no confirmation per tcagent tool - the guardrails (whitelist, modes, audit) live in TcAgent itself
     $e = New-Object PSObject; Set-Prop $e 'command' $TcAgentExe; Set-Prop $e 'args' @(); Set-Prop $e 'env' $envObj; Set-Prop $e 'trust' $true
     Set-Prop $j.mcpServers 'tcagent' $e
     Save-Json $f $j
@@ -128,7 +128,7 @@ $codexDir = Join-Path $env:USERPROFILE '.codex'
 if ((Has-Cmd 'codex') -or (Test-Path $codexDir)) {
     $f = Join-Path $codexDir 'config.toml'
     $toml = if (Test-Path $f) { [IO.File]::ReadAllText($f) } else { '' }
-    # vorhandene tcagent-Abschnitte entfernen (inkl. Unterabschnitt .env)
+    # remove existing tcagent sections (including the .env subsection)
     $toml = [regex]::Replace($toml, '(?ms)^\[mcp_servers\.tcagent(\.env)?\]\s*$.*?(?=^\[(?!mcp_servers\.tcagent)|\z)', '')
     $block = "`n[mcp_servers.tcagent]`ncommand = '$TcAgentExe'`nargs = []`n"
     if ($envVars.Count -gt 0) {
@@ -139,7 +139,7 @@ if ((Has-Cmd 'codex') -or (Test-Path $codexDir)) {
     $done.Add("Codex CLI (ChatGPT): $f")
 }
 
-# ------------------------------------------------------------------ Dateien fuer das Chat-Fenster in TwinCAT
+# ------------------------------------------------------------------ Files for the chat window in TwinCAT
 $tcDir = Join-Path $env:LOCALAPPDATA 'TcAgent'
 $m = New-Object PSObject; Set-Prop $m 'mcpServers' (New-Object PSObject)
 $e = New-Object PSObject; Set-Prop $e 'command' $TcAgentExe; Set-Prop $e 'args' @(); Set-Prop $e 'env' $envObj
@@ -163,10 +163,10 @@ if (-not (Test-Path $chatCfg)) {
   }
 }
 '@
-    $done.Add("Chat-Fenster: $chatCfg (Backends; Pfade/Argumente hier anpassbar)")
+    $done.Add("Chat window: $chatCfg (backends; paths/arguments can be adjusted here)")
 }
 else {
-    # alte Standard-Einstellung fuer Claude (ohne Fortschrittsanzeige) auf die neue heben, eigene Anpassungen bleiben
+    # upgrade the old Claude default (without progress display) to the new one; custom changes are kept
     $t = [IO.File]::ReadAllText($chatCfg)
     $new = '"args": "-p --input-format stream-json --output-format stream-json --verbose --strict-mcp-config --mcp-config {mcpClaude} --allowedTools mcp__tcagent WebSearch", "stdin": true, "format": "claude-stream"'
     $olds = @('"args": "-p --input-format stream-json --output-format stream-json --verbose --strict-mcp-config --mcp-config {mcpClaude} --allowedTools mcp__tcagent", "stdin": true, "format": "claude-stream"', '"args": "-p --output-format stream-json --verbose --strict-mcp-config --mcp-config {mcpClaude} --allowedTools mcp__tcagent", "stdin": true, "format": "claude-stream"', '"args": "-p --allowedTools mcp__tcagent --mcp-config {mcpClaude}", "stdin": true')
@@ -174,16 +174,16 @@ else {
     if ($hit) {
         Copy-Item $chatCfg "$chatCfg.bak-$(Get-Date -Format yyyyMMdd-HHmmss)"
         Save-Text $chatCfg ($t.Replace($hit, $new))
-        $done.Add("Chat-Fenster: $chatCfg - Claude-Backend auf dauerhafte Sitzung mit Live-Fortschritt umgestellt")
+        $done.Add("Chat window: $chatCfg - Claude backend switched to a persistent session with live progress")
     }
-    else { $done.Add("Chat-Fenster: $chatCfg bleibt unveraendert (bereits vorhanden)") }
+    else { $done.Add("Chat window: $chatCfg left unchanged (already exists)") }
 }
 
-# ------------------------------------------------------------------ Agenten-Anleitung (eine Quelle, vier Formate)
+# ------------------------------------------------------------------ Agent guide (one source, four formats)
 $guidePath = Join-Path $PSScriptRoot 'agents\TCAGENT_GUIDE.md'
 if (Test-Path $guidePath) {
     $guide = [IO.File]::ReadAllText($guidePath)
-    $blockText = "<!-- tcagent:begin (von setup-clients.ps1 verwaltet) -->`n$guide`n<!-- tcagent:end -->"
+    $blockText = "<!-- tcagent:begin (managed by setup-clients.ps1) -->`n$guide`n<!-- tcagent:end -->"
     function Merge-Guide($path) {
         $old = if (Test-Path $path) { [IO.File]::ReadAllText($path) } else { '' }
         $new = if ($old -match '(?s)<!-- tcagent:begin.*?<!-- tcagent:end -->') {
@@ -191,27 +191,27 @@ if (Test-Path $guidePath) {
         } else { ($old.TrimEnd() + "`n`n" + $blockText).TrimStart() }
         Save-Text $path ($new + "`n")
     }
-    if (Test-Path $geminiDir) { Merge-Guide (Join-Path $geminiDir 'GEMINI.md'); $done.Add("Anleitung: $geminiDir\GEMINI.md") }
-    if (Test-Path $codexDir) { Merge-Guide (Join-Path $codexDir 'AGENTS.md'); $done.Add("Anleitung: $codexDir\AGENTS.md") }
-    if (Test-Path $copilotDir) { Merge-Guide (Join-Path $copilotDir 'copilot-instructions.md'); $done.Add("Anleitung: $copilotDir\copilot-instructions.md") }
-    # Claude Code: als Benutzer-Skill (wird bei Bedarf geladen, auch im Chat-Fenster)
+    if (Test-Path $geminiDir) { Merge-Guide (Join-Path $geminiDir 'GEMINI.md'); $done.Add("Guide: $geminiDir\GEMINI.md") }
+    if (Test-Path $codexDir) { Merge-Guide (Join-Path $codexDir 'AGENTS.md'); $done.Add("Guide: $codexDir\AGENTS.md") }
+    if (Test-Path $copilotDir) { Merge-Guide (Join-Path $copilotDir 'copilot-instructions.md'); $done.Add("Guide: $copilotDir\copilot-instructions.md") }
+    # Claude Code: as a user skill (loaded on demand, also in the chat window)
     $skillSrc = Join-Path $PSScriptRoot 'SKILL.md'
     if ((Has-Cmd 'claude') -and (Test-Path $skillSrc)) {
         $skillDst = Join-Path $env:USERPROFILE '.claude\skills\twincat-tcagent\SKILL.md'
         Save-Text $skillDst ([IO.File]::ReadAllText($skillSrc))
-        $done.Add("Anleitung: $skillDst (Claude-Code-Skill)")
+        $done.Add("Guide: $skillDst (Claude Code skill)")
     }
     if ($SolutionDir) {
-        if (-not (Test-Path $SolutionDir)) { throw "SolutionDir nicht gefunden: $SolutionDir" }
+        if (-not (Test-Path $SolutionDir)) { throw "SolutionDir not found: $SolutionDir" }
         foreach ($p in @('AGENTS.md', 'GEMINI.md', 'CLAUDE.md', '.github\copilot-instructions.md')) {
-            Merge-Guide (Join-Path $SolutionDir $p); $done.Add("Anleitung im Projekt: $SolutionDir\$p")
+            Merge-Guide (Join-Path $SolutionDir $p); $done.Add("Guide in project: $SolutionDir\$p")
         }
     }
 }
-else { Write-Host "Hinweis: $guidePath fehlt - Anleitungen nicht verteilt" -ForegroundColor Yellow }
+else { Write-Host "Note: $guidePath is missing - guides not distributed" -ForegroundColor Yellow }
 
 Write-Host ""
-Write-Host "Eingerichtet:" -ForegroundColor Green
+Write-Host "Set up:" -ForegroundColor Green
 $done | ForEach-Object { Write-Host "  - $_" }
 Write-Host ""
-Write-Host "Nicht gefundene CLIs werden uebersprungen. Danach Clients neu starten (Claude Desktop ganz beenden, VS neu laden)."
+Write-Host "CLIs that were not found are skipped. Then restart the clients (quit Claude Desktop completely, reload VS)."

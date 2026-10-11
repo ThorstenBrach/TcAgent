@@ -50,7 +50,7 @@ public static class Confirm
                 var r = BridgeClient.Call(idePid, "confirm", new JsonObject { ["title"] = "TcAgent - " + tool, ["text"] = what }, 15 * 60_000);
                 return r["confirmed"]?.GetValue<bool>() == true;
             }
-            catch (Exception ex) { Log.Error("Rueckfrage ueber die Bruecke: " + ex.Message); }
+            catch (Exception ex) { Log.Error("Confirmation via the bridge: " + ex.Message); }
         }
         if (Mcp.CanElicit)
         {
@@ -59,11 +59,11 @@ public static class Confirm
                 ["type"] = "object",
                 ["properties"] = new JsonObject
                 {
-                    ["confirm"] = new JsonObject { ["type"] = "boolean", ["title"] = "Ausfuehren", ["description"] = what, ["default"] = false }
+                    ["confirm"] = new JsonObject { ["type"] = "boolean", ["title"] = "Execute", ["description"] = what, ["default"] = false }
                 },
                 ["required"] = new JsonArray("confirm")
             };
-            var answer = Mcp.Elicit("TcAgent moechte ausfuehren: " + what, schema);
+            var answer = Mcp.Elicit("TcAgent wants to execute: " + what, schema);
             // a client that offers elicitation but gets no answer/decline -> no
             return answer?["confirm"] is JsonValue c && c.ToString().Equals("true", StringComparison.OrdinalIgnoreCase);
         }
@@ -75,21 +75,21 @@ public static class Confirm
     {
         string S(string k) => a?[k] is JsonValue v ? v.ToString() : null;
         bool B(string k) => S(k)?.Equals("true", StringComparison.OrdinalIgnoreCase) == true;
-        var on = string.IsNullOrEmpty(target) ? "" : $" auf Zielsystem {target}";
+        var on = string.IsNullOrEmpty(target) ? "" : $" on target system {target}";
         switch (tool)
         {
             case "tc_activate":
-                return $"Konfiguration aktivieren{on}" + (a?["restart"] is JsonValue r && r.ToString() == "false" ? "" : " und TwinCAT im Run-Modus neu starten") + ".";
+                return $"Activate configuration{on}" + (a?["restart"] is JsonValue r && r.ToString() == "false" ? "" : " and restart TwinCAT in Run mode") + ".";
             case "tc_plc_online":
                 var cmds = new[] { "login", "stop", "start", "logout" }.Where(B).ToList();
                 return $"PLC {S("plcProjectPath")}: {string.Join(", ", cmds)}{on}.";
             case "ads_write":
-                return $"Variable {S("symbol")} := {S("value")} schreiben{(string.IsNullOrEmpty(target) ? " (lokale PLC)" : on)}, Port {S("port") ?? "851"}.";
+                return $"Write variable {S("symbol")} := {S("value")}{(string.IsNullOrEmpty(target) ? " (local PLC)" : on)}, port {S("port") ?? "851"}.";
             case "tc_runtime_mode":
-                return S("mode") == "config" ? $"TwinCAT{on} in den Config-Modus schalten - laufende PLC-Programme werden gestoppt."
-                                             : $"TwinCAT{on} mit der aktiven Konfiguration im Run-Modus neu starten.";
+                return S("mode") == "config" ? $"Switch TwinCAT{on} to Config mode - running PLC programs will be stopped."
+                                             : $"Restart TwinCAT{on} in Run mode with the active configuration.";
             case "tc_runtime_startup":
-                return $"Startmodus der lokalen TwinCAT-Runtime auf '{S("mode")}' setzen (gilt ab dem naechsten Hochfahren).";
+                return $"Set the start mode of the local TwinCAT runtime to '{S("mode")}' (takes effect from the next boot).";
             default:
                 var args = a == null ? "" : string.Join(", ", a.Where(p => p.Value is JsonValue).Select(p =>
                 {

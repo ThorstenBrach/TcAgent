@@ -1,4 +1,4 @@
-﻿# Rauchtest ohne Claude: startet den Server, schickt initialize + tools/list + tc_instances und zeigt die Antworten.
+﻿# Smoke test without Claude: starts the server, sends initialize + tools/list + tc_instances and shows the responses.
 $exe = Join-Path $PSScriptRoot 'bin\publish\TcAgent.exe'
 $msgs = @(
   '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}',

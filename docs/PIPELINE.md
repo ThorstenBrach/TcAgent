@@ -88,7 +88,7 @@ unless you save). Use `--no-boot-project` if your PLC is started differently.
 | Symptom | Cause / remedy |
 |---|---|
 | exit 3 "Could not open the TwinCAT solution" | Visual Studio/XAE not installed for this user, or the agent runs without a desktop session. Try `--visible` interactively. |
-| exit 3 "Zielsystem … nicht freigegeben" | the target is not in `TCAGENT_ALLOW_TARGETS` – set it in the pipeline's environment. |
+| exit 3 "target system … is not allowed" | the target is not in `TCAGENT_ALLOW_TARGETS` – set it in the pipeline's environment. |
 | exit 3 "Activation failed" | missing licenses on the target, runtime not installed, or Hyper-V/VBS blocking the real-time. |
 | exit 3 "no TcUnit output" | `TcUnit.RUN()` is not called, the task is not running, or the PLC did not start (boot project). |
 | JUnit has only one entry | `LogExtendedResults` is `FALSE` in the TcUnit parameters. |

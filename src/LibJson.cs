@@ -1,5 +1,5 @@
-// Auswertung des Export-JSON einer Bibliothek: Gliederung und Suche nach Symbolen.
-// Das Format ist undokumentiert; deshalb generisch: Objekte mit einem Namensfeld gelten als Symbole.
+// Evaluation of a library's export JSON: outline and search for symbols.
+// The format is undocumented, so this is generic: objects with a name field count as symbols.
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -23,7 +23,7 @@ public static class LibJson
         return null;
     }
 
-    // Kompakte Gliederung: je Symbol eine Zeile (Name, Art, Anzahl Ein-/Ausgaenge) - Members nur ueber Find
+    // Compact outline: one line per symbol (name, kind, number of inputs/outputs) - members only via Find
     public static string Outline(string json, string filter = null, int maxLines = 600)
     {
         var root = JsonNode.Parse(json);
@@ -55,15 +55,15 @@ public static class LibJson
         {
             if (n is JsonArray a) { foreach (var x in a) Walk(x, depth); return; }
             if (n is not JsonObject o) return;
-            if (NameOf(o) != null && depth > 0) { Emit(o, depth - 1); return; }   // Symbol: nicht weiter absteigen
+            if (NameOf(o) != null && depth > 0) { Emit(o, depth - 1); return; }   // symbol: do not descend further
             foreach (var kv in o)
                 if (kv.Value is JsonObject || kv.Value is JsonArray) Walk(kv.Value, depth + 1);
         }
         Walk(root, 0);
-        var head = $"{total} Symbole ({string.Join(", ", kinds.Select(kv => $"{kv.Key} {kv.Value}"))})" +
+        var head = $"{total} symbols ({string.Join(", ", kinds.Select(kv => $"{kv.Key} {kv.Value}"))})" +
                    (string.IsNullOrEmpty(filter) ? "" : $", Filter '{filter}'") + "\n";
-        if (lines >= maxLines) sb.AppendLine($"... (abgeschnitten nach {maxLines} Zeilen - mit filter oder symbol eingrenzen)");
-        if (total == 0) sb.AppendLine("Keine Objekte mit Namensfeld erkannt. Anfang des JSON:\n" + (json.Length > 3000 ? json[..3000] + "..." : json));
+        if (lines >= maxLines) sb.AppendLine($"... (truncated after {maxLines} lines - narrow down with filter or symbol)");
+        if (total == 0) sb.AppendLine("No objects with a name field recognized. Start of the JSON:\n" + (json.Length > 3000 ? json[..3000] + "..." : json));
         return head + sb;
     }
 
@@ -82,11 +82,11 @@ public static class LibJson
             foreach (var kv in o) Walk(kv.Value);
         }
         Walk(root);
-        if (hits.Count == 0) return $"Symbol '{symbol}' nicht gefunden.";
+        if (hits.Count == 0) return $"Symbol '{symbol}' not found.";
         var opts = new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
-        var sb = new StringBuilder($"{hits.Count} Treffer fuer '{symbol}':\n");
+        var sb = new StringBuilder($"{hits.Count} hits for '{symbol}':\n");
         foreach (var h in hits) sb.AppendLine(h.ToJsonString(opts));
         var s = sb.ToString();
-        return s.Length > maxChars ? s[..maxChars] + "\n... (abgeschnitten)" : s;
+        return s.Length > maxChars ? s[..maxChars] + "\n... (truncated)" : s;
     }
 }

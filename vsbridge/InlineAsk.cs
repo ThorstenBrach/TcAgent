@@ -1,6 +1,6 @@
-// TcAgentBridge - Inline-Frage direkt im Code-Fenster (Strg+Umschalt+Q)
-// Ein kleines Eingabefeld erscheint unter der Cursorzeile. Enter schickt die Frage an den TcAgent-Chat
-// (der sie im Hintergrund beantwortet), Esc bricht ab; danach steht der Fokus wieder im Code.
+// TcAgentBridge - inline question directly in the code window (Ctrl+Shift+Q)
+// A small input box appears below the cursor line. Enter sends the question to the TcAgent chat
+// (which answers it in the background), Esc cancels; afterwards the focus returns to the code.
 //
 // SPDX-License-Identifier: MIT
 using System;
@@ -31,14 +31,14 @@ namespace TcAgentBridge
         {
             open?.Finish(null);
 
-            // Editor und Cursorposition merken, solange der Editor noch den Fokus hat
+            // Remember editor and cursor position while the editor still has the focus
             var hwnd = GetFocus();
             System.Windows.Forms.Control editor = null;
             try { editor = System.Windows.Forms.Control.FromChildHandle(hwnd); } catch { }
             int lineH = editor?.Font?.Height ?? 16;
             POINT p = default;
             bool haveCaret = hwnd != IntPtr.Zero && GetCaretPos(out p) && ClientToScreen(hwnd, ref p);
-            // Caret-Position nur glauben, wenn sie im Editor liegt (sonst z. B. 0,0 -> falscher Monitor)
+            // Trust the caret position only if it lies within the editor (otherwise e.g. 0,0 -> wrong monitor)
             if (haveCaret && editor != null && !editor.RectangleToScreen(editor.ClientRectangle).Contains(p.X, p.Y)) haveCaret = false;
             if (!haveCaret)
             {
@@ -77,13 +77,13 @@ namespace TcAgentBridge
             if (!string.IsNullOrEmpty(ctx))
             {
                 var lines = ctx.Split('\n');
-                where = lines[0].Replace("Offenes Objekt: ", "");
+                where = lines[0].Replace("Open object: ", "");
                 if (lines.Length > 1 && lines[1].StartsWith("Cursor:")) where += " · " + lines[1].Substring(8);
             }
             var hint = new TextBlock
             {
-                Text = busy ? $"TcAgent arbeitet noch an der letzten Frage – Esc schliesst."
-                            : $"Frage an {backendName}{(where.Length > 0 ? "  ·  " + where : "")}   –   Enter senden · Umschalt+Enter neue Zeile · Esc abbrechen",
+                Text = busy ? $"TcAgent is still working on the last question – Esc closes."
+                            : $"Ask {backendName}{(where.Length > 0 ? "  ·  " + where : "")}   –   Enter send · Shift+Enter new line · Esc cancel",
                 FontSize = 11, Opacity = 0.75, Margin = new Thickness(2, 0, 2, 4), TextTrimming = TextTrimming.CharacterEllipsis
             };
             var panel = new StackPanel { Margin = new Thickness(6) };
@@ -91,7 +91,7 @@ namespace TcAgentBridge
             panel.Children.Add(box);
             Content = new Border { BorderThickness = new Thickness(1), Child = panel };
 
-            // VS-Farbschema
+            // VS color theme
             SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             ((Border)Content).SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
@@ -102,7 +102,7 @@ namespace TcAgentBridge
 
             box.PreviewKeyDown += OnKey;
             PreviewKeyDown += (s, e) => { if (e.Key == Key.Escape) { e.Handled = true; Finish(null); } };
-            Deactivated += (s, e) => Finish(null);   // Klick woanders hin = abbrechen
+            Deactivated += (s, e) => Finish(null);   // click elsewhere = cancel
         }
 
         void OnKey(object sender, KeyEventArgs e)
@@ -128,7 +128,7 @@ namespace TcAgentBridge
             if (open == this) open = null;
             try { Close(); } catch { }
             if (text != null) BridgePackage.Instance?.SendInline(text, ctx);
-            // Fokus zurueck in den Code (nach dem Schliessen, sonst holt ihn sich das Hauptfenster)
+            // Focus back to the code (after closing, otherwise the main window grabs it)
             var ed = editor;
             Dispatcher.BeginInvoke(new Action(() =>
             {
@@ -137,10 +137,10 @@ namespace TcAgentBridge
             }), System.Windows.Threading.DispatcherPriority.Input);
         }
 
-        // Pixel (Bildschirm) -> WPF-Einheiten, innerhalb des Arbeitsbereichs halten
+        // Pixels (screen) -> WPF units, kept within the work area
         void PlaceAt(int px, int py)
         {
-            // In Pixeln auf DEM Monitor begrenzen, auf dem der Cursor steht (SystemParameters.WorkArea ist nur der Hauptmonitor)
+            // Clamp in pixels to THE monitor the cursor is on (SystemParameters.WorkArea is only the primary monitor)
             var scr = System.Windows.Forms.Screen.FromPoint(new System.Drawing.Point(px, py)).WorkingArea;
             double sx = 1, sy = 1;
             try
