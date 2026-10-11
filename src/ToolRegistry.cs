@@ -177,6 +177,7 @@ public sealed partial class ToolRegistry
             a => tc.Sta.Run(() => IoAdd(a)));
 
         RegisterIoScan();
+        RegisterMotion();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +

@@ -325,6 +325,24 @@ Adds a library reference to a PLC.
 | `version` | string |  | Version or * (default) |
 | `vendor` | string |  | Vendor, e.g. Beckhoff Automation GmbH |
 
+## Motion
+
+### `tc_motion`
+
+Lists the motion configuration: NC tasks and their axes (name, type, tree path). Read only.
+
+### `tc_motion_add`
+
+Creates an NC task (`kind=nc_task`) or NC axes (`kind=axis`, several with `count`) under the Axes folder of an NC task. Parameters afterwards with `tc_xml_get`/`tc_xml_set`; the drive link is done in the IDE or via `tc_xml_set` on the axis. Takes effect after `tc_activate`.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `kind` | string | yes | `nc_task` or `axis` |
+| `name` | string |  | Name (default `NC-Task n` / `Axis n`) |
+| `count` | integer |  | axis: number of axes (default 1) |
+| `ncTaskPath` | string |  | axis: NC task, e.g. `TINC^NC-Task 1 SAF` (empty = the only one) |
+| `dryRun` | boolean |  | Only show what would be created |
+
 ## Build and test
 
 ### `tc_check`
