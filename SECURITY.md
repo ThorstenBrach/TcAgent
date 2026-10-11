@@ -9,6 +9,9 @@ activate configurations, start and stop the PLC, write variables. Use it accordi
   (`TCAGENT_ALLOW_TARGETS=local`). Enable other target systems deliberately and one at a time.
 * **Do not enable machines that can endanger people or equipment** unless a human confirms every
   runtime action (keep per-tool-call confirmation enabled in the client).
+* **Confirm runtime actions:** by default (`TCAGENT_CONFIRM=runtime`) you are asked before every activation, PLC
+  start/stop and ADS write; `all` asks before project changes as well. Clients without a question dialog fall back to the
+  whitelist only.
 * **Choose a mode:** `TCAGENT_MODE=propose` returns code changes only as a diff; `ask` allows read-only access.
 * **Audit log** (`%LOCALAPPDATA%\TcAgent\audit.jsonl`) records every write call with its arguments.
 * **Stay local:** TcAgent runs as a local process (stdio). Do not expose it over a network or as a public URL.

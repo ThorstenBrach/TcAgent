@@ -1278,6 +1278,15 @@ public sealed class ToolRegistry
         try
         {
             policy.Check(name, () => TargetOf(name, args));
+            if (Confirm.Needed(name, args))
+            {
+                string target = null;
+                try { target = TargetOf(name, args); } catch { }
+                var what = Confirm.Describe(name, args, target);
+                var ok = Confirm.Ask(name, what, tc.AttachedPid);
+                if (ok == false) throw new OperationCanceledException("Vom Benutzer abgelehnt: " + what + " - nicht erneut versuchen, ohne nachzufragen.");
+                if (ok == null) Log.Info("Keine Rueckfrage moeglich (kein Kanal) - " + what);
+            }
             text = RunWatchingDialogs(name, () => t.Handler(args));
         }
         catch (Exception ex) { text = "Fehler: " + (ex.InnerException?.Message ?? ex.Message); isError = true; Log.Error($"{name}: {ex}"); }

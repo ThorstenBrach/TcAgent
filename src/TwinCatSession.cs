@@ -117,6 +117,23 @@ public sealed class TwinCatSession
     [DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr OpenProcess(int access, bool inherit, int pid);
     [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
 
+    /// <summary>true, wenn dieser Prozess (indirekt) von Prozess pid gestartet wurde - z. B. aus dem TcAgent-Chat dieser IDE.</summary>
+    public static bool StartedFrom(int pid)
+    {
+        if (pid <= 0) return false;
+        try
+        {
+            int p = Environment.ProcessId;
+            for (int depth = 0; depth < 12 && p > 4; depth++)
+            {
+                p = ParentPid(p);
+                if (p == pid) return true;
+            }
+        }
+        catch { }
+        return false;
+    }
+
     static int ParentPid(int pid)
     {
         var h = OpenProcess(0x1000 /* PROCESS_QUERY_LIMITED_INFORMATION */, false, pid);

@@ -151,6 +151,7 @@ In the client's MCP configuration under `env` (or via parameters of `setup-clien
 |---|---|---|
 | `TCAGENT_ALLOW_TARGETS` | `local` | Target systems for activation, online commands, ADS writes. Comma-separated AmsNetIds; `local` = this PC |
 | `TCAGENT_MODE` | `agent` | `propose`: code changes only as a diff, nothing else · `ask`: read-only |
+| `TCAGENT_CONFIRM` | `runtime` | Ask before runtime actions (activate, PLC start/stop, ADS write, start mode): Yes/No dialog in Visual Studio from the TcAgent Chat, question dialog of the client elsewhere (if it supports MCP elicitation). `all` = also before project changes, `off` = never |
 | `TCAGENT_SOLUTION` | – | Optional: part of the solution path to pin one VS instance. Normally not needed – the TcAgent Chat uses its own IDE; with several open solutions the user picks one from a list |
 | `TCAGENT_AUDIT` | `%LOCALAPPDATA%\TcAgent\audit.jsonl` | Log of all write calls |
 

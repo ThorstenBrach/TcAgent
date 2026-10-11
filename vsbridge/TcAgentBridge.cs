@@ -117,6 +117,7 @@ namespace TcAgentBridge
                     {
                         case "context": return Context();
                         case "chat_show": ShowChat(); return new Dictionary<string, object> { ["shown"] = true };
+                        case "confirm": return ConfirmAction(Str(req, "title"), Str(req, "text"));
                         case "probe": return Probe();
                         case "libs": return Libs();
                         case "lib_export": return LibExport(Str(req, "library"), Str(req, "version"), Str(req, "refresh") == "True");
@@ -132,6 +133,22 @@ namespace TcAgentBridge
             r["ms"] = sw.ElapsedMilliseconds;
             Log("-> " + cmd + " ok (" + sw.ElapsedMilliseconds + " ms)");
             return r;
+        }
+
+        // ------------------------------------------------------------------ Rueckfrage vor Laufzeit-Aktionen
+        // TcAgent fragt vor Aktivieren, PLC-Start/Stop, ADS-Schreiben ... nach (TCAGENT_CONFIRM). Standard ist "Nein".
+        Dictionary<string, object> ConfirmAction(string title, string text)
+        {
+            System.Windows.MessageBoxResult r;
+            var owner = System.Windows.Application.Current?.MainWindow;
+            var msg = (text ?? "") + "\n\nAusfuehren?";
+            r = owner != null
+                ? System.Windows.MessageBox.Show(owner, msg, title ?? "TcAgent", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning, System.Windows.MessageBoxResult.No)
+                : System.Windows.MessageBox.Show(msg, title ?? "TcAgent", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning, System.Windows.MessageBoxResult.No);
+            bool ok = r == System.Windows.MessageBoxResult.Yes;
+            Log("Rueckfrage '" + text + "': " + (ok ? "ja" : "nein"));
+            try { ChatControl.Instance?.Notice(ok ? "Bestaetigt: " + text : "Abgelehnt: " + text); } catch { }
+            return new Dictionary<string, object> { ["confirmed"] = ok };
         }
 
         // ------------------------------------------------------------------ Chat-Fenster
