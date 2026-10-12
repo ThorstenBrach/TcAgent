@@ -293,20 +293,51 @@ public sealed class TwinCatSession
         }
         var slnName = Path.GetFileNameWithoutExtension(dte.Solution.FullName);
         var projName = proj.Name;
-        UIHierarchyItem Node() => dte.ToolWindows.SolutionExplorer.GetItem(slnName + "\\" + projName);
-        Node().Select(vsUISelectionType.vsUISelectionTypeSelect);
-        dte.ExecuteCommand("Project.UnloadProject");
+        // Project.UnloadProject/ReloadProject act on the selection in the Solution Explorer - it has to be the active window,
+        // otherwise (e.g. while a Scope or HMI editor has the focus) the command is not available and DTE returns E_FAIL.
+        void SelectProject()
+        {
+            try { dte.Windows.Item(EnvDTE.Constants.vsWindowKindSolutionExplorer).Activate(); } catch { }
+            UIHierarchyItem node = null;
+            try { node = dte.ToolWindows.SolutionExplorer.GetItem(slnName + "\\" + projName); } catch { }
+            node ??= FindNode(dte.ToolWindows.SolutionExplorer.UIHierarchyItems, projName)
+                     ?? throw new Exception($"project '{projName}' not found in the Solution Explorer");
+            node.Select(vsUISelectionType.vsUISelectionTypeSelect);
+        }
+        void Run(string command)
+        {
+            try { dte.ExecuteCommand(command); }
+            catch (Exception ex) { throw new Exception($"{command} for '{projName}' failed ({ex.Message}) - is the Solution Explorer visible?", ex); }
+        }
+        SelectProject();
+        Run("Project.UnloadProject");
         try { return edit(); }
         finally
         {
             try
             {
-                Node().Select(vsUISelectionType.vsUISelectionTypeSelect);
-                dte.ExecuteCommand("Project.ReloadProject");
+                SelectProject();
+                Run("Project.ReloadProject");
                 note = $" ({projName} unloaded for the change and reloaded)";
             }
             catch (Exception ex) { note = $" ({projName} could not be reloaded automatically: {ex.Message} - right-click > Reload Project in Visual Studio)"; }
         }
+    }
+
+    static UIHierarchyItem FindNode(UIHierarchyItems items, string name, int depth = 0)
+    {
+        if (items == null || depth > 4) return null;
+        foreach (UIHierarchyItem i in items)
+        {
+            try
+            {
+                if (string.Equals(i.Name, name, StringComparison.OrdinalIgnoreCase)) return i;
+                var hit = FindNode(i.UIHierarchyItems, name, depth + 1);
+                if (hit != null) return hit;
+            }
+            catch { }
+        }
+        return null;
     }
 
     /// <summary>Beckhoff template below ...\TwinCAT\3.1\Components\ (TWINCAT3DIR, C:\TwinCAT, Program Files (x86)).</summary>
