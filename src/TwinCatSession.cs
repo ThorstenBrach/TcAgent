@@ -269,6 +269,46 @@ public sealed class TwinCatSession
         throw new Exception("Could not create the solution: " + (last?.Message ?? "no matching ProgID registered"));
     }
 
+    /// <summary>Runs an edit of a project's files while the project is unloaded in Visual Studio, then reloads it.
+    /// Designers such as TwinCAT HMI and Scope keep their files in memory and overwrite or choke on changes made from outside.
+    /// Open documents of the project are saved and closed first. Must run on the STA thread.</summary>
+    public T EditUnloaded<T>(string projectFile, Func<T> edit, out string note)
+    {
+        note = "";
+        var dte = RequireDte();
+        Project proj = null;
+        foreach (Project p in dte.Solution.Projects)
+            try { if (string.Equals(p.FullName, projectFile, StringComparison.OrdinalIgnoreCase)) proj = p; } catch { }
+        if (proj == null) return edit();   // not loaded in the IDE - plain file edit
+        var dir = Path.GetDirectoryName(projectFile) ?? "";
+        foreach (Document d in dte.Documents.Cast<Document>().ToList())
+        {
+            try
+            {
+                if (!(d.FullName ?? "").StartsWith(dir, StringComparison.OrdinalIgnoreCase)) continue;
+                if (!d.Saved) d.Save();
+                d.Close(vsSaveChanges.vsSaveChangesNo);
+            }
+            catch { }
+        }
+        var slnName = Path.GetFileNameWithoutExtension(dte.Solution.FullName);
+        var projName = proj.Name;
+        UIHierarchyItem Node() => dte.ToolWindows.SolutionExplorer.GetItem(slnName + "\\" + projName);
+        Node().Select(vsUISelectionType.vsUISelectionTypeSelect);
+        dte.ExecuteCommand("Project.UnloadProject");
+        try { return edit(); }
+        finally
+        {
+            try
+            {
+                Node().Select(vsUISelectionType.vsUISelectionTypeSelect);
+                dte.ExecuteCommand("Project.ReloadProject");
+                note = $" ({projName} unloaded for the change and reloaded)";
+            }
+            catch (Exception ex) { note = $" ({projName} could not be reloaded automatically: {ex.Message} - right-click > Reload Project in Visual Studio)"; }
+        }
+    }
+
     /// <summary>Beckhoff template below ...\TwinCAT\3.1\Components\ (TWINCAT3DIR, C:\TwinCAT, Program Files (x86)).</summary>
     public static string FindTemplate(string relative)
     {

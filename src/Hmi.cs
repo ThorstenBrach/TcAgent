@@ -46,7 +46,7 @@ public sealed partial class ToolRegistry
                    P("startup", "boolean", "view: make it the start view"),
                    P("project", "string", "HMI project (empty = the only one)"),
                    P("dryRun", "boolean", "Only show what would be created")),
-            a => HmiPage(a));
+            a => HmiWrite(a, () => HmiPage(a)));
 
         Add("tc_hmi_control", "Adds, changes or removes a control in a view/content. Attributes without the data-tchmi- prefix, e.g. " +
                               "{\"text\":\"Start\",\"state-symbol\":\"%s%PLC1.MAIN.bStart%/s%\"}; bindings %s%<mapped symbol>%/s%, two-way: " +
@@ -63,7 +63,7 @@ public sealed partial class ToolRegistry
                    P("events", "array", "Trigger list as in the file: [{\"event\":\"<id>.onPressed\",\"actions\":[...]}] (replaces existing)"),
                    P("project", "string", "HMI project (empty = the only one)"),
                    P("dryRun", "boolean", "Only show the resulting HTML")),
-            a => HmiControl(a));
+            a => HmiWrite(a, () => HmiControl(a)));
 
         Add("tc_hmi_symbol", "Server symbols of the HMI: list, map (PLC variables -> HMI symbols in TcHmiSrv.Config.default.json, type read via ADS " +
                              "if not given), unmap, runtimes (ADS runtimes PLC1 ...), add_runtime. Alternative without mapping by hand: PLC attribute " +
@@ -75,7 +75,20 @@ public sealed partial class ToolRegistry
                    P("netId", "string", "add_runtime: AmsNetId (default 127.0.0.1.1.1)"), P("port", "integer", "add_runtime: ADS port (default 851)"),
                    P("project", "string", "HMI project (empty = the only one)"),
                    P("dryRun", "boolean", "Only show what would change")),
-            a => HmiSymbol(a));
+            a => (Str(a, "action") ?? "").ToLowerInvariant() is "list" or "runtimes" ? HmiSymbol(a) : HmiWrite(a, () => HmiSymbol(a)));
+    }
+
+    /// <summary>File changes to an HMI project only while it is unloaded in Visual Studio - the HMI engineering keeps
+    /// tchmiconfig.json and open views in memory and overwrites (or crashes on) changes made from outside.</summary>
+    string HmiWrite(JsonObject a, Func<string> write)
+    {
+        if (DryRun(a)) return write();
+        var p = FindHmi(Str(a, "project"));
+        return tc.Sta.Run(() =>
+        {
+            var r = tc.EditUnloaded(p.ProjFile, write, out var note);
+            return r + note;
+        }, 300_000);
     }
 
     // ================================================================== project files
@@ -134,11 +147,21 @@ public sealed partial class ToolRegistry
 
     static void WriteJson(string file, JsonNode node)
     {
+        var bom = HasBom(file);
         Backup(file);
-        File.WriteAllText(file, node.ToJsonString(JsonWrite), new UTF8Encoding(true));
+        File.WriteAllText(file, node.ToJsonString(JsonWrite), new UTF8Encoding(bom));
     }
 
-    static void WriteText(string file, string text) { Backup(file); File.WriteAllText(file, text, new UTF8Encoding(true)); }
+    /// <summary>Keeps the byte order mark as it was (Visual Studio writes HMI files without BOM); new files without BOM.</summary>
+    static bool HasBom(string file)
+    {
+        if (!File.Exists(file)) return false;
+        using var f = File.OpenRead(file);
+        var b = new byte[3];
+        return f.Read(b, 0, 3) == 3 && b[0] == 0xEF && b[1] == 0xBB && b[2] == 0xBF;
+    }
+
+    static void WriteText(string file, string text) { var bom = HasBom(file); Backup(file); File.WriteAllText(file, text, new UTF8Encoding(bom)); }
 
     /// <summary>Adds &lt;Content Include="rel"&gt; to the .hmiproj if missing (the HMI build only sees Content items).</summary>
     static bool RegisterContent(HmiProject p, string rel)
@@ -150,8 +173,10 @@ public sealed partial class ToolRegistry
         var group = doc.Root.Elements(ns + "ItemGroup").FirstOrDefault(g => g.Elements(ns + "Content").Any());
         if (group == null) { group = new XElement(ns + "ItemGroup"); doc.Root.Add(group); }
         group.Add(new XElement(ns + "Content", new XAttribute("Include", rel), new XElement(ns + "SubType", "Content")));
+        var bom = HasBom(p.ProjFile);
         Backup(p.ProjFile);
-        doc.Save(p.ProjFile);
+        using (var w = System.Xml.XmlWriter.Create(p.ProjFile, new System.Xml.XmlWriterSettings { Encoding = new UTF8Encoding(bom), Indent = false }))
+            doc.Save(w);
         return true;
     }
 

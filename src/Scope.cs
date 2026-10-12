@@ -103,18 +103,18 @@ public sealed partial class ToolRegistry
     static XElement El(string name, params object[] content) => new(name, content);
     static XElement Model(string name, params object[] content) => new(name, new XAttribute("AssemblyName", ScopeAsm), content);
 
-    /// <summary>Writes the configuration and reloads the measurement project, so Visual Studio shows the change.</summary>
+    /// <summary>Writes the configuration while the measurement project is unloaded in Visual Studio, then reloads it.</summary>
     string SaveScope(ScopeRef r, XDocument d)
     {
-        var dte = tc.RequireDte();
         var projFile = r.Project.FullName;
-        string note = "";
-        try { dte.Solution.Remove(r.Project); } catch (Exception ex) { note = " (project not unloaded: " + ex.Message + ")"; }
-        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backup", "scope");
-        Directory.CreateDirectory(dir);
-        File.Copy(r.File, Path.Combine(dir, $"{DateTime.Now:yyyyMMdd-HHmmss-fff}_{Path.GetFileName(r.File)}"), true);
-        d.Save(r.File);
-        try { dte.Solution.AddFromFile(projFile, false); } catch (Exception ex) { note += " (re-adding the project failed: " + ex.Message + " - add it again in Visual Studio)"; }
+        tc.EditUnloaded(projFile, () =>
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backup", "scope");
+            Directory.CreateDirectory(dir);
+            File.Copy(r.File, Path.Combine(dir, $"{DateTime.Now:yyyyMMdd-HHmmss-fff}_{Path.GetFileName(r.File)}"), true);
+            d.Save(r.File);
+            return 0;
+        }, out var note);
         return note;
     }
 

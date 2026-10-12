@@ -26,6 +26,7 @@ public sealed class StaWorker : IDisposable
 
     public T Run<T>(Func<T> f, int timeoutMs = 600_000)
     {
+        if (Thread.CurrentThread == thread) return f();   // already on the STA thread (nested call) - run inline, never deadlock
         T result = default; Exception err = null;
         using var done = new ManualResetEventSlim();
         queue.Add(() => { try { result = f(); } catch (Exception ex) { err = ex; } finally { done.Set(); } });
