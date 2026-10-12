@@ -92,6 +92,9 @@ public static class Confirm
                                              : $"Restart TwinCAT{on} in Run mode with the active configuration.";
             case "tc_route_add":
                 return $"Add ADS route '{S("name")}' to {S("netId")} ({S("ip") ?? S("host")}) - also stored on the target system.";
+            case "tc_packages_change":
+                return $"TwinCAT Package Manager on this PC: {S("action")} {S("packages") ?? S("name")}" +
+                       (B("allowDowngrade") ? " (downgrade allowed)" : "") + " - runs with administrator rights (Windows asks again).";
             case "tc_runtime_startup":
                 return $"Set the start mode of the local TwinCAT runtime to '{S("mode")}' (takes effect from the next boot).";
             default:

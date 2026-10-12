@@ -31,7 +31,8 @@ public sealed class Policy
         ["tc_library"] = ToolClass.ProjectWrite, ["tc_library_save"] = ToolClass.ProjectWrite, ["tc_mapping_import"] = ToolClass.ProjectWrite,
         ["tc_twincat_version"] = ToolClass.ProjectWrite, ["tc_platform"] = ToolClass.ProjectWrite, ["tc_variant"] = ToolClass.ProjectWrite,
         ["tc_tccom"] = ToolClass.ProjectWrite, ["tc_scope_new"] = ToolClass.ProjectWrite, ["tc_scope"] = ToolClass.ProjectWrite,
-        ["tc_hmi_page"] = ToolClass.ProjectWrite, ["tc_hmi_control"] = ToolClass.ProjectWrite, ["tc_hmi_symbol"] = ToolClass.ProjectWrite, ["tc_route_add"] = ToolClass.RuntimeWrite,
+        ["tc_hmi_page"] = ToolClass.ProjectWrite, ["tc_hmi_control"] = ToolClass.ProjectWrite, ["tc_hmi_symbol"] = ToolClass.ProjectWrite, ["tc_packages_change"] = ToolClass.RuntimeWrite,
+        ["tc_realtime"] = ToolClass.ProjectWrite, ["tc_coe"] = ToolClass.ProjectWrite, ["tc_route_add"] = ToolClass.RuntimeWrite,
         ["tc_activate"] = ToolClass.RuntimeWrite, ["tc_plc_online"] = ToolClass.RuntimeWrite,
         ["ads_write"] = ToolClass.RuntimeWrite,
     };

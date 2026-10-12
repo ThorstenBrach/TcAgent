@@ -181,6 +181,8 @@ public sealed partial class ToolRegistry
         RegisterAutomation();
         RegisterScope();
         RegisterHmi();
+        RegisterPackages();
+        RegisterSystemConfig();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +
@@ -334,13 +336,14 @@ public sealed partial class ToolRegistry
             Schema(), a => tc.Sta.Run(() => tc.TestResults()));
 
         // ---------------------------------------------------------- Tasks, boot project, startup mode, licenses
-        Add("tc_task", "Real-time tasks: list, create (name, cycleUs, priority, withImage) or set (path, cycleUs, priority, autoStart). " +
+        Add("tc_task", "Real-time tasks: list, create (name, cycleUs, priority, withImage) or set (path, cycleUs, priority, autoStart, cores). " +
                        "Takes effect only after tc_activate. The PLC task assignment is in the PLC instance (tc_tree/tc_xml_get).",
             Schema(Req(P("action", "string", "list, create or set")),
                    P("name", "string", "create: task name"), P("path", "string", "set: tree path of the task, e.g. TIRT^PlcTask"),
                    P("cycleUs", "integer", "Cycle time in microseconds, e.g. 1000 = 1 ms"),
                    P("priority", "integer", "Priority (lower = higher)"), P("autoStart", "boolean", "Start task automatically"),
                    P("withImage", "boolean", "create: task with process image (default false)"),
+                   P("cores", "string", "set: real-time core(s) the task runs on, e.g. '1' (see tc_realtime)"),
                    P("dryRun", "boolean", "Only show what would be changed")),
             a => tc.Sta.Run(() => Task(a)));
 
@@ -652,6 +655,8 @@ public sealed partial class ToolRegistry
         else if (r["signatures"] is JsonArray sigs && sigs.Count > 0)
             foreach (var s in sigs)
                 o.AppendLine($"{s?["kind"]} {s?["name"]}{(string.IsNullOrEmpty(s?["extends"]?.ToString()) ? "" : " EXTENDS " + s?["extends"])}: {Where(s)}");
+        else if (string.IsNullOrEmpty(r["context"]?.ToString()) && GotoByTree(name) is { } byTree)
+            o.Append(byTree);    // no editor open: the language model has no scope - look the name up in the project tree
         else o.AppendLine("Not found (neither a variable in the current object nor a type/POU). For text search: tc_plc_search.");
         if (r["members"] is JsonArray mem)
             foreach (var mm in mem)
@@ -664,6 +669,37 @@ public sealed partial class ToolRegistry
             o.AppendLine($"  Type {mt["name"]} ({mt["kind"]}{(string.IsNullOrEmpty(mt["extends"]?.ToString()) ? "" : " EXTENDS " + mt["extends"])}): {Where(mt)}");
         return o.ToString();
     }
+
+    // Fallback without an open editor: POU/DUT/GVL by name in the PLC tree, then members (GVL.x, FB.Method, a.b) via declarations
+    string GotoByTree(string name) => tc.Sta.Run(() =>
+    {
+        var parts = name.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        var objs = tc.PlcObjects().ToList();
+        ITcSmTreeItem Find(string n) => objs.FirstOrDefault(it => { try { return string.Equals(it.Name, n, StringComparison.OrdinalIgnoreCase); } catch { return false; } });
+        var cur = Find(parts[0]);
+        if (cur == null) return null;
+        var o = new StringBuilder($"(no editor open - resolved through the project tree)\n{parts[0]}: {cur.PathName}  (tc_plc_read)\n");
+        for (int i = 1; i < parts.Length && cur != null; i++)
+        {
+            // child object (method/property/action) with this name?
+            var child = TwinCatSession.Children(cur).FirstOrDefault(c => { try { return string.Equals(c.Name, parts[i], StringComparison.OrdinalIgnoreCase); } catch { return false; } });
+            if (child != null) { o.AppendLine($"  .{parts[i]}: {child.PathName}"); cur = child; continue; }
+            string decl = null;
+            try { if (cur is ITcPlcDeclaration d) decl = d.DeclarationText; } catch { }
+            var lines = (decl ?? "").Replace("\r\n", "\n").Split('\n');
+            var rx = new Regex($@"^\s*{Regex.Escape(parts[i])}\s*(AT\s+%\S+\s*)?:\s*([^;:=]+)", RegexOptions.IgnoreCase);
+            int ln = Array.FindIndex(lines, l => rx.IsMatch(l));
+            if (ln < 0) { o.AppendLine($"  .{parts[i]}: not found in the declaration of {cur.Name}"); break; }
+            var type = rx.Match(lines[ln]).Groups[2].Value.Trim();
+            var doc = ln > 0 && lines[ln - 1].TrimStart().StartsWith("///") ? "  // " + lines[ln - 1].Trim().TrimStart('/').Trim() : "";
+            o.AppendLine($"  .{parts[i]} : {type}  (declaration line {ln + 1} of {cur.PathName}){doc}");
+            var bare = Regex.Replace(type, @"^(ARRAY\s*\[.*?\]\s*OF\s+|POINTER\s+TO\s+|REFERENCE\s+TO\s+)+", "", RegexOptions.IgnoreCase).Split('(')[0].Trim();
+            cur = Find(bare);
+            if (cur == null) { if (i < parts.Length - 1) o.AppendLine($"  type {bare} is not a project object (library? -> tc_lib_signatures)"); break; }
+            o.AppendLine($"  type {bare}: {cur.PathName}");
+        }
+        return o.ToString();
+    });
 
     // Cross references: semantically from the project model (with access type), line/code via text search in the same object
     sealed record Hit(string Path, string Part, int Line, string Text);
@@ -1138,8 +1174,15 @@ public sealed partial class ToolRegistry
         if (a["cycleUs"] != null) changes.Add(("CycleTime", (Int(a, "cycleUs", 1000) * 10L).ToString()));
         if (a["priority"] != null) changes.Add(("Priority", Int(a, "priority", 20).ToString()));
         if (a["autoStart"] != null) changes.Add(("AutoStart", Bool(a, "autoStart", true) ? "true" : "false"));
-        if (changes.Count == 0) return res;
+        if (changes.Count == 0 && Str(a, "cores") == null) return res;
         var xml = (string)((dynamic)task).ProduceXml(false);
+        if (Str(a, "cores") is { } coreList)
+        {
+            var cores = coreList.Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToList();
+            ulong mask = cores.Aggregate(0UL, (acc, c) => acc | (1UL << c));
+            var cur = Regex.Match(xml, @"<CpuAffinity[^>]*>([^<]*)</CpuAffinity>", RegexOptions.IgnoreCase);
+            changes.Add(("CpuAffinity", FormatMask(mask, cur.Success ? cur.Groups[1].Value : "#x0000000000000001")));
+        }
         var notes = new List<string>();
         foreach (var (tag, val) in changes)
         {
