@@ -189,6 +189,24 @@ public sealed partial class ToolRegistry
             var list = new List<object>();
             try { foreach (var x in en) list.Add(x); return list; } catch (InvalidCastException) { }
         }
+        // interface with GetEnumerator (e.g. ITcModuleManager3), then late-bound foreach
+        try
+        {
+            if (ComCall.Invoke(coll, "GetEnumerator") is System.Collections.IEnumerator e1)
+            {
+                var list = new List<object>();
+                while (e1.MoveNext()) list.Add(e1.Current);
+                return list;
+            }
+        }
+        catch (NotSupportedException) { }
+        try
+        {
+            var list = new List<object>();
+            foreach (var x in (dynamic)coll) list.Add((object)x);
+            return list;
+        }
+        catch (Exception) { }
         int n = Convert.ToInt32(ComCall.Get(coll, "Count"), CultureInfo.InvariantCulture);
         var items = new List<object>();
         int start = 0;
