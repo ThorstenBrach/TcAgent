@@ -328,7 +328,10 @@ namespace TcAgentBridge
         {
             int cols = rows.Max(r => r.Length);
             var tbl = new Table { CellSpacing = 0, Margin = new Thickness(0, 4, 0, 4), BorderBrush = DimBrush, BorderThickness = new Thickness(0.5) };
-            for (int i = 0; i < cols; i++) tbl.Columns.Add(new TableColumn());
+            // column widths by content (a short "Folder" column next to a long "Content" column), at least 8 %
+            var len = Enumerable.Range(0, cols).Select(c => (double)Math.Max(4, rows.Max(r => c < r.Length ? Math.Min(r[c].Length, 80) : 0))).ToArray();
+            var sum = len.Sum();
+            for (int i = 0; i < cols; i++) tbl.Columns.Add(new TableColumn { Width = new GridLength(Math.Max(0.08, len[i] / sum), GridUnitType.Star) });
             var group = new TableRowGroup();
             for (int r = 0; r < rows.Count; r++)
             {
