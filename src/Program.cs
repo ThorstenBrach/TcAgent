@@ -141,8 +141,30 @@ public static class Mcp
     }
 }
 
+/// <summary>stderr (shown by the MCP client) and a daily file %LOCALAPPDATA%\TcAgent\logs\tcagent-yyyyMMdd.log
+/// (all TcAgent processes, marked with their pid) - so problems can be traced afterwards, e.g. after an IDE crash.</summary>
 public static class Log
 {
-    public static void Info(string m) => Console.Error.WriteLine($"[tcagent {DateTime.Now:HH:mm:ss}] {m}");
-    public static void Error(string m) => Console.Error.WriteLine($"[tcagent {DateTime.Now:HH:mm:ss}] ERROR {m}");
+    static readonly object gate = new();
+    static readonly string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "logs");
+    static readonly string client = Environment.GetEnvironmentVariable("TCAGENT_CLIENT") ?? "";
+
+    public static void Info(string m) => Write(m);
+    public static void Error(string m) => Write("ERROR " + m);
+
+    static void Write(string m)
+    {
+        var now = DateTime.Now;
+        Console.Error.WriteLine($"[tcagent {now:HH:mm:ss}] {m}");
+        try
+        {
+            lock (gate)
+            {
+                Directory.CreateDirectory(dir);
+                File.AppendAllText(Path.Combine(dir, $"tcagent-{now:yyyyMMdd}.log"),
+                    $"{now:HH:mm:ss.fff} [{Environment.ProcessId}{(client.Length > 0 ? " " + client : "")}] {m}{Environment.NewLine}");
+            }
+        }
+        catch { /* another TcAgent process is writing at this moment - stderr has it */ }
+    }
 }

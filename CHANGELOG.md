@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+### Added
+- Log file `%LOCALAPPDATA%\TcAgent\logs\tcagent-<date>.log` (all TcAgent processes, every tool call with duration) -
+  to trace problems afterwards, e.g. after an IDE crash.
+
+### Fixed
+- TwinCAT XAE Shell (32-bit): before a project is unloaded and reloaded for a Scope/HMI change, TcAgent checks the shell's
+  memory and refuses the step when it is close to the 32-bit limit - reloading then crashed the shell (OutOfMemoryException).
+
 ## [0.18.0] – 2026-10-12
 
 ### Added

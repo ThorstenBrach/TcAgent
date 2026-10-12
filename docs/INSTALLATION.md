@@ -181,6 +181,7 @@ In addition, every client can require confirmation of individual tool calls – 
 | `tc_scope record_start`: "not loaded in Visual Studio" | Open the .tcscopex once in the IDE (double-click), PLC in Run. |
 | VS asks "Save dataset?" during a Scope change | Only with older TcAgent versions - current versions back the recording up and answer the question themselves. |
 | `tc_hmi action=controls`: "Control package not found" | Build the HMI project once in the IDE (restores the NuGet packages into `<solution>\Packages`). |
+| XAE Shell crashes during HMI/Scope changes (event log: `OutOfMemoryException`, TcXaeShell.exe) | The XAE Shell is a 32-bit process; a large project with HMI and Scope open exhausts its memory, reloading a project then crashes it. Restart the shell regularly, close designers you do not need, or use Visual Studio 2022 (64-bit) for HMI/Scope work. TcAgent refuses unload/reload when the shell is close to the limit. |
 | `vsbridge\build.ps1`: CS1705 (version conflict) | Several versions of a VS assembly installed; the script uses the highest. Please report as an issue, with output. |
 
 Logs: `%LOCALAPPDATA%\TcAgent\` (`audit.jsonl`, `bridge\bridge.log`, `libcache\`). Agent feedback:

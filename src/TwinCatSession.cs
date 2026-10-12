@@ -286,6 +286,7 @@ public sealed class TwinCatSession
         foreach (Project p in dte.Solution.Projects)
             try { if (string.Equals(p.FullName, projectFile, StringComparison.OrdinalIgnoreCase)) proj = p; } catch { }
         if (proj == null) return edit();   // not loaded in the IDE - plain file edit
+        CheckIdeMemory("unloading and reloading " + Path.GetFileName(projectFile));
         var dir = Path.GetDirectoryName(projectFile) ?? "";
         foreach (Document d in dte.Documents.Cast<Document>().ToList())
         {
@@ -344,6 +345,31 @@ public sealed class TwinCatSession
             catch { }
         }
         return null;
+    }
+
+    [System.Runtime.InteropServices.DllImport("kernel32.dll", SetLastError = true)]
+    static extern bool IsWow64Process(IntPtr process, out bool wow64);
+
+    /// <summary>
+    /// The TwinCAT XAE Shell is a 32-bit process. With a large project, HMI and Scope open it runs out of address space,
+    /// and reloading a project then crashes it (OutOfMemoryException in the event log). Refuse such steps in time.
+    /// </summary>
+    public void CheckIdeMemory(string what)
+    {
+        if (AttachedPid <= 0) return;
+        string problem = null;
+        try
+        {
+            using var p = System.Diagnostics.Process.GetProcessById(AttachedPid);
+            if (!IsWow64Process(p.Handle, out var wow64) || !wow64) return;          // 64-bit IDE (VS 2022): no limit
+            long mb = p.PrivateMemorySize64 / (1024 * 1024), vmb = p.VirtualMemorySize64 / (1024 * 1024);
+            Log.Info($"IDE memory (32-bit): private {mb} MB, virtual {vmb} MB");
+            if (mb > 1800 || vmb > 3300)
+                problem = $"The IDE is a 32-bit process and already uses {mb} MB ({vmb} MB address space) - {what} could crash it " +
+                          "(out of memory). Ask the user to save and restart the IDE (or to use Visual Studio 2022, 64-bit), then retry.";
+        }
+        catch { }   // memory unknown - do not block
+        if (problem != null) throw new Exception(problem);
     }
 
     /// <summary>Beckhoff template below ...\TwinCAT\3.1\Components\ (TWINCAT3DIR, C:\TwinCAT, Program Files (x86)).</summary>

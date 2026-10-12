@@ -135,7 +135,8 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
 - `tc_hmi_symbol action=map symbols=GVL.x` maps PLC variables (HMI name `PLC1.GVL.x`); bind with `%s%PLC1.GVL.x%/s%`.
 - `tc_hmi_control action=add|update|remove` - attributes without the `data-tchmi-` prefix; `writeSymbol`/`writeValue` for buttons.
 - Changes are written while the HMI project is unloaded in the IDE and reloaded afterwards. Change one thing per call -
-  do not run several HMI/Scope changes in parallel. `tc_hmi action=build` checks the project; the user publishes.
+  do not run several HMI/Scope changes in parallel. In the TwinCAT XAE Shell (32-bit) prefer few, larger changes; if TcAgent
+  reports that the IDE is low on memory, ask the user to save and restart it - never retry blindly. `tc_hmi action=build` checks the project; the user publishes.
 
 ## Dialogs and confirmations
 

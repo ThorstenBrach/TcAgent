@@ -1294,7 +1294,9 @@ public sealed partial class ToolRegistry
                 if (ok == false) throw new OperationCanceledException("Rejected by the user: " + what + " - do not retry without asking.");
                 if (ok == null) Log.Info("No confirmation possible (no channel) - " + what);
             }
+            Log.Info($"{name} started");
             text = RunWatchingDialogs(name, () => t.Handler(args));
+            Log.Info($"{name} done ({sw.ElapsedMilliseconds} ms)");
         }
         catch (Exception ex) { text = "Error: " + (ex.InnerException?.Message ?? ex.Message); isError = true; Log.Error($"{name}: {ex}"); }
         finally { try { File.Delete(busy); } catch { } }
