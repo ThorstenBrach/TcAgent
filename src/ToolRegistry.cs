@@ -674,6 +674,7 @@ public sealed partial class ToolRegistry
     string GotoByTree(string name) => tc.Sta.Run(() =>
     {
         var parts = name.Split('.', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length == 0) return null;
         var objs = tc.PlcObjects().ToList();
         ITcSmTreeItem Find(string n) => objs.FirstOrDefault(it => { try { return string.Equals(it.Name, n, StringComparison.OrdinalIgnoreCase); } catch { return false; } });
         var cur = Find(parts[0]);
@@ -1179,6 +1180,7 @@ public sealed partial class ToolRegistry
         if (Str(a, "cores") is { } coreList)
         {
             var cores = coreList.Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToList();
+            if (cores.Count == 0 || cores.Any(c => c < 0 || c > 63)) throw new Exception("cores: 0 ... 63, e.g. '1'");
             ulong mask = cores.Aggregate(0UL, (acc, c) => acc | (1UL << c));
             var cur = Regex.Match(xml, @"<CpuAffinity[^>]*>([^<]*)</CpuAffinity>", RegexOptions.IgnoreCase);
             changes.Add(("CpuAffinity", FormatMask(mask, cur.Success ? cur.Groups[1].Value : "#x0000000000000001")));
@@ -1327,7 +1329,7 @@ public sealed partial class ToolRegistry
         try { File.WriteAllText(busy, name); } catch { }
         try
         {
-            policy.Check(name, () => TargetOf(name, args));
+            policy.Check(name, () => TargetOf(name, args), args);
             if (Confirm.Needed(name, args))
             {
                 string target = null;
@@ -1343,8 +1345,9 @@ public sealed partial class ToolRegistry
         }
         catch (Exception ex) { text = "Error: " + (ex.InnerException?.Message ?? ex.Message); isError = true; Log.Error($"{name}: {ex}"); }
         finally { try { File.Delete(busy); } catch { } }
-        if (Policy.ClassOf(name) != ToolClass.Read || isError) policy.Audit(name, args, !isError, text, sw.ElapsedMilliseconds);
-        if (Policy.ClassOf(name) != ToolClass.Read && !isError) tc.InvalidatePlcIndex();
+        var callClass = Policy.ClassOf(name, args);
+        if (callClass != ToolClass.Read || isError) policy.Audit(name, args, !isError, text, sw.ElapsedMilliseconds);
+        if (callClass != ToolClass.Read && !isError) tc.InvalidatePlcIndex();
         return new JsonObject
         {
             ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = text }),

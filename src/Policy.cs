@@ -68,6 +68,17 @@ public sealed class Policy
 
     public static ToolClass ClassOf(string tool) => Classes.TryGetValue(tool, out var c) ? c : ToolClass.Read;
 
+    // read-only actions of otherwise changing tools (tc_task list, tc_realtime show, tc_coe list, tc_scope list ...)
+    static readonly HashSet<string> ReadActions = new(StringComparer.OrdinalIgnoreCase) { "list", "show", "info", "read", "runtimes", "controls" };
+
+    /// <summary>Class of a concrete call: read-only actions count as Read (no confirmation, allowed in ask/propose mode).</summary>
+    public static ToolClass ClassOf(string tool, JsonObject args)
+    {
+        var cls = ClassOf(tool);
+        if (cls == ToolClass.ProjectWrite && args?["action"] is JsonValue v && ReadActions.Contains(v.ToString())) return ToolClass.Read;
+        return cls;
+    }
+
     public string Describe() =>
         $"Mode: {Mode} ({ModeText})\nAllowed target systems: {string.Join(", ", allowedTargets)}\nAudit log: {auditPath}";
 
@@ -82,9 +93,9 @@ public sealed class Policy
     public bool ForceDryRun => Mode == AgentMode.Propose;
 
     /// <summary>Throws an exception if the call is not allowed. targetNetId = target for runtime operations.</summary>
-    public void Check(string tool, Func<string> targetNetId)
+    public void Check(string tool, Func<string> targetNetId, JsonObject args = null)
     {
-        var cls = ClassOf(tool);
+        var cls = ClassOf(tool, args);
         if (cls != ToolClass.Read && Mode == AgentMode.Ask)
             throw new UnauthorizedAccessException($"{tool} blocked: TcAgent is running in mode 'ask' (read only).");
         if (cls != ToolClass.Read && Mode == AgentMode.Propose && tool is not ("tc_plc_write" or "tc_plc_create"))

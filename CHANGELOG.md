@@ -5,6 +5,8 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.19.0] – not released yet
+
 ### Added
 - **TwinCAT Package Manager** – `tc_packages` (installed, available, versions, outdated, details, feeds, settings) and
   `tc_packages_change` (install, upgrade, uninstall, repair, feeds; confirmed by the user, runs elevated).
@@ -14,6 +16,11 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - `tc_goto_definition` also works without an open editor (POUs, DUTs, GVLs and their members via the project tree).
 - Log file `%LOCALAPPDATA%\TcAgent\logs\tcagent-<date>.log` (all TcAgent processes, every tool call with duration) -
   to trace problems afterwards, e.g. after an IDE crash.
+
+### Changed
+- Read-only actions of changing tools (`action=list/show/info/read`, e.g. `tc_task list`, `tc_scope list`, `tc_coe list`)
+  count as reading: no confirmation, allowed in the `ask`/`propose` modes, not in the audit log.
+- `install-xaeshell.ps1` also installs into the 64-bit XAE Shell (VS 2022 base).
 
 ### Fixed
 - TwinCAT XAE Shell (32-bit): before a project is unloaded and reloaded for a Scope/HMI change, TcAgent checks the shell's
@@ -83,6 +90,7 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0

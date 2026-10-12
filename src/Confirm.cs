@@ -26,7 +26,7 @@ public static class Confirm
 
     public static bool Needed(string tool, JsonObject args)
     {
-        var cls = Policy.ClassOf(tool);
+        var cls = Policy.ClassOf(tool, args);
         if (cls == ToolClass.Read) return false;
         if (args?["dryRun"] is JsonValue v && v.ToString().Equals("true", StringComparison.OrdinalIgnoreCase)) return false;
         if (tool == "tc_runtime_startup" && string.IsNullOrEmpty(args?["mode"]?.ToString())) return false;   // only shows the mode
