@@ -173,6 +173,9 @@ docs/                   installation, tool reference, CI pipelines (docs/pipelin
 SIL/HIL test runs (simulated I/O, test PLCs on the network), motion drive links and parameters, and later TwinSAFE
 (read, analyze, propose – never download).
 
+* **TwinCAT Package Manager** (`tcpkg` CLI, TwinCAT 4026+): list installed and available packages/workloads, install,
+  update and uninstall them, manage feeds – install/update/uninstall only with confirmation.
+
 ## Known limitations
 
 * Windows and Visual Studio 2022 only (TcXaeShell works for most tools but is less tested).
