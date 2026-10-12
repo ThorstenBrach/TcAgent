@@ -181,6 +181,27 @@ public sealed partial class ToolRegistry
              : throw new Exception(all.Count == 0 ? "No PLC project in the solution." : "Several PLC projects - pass plcProjectPath: " + string.Join(", ", all.Select(p => p.PathName)));
     }
 
+    /// <summary>Elements of a COM collection: IEnumerable, otherwise Count + Item(i) on any interface (0- or 1-based).</summary>
+    static IEnumerable<object> ComItems(object coll)
+    {
+        if (coll is System.Collections.IEnumerable en)
+        {
+            var list = new List<object>();
+            try { foreach (var x in en) list.Add(x); return list; } catch (InvalidCastException) { }
+        }
+        int n = Convert.ToInt32(ComCall.Get(coll, "Count"), CultureInfo.InvariantCulture);
+        var items = new List<object>();
+        int start = 0;
+        try { ComCall.Invoke(coll, "Item", 0); } catch { start = 1; }
+        for (int i = start; i < n + start; i++)
+        {
+            object it = null;
+            try { it = ComCall.Invoke(coll, "Item", i); } catch { try { it = ComCall.Invoke(coll, "get_Item", i); } catch { } }
+            if (it != null) items.Add(it);
+        }
+        return items;
+    }
+
     static int Count(string s, string what)
     {
         int n = 0, i = 0;
@@ -388,7 +409,7 @@ public sealed partial class ToolRegistry
         var (compile, _) = tc.ReadErrorList(2000);
         int errs = compile.Count(e => e.Level == "ERROR"), warns = compile.Count(e => e.Level == "WARN");
         o.AppendLine($"Error list: {errs} errors, {warns} warnings");
-        foreach (var e in compile.Take(300)) o.AppendLine(e.ToString());
+        foreach (var e in compile.Where(e => e.Level is "ERROR" or "WARN").Take(300)) o.AppendLine(e.ToString());
         return o.ToString();
     }
 
@@ -507,7 +528,7 @@ public sealed partial class ToolRegistry
             {
                 var mm = ComCall.Invoke(tc.RequireSysMan(), "GetModuleManager");
                 o.AppendLine("Module instances (all):");
-                foreach (var mi in (System.Collections.IEnumerable)mm)
+                foreach (var mi in ComItems(mm))
                     o.AppendLine($"  {Prop(mi, "ModuleInstanceName")}  type={Prop(mi, "ModuleTypeName")}  class={Prop(mi, "ClassID")}  oid={Prop(mi, "oid")}");
             }
             catch (Exception ex) { o.AppendLine("(module manager not available: " + (ex.InnerException?.Message ?? ex.Message) + ")"); }
