@@ -177,6 +177,7 @@ public sealed class TwinCatSession
     }
 
     string lastSolution;
+    DateTime lostAt = DateTime.MinValue;
 
     // Check the connection and (re)establish it automatically if needed:
     // after a server restart (never connected) or when the IDE was restarted (COM object dead).
@@ -185,8 +186,13 @@ public sealed class TwinCatSession
         if (Dte != null)
         {
             try { _ = Dte.Solution.FullName; return; }
-            catch { Log.Info("Connection to the IDE lost - reconnecting"); Dte = null; SysMan = null; InstanceInfo = "not connected"; }
+            catch { Log.Info("Connection to the IDE lost"); Dte = null; SysMan = null; InstanceInfo = "not connected"; lostAt = DateTime.Now; }
         }
+        // Right after the IDE went away (crash, closed) do not reconnect on our own: queued calls would otherwise continue
+        // in a freshly restarted IDE (and could crash it again). After a pause, or with tc_attach, it reconnects.
+        if (DateTime.Now - lostAt < TimeSpan.FromSeconds(30))
+            throw new Exception("The connection to the IDE was lost just now (IDE crashed or closed). Tell the user and wait until the IDE " +
+                                "is open again, then call tc_attach - do not repeat changes blindly.");
         try
         {
             Attach(string.IsNullOrEmpty(lastSolution) ? null : lastSolution, 0);

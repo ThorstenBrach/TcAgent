@@ -32,8 +32,9 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Projects & files** | New solutions and PLC projects, PLCopen/XTI export and import, libraries (references, placeholders, repositories, save as library), mapping export/import, archive, TwinCAT version, target platform, variants | `tc_new_solution`, `tc_plc_project_add`, `tc_export`, `tc_import`, `tc_library`, `tc_library_save` |
 | **Quality** | Static analysis (TE1200) with SARIF export | `tc_static_analysis` |
 | **Network** | ADS broadcast search, add routes, TcCOM module instances | `tc_route_search`, `tc_route_add`, `tc_tccom` |
-| **Scope** | Scope configurations: charts, channels on PLC variables, record, export CSV/SVDX – also from the pipeline | `tc_scope_new`, `tc_scope` |
-| **HMI** | TwinCAT HMI pages, controls with PLC bindings and button actions, symbol mapping – directly in the project files | `tc_hmi`, `tc_hmi_page`, `tc_hmi_control`, `tc_hmi_symbol` |
+| **IDE dialogs** | Modal IDE dialogs are detected and reported instead of blocking silently | `tc_dialogs` |
+| **Scope** | Scope configurations (TE130x): charts, axes, channels on PLC variables, record, export CSV/SVDX – also from the pipeline | `tc_scope_new`, `tc_scope` |
+| **HMI** | TwinCAT HMI (TE2000) pages and regions, controls with PLC bindings and button actions, symbol mapping, build – directly in the project files | `tc_hmi`, `tc_hmi_page`, `tc_hmi_control`, `tc_hmi_symbol` |
 | **Motion** | NC tasks and axes (first step of the motion configuration) | `tc_motion`, `tc_motion_add` |
 | **Runtime** | Activate, login/start/stop, read/write variables via ADS – only on allowed targets | `tc_activate`, `tc_plc_online`, `ads_read`, `ads_write` |
 | **Your rules** | Coding rules per project/person/company; "remember that I want X" becomes a rule | `tc_coding_rules`, `tc_coding_rules_add` |
@@ -67,14 +68,19 @@ Ready-made definitions for GitHub Actions, Azure DevOps, Jenkins and GitLab: [do
 No scripts, no administrator rights, no .NET installation needed. Details, client sign-in and troubleshooting:
 [docs/INSTALLATION.md](docs/INSTALLATION.md). Building from source: [Build](#build-from-source).
 
+**TwinCAT XAE Shell:** TcAgent controls the shell just like Visual Studio. For the chat window and the inline question in the
+shell run `vsbridge\install-xaeshell.ps1` once (shell closed, asks for administrator rights).
+
+What changed in each version: [CHANGELOG.md](CHANGELOG.md).
+
 ## Use it where you work
 
 **Inline question** – in the TwinCAT editor press **Ctrl+Shift+Q**, type, press Enter. You stay in the code; the answer
 streams into the chat window. **TcAgent Chat** – a tool window with backend selection (Claude Code, Copilot CLI,
 Gemini CLI, Codex CLI); the editor context is sent along automatically. Your prompts on the right, the agent's answers on
 the left, ↑/↓ brings back earlier prompts, and documents (manuals, data sheets, screenshots, long texts) can be pasted or
-dropped into the input box for the agent to use. Also in the TwinCAT XAE Shell: `vsbridge\install-xaeshell.ps1`. **Any MCP client** – Claude Desktop, Copilot
-agent mode in Visual Studio, or a CLI in your terminal use the very same tools.
+dropped into the input box for the agent to use. **Any MCP client** – Claude Desktop, Copilot agent mode in Visual Studio,
+or a CLI in your terminal use the very same tools.
 
 | Client | How it is connected |
 |---|---|
@@ -162,7 +168,8 @@ The Automation Interface interop is generated from your local TwinCAT installati
 
 ```
 src/                    TcAgent (MCP server, .NET 8)
-vsbridge/               TcAgentBridge (VS 2022 extension, .NET Framework): chat window, inline ask, installer
+vsbridge/               TcAgentBridge (VS 2022 extension, .NET Framework): chat window, inline ask, installer;
+                        install-xaeshell.ps1 builds and installs it for the TwinCAT XAE Shell
 agents/TCAGENT_GUIDE.md agent guide (source for AGENTS.md / GEMINI.md / CLAUDE.md / copilot-instructions.md)
 SKILL.md                the same guide as a Claude skill
 setup-clients.ps1       registers TcAgent in all AI clients (run automatically by the VSIX)
@@ -172,15 +179,17 @@ docs/                   installation, tool reference, CI pipelines (docs/pipelin
 
 ## Roadmap
 
-SIL/HIL test runs (simulated I/O, test PLCs on the network), motion drive links and parameters, and later TwinSAFE
-(read, analyze, propose – never download).
-
+* SIL/HIL test runs (simulated I/O, test PLCs on the network)
+* Motion: drive links and axis parameters
+* TwinSAFE: read, analyze, propose – never download
 * **TwinCAT Package Manager** (`tcpkg` CLI, TwinCAT 4026+): list installed and available packages/workloads, install,
   update and uninstall them, manage feeds – install/update/uninstall only with confirmation.
 
 ## Known limitations
 
-* Windows and Visual Studio 2022 only (TcXaeShell works for most tools but is less tested).
+* Windows with Visual Studio 2022 or the TwinCAT XAE Shell (the XAE Shell is less tested).
+* Scope and HMI changes are written to the project files while the project is unloaded in the IDE and reloaded afterwards –
+  unsaved changes in their open editors are saved first. Scope needs matching Scope packages for the IDE (see troubleshooting).
 * Every Automation Interface call runs on the IDE's UI thread – while the agent works, the IDE can pause briefly.
 * Tested with TwinCAT 3.1 build 4026; other builds may need adjustments.
 

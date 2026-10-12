@@ -34,7 +34,11 @@ The remaining sections describe the **manual / developer setup** from source.
 | Windows SDK or .NET Framework 4.8 Developer Pack | `TlbImp.exe` for the interop assembly | VS Installer under "Individual components" |
 | At least one AI client | see [step 5](#5-install-and-sign-in-to-ai-clients) | |
 
-TcXaeShell is supported as well but less tested. The VS extension (step 3) is only available for Visual Studio 2022.
+The TwinCAT XAE Shell works as well (TcAgent attaches to `TcXaeShell.DTE`). The VS extension (step 3, chat window and inline
+question) is built for the shell with `vsbridge\install-xaeshell.ps1` (close the shell first; asks for administrator rights) -
+the VSIX itself only installs into Visual Studio 2022.
+
+Optional, for the Scope and HMI tools: **TE1300 Scope View** (`tc_scope`) and **TE2000 HMI Engineering** (`tc_hmi*`).
 
 ## 2. Build TcAgent
 
@@ -170,7 +174,13 @@ In addition, every client can require confirmation of individual tool calls – 
 | `tc_ide command=ping` fails | Extension not installed or VS not restarted. Check `bridge.log`. |
 | Yellow bar in VS "stopped responding … TcAgentBridge" | First export of a large library (runs on the UI thread). Do not disable – afterwards everything comes from the cache. |
 | Cursor shows "declaration, line 1" | No click into the editor since VS was opened. Click into the code once. |
+| Chat window: attached PDF/images are not read | The Claude backend needs `Read` in `--allowedTools` - TcAgent adds it automatically together with `--add-dir` for the attachments folder; check a custom `chat-backends.json`. |
 | Chat window: "… could not be started" | CLI not installed or not in PATH; enter the full path under `exe` in `chat-backends.json`. |
+| Setup message "TcAgent.exe … being used by another process" | An AI client (e.g. Claude Desktop) still runs the previous TcAgent.exe. Quit it (tray icon > Quit), then "Set up clients" in the TcAgent Chat. |
+| `.tcscopex` shows a plain file icon, "Could not load file with the extension .tcscopex. Please upgrade your TwinCAT Measurement" | The Scope integration in VS and the installed Scope files have different versions. Update them together: `tcpkg upgrade TE1300.ScopeViewProfessional.XAE` (VS closed), then `devenv /updateconfiguration`. |
+| `tc_scope record_start`: "not loaded in Visual Studio" | Open the .tcscopex once in the IDE (double-click), PLC in Run. |
+| VS asks "Save dataset?" during a Scope change | Only with older TcAgent versions - current versions back the recording up and answer the question themselves. |
+| `tc_hmi action=controls`: "Control package not found" | Build the HMI project once in the IDE (restores the NuGet packages into `<solution>\Packages`). |
 | `vsbridge\build.ps1`: CS1705 (version conflict) | Several versions of a VS assembly installed; the script uses the highest. Please report as an issue, with output. |
 
 Logs: `%LOCALAPPDATA%\TcAgent\` (`audit.jsonl`, `bridge\bridge.log`, `libcache\`). Agent feedback:

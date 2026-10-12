@@ -61,6 +61,10 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
 
 ## I/O and configuration
 
+- **Scan real hardware:** `tc_runtime_mode mode=config` (stops the PLC - confirmation), `tc_io_scan` (read-only: adapters,
+  EtherCAT masters), then `tc_io_scan_add` to create the device or assign the adapter to an existing one (`devicePath`).
+  Back to run mode with `tc_runtime_mode mode=run`. Only on enabled targets and with the user's agreement.
+
 - **Add hardware:** `tc_io_add kind=ethercat_master` (under TIID), then a whole station in ONE call:
   `tc_io_add kind=box parentPath='TIID^Device 1 (EtherCAT)' product=EK1100 children=EL1008,EL2008,EL6001`.
   Product names without revision usually work; otherwise include the revision (`EL6001-0000-0020`). Then `tc_tree` for the paths.
@@ -99,12 +103,58 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
   The first fetch of a large library freezes VS for a few seconds; after that it is cached.
 - `tc_plc_library_add` on the `...^References` node adds a library.
 
-## Known limitations (as of v0.7 - `tc_version` shows the running version)
+## Projects, files and analysis
+
+- New solution / PLC project: `tc_new_solution`, `tc_plc_project_add`. Export/import PLCopen XML or XTI: `tc_export`, `tc_import`.
+- Libraries: `tc_library` (references, placeholders, repositories, install), `tc_library_save` (save a PLC project as library).
+- `tc_static_analysis` (TE1200) shows errors/warnings, optionally as SARIF. `tc_mapping_export`/`tc_mapping_import` for I/O mappings,
+  `tc_archive` for a .tnzip, `tc_twincat_version` and `tc_platform` for the build environment, `tc_variant` for project variants.
+- Network: `tc_route_search` (ADS broadcast), `tc_route_add` (runtime action - confirmation), `tc_tccom` (TcCOM module instances).
+
+## Motion
+
+- `tc_motion` lists NC tasks and axes, `tc_motion_add` creates an NC task (it appears as `<name> SAF`) and axes.
+  Drive links and axis parameters are not automated yet - use `tc_xml_get`/`tc_xml_set` and tell the user.
+
+## Scope (TE130x Scope View)
+
+- `tc_scope action=list` shows measurement projects, charts, axes and channels with their PLC variables.
+- New configuration: `tc_scope_new name=...` (YT template). An empty measurement project gets one with `tc_scope action=add_config`.
+- `add_chart`, `add_axis`, `add_channel symbol=GVL.x` (type read via ADS, sampled with the task cycle), `remove_channel`.
+  Paths: `'<project>/<file.tcscopex>/<chart>/<axis>'`, missing parts = the first one. TcAgent edits the .tcscopex while the
+  measurement project is unloaded in the IDE and reloads it; unsaved recorded data is backed up first.
+- `record_start` / `record_stop` / `export file=...csv|.svdx` - the PLC must be running and the .tcscopex must be loaded in the IDE
+  (open it once). If the .tcscopex shows a plain file icon in the IDE, the Scope integration does not match the installed
+  Scope version - tell the user (fix: update the Scope packages with the TwinCAT Package Manager).
+
+## HMI (TE2000, file based)
+
+- `tc_hmi action=info` first (pages, start view, ADS runtimes, mapped PLC symbols); `action=controls filter=...` lists control
+  types and their attribute names - check names there instead of guessing; `action=read file=...` shows a view/content.
+- `tc_hmi_page` creates views/contents; show a content in a view with a `TcHmiRegion` (`target-content`).
+- `tc_hmi_symbol action=map symbols=GVL.x` maps PLC variables (HMI name `PLC1.GVL.x`); bind with `%s%PLC1.GVL.x%/s%`.
+- `tc_hmi_control action=add|update|remove` - attributes without the `data-tchmi-` prefix; `writeSymbol`/`writeValue` for buttons.
+- Changes are written while the HMI project is unloaded in the IDE and reloaded afterwards. Change one thing per call -
+  do not run several HMI/Scope changes in parallel. `tc_hmi action=build` checks the project; the user publishes.
+
+## Dialogs and confirmations
+
+- While the IDE shows a modal dialog, every Automation Interface call waits. Tools then return the dialog text -
+  tell the user what it says; `tc_dialogs` lists open dialogs, `tc_dialogs action=close` only cancels (never Yes/OK).
+- Runtime actions (activate, PLC start/stop, ADS write, runtime mode, routes) may need the user's confirmation
+  (`TCAGENT_CONFIRM`). A declined confirmation is final - do not retry or work around it.
+
+## Pipeline
+
+- The same TcAgent.exe runs in CI without an AI: `TcAgent.exe check|build|test|analyze|library|archive|scope ...`
+  with exit codes and JUnit XML (see docs/PIPELINE.md). Suggest it when the user wants automated checks.
+
+## Known limitations (`tc_version` shows the running version)
 
 - Without the VS extension TcAgentBridge (`tc_ide command=ping`) there are no library signatures and no cursor.
-- No pipeline CLI. The "TcAgent Chat" window in TwinCAT sends editor context and history; agents
-  running there use the same tools.
+  `tc_goto_definition` resolves names in the scope of the object open in the editor - without an open editor use `tc_plc_search`.
 - Changes in a currently open editor window can collide with tool changes.
+- Drive links/parameters (motion), TwinSAFE and SIL/HIL runs are not automated.
 
 ## Feedback - mandatory
 
