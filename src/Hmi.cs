@@ -176,7 +176,11 @@ public sealed partial class ToolRegistry
                 if (File.Exists(p.AdsConfig) && ReadJson(p.AdsConfig)["RUNTIMES"] is JsonObject rts)
                     o.AppendLine("ADS runtimes: " + string.Join(", ", rts.Select(kv => $"{kv.Key} ({kv.Value?["NETID"]}:{kv.Value?["PORT"]})")));
                 if (File.Exists(p.ServerConfig) && ReadJson(p.ServerConfig)["SYMBOLS"] is JsonObject syms)
-                    o.AppendLine($"Mapped symbols: {syms.Count}" + (syms.Count > 0 ? " - " + string.Join(", ", syms.Select(kv => kv.Key).Take(40)) + (syms.Count > 40 ? " ..." : "") : ""));
+                {
+                    var plc = syms.Where(kv => IsPlcSymbol(kv.Value)).Select(kv => kv.Key).ToList();
+                    o.AppendLine($"Mapped PLC symbols: {plc.Count}" + (plc.Count > 0 ? " - " + string.Join(", ", plc.Take(40)) + (plc.Count > 40 ? " ..." : "") : "") +
+                                 $" ({syms.Count - plc.Count} server/system symbols not shown)");
+                }
                 var pages = Directory.EnumerateFiles(p.Dir, "*.*", SearchOption.AllDirectories)
                     .Where(f => f.EndsWith(".view", StringComparison.OrdinalIgnoreCase) || f.EndsWith(".content", StringComparison.OrdinalIgnoreCase))
                     .Where(f => !f.Contains("\\bin\\") && !f.Contains("\\obj\\"))
@@ -212,6 +216,10 @@ public sealed partial class ToolRegistry
         }
     }
 
+    /// <summary>A mapped PLC variable (not one of the server's own functions/system symbols).</summary>
+    static bool IsPlcSymbol(JsonNode v) =>
+        v?["DOMAIN"]?.ToString() == "ADS" && (v?["MAPPING"]?.ToString() ?? "").Contains("::") && v?["SCHEMA"]?["function"] == null;
+
     /// <summary>Control types and attribute names from Description.json files of the installed control packages.</summary>
     static string HmiControlTypes(HmiProject p, string filter)
     {
@@ -221,7 +229,11 @@ public sealed partial class ToolRegistry
             var pk = Path.Combine(d.FullName, "Packages");
             if (Directory.Exists(pk)) roots.AddRange(Directory.GetDirectories(pk, "Beckhoff.TwinCAT.HMI.Controls.*"));
         }
-        if (roots.Count == 0) return "Control package not found (Packages\\Beckhoff.TwinCAT.HMI.Controls.*) - restore the NuGet packages of the HMI project. " +
+        // NuGet global package folder (packages restored there, e.g. %USERPROFILE%\.nuget\packages\beckhoff.twincat.hmi.controls\14.2.110)
+        var global = Path.Combine(Environment.GetEnvironmentVariable("NUGET_PACKAGES") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages"),
+                                  "beckhoff.twincat.hmi.controls");
+        if (roots.Count == 0 && Directory.Exists(global)) roots.AddRange(Directory.GetDirectories(global));
+        if (roots.Count == 0) return "Control package not found (Packages\\Beckhoff.TwinCAT.HMI.Controls.* or the NuGet cache) - build the HMI project once in Visual Studio. " +
                                      "Common types: TcHmiButton, TcHmiTextblock, TcHmiInput, TcHmiSpinboxInput, TcHmiCheckbox, TcHmiToggleButton, TcHmiImage, " +
                                      "TcHmiRadialGauge, TcHmiLinearGauge, TcHmiCombobox, TcHmiDatagrid, TcHmiContainer, TcHmiGrid; System: TcHmiRegion.";
         var root = roots.OrderByDescending(r => r).First();
