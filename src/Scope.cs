@@ -310,7 +310,10 @@ public sealed partial class ToolRegistry
         try { obj = item.Object; } catch { }
         if (obj == null)
             throw new Exception("The Scope configuration is not loaded in Visual Studio - open it once (double-click the .tcscopex), then retry.");
-        dynamic s = obj;
+        // the item's default IDispatch does not expose the Scope methods - use the IMeasurementScope dispinterface
+        // (type library TwinCAT.Measurement.AutomationInterface.tlb, DISPIDs 0x60020000 ...)
+        IMeasurementScopeDisp s = obj as IMeasurementScopeDisp
+            ?? throw new Exception("The Scope configuration object does not offer IMeasurementScope - is TwinCAT Measurement (TE130x) integrated into this Visual Studio?");
         switch (action)
         {
             case "record_start":
@@ -336,4 +339,19 @@ public sealed partial class ToolRegistry
             }
         }
     }
+}
+
+/// <summary>IMeasurementScope from TwinCAT.Measurement.AutomationInterface.tlb (dispinterface, DISPIDs from the type library).</summary>
+[System.Runtime.InteropServices.ComImport, System.Runtime.InteropServices.Guid("8fbf6b86-2b51-4b09-8045-d071f2663878"),
+ System.Runtime.InteropServices.InterfaceType(System.Runtime.InteropServices.ComInterfaceType.InterfaceIsIDispatch)]
+public interface IMeasurementScopeDisp
+{
+    [System.Runtime.InteropServices.DispId(0x60020000)] void StartRecord();
+    [System.Runtime.InteropServices.DispId(0x60020001)] void StopRecord();
+    [System.Runtime.InteropServices.DispId(0x60020002)] void Disconnect();
+    [System.Runtime.InteropServices.DispId(0x60020003)] void SaveSVD([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.BStr)] string file);
+    [System.Runtime.InteropServices.DispId(0x60020004)] void ExportCSV([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.BStr)] string file);
+    [System.Runtime.InteropServices.DispId(0x60020005)] void ExportBinary([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.BStr)] string file);
+    [System.Runtime.InteropServices.DispId(0x60020006)] void ExportTDMS([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.BStr)] string file);
+    [System.Runtime.InteropServices.DispId(0x60020007)] void ExportDAT([System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.BStr)] string file);
 }
