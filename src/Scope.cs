@@ -1,73 +1,53 @@
-// TwinCAT Scope (TE130x Scope View) through Visual Studio: a Scope configuration is a "TwinCAT Measurement" project
-// in the solution. Its elements are DTE project items whose Object implements IMeasurementScope
-// (CreateChild, ChangeName, StartRecord, StopRecord, SaveSVD, ExportCSV, ExportBinary, ExportTDMS, ExportDAT, Disconnect);
-// settings are the item's DTE Properties (as in the property grid). Everything is called late-bound, so TcAgent needs
-// no reference to the Scope assemblies.
+// TwinCAT Scope (TE130x Scope View). A Scope configuration is a "TwinCAT Measurement" project (.tcmproj) in the solution;
+// the configuration itself is a .tcscopex file - plain XML of the Scope model:
+//   ScopeProject/SubMember/{ DataPool/SubMember/AdsAcquisition*, YTChart/SubMember/AxisGroup/SubMember/Channel*, TriggerModule }
+//   Channel/SubMember/AcquisitionInterpreter/AcquisitionGUID -> AdsAcquisition/Guid
+// Charts, axes and channels are therefore edited in the file (like the HMI tools), then the measurement project is reloaded
+// in Visual Studio. Recording and export use the Scope's automation object in Visual Studio (IMeasurementScope, late-bound).
+// Format taken from the Scope templates installed with TwinCAT (Functions\TwinCAT Measurement\Templates).
 //
-// Paths address items by name: "<measurement project>/<scope>/<chart>/<axis>/<channel>", e.g. "Measurement/Scope Project/Chart/Axis/Channel".
+// Paths: "<measurement project>/<file.tcscopex>/<chart>/<axis group>" by name; empty parts = the first one.
 //
 // SPDX-License-Identifier: MIT
 using System.Text;
 using System.Text.Json.Nodes;
+using System.Xml.Linq;
 using EnvDTE;
+using TwinCAT.Ads;
+using TwinCAT.Ads.TypeSystem;
 
 namespace TcAgent;
 
 public sealed partial class ToolRegistry
 {
+    const string ScopeAsm = "TwinCAT.Measurement.Scope.API.Model";
+
     void RegisterScope()
     {
         Add("tc_scope_new", "Adds a TwinCAT Scope configuration (Measurement project, TE130x Scope View) to the solution. Then add charts and " +
                             "channels with tc_scope.",
             Schema(Req(P("name", "string", "Name of the measurement project")),
-                   P("template", "string", "Path of a .tcmproj template (default: 'TwinCAT Scope Project' of the Scope installation)"),
+                   P("template", "string", "Path of a .tcmproj template (default: 'YT Scope Project' of the installation)"),
                    P("folder", "string", "Folder (default: next to the solution)")),
             a => tc.Sta.Run(() => ScopeNew(a), 300_000));
 
-        Add("tc_scope", "TwinCAT Scope: list (measurement projects and their elements), properties / set (settings of an element, e.g. record time), " +
-                        "add_chart, add_axis, add_channel (channel for a PLC variable incl. acquisition), record_start, record_stop, " +
-                        "export (file by extension: .csv, .svdx/.svd, .bin, .tdms, .dat - TDMS/DAT need a Scope license), disconnect. " +
-                        "Paths: '<project>/<scope>/<chart>/<axis>/<channel>' by name.",
-            Schema(Req(P("action", "string", "list, properties, set, add_chart, add_axis, add_channel, record_start, record_stop, export, disconnect")),
-                   P("path", "string", "Element path, e.g. 'Measurement/Scope Project/Chart 1' (empty = the only scope)"),
-                   P("name", "string", "add_*: name of the new element"),
-                   P("property", "string", "set: property name (as shown by properties; a unique part of it is enough)"),
-                   P("value", "string", "set: new value"),
+        Add("tc_scope", "TwinCAT Scope: list (configurations, charts, axes, channels with their PLC variables), add_chart, add_axis, " +
+                        "add_channel (channel for a PLC variable: type and size read via ADS, sampled with the task cycle), remove_channel, " +
+                        "record_start, record_stop, export (file by extension: .csv, .svdx/.svd, .bin, .tdms, .dat - TDMS/DAT need a Scope license). " +
+                        "Configuration changes are written to the .tcscopex file and the measurement project is reloaded in Visual Studio. " +
+                        "Paths: '<project>/<file.tcscopex>/<chart>/<axis>' by name, missing parts = the first one.",
+            Schema(Req(P("action", "string", "list, add_chart, add_axis, add_channel, remove_channel, record_start, record_stop, export")),
+                   P("path", "string", "e.g. 'TcAgentScope/YT Scope Project.tcscopex/Chart 1/Axis 1' (empty = the first scope/chart/axis)"),
+                   P("name", "string", "add_chart/add_axis: name; add_channel: channel name (default: the symbol); remove_channel: channel name"),
                    P("symbol", "string", "add_channel: PLC variable, e.g. MAIN.fSine"),
-                   P("netId", "string", "add_channel: AmsNetId (default: local)"),
+                   P("netId", "string", "add_channel: AmsNetId (default 127.0.0.1.1.1)"),
                    P("port", "integer", "add_channel: ADS port (default 851)"),
-                   P("sampleTimeMs", "number", "add_channel: sample time in ms (default 1)"),
-                   P("file", "string", "export: target file"),
-                   P("chartType", "integer", "add_chart: 0 = YT (default), 1 = XY, 2 = array, 3 = bar")),
+                   P("dataType", "string", "add_channel: Scope data type if the PLC is not reachable: BIT, INT8, UINT8, INT16, UINT16, INT32, UINT32, INT64, UINT64, REAL32, REAL64"),
+                   P("file", "string", "export: target file")),
             a => tc.Sta.Run(() => Scope(a), 300_000));
     }
 
-    // ------------------------------------------------------------------ helpers
-    static object ScopeObj(ProjectItem pi) { try { return pi.Object; } catch { return null; } }
-
-    static bool IsScopeItem(object o)
-    {
-        try { return o != null && HasDispMember(o, "StartRecord"); } catch { return false; }
-    }
-
-    [System.Runtime.InteropServices.ComImport, System.Runtime.InteropServices.Guid("00020400-0000-0000-C000-000000000046"),
-     System.Runtime.InteropServices.InterfaceType(System.Runtime.InteropServices.ComInterfaceType.InterfaceIsIUnknown)]
-    interface IDispatchLite
-    {
-        int GetTypeInfoCount(out uint n);
-        int GetTypeInfo(uint i, uint lcid, out IntPtr ti);
-        [System.Runtime.InteropServices.PreserveSig]
-        int GetIDsOfNames(ref Guid riid, [System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.LPArray, ArraySubType = System.Runtime.InteropServices.UnmanagedType.LPWStr)] string[] names,
-                          uint count, uint lcid, [System.Runtime.InteropServices.Out] int[] ids);
-    }
-
-    static bool HasDispMember(object o, string name)
-    {
-        if (o is not IDispatchLite d) return false;
-        var iid = Guid.Empty; var ids = new int[1];
-        return d.GetIDsOfNames(ref iid, new[] { name }, 1, 0, ids) == 0;
-    }
-
+    // ================================================================== projects and files
     List<Project> MeasurementProjects()
     {
         var list = new List<Project>();
@@ -80,100 +60,65 @@ public sealed partial class ToolRegistry
         return list;
     }
 
-    /// <summary>Resolves "project/item/item..." to a project item; empty = the first scope of the only measurement project.</summary>
-    ProjectItem ScopeItem(string path)
+    sealed record ScopeRef(Project Project, string File, string Chart, string Axis);
+
+    ScopeRef ResolveScope(string path)
     {
         var projects = MeasurementProjects();
         if (projects.Count == 0) throw new Exception("No TwinCAT Measurement (Scope) project in the solution - create one with tc_scope_new.");
-        var parts = (path ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        var parts = (path ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
         Project proj;
-        int i = 0;
-        if (parts.Length > 0 && projects.FirstOrDefault(p => p.Name.Equals(parts[0], StringComparison.OrdinalIgnoreCase)) is { } named) { proj = named; i = 1; }
+        if (parts.Count > 0 && projects.FirstOrDefault(p => p.Name.Equals(parts[0], StringComparison.OrdinalIgnoreCase)) is { } named) { proj = named; parts.RemoveAt(0); }
         else if (projects.Count == 1) proj = projects[0];
         else throw new Exception("Several measurement projects - start the path with one of: " + string.Join(", ", projects.Select(p => p.Name)));
-        ProjectItems items = proj.ProjectItems;
-        ProjectItem cur = null;
-        if (i >= parts.Length)
-        {
-            cur = items.Cast<ProjectItem>().FirstOrDefault(x => IsScopeItem(ScopeObj(x))) ?? items.Cast<ProjectItem>().FirstOrDefault()
-                  ?? throw new Exception($"{proj.Name} contains no scope.");
-            return cur;
-        }
-        for (; i < parts.Length; i++)
-        {
-            cur = items.Cast<ProjectItem>().FirstOrDefault(x => x.Name.Equals(parts[i], StringComparison.OrdinalIgnoreCase))
-                  ?? throw new Exception($"'{parts[i]}' not found. Available: " + string.Join(", ", items.Cast<ProjectItem>().Select(x => x.Name)));
-            items = cur.ProjectItems;
-        }
-        return cur;
+        var dir = Path.GetDirectoryName(proj.FullName)!;
+        var files = Directory.GetFiles(dir, "*.tcscopex", SearchOption.AllDirectories);
+        string file;
+        if (parts.Count > 0 && files.FirstOrDefault(f => Path.GetFileName(f).Equals(parts[0], StringComparison.OrdinalIgnoreCase)
+                                                        || Path.GetFileNameWithoutExtension(f).Equals(parts[0], StringComparison.OrdinalIgnoreCase)) is { } f1)
+        { file = f1; parts.RemoveAt(0); }
+        else file = files.FirstOrDefault() ?? throw new Exception($"{proj.Name} contains no .tcscopex file.");
+        return new ScopeRef(proj, file, parts.ElementAtOrDefault(0), parts.ElementAtOrDefault(1));
     }
 
-    static string ItemPath(ProjectItem pi)
+    static XElement Sub(XElement e)
     {
-        var names = new List<string>();
-        object o = pi;
-        for (int guard = 0; guard < 12 && o != null; guard++)
-        {
-            if (o is ProjectItem p) { names.Add(p.Name); o = p.Collection?.Parent; }
-            else if (o is Project pr) { names.Add(pr.Name); break; }
-            else break;
-        }
-        names.Reverse();
-        return string.Join("/", names);
+        var s = e.Element("SubMember");
+        if (s == null) { s = new XElement("SubMember"); e.AddFirst(s); }
+        return s;
     }
 
-    static string PropValue(Property p) { try { return Convert.ToString(p.Value, System.Globalization.CultureInfo.InvariantCulture); } catch { return "?"; } }
+    static string NameOf(XElement e) => (string)e.Element("Name") ?? (string)e.Element("Title") ?? e.Name.LocalName;
 
-    static List<Property> Props(ProjectItem pi)
+    static IEnumerable<XElement> Charts(XDocument d) => Sub(d.Root!).Elements().Where(e => e.Name.LocalName.EndsWith("Chart"));
+
+    static XElement Pick(IEnumerable<XElement> items, string name, string what)
     {
-        var l = new List<Property>();
-        try { foreach (Property p in pi.Properties) l.Add(p); } catch { }
-        return l;
+        var list = items.ToList();
+        if (string.IsNullOrEmpty(name)) return list.FirstOrDefault() ?? throw new Exception($"no {what} - add one first");
+        return list.FirstOrDefault(e => NameOf(e).Equals(name, StringComparison.OrdinalIgnoreCase))
+               ?? throw new Exception($"{what} '{name}' not found. Available: {string.Join(", ", list.Select(NameOf))}");
     }
 
-    /// <summary>Sets a property by exact name or a unique part of it. Returns a report line.</summary>
-    static string SetProp(ProjectItem pi, string key, object value, bool required = true)
+    static XElement El(string name, params object[] content) => new(name, content);
+    static XElement Model(string name, params object[] content) => new(name, new XAttribute("AssemblyName", ScopeAsm), content);
+
+    /// <summary>Writes the configuration and reloads the measurement project, so Visual Studio shows the change.</summary>
+    string SaveScope(ScopeRef r, XDocument d)
     {
-        var props = Props(pi);
-        var hit = props.FirstOrDefault(p => p.Name.Equals(key, StringComparison.OrdinalIgnoreCase));
-        if (hit == null)
-        {
-            var cands = props.Where(p => p.Name.Contains(key, StringComparison.OrdinalIgnoreCase)).ToList();
-            if (cands.Count == 1) hit = cands[0];
-            else if (!required) return null;
-            else throw new Exception(cands.Count == 0 ? $"No property '{key}' on {pi.Name}. Properties: {string.Join(", ", props.Select(p => p.Name))}"
-                                                      : $"'{key}' is ambiguous on {pi.Name}: {string.Join(", ", cands.Select(p => p.Name))}");
-        }
-        var before = PropValue(hit);
-        object v = value;
-        try
-        {
-            var cur = hit.Value;
-            if (cur != null && value is string s && cur is not string)
-                v = cur is bool ? (object)(s.Trim().ToUpperInvariant() is "TRUE" or "1")
-                  : cur.GetType().IsEnum ? Enum.Parse(cur.GetType(), s, true)
-                  : Convert.ChangeType(s, cur.GetType(), System.Globalization.CultureInfo.InvariantCulture);
-        }
-        catch { }
-        hit.Value = v;
-        return $"{hit.Name}: {before} -> {PropValue(hit)}";
+        var dte = tc.RequireDte();
+        var projFile = r.Project.FullName;
+        string note = "";
+        try { dte.Solution.Remove(r.Project); } catch (Exception ex) { note = " (project not unloaded: " + ex.Message + ")"; }
+        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backup", "scope");
+        Directory.CreateDirectory(dir);
+        File.Copy(r.File, Path.Combine(dir, $"{DateTime.Now:yyyyMMdd-HHmmss-fff}_{Path.GetFileName(r.File)}"), true);
+        d.Save(r.File);
+        try { dte.Solution.AddFromFile(projFile, false); } catch (Exception ex) { note += " (re-adding the project failed: " + ex.Message + " - add it again in Visual Studio)"; }
+        return note;
     }
 
-    static object ScopeCreateChild(object scopeObj, string name, int elementType)
-    {
-        dynamic d = scopeObj;
-        object child = null;
-        try { d.CreateChild(out child, name ?? "", elementType); }
-        catch (Microsoft.CSharp.RuntimeBinder.RuntimeBinderException)
-        {
-            // older Scope versions: CreateChild(out child) only, then rename
-            d.CreateChild(out child);
-            if (!string.IsNullOrEmpty(name)) { try { ((dynamic)((ProjectItem)child).Object).ChangeName(name); } catch { } }
-        }
-        return child as ProjectItem ?? throw new Exception("CreateChild returned no project item (" + (child?.GetType().Name ?? "null") + ")");
-    }
-
-    // ------------------------------------------------------------------ tools
+    // ================================================================== tools
     string ScopeNew(JsonObject a)
     {
         var dte = tc.RequireDte();
@@ -181,13 +126,15 @@ public sealed partial class ToolRegistry
         var template = Str(a, "template");
         if (string.IsNullOrEmpty(template))
         {
-            foreach (var root in new[] { @"C:\TwinCAT\Functions\TE130X-Scope-View\Templates\Projects",
+            foreach (var root in new[] { @"C:\Program Files (x86)\Beckhoff\TwinCAT\Functions\TwinCAT Measurement\Templates\Projects",
+                                         @"C:\TwinCAT\Functions\TwinCAT Measurement\Templates\Projects",
                                          @"C:\Program Files (x86)\Beckhoff\TwinCAT\Functions\TE130X-Scope-View\Templates\Projects",
-                                         @"C:\Program Files\Beckhoff\TwinCAT\Functions\TE130X-Scope-View\Templates\Projects" })
+                                         @"C:\TwinCAT\Functions\TE130X-Scope-View\Templates\Projects" })
             {
                 if (!Directory.Exists(root)) continue;
                 var files = Directory.GetFiles(root, "*.tcmproj", SearchOption.AllDirectories);
-                template = files.FirstOrDefault(f => Path.GetFileNameWithoutExtension(f).Contains("Scope", StringComparison.OrdinalIgnoreCase)) ?? files.FirstOrDefault();
+                template = files.FirstOrDefault(f => Path.GetFileNameWithoutExtension(f).Equals("YT Scope Project", StringComparison.OrdinalIgnoreCase))
+                           ?? files.FirstOrDefault(f => Path.GetFileNameWithoutExtension(f).Contains("Scope", StringComparison.OrdinalIgnoreCase));
                 if (template != null) break;
             }
             if (template == null) throw new Exception("Scope project template (*.tcmproj) not found - is TE130x Scope View installed (TwinCAT 4026: workload TE1300.ScopeViewProfessional.XAE)? Pass template=<path>.");
@@ -195,10 +142,9 @@ public sealed partial class ToolRegistry
         var folder = Str(a, "folder") ?? Path.Combine(Path.GetDirectoryName(dte.Solution.FullName) ?? ".", name);
         Directory.CreateDirectory(folder);
         dte.Solution.AddFromTemplate(template, folder, name, false);
-        var proj = MeasurementProjects().FirstOrDefault(p => p.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
         var o = new StringBuilder($"Measurement project created: {name} ({folder}), template {Path.GetFileName(template)}");
-        if (proj != null) foreach (ProjectItem pi in proj.ProjectItems) o.Append("\n  ").Append(ItemPath(pi));
-        o.Append("\nNext: tc_scope action=add_chart, add_axis, add_channel symbol=MAIN.x, then record_start.");
+        foreach (var f in Directory.GetFiles(folder, "*.tcscopex")) o.Append("\n  ").Append(name).Append('/').Append(Path.GetFileName(f));
+        o.Append("\nNext: tc_scope action=add_channel symbol=MAIN.x (the template already has a chart and an axis), then record_start.");
         return o.ToString();
     }
 
@@ -213,68 +159,170 @@ public sealed partial class ToolRegistry
                 foreach (var p in MeasurementProjects())
                 {
                     o.AppendLine($"{p.Name}  ({p.FullName})");
-                    void Walk(ProjectItems items, int depth)
+                    foreach (var f in Directory.GetFiles(Path.GetDirectoryName(p.FullName)!, "*.tcscopex", SearchOption.AllDirectories))
                     {
-                        if (items == null || depth > 6) return;
-                        foreach (ProjectItem pi in items)
+                        o.AppendLine($"  {Path.GetFileName(f)}");
+                        var d = XDocument.Load(f);
+                        var acqs = Sub(d.Root!).Element("DataPool") is { } dp ? Sub(dp).Elements("AdsAcquisition").ToDictionary(x => (string)x.Element("Guid") ?? "", x => x) : new();
+                        foreach (var c in Charts(d))
                         {
-                            o.Append(' ', depth * 2).AppendLine(pi.Name);
-                            Walk(pi.ProjectItems, depth + 1);
+                            o.AppendLine($"    {NameOf(c)} ({c.Name.LocalName})");
+                            foreach (var ag in Sub(c).Elements("AxisGroup"))
+                            {
+                                o.AppendLine($"      {NameOf(ag)}");
+                                foreach (var ch in Sub(ag).Elements("Channel"))
+                                {
+                                    var guid = (string)ch.Descendants("AcquisitionGUID").FirstOrDefault();
+                                    var acq = guid != null && acqs.TryGetValue(guid, out var x) ? x : null;
+                                    o.AppendLine($"        {NameOf(ch)}" + (acq != null ? $"  <- {(string)acq.Element("SymbolName")} ({(string)acq.Element("DataType")}, {(string)acq.Element("AmsNetId")}:{(string)acq.Element("TargetPort")})" : ""));
+                                }
+                            }
                         }
                     }
-                    Walk(p.ProjectItems, 1);
                 }
                 return o.Length > 0 ? o.ToString() : "No TwinCAT Measurement (Scope) project in the solution.";
             }
-            case "properties":
-            {
-                var pi = ScopeItem(Str(a, "path"));
-                var o = new StringBuilder($"{ItemPath(pi)}:\n");
-                foreach (var p in Props(pi)) o.AppendLine($"  {p.Name} = {PropValue(p)}");
-                return o.ToString();
-            }
-            case "set":
-            {
-                var pi = ScopeItem(Str(a, "path"));
-                return SetProp(pi, Str(a, "property") ?? throw new Exception("property is required"), Str(a, "value") ?? "");
-            }
             case "add_chart":
             {
-                var scope = ScopeItem(Str(a, "path"));
-                var child = (ProjectItem)ScopeCreateChild(ScopeObj(scope), Str(a, "name") ?? "", Int(a, "chartType", 0));
-                return "created: " + ItemPath(child);
+                var r = ResolveScope(Str(a, "path"));
+                var d = XDocument.Load(r.File);
+                var name = Str(a, "name") ?? $"Chart {Charts(d).Count() + 1}";
+                var chart = Model("YTChart", El("SubMember", Model("AxisGroup", El("SubMember"), El("Title", "Axis 1"), El("Name", "Axis 1"))),
+                                  El("Title", name), El("Name", name));
+                var root = Sub(d.Root!);
+                var trigger = root.Element("TriggerModule");
+                if (trigger != null) trigger.AddBeforeSelf(chart); else root.Add(chart);
+                return $"chart added: {name} (with axis 'Axis 1')" + SaveScope(r, d);
             }
             case "add_axis":
             {
-                var chart = ScopeItem(Str(a, "path"));
-                var child = (ProjectItem)ScopeCreateChild(ScopeObj(chart), Str(a, "name") ?? "", 0);
-                return "created: " + ItemPath(child);
+                var r = ResolveScope(Str(a, "path"));
+                var d = XDocument.Load(r.File);
+                var chart = Pick(Charts(d), r.Chart, "chart");
+                var name = Str(a, "name") ?? $"Axis {Sub(chart).Elements("AxisGroup").Count() + 1}";
+                Sub(chart).Add(Model("AxisGroup", El("SubMember"), El("Title", name), El("Name", name)));
+                return $"axis added: {NameOf(chart)}/{name}" + SaveScope(r, d);
             }
             case "add_channel":
                 return ScopeAddChannel(a);
-            case "record_start":
+            case "remove_channel":
             {
-                dynamic s = ScopeObj(ScopeItem(Str(a, "path")));
-                s.StartRecord();
-                return "recording started (whole scope project). Stop with action=record_stop, then export.";
+                var r = ResolveScope(Str(a, "path"));
+                var d = XDocument.Load(r.File);
+                var name = Str(a, "name") ?? throw new Exception("name (channel) is required");
+                var ch = d.Descendants("Channel").FirstOrDefault(c => NameOf(c).Equals(name, StringComparison.OrdinalIgnoreCase))
+                         ?? throw new Exception($"channel '{name}' not found");
+                var guid = (string)ch.Descendants("AcquisitionGUID").FirstOrDefault();
+                ch.Remove();
+                if (guid != null && !d.Descendants("AcquisitionGUID").Any(g => (string)g == guid))
+                    d.Descendants("AdsAcquisition").FirstOrDefault(x => (string)x.Element("Guid") == guid)?.Remove();
+                return $"channel removed: {name}" + SaveScope(r, d);
             }
+            case "record_start":
             case "record_stop":
-            {
-                dynamic s = ScopeObj(ScopeItem(Str(a, "path")));
+            case "export":
+                return ScopeRuntime(a, action);
+            default:
+                throw new Exception("unknown action: " + action);
+        }
+    }
+
+    // ------------------------------------------------------------------ channels
+    static readonly Dictionary<string, (string type, int size)> ScopeTypes = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["BOOL"] = ("BIT", 1), ["BIT"] = ("BIT", 1), ["SINT"] = ("INT8", 1), ["USINT"] = ("UINT8", 1), ["BYTE"] = ("UINT8", 1),
+        ["INT"] = ("INT16", 2), ["UINT"] = ("UINT16", 2), ["WORD"] = ("UINT16", 2), ["DINT"] = ("INT32", 4), ["UDINT"] = ("UINT32", 4),
+        ["DWORD"] = ("UINT32", 4), ["LINT"] = ("INT64", 8), ["ULINT"] = ("UINT64", 8), ["LWORD"] = ("UINT64", 8),
+        ["REAL"] = ("REAL32", 4), ["LREAL"] = ("REAL64", 8), ["TIME"] = ("UINT32", 4),
+        ["INT8"] = ("INT8", 1), ["UINT8"] = ("UINT8", 1), ["INT16"] = ("INT16", 2), ["UINT16"] = ("UINT16", 2), ["INT32"] = ("INT32", 4),
+        ["UINT32"] = ("UINT32", 4), ["INT64"] = ("INT64", 8), ["UINT64"] = ("UINT64", 8), ["REAL32"] = ("REAL32", 4), ["REAL64"] = ("REAL64", 8),
+    };
+
+    static (string iec, long group, long offset)? AdsSymbolInfo(string net, int port, string symbol)
+    {
+        try
+        {
+            using var c = new AdsClient();
+            c.Connect(AmsNetId.Parse(net), port);
+            var loader = SymbolLoaderFactory.Create(c, new TwinCAT.SymbolLoaderSettings(TwinCAT.SymbolsLoadMode.VirtualTree));
+            if (!loader.Symbols.TryGetInstance(symbol, out var s)) return null;
+            long g = 0, off = 0;
+            if (s is IAdsSymbol ads) { g = ads.IndexGroup; off = ads.IndexOffset; }
+            return (s.TypeName, g, off);
+        }
+        catch { return null; }
+    }
+
+    string ScopeAddChannel(JsonObject a)
+    {
+        var symbol = Str(a, "symbol") ?? throw new Exception("symbol is required, e.g. MAIN.fSine");
+        var net = Str(a, "netId") ?? "127.0.0.1.1.1";
+        int port = Int(a, "port", 851);
+        var info = AdsSymbolInfo(net, port, symbol);
+        string iec = info?.iec ?? Str(a, "dataType") ?? throw new Exception($"PLC symbol {symbol} not readable via ADS ({net}:{port}) - pass dataType (e.g. REAL64).");
+        if (!ScopeTypes.TryGetValue(iec.Trim(), out var st))
+            throw new Exception($"Type {iec} cannot be recorded as one channel - choose a member with an elementary type (BOOL, INT, DINT, REAL, LREAL ...).");
+
+        var r = ResolveScope(Str(a, "path"));
+        var d = XDocument.Load(r.File);
+        var chart = Pick(Charts(d), r.Chart, "chart");
+        var axis = Pick(Sub(chart).Elements("AxisGroup"), r.Axis, "axis");
+        var root = Sub(d.Root!);
+        var pool = root.Element("DataPool");
+        if (pool == null) { pool = Model("DataPool"); root.AddFirst(pool); }
+        var guid = Guid.NewGuid().ToString();
+        var name = Str(a, "name") ?? symbol;
+
+        var acq = Model("AdsAcquisition",
+            info is { } i && i.group != 0 ? new object[] { El("IndexGroup", i.group), El("IndexOffset", i.offset) } : Array.Empty<object>(),
+            El("SymbolName", symbol), El("SymbolBased", "true"), El("TargetPort", port), El("IsHistorical", "false"), El("Enabled", "true"),
+            El("AmsNetId", net), El("DataType", st.type), El("UseTaskSampleTime", "true"), El("ContextMask", -1), El("VariableSize", st.size),
+            El("DataAccess", El("DataAccessMode", El("Source", "TwinCAT"), El("Protocoll", "ADS"), El("Format", "TcBinary"), El("TimeContext", "Present"))),
+            El("Area", "None"), El("Guid", guid), El("Name", symbol), El("SortPriority", 10), El("ChannelStyleInformation"));
+        Sub(pool).Add(acq);
+
+        int[] colors = { -14774017, -16776961, -65536, -16744448, -23296, -8388480, -16711681, -5952982 };
+        var color = colors[d.Descendants("Channel").Count() % colors.Length];
+        var channel = Model("Channel",
+            El("SubMember",
+                Model("AcquisitionInterpreter", El("BitMask", "18446744073709551615"), El("Usage", "Y"), El("AcquisitionGUID", guid), El("SubMember"),
+                      El("Name", "Y: " + symbol), El("SortPriority", 2)),
+                Model("ChannelStyle", El("Visible", "true"),
+                      El("SubMember", Model("SeriesStyle", El("MarkColor", color), El("FillColor", 853385437), El("SeriesType", "Line"), El("LineWidth", 2),
+                                            El("Antialias", "true"), El("DisplayColor", color), El("SortPriority", 100))),
+                      El("SortPriority", 100))),
+            El("Title", name), El("Name", name), El("SortPriority", -1));
+        Sub(axis).Add(channel);
+        return $"channel added: {NameOf(chart)}/{NameOf(axis)}/{name} <- {symbol} ({iec} as {st.type}, {net}:{port}, task cycle)" +
+               (info == null ? " - type from dataType, PLC not reachable" : "") + SaveScope(r, d) +
+               "\nStart a recording with tc_scope action=record_start (PLC must be running).";
+    }
+
+    // ------------------------------------------------------------------ recording / export via Visual Studio
+    string ScopeRuntime(JsonObject a, string action)
+    {
+        var r = ResolveScope(Str(a, "path"));
+        ProjectItem item = null;
+        foreach (ProjectItem pi in r.Project.ProjectItems)
+            if (string.Equals(pi.Name, Path.GetFileName(r.File), StringComparison.OrdinalIgnoreCase)) item = pi;
+        if (item == null) throw new Exception($"{Path.GetFileName(r.File)} not found in {r.Project.Name}");
+        object obj = null;
+        try { obj = item.Object; } catch { }
+        if (obj == null)
+            throw new Exception("The Scope configuration is not loaded in Visual Studio - open it once (double-click the .tcscopex), then retry.");
+        dynamic s = obj;
+        switch (action)
+        {
+            case "record_start":
+                s.StartRecord();
+                return "recording started (whole scope configuration). Stop with action=record_stop, then export.";
+            case "record_stop":
                 s.StopRecord();
                 return "recording stopped. Export with action=export file=<.csv|.svdx|.bin|.tdms|.dat>.";
-            }
-            case "disconnect":
-            {
-                dynamic s = ScopeObj(ScopeItem(Str(a, "path")));
-                s.Disconnect();
-                return "disconnected from the Scope Server (recorded data discarded).";
-            }
-            case "export":
+            default:
             {
                 var file = Path.GetFullPath(Str(a, "file") ?? throw new Exception("file is required"));
                 Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-                dynamic s = ScopeObj(ScopeItem(Str(a, "path")));
                 switch (Path.GetExtension(file).ToLowerInvariant())
                 {
                     case ".csv": s.ExportCSV(file); break;
@@ -284,61 +332,8 @@ public sealed partial class ToolRegistry
                     case ".dat": s.ExportDAT(file); break;
                     default: throw new Exception("file extension: .csv, .svdx/.svd, .bin, .tdms or .dat");
                 }
-                return $"exported: {file}" + (File.Exists(file) ? $" ({new FileInfo(file).Length / 1024} KB)" : " (file not found yet - recording stopped?)");
+                return $"exported: {file}" + (File.Exists(file) ? $" ({new FileInfo(file).Length / 1024} KB)" : " (file not written yet - recording stopped?)");
             }
-            default:
-                throw new Exception("unknown action: " + action);
         }
-    }
-
-    /// <summary>Channel below an axis group plus an ADS acquisition in the DataPool, linked via "Y-Data.Acquisition".</summary>
-    string ScopeAddChannel(JsonObject a)
-    {
-        var symbol = Str(a, "symbol") ?? throw new Exception("symbol is required, e.g. MAIN.fSine");
-        var axis = ScopeItem(Str(a, "path"));
-        var name = Str(a, "name") ?? symbol;
-        var o = new StringBuilder();
-
-        // the scope node (2nd path level) holds the DataPool as first child
-        var scopeNode = axis;
-        for (int guard = 0; guard < 6; guard++)
-        {
-            if (scopeNode.Collection?.Parent is ProjectItem parent) scopeNode = parent; else break;
-        }
-        var dataPool = scopeNode.ProjectItems.Cast<ProjectItem>().FirstOrDefault(x => x.Name.Contains("DataPool", StringComparison.OrdinalIgnoreCase))
-                       ?? scopeNode.ProjectItems.Item(1);
-        var acq = (ProjectItem)ScopeCreateChild(ScopeObj(dataPool), name, 0 /* ADS */);
-        o.AppendLine("acquisition: " + ItemPath(acq));
-        var net = Str(a, "netId");
-        foreach (var (keys, value) in new (string[] keys, object value)[]
-                 {
-                     (new[] { "SymbolName", "Symbol" }, symbol),
-                     (new[] { "AmsNetId", "NetId", "Target" }, string.IsNullOrEmpty(net) ? "Local" : net),
-                     (new[] { "TargetPort", "Port" }, Int(a, "port", 851).ToString()),
-                     (new[] { "SampleTime" }, (a["sampleTimeMs"] is JsonValue st ? st.ToString() : "1")),
-                 })
-        {
-            string done = null;
-            foreach (var k in keys)
-            {
-                try { done = SetProp(acq, k, value, required: false); } catch (Exception ex) { done = $"{k}: ERROR {ex.InnerException?.Message ?? ex.Message}"; }
-                if (done != null) break;
-            }
-            o.AppendLine("  " + (done ?? $"{keys[0]}: property not found - set it with action=set path={ItemPath(acq)}"));
-        }
-
-        var channel = (ProjectItem)ScopeCreateChild(ScopeObj(axis), name, 0 /* channel */);
-        o.AppendLine("channel: " + ItemPath(channel));
-        try
-        {
-            var link = Props(channel).FirstOrDefault(p => p.Name.Equals("Y-Data.Acquisition", StringComparison.OrdinalIgnoreCase))
-                       ?? Props(channel).FirstOrDefault(p => p.Name.EndsWith("Acquisition", StringComparison.OrdinalIgnoreCase));
-            if (link == null) throw new Exception("property Y-Data.Acquisition not found");
-            link.Value = ScopeObj(acq);
-            o.AppendLine("  linked: " + link.Name + " = " + PropValue(link));
-        }
-        catch (Exception ex) { o.AppendLine("  link FAILED: " + (ex.InnerException?.Message ?? ex.Message) + " - check with action=properties"); }
-        o.Append("Check the acquisition with action=properties path=" + ItemPath(acq) + " (data type, sample time).");
-        return o.ToString();
     }
 }

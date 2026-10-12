@@ -516,26 +516,23 @@ Adds a TwinCAT Scope configuration (Measurement project, TE130x Scope View) to t
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | yes | Name of the measurement project |
-| `template` | string |  | Path of a .tcmproj template (default: 'TwinCAT Scope Project' of the Scope installation) |
+| `template` | string |  | Path of a .tcmproj template (default: 'YT Scope Project' of the installation) |
 | `folder` | string |  | Folder (default: next to the solution) |
 
 ### `tc_scope`
 
-TwinCAT Scope: list (measurement projects and their elements), properties / set (settings of an element, e.g. record time), add_chart, add_axis, add_channel (channel for a PLC variable incl. acquisition), record_start, record_stop, export (file by extension: .csv, .svdx/.svd, .bin, .tdms, .dat - TDMS/DAT need a Scope license), disconnect. Paths: '<project>/<scope>/<chart>/<axis>/<channel>' by name.
+TwinCAT Scope: list (configurations, charts, axes, channels with their PLC variables), add_chart, add_axis, add_channel (channel for a PLC variable: type and size read via ADS, sampled with the task cycle), remove_channel, record_start, record_stop, export (file by extension: .csv, .svdx/.svd, .bin, .tdms, .dat - TDMS/DAT need a Scope license). Configuration changes are written to the .tcscopex file and the measurement project is reloaded in Visual Studio. Paths: '<project>/<file.tcscopex>/<chart>/<axis>' by name, missing parts = the first one.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `action` | string | yes | list, properties, set, add_chart, add_axis, add_channel, record_start, record_stop, export, disconnect |
-| `path` | string |  | Element path, e.g. 'Measurement/Scope Project/Chart 1' (empty = the only scope) |
-| `name` | string |  | add_*: name of the new element |
-| `property` | string |  | set: property name (as shown by properties; a unique part of it is enough) |
-| `value` | string |  | set: new value |
+| `action` | string | yes | list, add_chart, add_axis, add_channel, remove_channel, record_start, record_stop, export |
+| `path` | string |  | e.g. 'TcAgentScope/YT Scope Project.tcscopex/Chart 1/Axis 1' (empty = the first scope/chart/axis) |
+| `name` | string |  | add_chart/add_axis: name; add_channel: channel name (default: the symbol); remove_channel: channel name |
 | `symbol` | string |  | add_channel: PLC variable, e.g. MAIN.fSine |
-| `netId` | string |  | add_channel: AmsNetId (default: local) |
+| `netId` | string |  | add_channel: AmsNetId (default 127.0.0.1.1.1) |
 | `port` | integer |  | add_channel: ADS port (default 851) |
-| `sampleTimeMs` | number |  | add_channel: sample time in ms (default 1) |
+| `dataType` | string |  | add_channel: Scope data type if the PLC is not reachable: BIT, INT8, UINT8, INT16, UINT16, INT32, UINT32, INT64, UINT64, REAL32, REAL64 |
 | `file` | string |  | export: target file |
-| `chartType` | integer |  | add_chart: 0 = YT (default), 1 = XY, 2 = array, 3 = bar |
 
 ## TwinCAT HMI (TE2000, file based)
 
