@@ -36,8 +36,11 @@ function Invoke-Install {
         Copy-Item "$out\*" $target -Force
         Write-Host "Copied to $target"
     }
-    Write-Host "$([IO.Path]::GetFileName($shellExe)) /updateconfiguration ..."
-    Start-Process $shellExe -ArgumentList '/updateconfiguration' -Wait
+    # the isolated VS 2017 shell has no /updateconfiguration switch - touching this file makes it rebuild
+    # its configuration (pkgdef merge) on the next start
+    $flag = Join-Path $ShellIde 'Extensions\extensions.configurationchanged'
+    if (Test-Path $flag) { (Get-Item $flag).LastWriteTime = Get-Date } else { New-Item -ItemType File $flag | Out-Null }
+    Write-Host "Configuration refresh requested ($flag)"
     Write-Host "Done. Start the XAE Shell: View > Other Windows > TcAgent Chat (or Ctrl+Shift+Q in the code editor)." -ForegroundColor Green
 }
 
