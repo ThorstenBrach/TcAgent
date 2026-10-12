@@ -31,19 +31,20 @@ public sealed partial class ToolRegistry
                    P("folder", "string", "Folder (default: next to the solution)")),
             a => tc.Sta.Run(() => ScopeNew(a), 300_000));
 
-        Add("tc_scope", "TwinCAT Scope: list (configurations, charts, axes, channels with their PLC variables), add_chart, add_axis, " +
+        Add("tc_scope", "TwinCAT Scope: list (configurations, charts, axes, channels with their PLC variables), add_config (.tcscopex from the YT template into an empty measurement project), add_chart, add_axis, " +
                         "add_channel (channel for a PLC variable: type and size read via ADS, sampled with the task cycle), remove_channel, " +
                         "record_start, record_stop, export (file by extension: .csv, .svdx/.svd, .bin, .tdms, .dat - TDMS/DAT need a Scope license). " +
                         "Configuration changes are written to the .tcscopex file and the measurement project is reloaded in Visual Studio. " +
                         "Paths: '<project>/<file.tcscopex>/<chart>/<axis>' by name, missing parts = the first one.",
-            Schema(Req(P("action", "string", "list, add_chart, add_axis, add_channel, remove_channel, record_start, record_stop, export")),
+            Schema(Req(P("action", "string", "list, add_config, add_chart, add_axis, add_channel, remove_channel, record_start, record_stop, export")),
                    P("path", "string", "e.g. 'TcAgentScope/YT Scope Project.tcscopex/Chart 1/Axis 1' (empty = the first scope/chart/axis)"),
-                   P("name", "string", "add_chart/add_axis: name; add_channel: channel name (default: the symbol); remove_channel: channel name"),
+                   P("name", "string", "add_config: file name (default YT Scope Project); add_chart/add_axis: name; add_channel: channel name (default: the symbol); remove_channel: channel name"),
                    P("symbol", "string", "add_channel: PLC variable, e.g. MAIN.fSine"),
                    P("netId", "string", "add_channel: AmsNetId (default 127.0.0.1.1.1)"),
                    P("port", "integer", "add_channel: ADS port (default 851)"),
                    P("dataType", "string", "add_channel: Scope data type if the PLC is not reachable: BIT, INT8, UINT8, INT16, UINT16, INT32, UINT32, INT64, UINT64, REAL32, REAL64"),
-                   P("file", "string", "export: target file")),
+                   P("file", "string", "export: target file"),
+                   P("template", "string", "add_config: .tcscopex to copy (default: YT Scope Project of the installation)")),
             a => tc.Sta.Run(() => Scope(a), 300_000));
     }
 
@@ -119,6 +120,72 @@ public sealed partial class ToolRegistry
     }
 
     // ================================================================== tools
+    static readonly string[] ScopeTemplateRoots =
+    {
+        @"C:\Program Files (x86)\Beckhoff\TwinCAT\Functions\TwinCAT Measurement\Templates",
+        @"C:\TwinCAT\Functions\TwinCAT Measurement\Templates",
+        @"C:\Program Files (x86)\Beckhoff\TwinCAT\Functions\TE130X-Scope-View\Templates",
+        @"C:\TwinCAT\Functions\TE130X-Scope-View\Templates"
+    };
+
+    /// <summary>A file of the installed Scope templates, 'YT Scope Project' preferred.</summary>
+    static string ScopeTemplate(string pattern)
+    {
+        foreach (var root in ScopeTemplateRoots)
+        {
+            if (!Directory.Exists(root)) continue;
+            var files = Directory.GetFiles(root, pattern, SearchOption.AllDirectories);
+            var t = files.FirstOrDefault(f => Path.GetFileNameWithoutExtension(f).Equals("YT Scope Project", StringComparison.OrdinalIgnoreCase))
+                    ?? files.FirstOrDefault(f => Path.GetFileNameWithoutExtension(f).StartsWith("YT", StringComparison.OrdinalIgnoreCase))
+                    ?? files.FirstOrDefault(f => Path.GetFileNameWithoutExtension(f).Contains("Scope", StringComparison.OrdinalIgnoreCase));
+            if (t != null) return t;
+        }
+        return null;
+    }
+
+    /// <summary>Adds a Scope configuration (.tcscopex from the YT template) to an existing measurement project, e.g. one created empty in VS.</summary>
+    string ScopeAddConfig(JsonObject a)
+    {
+        var projects = MeasurementProjects();
+        if (projects.Count == 0) throw new Exception("No TwinCAT Measurement (Scope) project in the solution - create one with tc_scope_new.");
+        var first = (Str(a, "path") ?? "").Split('/', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).FirstOrDefault();
+        var proj = (first != null ? projects.FirstOrDefault(p => p.Name.Equals(first, StringComparison.OrdinalIgnoreCase)) : null)
+                   ?? (projects.Count == 1 ? projects[0] : throw new Exception("Several measurement projects - pass path=<project>: " + string.Join(", ", projects.Select(p => p.Name))));
+        var template = Str(a, "template") ?? ScopeTemplate("*.tcscopex")
+                       ?? throw new Exception("Scope template (*.tcscopex) not found - is TE130x Scope View installed? Pass template=<path of a .tcscopex>.");
+        var name = Str(a, "name") ?? "YT Scope Project";
+        if (!name.EndsWith(".tcscopex", StringComparison.OrdinalIgnoreCase)) name += ".tcscopex";
+        var projFile = proj.FullName;
+        var target = Path.Combine(Path.GetDirectoryName(projFile)!, name);
+        if (File.Exists(target)) throw new Exception($"{name} already exists in {proj.Name}.");
+
+        // fresh GUIDs, so two configurations from the same template do not share identities
+        var d = XDocument.Load(template);
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var e in d.Descendants().Where(e => !e.HasElements && Guid.TryParse(e.Value, out _)))
+        {
+            if (!map.TryGetValue(e.Value, out var n)) map[e.Value] = n = Guid.NewGuid().ToString();
+            e.Value = n;
+        }
+
+        tc.EditUnloaded(projFile, () =>
+        {
+            var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backup", "scope");
+            Directory.CreateDirectory(dir);
+            File.Copy(projFile, Path.Combine(dir, $"{DateTime.Now:yyyyMMdd-HHmmss-fff}_{Path.GetFileName(projFile)}"), true);
+            d.Save(target);
+            var pd = XDocument.Load(projFile, LoadOptions.PreserveWhitespace);
+            XNamespace ns = pd.Root!.Name.Namespace;
+            var group = new XElement(ns + "ItemGroup",
+                new XElement(ns + "Content", new XAttribute("Include", name), new XElement(ns + "SubType", "Content")));
+            pd.Root.Add(group);
+            pd.Save(projFile);
+            return 0;
+        }, out var note);
+        return $"Scope configuration added: {proj.Name}/{name} (from {Path.GetFileName(template)})" + note +
+               "\nNext: tc_scope action=list, then add_channel symbol=MAIN.x.";
+    }
+
     string ScopeNew(JsonObject a)
     {
         var dte = tc.RequireDte();
@@ -126,17 +193,7 @@ public sealed partial class ToolRegistry
         var template = Str(a, "template");
         if (string.IsNullOrEmpty(template))
         {
-            foreach (var root in new[] { @"C:\Program Files (x86)\Beckhoff\TwinCAT\Functions\TwinCAT Measurement\Templates\Projects",
-                                         @"C:\TwinCAT\Functions\TwinCAT Measurement\Templates\Projects",
-                                         @"C:\Program Files (x86)\Beckhoff\TwinCAT\Functions\TE130X-Scope-View\Templates\Projects",
-                                         @"C:\TwinCAT\Functions\TE130X-Scope-View\Templates\Projects" })
-            {
-                if (!Directory.Exists(root)) continue;
-                var files = Directory.GetFiles(root, "*.tcmproj", SearchOption.AllDirectories);
-                template = files.FirstOrDefault(f => Path.GetFileNameWithoutExtension(f).Equals("YT Scope Project", StringComparison.OrdinalIgnoreCase))
-                           ?? files.FirstOrDefault(f => Path.GetFileNameWithoutExtension(f).Contains("Scope", StringComparison.OrdinalIgnoreCase));
-                if (template != null) break;
-            }
+            template = ScopeTemplate("*.tcmproj");
             if (template == null) throw new Exception("Scope project template (*.tcmproj) not found - is TE130x Scope View installed (TwinCAT 4026: workload TE1300.ScopeViewProfessional.XAE)? Pass template=<path>.");
         }
         var folder = Str(a, "folder") ?? Path.Combine(Path.GetDirectoryName(dte.Solution.FullName) ?? ".", name);
@@ -182,6 +239,8 @@ public sealed partial class ToolRegistry
                 }
                 return o.Length > 0 ? o.ToString() : "No TwinCAT Measurement (Scope) project in the solution.";
             }
+            case "add_config":
+                return ScopeAddConfig(a);
             case "add_chart":
             {
                 var r = ResolveScope(Str(a, "path"));
