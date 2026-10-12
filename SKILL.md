@@ -52,6 +52,17 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
    TcUnit output appears in the IDE as "errors" in the error list - these are runtime messages, not
    compiler errors; `tc_errors kind=compile|runtime` separates them.
 
+## SFC step chains
+
+- `tc_sfc action=read path=<POU>` shows the chain as text: `STEP Init INITIAL`, `ACTION N A_Init`, `TRANSITION bStart`,
+  `ALTERNATIVE`/`PARALLEL` with `BRANCH` ... `END_ALTERNATIVE`/`END_PARALLEL`, `JUMP Init`, plus the action/transition objects.
+- New chain: `tc_plc_create language=SFC`, then the actions (`tc_plc_create kind=action parentPath=<POU>`, ST code) and
+  transitions with code if needed (`kind=transition`), then `tc_sfc action=write chain=...` with the complete chain.
+  A transition line holds an ST condition (`bDone AND NOT bError`) or the name of a transition object.
+- Rules: steps and transitions alternate; ALTERNATIVE follows a step and every branch starts with a TRANSITION;
+  PARALLEL follows a transition and every branch starts with a STEP; branches end with a STEP (alternative also JUMP);
+  the chain ends with TRANSITION + JUMP. Read first, write the whole chain, then `tc_check`.
+
 ## Runtime (enabled targets only)
 
 - `tc_activate` activates the configuration and restarts TwinCAT (running tests are aborted!).

@@ -256,6 +256,36 @@ Searches declarations and implementations of all PLC objects (full text or regex
 | `path` | string |  | Only search below this tree path (default: all PLC projects) |
 | `max` | integer |  | Max. hits (default 200) |
 
+### `tc_sfc`
+
+Sequential function charts (SFC step chains) as text. `action=read` returns the chain (steps, actions with qualifiers, transitions, `ALTERNATIVE`/`PARALLEL` branches, jumps) and the action/transition objects of the POU with their code; `action=write` replaces the chain with the given text; `action=xml` shows the raw PLCopen SFC body. Works through PLCopen XML export/import of the POU. Create the POU with `tc_plc_create language=SFC`, actions/transitions with code with `tc_plc_create kind=action|transition`.
+
+```
+STEP Init INITIAL
+  ACTION N A_Init
+TRANSITION bStart
+STEP Run
+ALTERNATIVE
+  BRANCH
+    TRANSITION bError
+    STEP Error
+    TRANSITION bAck
+    JUMP Init
+  BRANCH
+    TRANSITION bDone
+    STEP Done
+END_ALTERNATIVE
+TRANSITION TRUE
+JUMP Init
+```
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | read, write or xml |
+| `path` | string | yes | tree path of the SFC POU, e.g. TIPC^MyPlc^MyPlc Project^POUs^FB_Sequence |
+| `chain` | string |  | write: the complete chain in the text form of action=read |
+| `dryRun` | boolean |  | write: only show the generated PLCopen XML |
+
 ## Editor context and navigation (TcAgentBridge)
 
 ### `tc_editor_context`

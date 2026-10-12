@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 ## [0.19.0] – not released yet
 
 ### Added
+- **SFC step chains** – `tc_sfc` reads a sequential function chart as text (steps, actions, transitions, alternative and
+  parallel branches, jumps) and writes it back from text (through PLCopen XML).
 - **TwinCAT Package Manager** – `tc_packages` (installed, available, versions, outdated, details, feeds, settings) and
   `tc_packages_change` (install, upgrade, uninstall, repair, feeds; confirmed by the user, runs elevated).
 - **Real-time cores** – `tc_realtime` shows and sets cores for TwinCAT, isolated cores, real-time cores, base time, load
