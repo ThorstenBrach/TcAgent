@@ -108,6 +108,18 @@ public sealed partial class ToolRegistry
     string SaveScope(ScopeRef r, XDocument d)
     {
         var projFile = r.Project.FullName;
+        var backupDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backup", "scope");
+        Directory.CreateDirectory(backupDir);
+        // Unloading a scope that holds recorded data makes Visual Studio ask "Save dataset? Save data to local file?".
+        // Keep the data: save it to the backup folder first, then answer that one question with "No" while unloading.
+        string dataNote = "";
+        var ops = FindScopeOps(r, out _);
+        if (ops != null)
+        {
+            var svdx = Path.Combine(backupDir, $"{DateTime.Now:yyyyMMdd-HHmmss-fff}_{Path.GetFileNameWithoutExtension(r.File)}.svdx");
+            try { ops.SaveSVD(svdx); if (File.Exists(svdx)) dataNote = $"\nRecorded data saved before unloading: {svdx}"; } catch { }
+        }
+        using var watcher = dataNote.Length > 0 ? AnswerSaveDatasetNo() : null;
         tc.EditUnloaded(projFile, () =>
         {
             var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backup", "scope");
@@ -116,8 +128,29 @@ public sealed partial class ToolRegistry
             d.Save(r.File);
             return 0;
         }, out var note);
-        return note;
+        return note + dataNote;
     }
+
+    /// <summary>While disposed-not: answers Visual Studio's "Save dataset?" question of the Scope with "No" (the data was saved before).</summary>
+    IDisposable AnswerSaveDatasetNo()
+    {
+        var cts = new CancellationTokenSource();
+        int pid = tc.AttachedPid;
+        var t = new System.Threading.Thread(() =>
+        {
+            while (!cts.IsCancellationRequested)
+            {
+                foreach (var dlg in IdeDialogs.Find(pid))
+                    if (dlg.Title.StartsWith("Save dataset", StringComparison.OrdinalIgnoreCase) || dlg.Text.Contains("Save data to local file", StringComparison.OrdinalIgnoreCase))
+                        IdeDialogs.Click(dlg, "No", "Nein");
+                cts.Token.WaitHandle.WaitOne(200);
+            }
+        }) { IsBackground = true, Name = "scope-save-dataset" };
+        t.Start();
+        return new Disposer(() => { cts.Cancel(); t.Join(2000); cts.Dispose(); });
+    }
+
+    sealed class Disposer(Action a) : IDisposable { public void Dispose() => a(); }
 
     // ================================================================== tools
     static readonly string[] ScopeTemplateRoots =
@@ -362,27 +395,7 @@ public sealed partial class ToolRegistry
     string ScopeRuntime(JsonObject a, string action)
     {
         var r = ResolveScope(Str(a, "path"));
-        ProjectItem item = null;
-        foreach (ProjectItem pi in r.Project.ProjectItems)
-            if (string.Equals(pi.Name, Path.GetFileName(r.File), StringComparison.OrdinalIgnoreCase)) item = pi;
-        if (item == null) throw new Exception($"{Path.GetFileName(r.File)} not found in {r.Project.Name}");
-        // candidates: the item's object, its child items, the project object
-        var candidates = new List<(string where, object o)>();
-        void AddCand(string where, Func<object> get) { try { var o = get(); if (o != null) candidates.Add((where, o)); } catch { } }
-        AddCand("item", () => item.Object);
-        try { foreach (ProjectItem c in item.ProjectItems) { var cc = c; AddCand("child " + cc.Name, () => cc.Object); } } catch { }
-        AddCand("project", () => r.Project.Object);
-        if (candidates.Count == 0)
-            throw new Exception("The Scope configuration is not loaded in Visual Studio - open it once (double-click the .tcscopex), then retry.");
-        // 1) the IMeasurementScope dispinterface (TwinCAT.Measurement.AutomationInterface.tlb, DISPIDs 0x60020000 ...)
-        IScopeOps s = candidates.Select(c => c.o as IMeasurementScopeDisp).Where(x => x != null).Select(x => (IScopeOps)new DispOps(x)).FirstOrDefault();
-        // 2) late bound by name through IDispatch, if the object's type info has StartRecord
-        if (s == null)
-            foreach (var c in candidates)
-                if (ComTypeInfo.Members(c.o).Contains("StartRecord")) { s = new NamedOps(c.o); break; }
-        if (s == null)
-            throw new Exception("No Scope automation object found (IMeasurementScope / StartRecord). Seen: " +
-                                string.Join("; ", candidates.Select(c => $"{c.where}: {ComTypeInfo.Describe(c.o)}")));
+        var s = FindScopeOps(r, out var problem) ?? throw new Exception(problem);
         switch (action)
         {
             case "record_start":
@@ -408,6 +421,39 @@ public sealed partial class ToolRegistry
             }
         }
     }
+
+    /// <summary>The Scope automation object of a configuration, or null with the reason.</summary>
+    IScopeOps FindScopeOps(ScopeRef r, out string problem)
+    {
+        problem = null;
+        ProjectItem item = null;
+        try
+        {
+            foreach (ProjectItem pi in r.Project.ProjectItems)
+                if (string.Equals(pi.Name, Path.GetFileName(r.File), StringComparison.OrdinalIgnoreCase)) item = pi;
+        }
+        catch { }
+        if (item == null) { problem = $"{Path.GetFileName(r.File)} not found in {r.Project.Name}"; return null; }
+        // candidates: the item's object, its child items, the project object
+        var candidates = new List<(string where, object o)>();
+        void AddCand(string where, Func<object> get) { try { var o = get(); if (o != null) candidates.Add((where, o)); } catch { } }
+        AddCand("item", () => item.Object);
+        try { foreach (ProjectItem c in item.ProjectItems) { var cc = c; AddCand("child " + cc.Name, () => cc.Object); } } catch { }
+        AddCand("project", () => r.Project.Object);
+        if (candidates.Count == 0)
+        { problem = "The Scope configuration is not loaded in Visual Studio - open it once (double-click the .tcscopex), then retry."; return null; }
+        // 1) the IMeasurementScope dispinterface (TwinCAT.Measurement.AutomationInterface.tlb, DISPIDs 0x60020000 ...)
+        IScopeOps s = candidates.Select(c => c.o as IMeasurementScopeDisp).Where(x => x != null).Select(x => (IScopeOps)new DispOps(x)).FirstOrDefault();
+        // 2) late bound by name through IDispatch, if the object's type info has StartRecord
+        if (s == null)
+            foreach (var c in candidates)
+                if (ComTypeInfo.Members(c.o).Contains("StartRecord")) { s = new NamedOps(c.o); break; }
+        if (s == null)
+            problem = "No Scope automation object found (IMeasurementScope / StartRecord). Seen: " +
+                      string.Join("; ", candidates.Select(c => $"{c.where}: {ComTypeInfo.Describe(c.o)}"));
+        return s;
+    }
+
 }
 
 interface IScopeOps { void StartRecord(); void StopRecord(); void SaveSVD(string f); void ExportCSV(string f); void ExportBinary(string f); void ExportTDMS(string f); void ExportDAT(string f); }

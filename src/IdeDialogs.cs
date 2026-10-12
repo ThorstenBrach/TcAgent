@@ -67,6 +67,24 @@ public static class IdeDialogs
         return result;
     }
 
+    const uint BM_CLICK = 0x00F5;
+
+    /// <summary>Presses the button with this caption (without '&'), e.g. "No". Only for answers that are known to be safe.</summary>
+    public static bool Click(Dialog d, params string[] captions)
+    {
+        IntPtr target = IntPtr.Zero;
+        EnumChildWindows(d.Handle, (c, _) =>
+        {
+            if (!IsWindowVisible(c) || !ClassOf(c).Contains("BUTTON", StringComparison.OrdinalIgnoreCase)) return true;
+            var t = TextOf(c).Replace("&", "").Trim();
+            if (captions.Any(x => x.Equals(t, StringComparison.OrdinalIgnoreCase))) { target = c; return false; }
+            return true;
+        }, IntPtr.Zero);
+        if (target == IntPtr.Zero) return false;
+        PostMessage(target, BM_CLICK, IntPtr.Zero, IntPtr.Zero);
+        return true;
+    }
+
     /// <summary>Closes a dialog like the X button / Esc (cancel semantics).</summary>
     public static void Close(Dialog d) => PostMessage(d.Handle, WM_CLOSE, IntPtr.Zero, IntPtr.Zero);
 
