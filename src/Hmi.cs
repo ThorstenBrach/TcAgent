@@ -86,10 +86,17 @@ public sealed partial class ToolRegistry
         var p = FindHmi(Str(a, "project"));
         return tc.Sta.Run(() =>
         {
-            var r = tc.EditUnloaded(p.ProjFile, write, out var note);
-            return r + note;
+            pinnedHmi = p;   // while unloaded, Visual Studio no longer reports the project - keep the resolved one
+            try
+            {
+                var r = tc.EditUnloaded(p.ProjFile, write, out var note);
+                return r + note;
+            }
+            finally { pinnedHmi = null; }
         }, 300_000);
     }
+
+    HmiProject pinnedHmi;
 
     // ================================================================== project files
     sealed record HmiProject(string ProjFile, string Dir)
@@ -103,6 +110,7 @@ public sealed partial class ToolRegistry
 
     HmiProject FindHmi(string hint)
     {
+        if (pinnedHmi != null) return pinnedHmi;
         if (!string.IsNullOrEmpty(hint) && hint.EndsWith(".hmiproj", StringComparison.OrdinalIgnoreCase) && File.Exists(hint))
             return new HmiProject(Path.GetFullPath(hint), Path.GetDirectoryName(Path.GetFullPath(hint))!);
         var found = new List<string>();
@@ -119,6 +127,10 @@ public sealed partial class ToolRegistry
                     var dir = Path.GetDirectoryName(tc.RequireDte().Solution.FullName);
                     if (!string.IsNullOrEmpty(dir))
                         found.AddRange(Directory.EnumerateFiles(dir, "*.hmiproj", new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 3 }));
+                    // HMI projects are often created next to the TwinCAT folder (..\HmiProject)
+                    var parent = string.IsNullOrEmpty(dir) ? null : Path.GetDirectoryName(dir);
+                    if (found.Count == 0 && !string.IsNullOrEmpty(parent))
+                        found.AddRange(Directory.EnumerateFiles(parent, "*.hmiproj", new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 3 }));
                 }
                 return 0;
             });
