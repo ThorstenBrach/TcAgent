@@ -32,6 +32,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Projects & files** | New solutions and PLC projects, PLCopen/XTI export and import, libraries (references, placeholders, repositories, save as library), mapping export/import, archive, TwinCAT version, target platform, variants | `tc_new_solution`, `tc_plc_project_add`, `tc_export`, `tc_import`, `tc_library`, `tc_library_save` |
 | **Quality** | Static analysis (TE1200) with SARIF export | `tc_static_analysis` |
 | **Network** | ADS broadcast search, add routes, TcCOM module instances | `tc_route_search`, `tc_route_add`, `tc_tccom` |
+| **System** | Real-time cores and base time, task core assignment, CoE startup lists of EtherCAT devices, TwinCAT Package Manager (installed/available/outdated packages, install and upgrade with confirmation) | `tc_realtime`, `tc_coe`, `tc_packages`, `tc_packages_change` |
 | **IDE dialogs** | Modal IDE dialogs are detected and reported instead of blocking silently | `tc_dialogs` |
 | **Scope** | Scope configurations (TE130x): charts, axes, channels on PLC variables, record, export CSV/SVDX – also from the pipeline | `tc_scope_new`, `tc_scope` |
 | **HMI** | TwinCAT HMI (TE2000) pages and regions, controls with PLC bindings and button actions, symbol mapping, build – directly in the project files | `tc_hmi`, `tc_hmi_page`, `tc_hmi_control`, `tc_hmi_symbol` |
@@ -40,7 +41,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Your rules** | Coding rules per project/person/company; "remember that I want X" becomes a rule | `tc_coding_rules`, `tc_coding_rules_add` |
 | **Documentation** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 
-All 73 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 77 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 ## In your CI pipeline
 
@@ -182,8 +183,6 @@ docs/                   installation, tool reference, CI pipelines (docs/pipelin
 * SIL/HIL test runs (simulated I/O, test PLCs on the network)
 * Motion: drive links and axis parameters
 * TwinSAFE: read, analyze, propose – never download
-* **TwinCAT Package Manager** (`tcpkg` CLI, TwinCAT 4026+): list installed and available packages/workloads, install,
-  update and uninstall them, manage feeds – install/update/uninstall only with confirmation.
 
 ## Known limitations
 

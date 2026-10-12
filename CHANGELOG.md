@@ -6,6 +6,12 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 ## [Unreleased]
 
 ### Added
+- **TwinCAT Package Manager** – `tc_packages` (installed, available, versions, outdated, details, feeds, settings) and
+  `tc_packages_change` (install, upgrade, uninstall, repair, feeds; confirmed by the user, runs elevated).
+- **Real-time cores** – `tc_realtime` shows and sets cores for TwinCAT, isolated cores, real-time cores, base time, load
+  limit; `tc_task cores=...` assigns a task to a core.
+- **CoE startup list** – `tc_coe` lists, adds and removes startup parameters of EtherCAT devices.
+- `tc_goto_definition` also works without an open editor (POUs, DUTs, GVLs and their members via the project tree).
 - Log file `%LOCALAPPDATA%\TcAgent\logs\tcagent-<date>.log` (all TcAgent processes, every tool call with duration) -
   to trace problems afterwards, e.g. after an IDE crash.
 

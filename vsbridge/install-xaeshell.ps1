@@ -20,6 +20,9 @@ function Find-Shell {
 }
 if (-not $ShellIde) { $ShellIde = Find-Shell }
 $shellExe = (Get-ChildItem $ShellIde -Filter 'TcXaeShell*.exe' | Select-Object -First 1).FullName
+# 32-bit shell = VS 2017 base (15.x), 64-bit shell (TcXaeShell64) = VS 2022 base (17.x)
+$shellMajor = [int]((Get-Item $shellExe).VersionInfo.FileMajorPart)
+if ($shellMajor -lt 15) { $shellMajor = 15 }
 $target = Join-Path $ShellIde 'Extensions\TcAgent\TcAgentBridge'
 $out = Join-Path $here 'bin-xaeshell'
 Write-Host "XAE Shell: $shellExe"
@@ -94,10 +97,11 @@ if (-not $Uninstall) {
     Copy-Item "$here\TcAgentBridge.pkgdef" $out -Force
     Copy-Item "$here\..\LICENSE" "$out\LICENSE.txt" -Force
     Copy-Item "$here\..\docs\img\icon.png" "$out\icon.png" -Force
-    # manifest for the shell: VS 15 base, installed like Beckhoff's own shell extensions (no VSIX installer)
+    # manifest for the shell: its VS base version, installed like Beckhoff's own shell extensions (no VSIX installer)
     $m = Get-Content "$here\extension.vsixmanifest" -Raw
-    $m = [regex]::Replace($m, '(?s)<Installation[^>]*>.*?</Installation>',
-        '<Installation InstalledByMsi="true"><InstallationTarget Id="Microsoft.VisualStudio.Community" Version="[15.0,16.0)" /></Installation>')
+    $range = "[$shellMajor.0,$($shellMajor + 1).0)"
+    $installation = '<Installation InstalledByMsi="true"><InstallationTarget Id="Microsoft.VisualStudio.Community" Version="' + $range + '" /></Installation>'
+    $m = [regex]::Replace($m, '(?s)<Installation[^>]*>.*?</Installation>', $installation)
     $m = [regex]::Replace($m, '(?s)<Prerequisites>.*?</Prerequisites>', '')
     Set-Content "$out\extension.vsixmanifest" $m -Encoding UTF8
     Write-Host "Built: $out\TcAgentBridge.dll" -ForegroundColor Green

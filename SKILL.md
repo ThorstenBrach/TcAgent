@@ -106,6 +106,17 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
   The first fetch of a large library freezes VS for a few seconds; after that it is cached.
 - `tc_plc_library_add` on the `...^References` node adds a library.
 
+## Real-time cores, CoE startup list, packages
+
+- `tc_realtime action=show` shows cores and base times; `action=set maxCpus=.. isolated=.. cores=.. baseTimeUs=..` changes the project
+  (first with `dryRun=true`). Isolated cores need "Set on target" and a reboot - tell the user, never reboot a target yourself.
+  Which core a task runs on: `tc_task action=set path=TIRT^PlcTask cores=1`.
+- `tc_coe action=list path=<terminal>` shows the CoE startup list; `add index=0x8000 subIndex=0x06 value=1 dataType=BOOL`
+  or `remove`. Take index/subindex from the device documentation (`tc_docs`), never guess. Use `dryRun=true` first.
+- `tc_packages` (read only) shows installed/available/outdated TwinCAT packages and feeds; `tc_packages_change` installs,
+  upgrades, uninstalls or repairs packages and edits feeds - only when the user asks, always confirmed, the IDE should be
+  closed for XAE packages. Version mismatches between IDE integrations (e.g. Scope) are fixed by upgrading the workload.
+
 ## Projects, files and analysis
 
 - New solution / PLC project: `tc_new_solution`, `tc_plc_project_add`. Export/import PLCopen XML or XTI: `tc_export`, `tc_import`.
@@ -156,7 +167,8 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
 ## Known limitations (`tc_version` shows the running version)
 
 - Without the VS extension TcAgentBridge (`tc_ide command=ping`) there are no library signatures and no cursor.
-  `tc_goto_definition` resolves names in the scope of the object open in the editor - without an open editor use `tc_plc_search`.
+  `tc_goto_definition` resolves names in the scope of the object open in the editor; without an open editor it looks up
+  POUs/DUTs/GVLs and their members in the project tree (local variables then need an open editor or `tc_plc_search`).
 - Changes in a currently open editor window can collide with tool changes.
 - Drive links/parameters (motion), TwinSAFE and SIL/HIL runs are not automated.
 

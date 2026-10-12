@@ -257,7 +257,7 @@ public sealed partial class ToolRegistry
                 catch (Exception ex) { return text + "\nTcAgentBridge: " + ex.Message + "\n"; }
             });
 
-        Add("tc_goto_definition", "Go to definition: resolves a name the way TwinCAT itself does - in the scope of the object open in the editor. Without symbol the word at the cursor (or the selection) is used. For variables returns type, declaration location and the resolved type; for types/POUs the location in the project (tree path) or the library. Requires the VS extension TcAgentBridge.",
+        Add("tc_goto_definition", "Go to definition: resolves a name the way TwinCAT itself does - in the scope of the object open in the editor. Without symbol the word at the cursor (or the selection) is used. For variables returns type, declaration location and the resolved type; for types/POUs the location in the project (tree path) or the library. Without an open editor, POUs/DUTs/GVLs and their members are looked up in the project tree. Requires the VS extension TcAgentBridge.",
             Schema(P("symbol", "string", "Name, e.g. _startTime, MC_MoveLinearAbsoluteFB, GVL_Progress.Progress (empty = word at cursor)")),
             a => GotoDefinition(a));
 

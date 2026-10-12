@@ -264,7 +264,7 @@ Shows what the user is currently working on in the IDE: active window/document, 
 
 ### `tc_goto_definition`
 
-Go to definition: resolves a name the way TwinCAT itself does - in the scope of the object open in the editor. Without symbol, the word at the cursor (or the selection) is used. For variables returns type, declaration site and resolved type; for types/POUs the location in the project (tree path) or the library. Requires the VS extension TcAgentBridge.
+Go to definition: resolves a name the way TwinCAT itself does - in the scope of the object open in the editor. Without symbol, the word at the cursor (or the selection) is used. For variables returns type, declaration site and resolved type; for types/POUs the location in the project (tree path) or the library. Without an open editor, POUs/DUTs/GVLs and their members are looked up in the project tree. Requires the VS extension TcAgentBridge.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -507,6 +507,71 @@ TcCOM module instances: list, or add an instance of a module class (class id GUI
 | `taskPath` | string |  | add: task that calls the module, e.g. TIRT^Task 1 |
 | `dryRun` | boolean |  | Only show what would happen |
 
+## Real-time cores, CoE startup list, package manager
+
+### `tc_realtime`
+
+Real-time settings (cores): `action=show` (available cores, cores for TwinCAT, isolated cores, real-time cores, base time / load limit / latency warning per core) or `set`. Changes the project; takes effect with `tc_activate`. Isolating cores additionally needs "Set on target" in the IDE and a reboot of the target.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | show or set |
+| `maxCpus` | integer |  | set: number of cores TwinCAT may use |
+| `isolated` | integer |  | set: how many of them are isolated from Windows (0 = shared only) |
+| `cores` | string |  | set: real-time cores, e.g. '1' or '1,2' (core 0 = first core) |
+| `baseTimeUs` | integer |  | set: base time in microseconds for the listed cores, e.g. 1000 |
+| `loadLimit` | integer |  | set: CPU limit in percent for the listed cores |
+| `latencyWarning` | integer |  | set: latency warning for the listed cores (unit as shown by action=show) |
+| `dryRun` | boolean |  | only show the XML |
+
+### `tc_coe`
+
+CoE startup list of an EtherCAT device (parameters written at a state transition, e.g. PS): `action=list`, `add` (index, subIndex, value + dataType or data as hex bytes, transition, comment) or `remove`. The list is written back as a whole; takes effect with `tc_activate`. Look up index/subindex in the device documentation.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | list, add or remove |
+| `path` | string | yes | tree path of the terminal/drive, e.g. TIID^Device 1 (EtherCAT)^Term 1 (EK1100)^Term 2 (EL3102) |
+| `index` | string |  | add/remove: object index, e.g. 0x8000 |
+| `subIndex` | string |  | add/remove: subindex, e.g. 0x06 or 6 |
+| `value` | string |  | add: value, e.g. 1000, TRUE, 0.5 |
+| `dataType` | string |  | add: BOOL, USINT/UINT8, UINT/UINT16, UDINT/UINT32, ULINT/UINT64, SINT/INT8, INT/INT16, DINT/INT32, LINT/INT64, REAL/REAL32, LREAL/REAL64 |
+| `data` | string |  | add: raw bytes as hex instead of value/dataType, e.g. e803 |
+| `transition` | string |  | add/remove: PS (default), SO, SP, OP, IP ... |
+| `comment` | string |  | add: comment shown in the startup list |
+| `dryRun` | boolean |  | only show the resulting XML |
+
+### `tc_packages`
+
+TwinCAT Package Manager (tcpkg, TwinCAT 4026+), read only: installed packages and workloads, available packages, all versions of one package, outdated packages, package details, feeds, feed check, tcpkg settings.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | installed, available, versions, outdated, show, feeds, verify_feeds or config |
+| `package` | string |  | versions/show: package id, e.g. TE1300.ScopeViewProfessional.XAE; otherwise optional filter |
+| `type` | string |  | available/installed: Workload to list workloads only |
+| `feed` | string |  | only this feed |
+| `prerelease` | boolean |  | include pre-release versions |
+
+### `tc_packages_change`
+
+TwinCAT Package Manager, changes: install, upgrade, uninstall, repair packages; add, edit, remove feeds. Always confirmed by the user and run with administrator rights (UAC prompt). Close Visual Studio / XAE Shell before changing XAE packages.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | install, upgrade, uninstall, repair, feed_add, feed_edit or feed_remove |
+| `packages` | string |  | package ids, optionally =version, e.g. TwinCAT.Standard.XAE=4026.22.0; upgrade also 'all' |
+| `allowDowngrade` | boolean |  | upgrade: allow a lower version |
+| `includeDependencies` | boolean |  | uninstall: also remove dependencies no longer needed |
+| `prerelease` | boolean |  | install/upgrade: allow pre-release versions |
+| `feed` | string |  | install/upgrade: only this feed |
+| `name` | string |  | feed_*: feed name |
+| `source` | string |  | feed_add/feed_edit: feed URL or folder |
+| `priority` | integer |  | feed_add/feed_edit: search order (lower = first) |
+| `enabled` | boolean |  | feed_edit: enable/disable |
+| `newName` | string |  | feed_edit: rename |
+| `dryRun` | boolean |  | only show the tcpkg command |
+
 ## Scope (TE130x Scope View)
 
 ### `tc_scope_new`
@@ -662,7 +727,7 @@ Switches the TwinCAT runtime of the target to config mode (needed for the I/O sc
 
 ### `tc_task`
 
-Real-time tasks: `action=list`, `create` (`name`, `cycleUs`, `priority`, `withImage`) or `set` (`path`, `cycleUs`, `priority`, `autoStart`). Takes effect after `tc_activate`.
+Real-time tasks: `action=list`, `create` (`name`, `cycleUs`, `priority`, `withImage`) or `set` (`path`, `cycleUs`, `priority`, `autoStart`, `cores` = real-time core(s) of the task, e.g. `1`). Takes effect after `tc_activate`.
 
 ### `tc_boot_project`
 
