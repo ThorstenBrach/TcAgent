@@ -13,6 +13,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Task = System.Threading.Tasks.Task;   // the VS 15 shell (XAE Shell) also has Microsoft.VisualStudio.Shell.Task
 using System.Web.Script.Serialization;
 using System.Windows;
 using System.Windows.Controls;
