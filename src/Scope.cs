@@ -156,6 +156,7 @@ public sealed partial class ToolRegistry
         var name = Str(a, "name") ?? "YT Scope Project";
         if (!name.EndsWith(".tcscopex", StringComparison.OrdinalIgnoreCase)) name += ".tcscopex";
         var projFile = proj.FullName;
+        var projName = proj.Name;
         var target = Path.Combine(Path.GetDirectoryName(projFile)!, name);
         if (File.Exists(target)) throw new Exception($"{name} already exists in {proj.Name}.");
 
@@ -182,7 +183,7 @@ public sealed partial class ToolRegistry
             pd.Save(projFile);
             return 0;
         }, out var note);
-        return $"Scope configuration added: {proj.Name}/{name} (from {Path.GetFileName(template)})" + note +
+        return $"Scope configuration added: {projName}/{name} (from {Path.GetFileName(template)})" + note +
                "\nNext: tc_scope action=list, then add_channel symbol=MAIN.x.";
     }
 
@@ -365,14 +366,23 @@ public sealed partial class ToolRegistry
         foreach (ProjectItem pi in r.Project.ProjectItems)
             if (string.Equals(pi.Name, Path.GetFileName(r.File), StringComparison.OrdinalIgnoreCase)) item = pi;
         if (item == null) throw new Exception($"{Path.GetFileName(r.File)} not found in {r.Project.Name}");
-        object obj = null;
-        try { obj = item.Object; } catch { }
-        if (obj == null)
+        // candidates: the item's object, its child items, the project object
+        var candidates = new List<(string where, object o)>();
+        void AddCand(string where, Func<object> get) { try { var o = get(); if (o != null) candidates.Add((where, o)); } catch { } }
+        AddCand("item", () => item.Object);
+        try { foreach (ProjectItem c in item.ProjectItems) { var cc = c; AddCand("child " + cc.Name, () => cc.Object); } } catch { }
+        AddCand("project", () => r.Project.Object);
+        if (candidates.Count == 0)
             throw new Exception("The Scope configuration is not loaded in Visual Studio - open it once (double-click the .tcscopex), then retry.");
-        // the item's default IDispatch does not expose the Scope methods - use the IMeasurementScope dispinterface
-        // (type library TwinCAT.Measurement.AutomationInterface.tlb, DISPIDs 0x60020000 ...)
-        IMeasurementScopeDisp s = obj as IMeasurementScopeDisp
-            ?? throw new Exception("The Scope configuration object does not offer IMeasurementScope - is TwinCAT Measurement (TE130x) integrated into this Visual Studio?");
+        // 1) the IMeasurementScope dispinterface (TwinCAT.Measurement.AutomationInterface.tlb, DISPIDs 0x60020000 ...)
+        IScopeOps s = candidates.Select(c => c.o as IMeasurementScopeDisp).Where(x => x != null).Select(x => (IScopeOps)new DispOps(x)).FirstOrDefault();
+        // 2) late bound by name through IDispatch, if the object's type info has StartRecord
+        if (s == null)
+            foreach (var c in candidates)
+                if (ComTypeInfo.Members(c.o).Contains("StartRecord")) { s = new NamedOps(c.o); break; }
+        if (s == null)
+            throw new Exception("No Scope automation object found (IMeasurementScope / StartRecord). Seen: " +
+                                string.Join("; ", candidates.Select(c => $"{c.where}: {ComTypeInfo.Describe(c.o)}")));
         switch (action)
         {
             case "record_start":
@@ -397,6 +407,95 @@ public sealed partial class ToolRegistry
                 return $"exported: {file}" + (File.Exists(file) ? $" ({new FileInfo(file).Length / 1024} KB)" : " (file not written yet - recording stopped?)");
             }
         }
+    }
+}
+
+interface IScopeOps { void StartRecord(); void StopRecord(); void SaveSVD(string f); void ExportCSV(string f); void ExportBinary(string f); void ExportTDMS(string f); void ExportDAT(string f); }
+
+sealed class DispOps(IMeasurementScopeDisp d) : IScopeOps
+{
+    public void StartRecord() => d.StartRecord();
+    public void StopRecord() => d.StopRecord();
+    public void SaveSVD(string f) => d.SaveSVD(f);
+    public void ExportCSV(string f) => d.ExportCSV(f);
+    public void ExportBinary(string f) => d.ExportBinary(f);
+    public void ExportTDMS(string f) => d.ExportTDMS(f);
+    public void ExportDAT(string f) => d.ExportDAT(f);
+}
+
+/// <summary>Calls by name through IDispatch (GetIDsOfNames + Invoke).</summary>
+sealed class NamedOps(object o) : IScopeOps
+{
+    void Call(string m, params object[] args)
+    {
+        try { o.GetType().InvokeMember(m, System.Reflection.BindingFlags.InvokeMethod, null, o, args); }
+        catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException != null) { throw ex.InnerException; }
+    }
+    public void StartRecord() => Call("StartRecord");
+    public void StopRecord() => Call("StopRecord");
+    public void SaveSVD(string f) => Call("SaveSVD", f);
+    public void ExportCSV(string f) => Call("ExportCSV", f);
+    public void ExportBinary(string f) => Call("ExportBinary", f);
+    public void ExportTDMS(string f) => Call("ExportTDMS", f);
+    public void ExportDAT(string f) => Call("ExportDAT", f);
+}
+
+/// <summary>Reads the type information of a COM object (IDispatch.GetTypeInfo) - only reads, never calls members.</summary>
+static class ComTypeInfo
+{
+    [System.Runtime.InteropServices.ComImport, System.Runtime.InteropServices.Guid("00020400-0000-0000-C000-000000000046"),
+     System.Runtime.InteropServices.InterfaceType(System.Runtime.InteropServices.ComInterfaceType.InterfaceIsIUnknown)]
+    interface IDispatchInfo
+    {
+        [System.Runtime.InteropServices.PreserveSig] int GetTypeInfoCount(out uint count);
+        [System.Runtime.InteropServices.PreserveSig] int GetTypeInfo(uint index, uint lcid, out System.Runtime.InteropServices.ComTypes.ITypeInfo info);
+    }
+
+    static System.Runtime.InteropServices.ComTypes.ITypeInfo Info(object o)
+    {
+        try
+        {
+            if (o is not IDispatchInfo d || d.GetTypeInfoCount(out var n) != 0 || n == 0) return null;
+            return d.GetTypeInfo(0, 0, out var ti) == 0 ? ti : null;
+        }
+        catch { return null; }
+    }
+
+    static string Name(System.Runtime.InteropServices.ComTypes.ITypeInfo ti)
+    {
+        try { ti.GetDocumentation(-1, out var name, out _, out _, out _); return name; } catch { return "?"; }
+    }
+
+    public static HashSet<string> Members(object o)
+    {
+        var set = new HashSet<string>(StringComparer.Ordinal);
+        var ti = Info(o);
+        if (ti == null) return set;
+        try
+        {
+            ti.GetTypeAttr(out var pAttr);
+            var attr = System.Runtime.InteropServices.Marshal.PtrToStructure<System.Runtime.InteropServices.ComTypes.TYPEATTR>(pAttr);
+            ti.ReleaseTypeAttr(pAttr);
+            for (int i = 0; i < attr.cFuncs; i++)
+            {
+                ti.GetFuncDesc(i, out var pFunc);
+                var fd = System.Runtime.InteropServices.Marshal.PtrToStructure<System.Runtime.InteropServices.ComTypes.FUNCDESC>(pFunc);
+                ti.ReleaseFuncDesc(pFunc);
+                var names = new string[1];
+                ti.GetNames(fd.memid, names, 1, out var got);
+                if (got > 0 && names[0] != null) set.Add(names[0]);
+            }
+        }
+        catch { }
+        return set;
+    }
+
+    public static string Describe(object o)
+    {
+        var ti = Info(o);
+        if (ti == null) return "no type info";
+        var m = Members(o).Where(x => !x.StartsWith("get_") && !x.StartsWith("set_")).Take(40);
+        return $"{Name(ti)} [{string.Join(", ", m)}]";
     }
 }
 
