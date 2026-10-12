@@ -266,6 +266,20 @@ public sealed partial class ToolRegistry
             var pk = Path.Combine(d.FullName, "Packages");
             if (Directory.Exists(pk)) roots.AddRange(Directory.GetDirectories(pk, "Beckhoff.TwinCAT.HMI.Controls.*"));
         }
+        // packages.config restores into <solution folder>\Packages - the HMI project's tsconfig.json points there
+        // (e.g. "../../TwinCAT/Packages/Beckhoff.TwinCAT.HMI.Framework.14.2.110/...")
+        if (roots.Count == 0)
+            try
+            {
+                var ts = Path.Combine(p.Dir, "tsconfig.json");
+                if (File.Exists(ts))
+                    foreach (Match m in Regex.Matches(File.ReadAllText(ts), @"""([^""]*?[\\/]Packages)[\\/]Beckhoff\.TwinCAT\.HMI\.", RegexOptions.IgnoreCase))
+                    {
+                        var pk = Path.GetFullPath(Path.Combine(p.Dir, m.Groups[1].Value.Replace('/', Path.DirectorySeparatorChar)));
+                        if (Directory.Exists(pk)) { roots.AddRange(Directory.GetDirectories(pk, "Beckhoff.TwinCAT.HMI.Controls.*")); break; }
+                    }
+            }
+            catch { }
         // NuGet global package folder (packages restored there, e.g. %USERPROFILE%\.nuget\packages\beckhoff.twincat.hmi.controls\14.2.110)
         var global = Path.Combine(Environment.GetEnvironmentVariable("NUGET_PACKAGES") ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ".nuget", "packages"),
                                   "beckhoff.twincat.hmi.controls");
@@ -547,8 +561,11 @@ public sealed partial class ToolRegistry
             {
                 if (!File.Exists(p.ServerConfig)) return "Server configuration not found: " + p.ServerConfig;
                 var syms = ReadJson(p.ServerConfig)["SYMBOLS"] as JsonObject;
-                return syms == null || syms.Count == 0 ? "No mapped symbols." :
-                    $"{syms.Count} mapped symbols:\n" + string.Join("\n", syms.Select(kv => $"  {kv.Key}  <- {kv.Value?["MAPPING"]}  {kv.Value?["SCHEMA"]?["$ref"]}"));
+                var plc = syms?.Where(kv => IsPlcSymbol(kv.Value)).ToList() ?? new();
+                int hidden = (syms?.Count ?? 0) - plc.Count;
+                return (plc.Count == 0 ? "No mapped PLC symbols." :
+                        $"{plc.Count} mapped PLC symbols:\n" + string.Join("\n", plc.Select(kv => $"  {kv.Key}  <- {kv.Value?["MAPPING"]}  {kv.Value?["SCHEMA"]?["$ref"]}"))) +
+                       (hidden > 0 ? $"\n({hidden} server/system symbols not shown)" : "");
             }
             case "map":
             case "unmap":
