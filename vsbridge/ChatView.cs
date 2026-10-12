@@ -39,6 +39,7 @@ namespace TcAgentBridge
         static readonly Brush UserBubble = Freeze(new SolidColorBrush(Color.FromArgb(0x38, 0x00, 0x78, 0xD4)));
         static readonly Brush AgentBubble = Freeze(new SolidColorBrush(Color.FromArgb(0x14, 0x80, 0x80, 0x80)));
         static readonly Brush CodeBack = Freeze(new SolidColorBrush(Color.FromArgb(0x24, 0x80, 0x80, 0x80)));
+        static readonly Brush DimBrush = Freeze(new SolidColorBrush(Color.FromArgb(0xC0, 0x80, 0x80, 0x80)));
         static readonly Brush ErrorBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xD1, 0x34, 0x38)));
         static Brush Freeze(SolidColorBrush b) { b.Freeze(); return b; }
 
@@ -194,7 +195,7 @@ namespace TcAgentBridge
             };
             box.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             box.Document = new FlowDocument { PagePadding = new Thickness(0) };
-            box.Document.Blocks.Add(new Paragraph(new Run("…")) { Margin = new Thickness(0), Opacity = 0.6 });
+            box.Document.Blocks.Add(new Paragraph(new Run("…")) { Margin = new Thickness(0), Foreground = DimBrush });
             var head = new TextBlock { Text = name, FontSize = 11, Opacity = 0.6, Margin = new Thickness(0, 0, 0, 2) };
             head.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             var panel = new StackPanel();
@@ -259,7 +260,7 @@ namespace TcAgentBridge
                 if (line.Length > 0 && line[0] == ToolMark)
                 {
                     para = null;
-                    doc.Blocks.Add(new Paragraph(new Run("⚙ " + line.Substring(1).Trim())) { Margin = new Thickness(0, 1, 0, 1), FontSize = 11, Opacity = 0.6 });
+                    doc.Blocks.Add(new Paragraph(new Run("⚙ " + line.Substring(1).Trim())) { Margin = new Thickness(0, 1, 0, 1), FontSize = 11, Foreground = DimBrush });
                     continue;
                 }
                 if (line.Trim().Length == 0) { para = null; continue; }
