@@ -71,7 +71,9 @@ No scripts, no administrator rights, no .NET installation needed. Details, clien
 
 **Inline question** – in the TwinCAT editor press **Ctrl+Shift+Q**, type, press Enter. You stay in the code; the answer
 streams into the chat window. **TcAgent Chat** – a tool window with backend selection (Claude Code, Copilot CLI,
-Gemini CLI, Codex CLI); the editor context is sent along automatically. **Any MCP client** – Claude Desktop, Copilot
+Gemini CLI, Codex CLI); the editor context is sent along automatically. Your prompts on the right, the agent's answers on
+the left, ↑/↓ brings back earlier prompts, and documents (manuals, data sheets, screenshots, long texts) can be pasted or
+dropped into the input box for the agent to use. Also in the TwinCAT XAE Shell: `vsbridge\install-xaeshell.ps1`. **Any MCP client** – Claude Desktop, Copilot
 agent mode in Visual Studio, or a CLI in your terminal use the very same tools.
 
 | Client | How it is connected |

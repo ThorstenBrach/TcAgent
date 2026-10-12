@@ -13,3 +13,8 @@ Install
 Log: %LOCALAPPDATA%\TcAgent\bridge\bridge.log   Probe: ...\bridge\probe.txt
 Cache: %LOCALAPPDATA%\TcAgent\libcache\<Library>_<Version>.json
 Uninstall: run uninstall.ps1 as administrator.
+
+TwinCAT XAE Shell (isolated VS shell, 32 bit)
+  powershell -ExecutionPolicy Bypass -File .\install-xaeshell.ps1             (close the shell first; asks for admin rights)
+  Builds against the shell's own assemblies and copies the extension to <shell>\Common7\IDE\Extensions\TcAgent.
+  Remove: install-xaeshell.ps1 -Uninstall

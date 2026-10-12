@@ -36,7 +36,8 @@ $refs = New-Object System.Collections.Generic.List[string]
 foreach ($n in 'Microsoft.VisualStudio.Shell.15.0', 'Microsoft.VisualStudio.Shell.Framework', 'Microsoft.VisualStudio.Interop',
                'Microsoft.VisualStudio.Shell.Interop', 'Microsoft.VisualStudio.OLE.Interop', 'Microsoft.VisualStudio.Threading',
                'Microsoft.VisualStudio.Validation', 'PresentationFramework', 'PresentationCore', 'WindowsBase', 'System.Xaml',
-               'System.Web.Extensions', 'System.Windows.Forms', 'System.Drawing', 'System.Core') {
+               'System.Web.Extensions', 'System.Windows.Forms', 'System.Drawing', 'System.Core',
+               'System.IO.Compression', 'System.IO.Compression.FileSystem', 'System') {
     if ($index.ContainsKey($n)) { $refs.Add($index[$n]) } else { Write-Host "  (not found: $n)" -ForegroundColor Yellow }
 }
 

@@ -40,7 +40,7 @@ namespace TcAgentBridge
         public bool Stdin;
     }
 
-    public sealed class ChatControl : UserControl
+    public sealed partial class ChatControl : UserControl
     {
         static readonly string Dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent");
         static readonly string SettingsFile = Path.Combine(Dir, "chat-backends.json");
@@ -48,13 +48,12 @@ namespace TcAgentBridge
         readonly ComboBox backendBox = new ComboBox { MinWidth = 170, Margin = new Thickness(0, 0, 6, 0) };
         readonly CheckBox buildBox = new CheckBox { Content = "Check after changes", IsChecked = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
         readonly CheckBox contextBox = new CheckBox { Content = "Send editor context", IsChecked = true, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
-        readonly TextBox log = new TextBox { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontFamily = new FontFamily("Consolas"), FontSize = 12, BorderThickness = new Thickness(0) };
-        readonly TextBox input = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 54, MaxHeight = 160, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontFamily = new FontFamily("Consolas"), FontSize = 12 };
-        readonly Button send = new Button { Content = "Send (Ctrl+Enter)", Padding = new Thickness(8, 2, 8, 2), Margin = new Thickness(6, 0, 0, 0) };
-        readonly Button stop = new Button { Content = "Stop", Padding = new Thickness(8, 2, 8, 2), Margin = new Thickness(6, 0, 0, 0), IsEnabled = false };
+        readonly TextBox input = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 40, MaxHeight = 220, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+        readonly Button send = new Button { Content = "Send", Padding = new Thickness(10, 2, 10, 2), Margin = new Thickness(6, 0, 0, 0) };
+        readonly Button stop = new Button { Content = "Stop", Padding = new Thickness(10, 2, 10, 2), Margin = new Thickness(6, 0, 0, 0), IsEnabled = false };
         readonly Button setup = new Button { Content = "Set up clients", Padding = new Thickness(8, 2, 8, 2), Margin = new Thickness(0, 0, 6, 0),
                                              ToolTip = "Register TcAgent in Claude, Copilot, Gemini and Codex (setup-clients.ps1)" };
-        readonly Button clear = new Button { Content = "New", Padding = new Thickness(8, 2, 8, 2), ToolTip = "Clear history - next request starts without previous conversation" };
+        readonly Button clear = new Button { Content = "New chat", Padding = new Thickness(8, 2, 8, 2), ToolTip = "Clear history - next request starts without previous conversation" };
         readonly TextBlock status = new TextBlock { Margin = new Thickness(0, 4, 0, 0), Opacity = 0.75 };
 
         readonly List<Backend> backends = new List<Backend>();
@@ -64,7 +63,11 @@ namespace TcAgentBridge
 
         internal static ChatControl Instance;
 
-        internal void Notice(string msg) => Append("\n[TcAgent] " + msg + "\n");
+        internal void Notice(string msg)
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(() => Notice(msg))); return; }
+            SystemLine("[TcAgent] " + msg);
+        }
 
         internal void FocusInput()
         {
@@ -80,34 +83,12 @@ namespace TcAgentBridge
             foreach (var b in backends) backendBox.Items.Add(new ComboBoxItem { Content = b.Name, Tag = b });
             if (backendBox.Items.Count > 0) backendBox.SelectedIndex = Math.Min(preferred, backendBox.Items.Count - 1);
 
-            var top = new DockPanel { Margin = new Thickness(6) };
-            DockPanel.SetDock(clear, Dock.Right);
-            top.Children.Add(clear);
-            if (Installer.IsVsixInstall) { DockPanel.SetDock(setup, Dock.Right); top.Children.Add(setup); }
-            var left = new StackPanel { Orientation = Orientation.Horizontal };
-            left.Children.Add(backendBox); left.Children.Add(contextBox); left.Children.Add(buildBox);
-            top.Children.Add(left);
-
-            var bottom = new DockPanel { Margin = new Thickness(6) };
-            var buttons = new StackPanel { Orientation = Orientation.Vertical };
-            buttons.Children.Add(send); buttons.Children.Add(new Border { Height = 4 }); buttons.Children.Add(stop);
-            DockPanel.SetDock(buttons, Dock.Right);
-            DockPanel.SetDock(status, Dock.Bottom);
-            bottom.Children.Add(buttons); bottom.Children.Add(status); bottom.Children.Add(input);
-
-            var root = new DockPanel();
-            DockPanel.SetDock(top, Dock.Top); DockPanel.SetDock(bottom, Dock.Bottom);
-            root.Children.Add(top); root.Children.Add(bottom); root.Children.Add(new Border { Margin = new Thickness(6, 0, 6, 0), Child = log });
-            Content = root;
+            Content = BuildView();
 
             // Adopt the VS color theme (light/dark)
             SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
-            foreach (var tb in new[] { log, input })
-            {
-                tb.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
-                tb.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
-            }
+            ThemeView();
             contextBox.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             buildBox.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             status.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
@@ -119,18 +100,19 @@ namespace TcAgentBridge
                 status.Text = "Setting up AI clients ...";
                 System.Threading.Tasks.Task.Run(() => Installer.Run(true, _ => { }, m => BridgePackage.Instance?.Notify(m)));
             };
-            clear.Click += (s, e) => { history.Clear(); log.Clear(); logChars = 0; KillSession(); status.Text = "New conversation."; WarmUp(); };
+            clear.Click += (s, e) => { history.Clear(); msgs.Children.Clear(); cur = null; KillSession(); status.Text = "New conversation."; WarmUp(); };
             // Pre-start the Claude session as soon as the window becomes visible or the backend changes
             IsVisibleChanged += (s, e) => { if (IsVisible) WarmUp(); };
             backendBox.SelectionChanged += (s, e) => { if (IsVisible && !busy) WarmUp(); };
             Dispatcher.ShutdownStarted += (s, e) => KillSession();
             input.PreviewKeyDown += (s, e) =>
             {
-                if (e.Key == Key.Enter && (Keyboard.Modifiers & ModifierKeys.Control) != 0) { e.Handled = true; Send(); }
+                if (InputKey(e)) e.Handled = true;
                 else if (e.Key == Key.Escape) { e.Handled = true; BridgePackage.Instance?.ReturnToEditor(); }
             };
             status.Text = File.Exists(SettingsFile) ? "Ready." : "Default settings - run setup-clients.ps1 once to set up all clients.";
-            Append("TcAgent Chat - choose a backend above, enter your question below. The agent works directly in this TwinCAT solution through the TcAgent tools (tc_*).\n");
+            SystemLine("TcAgent Chat - choose a backend above, enter your question below. The agent works directly in this TwinCAT solution through the TcAgent tools (tc_*). " +
+                       "Paste or drop documents (manuals, data sheets, screenshots) into the input box to give them to the agent.");
         }
 
         // ------------------------------------------------------------------ Settings
@@ -170,46 +152,6 @@ namespace TcAgentBridge
             preferred = Math.Max(0, backends.FindIndex(x => x.Key == def));
         }
 
-        // ------------------------------------------------------------------ Output
-        // Write output buffered: at most every 120 ms and at low priority so that typing takes precedence.
-        // A WPF TextBox with a lot of text is re-wrapped on every AppendText - hence also the length limit.
-        readonly StringBuilder pending = new StringBuilder();
-        System.Windows.Threading.DispatcherTimer flushTimer;
-        int logChars;
-        const int MaxLogChars = 120000;
-
-        void Append(string text)
-        {
-            lock (pending) pending.Append(text);
-            if (flushTimer == null)
-            {
-                flushTimer = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background, Dispatcher)
-                    { Interval = TimeSpan.FromMilliseconds(120) };
-                flushTimer.Tick += (s, e) => FlushLog();
-            }
-            if (!flushTimer.IsEnabled) flushTimer.Start();
-        }
-
-        void FlushLog()
-        {
-            string t;
-            lock (pending) { t = pending.ToString(); pending.Clear(); }
-            flushTimer.Stop();
-            if (t.Length == 0) return;
-            logChars += t.Length;
-            if (logChars > MaxLogChars)
-            {
-                var all = log.Text + t;
-                var keep = all.Substring(all.Length - MaxLogChars / 2);
-                var cut = keep.IndexOf("\n> You ", StringComparison.Ordinal);   // cut at the start of a question
-                if (cut > 0) keep = keep.Substring(cut);
-                log.Text = "(older output truncated)\n" + keep;
-                logChars = log.Text.Length;
-            }
-            else log.AppendText(t);
-            log.ScrollToEnd();
-        }
-
         // ------------------------------------------------------------------ Send
         // Two kinds of backends:
         //  * one-shot: one process per question (Copilot, Gemini, Codex) - the history is sent along in the prompt
@@ -234,6 +176,12 @@ namespace TcAgentBridge
             a = a.Replace("{mcpClaude}", Quote(Path.Combine(Dir, "mcp-claude.json")))
                  .Replace("{mcpCopilot}", Quote(Path.Combine(Dir, "mcp-copilot.json")))
                  .Replace("{prompt}", Quote(prompt ?? ""));
+            // attachments (PDF, images) are read by Claude Code with its Read tool from the attachments folder
+            if ((be.Exe ?? "").IndexOf("claude", StringComparison.OrdinalIgnoreCase) >= 0 && a.Contains("--allowedTools"))
+            {
+                if (!Regex.IsMatch(a, @"--allowedTools\s[^-]*\bRead\b")) a = a.Replace("--allowedTools ", "--allowedTools Read ");
+                if (!a.Contains("--add-dir")) { Directory.CreateDirectory(AttachDir); a += " --add-dir " + Quote(AttachDir); }
+            }
             var (f, prefix) = Resolve(be.Exe);
             return (f, (prefix + " " + a).Trim());
         }
@@ -285,8 +233,8 @@ namespace TcAgentBridge
             if (s.Turn == null) return;                     // do not show output before the first question (startup)
             if (final != null) s.Answer.AppendLine(final);
             if (sum != null) s.Summary = sum;
-            if (show != null || stat != null)
-                Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { if (show != null) Append(show); if (stat != null) status.Text = stat; }));
+            if (show != null) AgentAppend(show);
+            if (stat != null) Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => status.Text = stat));
             if (done) s.Turn.TrySetResult(s.Answer.ToString());
         }
 
@@ -340,9 +288,11 @@ namespace TcAgentBridge
 
             string ctx = external != null ? (contextBox.IsChecked == true ? externalCtx : null)
                                           : (contextBox.IsChecked == true ? EditorContext() : null);
-            Append($"\n> You ({be.Name}){(external != null ? " [from code]" : "")}:\n{text}\n");
-            if (ctx != null) Append($"  [Context: {string.Join(" | ", ctx.Split('\n').Take(2))}]\n");
-            if (external == null) input.Clear();
+            var att = external == null ? TakeAttachments() : new List<Attachment>();
+            AddUserBubble(text, ctx, att, external != null);
+            if (external == null) { RememberPrompt(text); input.Clear(); }
+            var docs = AttachmentPrompt(att);
+            if (docs != null) ctx = (ctx != null ? ctx + "\n\n" : "") + docs;
             busy = true; send.IsEnabled = false; stop.IsEnabled = true;
             try
             {
@@ -351,11 +301,11 @@ namespace TcAgentBridge
             }
             catch (System.ComponentModel.Win32Exception ex)
             {
-                Append($"! {be.Name} could not be started: {ex.Message}\n  Is the CLI installed and signed in? If needed, enter its path in chat-backends.json.\n");
+                SystemLine($"{be.Name} could not be started: {ex.Message}\nIs the CLI installed and signed in? If needed, enter its path in chat-backends.json.", true);
                 status.Text = "Start failed.";
             }
-            catch (Exception ex) { Append("! " + ex.Message + "\n"); }
-            finally { busy = false; send.IsEnabled = true; stop.IsEnabled = false; }
+            catch (Exception ex) { SystemLine(ex.Message, true); }
+            finally { FlushAgent(); cur = null; busy = false; send.IsEnabled = true; stop.IsEnabled = false; }
         }
 
         async Task SendPersistent(Backend be, string text, string ctx)
@@ -368,7 +318,7 @@ namespace TcAgentBridge
             var prompt = BuildPrompt(text, ctx, followUp: s.Greeted);
             s.Greeted = true;
             status.Text = $"{be.Name} is working ... ({(warm ? "session running" : "session starting")})";
-            Append($"\n< {be.Name}:\n");
+            StartAgent(be.Name);
             var msg = new Dictionary<string, object>
             {
                 ["type"] = "user",
@@ -386,7 +336,8 @@ namespace TcAgentBridge
             if (answer == null)
             {
                 string err; lock (s.Err) err = s.Err.ToString().Trim();
-                Append($"\n! {be.Name} session ended." + (err.Length > 0 ? "\n" + Tail(err, 2500) : "") + "\n");
+                FlushAgent();
+                SystemLine($"{be.Name} session ended." + (err.Length > 0 ? "\n" + Tail(err, 2500) : ""), true);
                 status.Text = "Session ended - the next question starts a new one.";
                 if (sess == s) sess = null;
                 return;
@@ -406,7 +357,7 @@ namespace TcAgentBridge
             try
             {
                 status.Text = $"{be.Name} is working ... ({Path.GetFileName(file)})";
-                Append($"\n< {be.Name}:\n");
+                StartAgent(be.Name);
                 // Prompt via stdin (UTF-8, independent of the console code page)
                 var stdin = proc.StandardInput.BaseStream;
                 if (be.Stdin) { var bytes = new UTF8Encoding(false).GetBytes(prompt); await stdin.WriteAsync(bytes, 0, bytes.Length); }
@@ -423,14 +374,14 @@ namespace TcAgentBridge
                         {
                             var l = line;
                             answer.AppendLine(l);
-                            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => Append(l + "\n")));
+                            AgentAppend(l + "\n");
                             continue;
                         }
                         var (show, final, stat, sum, _) = ClaudeEvent(line, sw.Elapsed.TotalSeconds, answer.Length > 0);
                         if (final != null) answer.AppendLine(final);
                         if (sum != null) summary = sum;
-                        if (show != null || stat != null)
-                            Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => { if (show != null) Append(show); if (stat != null) status.Text = stat; }));
+                        if (show != null) AgentAppend(show);
+                        if (stat != null) Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => status.Text = stat));
                     }
                 });
                 var errTask = Task.Run(() => { string line; while ((line = p.StandardError.ReadLine()) != null) lock (errors) errors.AppendLine(line); });
@@ -440,7 +391,8 @@ namespace TcAgentBridge
                 if (code != 0 || answer.Length == 0)
                 {
                     var err = errors.ToString().Trim();
-                    Append($"\n! {be.Name} exited with code {code}." + (err.Length > 0 ? "\n" + Tail(err, 2500) : "") + "\n");
+                    FlushAgent();
+                    SystemLine($"{be.Name} exited with code {code}." + (err.Length > 0 ? "\n" + Tail(err, 2500) : ""), true);
                 }
                 status.Text = $"Done in {sw.Elapsed.TotalSeconds:0} s ({be.Name})" + (summary != null ? " - " + summary : ".");
                 if (answer.Length > 0) history.Add(new KeyValuePair<string, string>(text, answer.ToString().Trim()));
@@ -476,7 +428,7 @@ namespace TcAgentBridge
                         var arg = "";
                         if (c.TryGetValue("input", out var inp) && inp is Dictionary<string, object> d && d.Count > 0)
                             arg = " " + string.Join(", ", d.Select(kv => kv.Key + "=" + Short(Convert.ToString(kv.Value), 60)));
-                        show.Append($"  · {name}{arg}  [{t:0.0} s]\n");
+                        show.Append($"{ToolMark}{name}{arg}  [{t:0.0} s]\n");
                         stat = $"{name} ... ({t:0} s)";
                     }
                 }
@@ -507,13 +459,13 @@ namespace TcAgentBridge
             if (sess != null && sess.Turn != null)
             {
                 KillSession();          // abort the running answer; the next question starts a new session
-                Append("\n! cancelled (session restarted)\n");
+                SystemLine("cancelled (session restarted)", true);
                 return;
             }
             var p = proc;
             if (p == null) return;
             try { Process.Start(new ProcessStartInfo("taskkill", $"/T /F /PID {p.Id}") { CreateNoWindow = true, UseShellExecute = false }); } catch { }
-            Append("\n! cancelled\n");
+            SystemLine("cancelled", true);
         }
 
         string BuildPrompt(string text, string ctx, bool followUp)
