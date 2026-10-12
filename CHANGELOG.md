@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 ## [0.19.0] – not released yet
 
 ### Added
+- **Program documentation** – `tc_doc` explains a PLC project: call hierarchy (task -> program -> FBs, methods,
+  functions), call graph, class diagram, step chains (SFC and CASE state machines), description per object, findings
+  (unused POUs, very long POUs, global coupling) – as text for the agent and as one HTML page. The agent's explanations
+  are kept as project memory (`.tcagent/doc-summaries.json`); pipeline command `TcAgent.exe doc`.
 - **SFC step chains** – `tc_sfc` reads a sequential function chart as text (steps, actions, transitions, alternative and
   parallel branches, jumps) and writes it back from text (through PLCopen XML).
 - **TwinCAT Package Manager** – `tc_packages` (installed, available, versions, outdated, details, feeds, settings) and

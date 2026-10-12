@@ -288,6 +288,18 @@ JUMP Init
 
 ## Editor context and navigation (TcAgentBridge)
 
+### `tc_doc`
+
+Program documentation of a PLC project (project memory). `action=outline` returns the call hierarchy (task -> program -> FBs/methods/functions), every object with its description, step chains (SFC and CASE state machines) and findings; `action=html` writes one self-contained HTML page with clickable call hierarchy, call graph, class diagram (EXTENDS/IMPLEMENTS, methods, properties), step chain diagrams, findings and a reference per object (description, explanation, inputs/outputs, calls, used by, code); `action=memory` returns the stored overview and explanations. Explanations are kept in `<solution>\.tcagent\doc-summaries.json` and reused by later runs and by `TcAgent.exe doc`. Diagrams use Mermaid (needs internet access in the browser; the hierarchy tree works offline).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | outline, html or memory |
+| `plcProjectPath` | string |  | PLC project, e.g. TIPC^MyPlc^MyPlc Project (empty = the only one) |
+| `file` | string |  | html: target file (default `<solution>\doc\<PLC project>.html`) |
+| `overview` | string |  | html: how the program works – tasks, main sequence, important blocks, interfaces |
+| `summaries` | object |  | html: `{"FB_Axis": "what it does", "FB_Axis.MoveAbs": "..."}` – explanations per object (keys as in outline) |
+
 ### `tc_editor_context`
 
 Shows what the user is currently working on in the IDE: active window/document, selected items, tree paths derived from them (usable directly with tc_plc_read) and - with the VS extension TcAgentBridge - cursor and selection. Use when the user talks about 'here', 'this FB' or 'the method'.

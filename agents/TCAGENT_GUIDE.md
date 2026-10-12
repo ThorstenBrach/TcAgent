@@ -60,6 +60,19 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
   PARALLEL follows a transition and every branch starts with a STEP; branches end with a STEP (alternative also JUMP);
   the chain ends with TRANSITION + JUMP. Read first, write the whole chain, then `tc_check`.
 
+## Program documentation (project memory)
+
+- "Explain / document the program": `tc_doc action=memory` first (stored overview and explanations), then
+  `tc_doc action=outline` - call hierarchy task -> program -> FBs/methods, all objects with their description,
+  step chains (SFC, CASE state machines) and findings (unused POUs, very long POUs, global coupling).
+- Read the important objects (`tc_plc_read`, `tc_sfc action=read`), then `tc_doc action=html` with `overview`
+  (how the program works: tasks, main sequence, important blocks, interfaces to hardware) and `summaries`
+  `{"FB_Axis": "1-3 sentences what it does", "FB_Axis.MoveAbs": "..."}` - keys exactly as in the outline.
+  Explain what the code does, not what you assume; mark uncertainties.
+- Explanations are stored in `<solution>\.tcagent\doc-summaries.json` and reused - later pass only new or changed
+  ones. The page (default `<solution>\doc\<PLC>.html`) has a clickable hierarchy, call graph, class diagram,
+  step chain diagrams and a reference per object. In pipelines: `TcAgent.exe doc --solution X.sln`.
+
 ## Runtime (enabled targets only)
 
 - `tc_activate` activates the configuration and restarts TwinCAT (running tests are aborted!).

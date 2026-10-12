@@ -20,7 +20,7 @@ public static class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "analyze" or "library" or "archive" or "scope" or "help" or "--help" or "-h" or "/?" or "version" or "--version";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "analyze" or "library" or "archive" or "scope" or "doc" or "help" or "--help" or "-h" or "/?" or "version" or "--version";
 
     sealed class Options
     {
@@ -81,6 +81,7 @@ public static class Cli
                 "library" => SaveLibrary(o, tc),
                 "archive" => Archive(o, tc),
                 "scope" => ScopeRecord(o, tc),
+                "doc" => Doc(o, tc),
                 "build" => Build(o, tc),
                 "test" => Test(o, tc, ownIde),
                 _ => Usage
@@ -192,6 +193,31 @@ public static class Cli
         tc.Sta.Run(() => { ComCall.Invoke(tc.RequireSysMan(), "SaveAsArchive", file); return 0; }, o.TimeoutSec * 1000);
         if (!File.Exists(file)) { Say("ARCHIVE FAILED: no file written"); return Failed; }
         Say($"ARCHIVE OK: {file} ({new FileInfo(file).Length / 1024} KB)");
+        return Ok;
+    }
+
+    /// <summary>Program documentation (HTML) of each PLC project, with the explanations stored by the agent (tc_doc).</summary>
+    static int Doc(Options o, TwinCatSession tc)
+    {
+        var sln = SolutionName(tc);
+        var dir = Path.GetDirectoryName(sln);
+        var mem = PlcDoc.Summaries.Load(dir);
+        var docs = tc.Sta.Run(() => SelectedPlcs(o, tc).Select(plc =>
+        {
+            var d = PlcDoc.Collect(tc, plc, ToolRegistry.SfcForDoc);
+            d.Analyze();
+            return d;
+        }).ToList(), o.TimeoutSec * 1000);
+        foreach (var d in docs)
+        {
+            var file = o.Out == null ? Path.Combine(dir ?? ".", "doc", d.Project + ".html")
+                     : docs.Count == 1 ? o.Out
+                     : Path.Combine(Path.GetDirectoryName(o.Out) ?? "", $"{Path.GetFileNameWithoutExtension(o.Out)}.{d.Project}{Path.GetExtension(o.Out)}");
+            file = Path.GetFullPath(file);
+            Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+            File.WriteAllText(file, d.Html(mem, "TcAgent " + Program.ServerVersion), new System.Text.UTF8Encoding(false));
+            Say($"DOC OK: {file} ({d.Pous.Count} objects, {d.Findings().Count} findings)");
+        }
         return Ok;
     }
 
@@ -570,6 +596,11 @@ public static class Cli
   TcAgent.exe scope --solution <sln> --out <file.csv|.svdx> [--scope <project/scope>] [--seconds <n>]
       Records with a Scope configuration of the solution (TE130x) for n seconds (default 10) and exports the data.
 
+  TcAgent.exe doc --solution <sln> [--out <file.html>] [--plc <names>]
+      Program documentation as HTML: call hierarchy, call graph, class diagram, step chains, reference per object.
+      Uses the explanations the agent stored with tc_doc (<solution>\.tcagent\doc-summaries.json).
+      Default output: <solution folder>\doc\<PLC project>.html
+
   TcAgent.exe test --solution <sln> [--target <AmsNetId>] [--plc <names>] [--timeout <s>] [--junit <file>]
       Builds, activates the configuration on the test target, starts the PLC via boot project with autostart,
       waits for TcUnit and writes the results. Only targets allowed by TCAGENT_ALLOW_TARGETS (default: this PC).
@@ -590,7 +621,7 @@ Options
   --no-build               test: use the existing build
   --no-boot-project        test: do not create a boot project (PLC must start by itself)
   --disable-io / --keep-io test: disable all I/O devices (default: only in a Visual Studio started by TcAgent)
-  --out <file>             library/archive: output file
+  --out <file>             library/archive/scope/doc: output file
   --sarif <file>           analyze: SARIF output
   --settings <file.csa>    analyze: static analysis settings to load first
   --install                library: also install into the library repository

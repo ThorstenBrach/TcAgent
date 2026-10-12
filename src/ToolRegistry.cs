@@ -184,6 +184,7 @@ public sealed partial class ToolRegistry
         RegisterPackages();
         RegisterSystemConfig();
         RegisterSfc();
+        RegisterDoc();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +
