@@ -18,7 +18,7 @@
 //     BRANCH
 //       TRANSITION bDone
 //       STEP Done
-//   END_ALTERNATIVE                   followed by a TRANSITION (or JUMP)
+//   END_ALTERNATIVE                   followed by a TRANSITION (nothing, if every branch ends with JUMP)
 //   PARALLEL                          simultaneous branch after a transition - every BRANCH starts with a STEP
 //     BRANCH ... END_PARALLEL         followed by a TRANSITION
 //   JUMP Init                         jump to a step (ends the chain or a branch)
@@ -269,7 +269,13 @@ public sealed partial class ToolRegistry
 
     static List<SfcNode> ParseChain(string text)
     {
-        var lines = text.Replace("\r\n", "\n").Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith("//") && !l.StartsWith("(*")).ToList();
+        // the output of action=read can be passed back as it is: header and object listing are skipped
+        text = text.Replace("\r\n", "\n");
+        var cut = text.IndexOf("\nObjects of the POU", StringComparison.Ordinal);
+        if (cut >= 0) text = text[..cut];
+        var lines = text.Split('\n').Select(l => l.Trim())
+                        .Where(l => l.Length > 0 && !l.StartsWith("//") && !l.StartsWith("(*") && !l.StartsWith("SFC ", StringComparison.OrdinalIgnoreCase)
+                                    && !l.StartsWith("(not reached", StringComparison.OrdinalIgnoreCase)).ToList();
         int i = 0;
         List<SfcNode> Seq(params string[] stop)
         {
@@ -329,7 +335,23 @@ public sealed partial class ToolRegistry
         var root = Seq();
         if (i < lines.Count) throw new Exception($"unexpected line '{lines[i]}'");
         ValidateChain(root, true);
-        if (root[^1].Kind != "jump") throw new Exception("the chain must end with a TRANSITION followed by JUMP <step> (usually back to the initial step)");
+        var steps = new List<string>();
+        void Collect(List<SfcNode> seq) { foreach (var n in seq) { if (n.Kind == "step") steps.Add(n.Name); n.Branches.ForEach(Collect); } }
+        Collect(root);
+        var dup = steps.GroupBy(x => x, StringComparer.OrdinalIgnoreCase).FirstOrDefault(g => g.Count() > 1);
+        if (dup != null) throw new Exception($"step name {dup.Key} is used more than once");
+        void Jumps(List<SfcNode> seq)
+        {
+            foreach (var n in seq)
+            {
+                if (n.Kind == "jump" && !steps.Contains(n.Name, StringComparer.OrdinalIgnoreCase)) throw new Exception($"JUMP {n.Name}: no step with this name");
+                if (n.Kind == "step" && n.Initial && !ReferenceEquals(n, root[0])) throw new Exception($"only the first step is INITIAL ({n.Name})");
+                n.Branches.ForEach(Jumps);
+            }
+        }
+        Jumps(root);
+        bool AllJump(SfcNode n) => n.Kind == "alternative" && n.Branches.All(b => b[^1].Kind == "jump" || AllJump(b[^1]));
+        if (root[^1].Kind != "jump" && !AllJump(root[^1])) throw new Exception("the chain must end with a TRANSITION followed by JUMP <step> (usually back to the initial step)");
         return root;
     }
 
@@ -345,6 +367,7 @@ public sealed partial class ToolRegistry
         string last = null;
         foreach (var n in seq)
         {
+            if (last == "end") throw new Exception("nothing may follow an ALTERNATIVE whose branches all end with JUMP");
             var first = n.Kind switch { "alternative" => "transition", "parallel" => "step", "jump" => "jump", _ => n.Kind };
             var lastOf = n.Kind switch { "alternative" => "step", "parallel" => "step", _ => n.Kind };
             if (last == first && first != "jump") throw new Exception($"two {first}s in a row (at {n.Name ?? n.Kind}) - steps and transitions alternate");
@@ -363,6 +386,7 @@ public sealed partial class ToolRegistry
             if (n.Kind == "parallel" && n.Branches.Any(b => b.Count == 0)) throw new Exception("empty BRANCH");
             last = lastOf;
             if (n.Kind == "parallel") last = "step";
+            if (n.Kind == "alternative" && n.Branches.All(b => b[^1].Kind == "jump")) last = "end";
         }
     }
 
