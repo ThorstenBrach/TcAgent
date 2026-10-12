@@ -158,8 +158,9 @@ namespace TcAgentBridge
             panel.Children.Add(t);
             if (att != null && att.Count > 0)
                 panel.Children.Add(Selectable("📎 " + string.Join(", ", att.Select(a => a.Name)), 11, 0.75));
-            if (ctx != null || fromCode)
-                panel.Children.Add(Selectable((fromCode ? "[from code] " : "") + (ctx != null ? string.Join(" | ", ctx.Split('\n').Take(2)) : ""), 11, 0.6));
+            var where = ContextLabel(ctx);
+            if (where != null || fromCode)
+                panel.Children.Add(Selectable((fromCode ? "from code" + (where != null ? " · " : "") : "") + (where ?? ""), 11, 0.6));
             foreach (var tb in panel.Children.OfType<TextBox>()) tb.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             AddMessage(new Border
             {
@@ -167,6 +168,17 @@ namespace TcAgentBridge
                 Padding = new Thickness(10, 6, 10, 6), CornerRadius = new CornerRadius(10, 10, 2, 10), Background = UserBubble, Child = panel
             });
             scroller.ScrollToEnd();
+        }
+
+        // "Open object: MAIN\nCursor: impl, line 12, column 3" -> "📄 MAIN · line 12"; nothing if no editor was open
+        static string ContextLabel(string ctx)
+        {
+            if (string.IsNullOrEmpty(ctx)) return null;
+            var obj = Regex.Match(ctx, @"^Open object:\s*(.+)$", RegexOptions.Multiline).Groups[1].Value.Trim();
+            var line = Regex.Match(ctx, @"^Cursor:.*?line (\d+)", RegexOptions.Multiline).Groups[1].Value;
+            var sel = ctx.Contains("\nSelected:\n");
+            if (obj.Length == 0 || obj == "?") return null;
+            return "📄 " + obj + (line.Length > 0 ? " · line " + line : "") + (sel ? " · selection" : "");
         }
 
         void SystemLine(string text, bool error = false)
@@ -248,8 +260,11 @@ namespace TcAgentBridge
             var lines = m.Raw.ToString().Replace("\r", "").Split('\n');
             Paragraph para = null;
             StringBuilder code = null;
+            List<string[]> table = null;
+            Section tableBlock = null;
             foreach (var line in lines)
             {
+                if (table != null && !line.TrimStart().StartsWith("|")) table = null;
                 if (code != null)
                 {
                     if (line.TrimStart().StartsWith("```")) { doc.Blocks.Add(CodeBlock(code.ToString().TrimEnd('\n'))); code = null; }
@@ -286,16 +301,50 @@ namespace TcAgentBridge
                 if (line.TrimStart().StartsWith("|"))
                 {
                     para = null;
-                    if (Regex.IsMatch(line, @"^\s*\|[\s:|-]+\|\s*$")) continue;   // table separator row
-                    doc.Blocks.Add(new Paragraph(new Run(line.Trim())) { Margin = new Thickness(0), FontFamily = new FontFamily("Consolas"), FontSize = 12 });
+                    if (table == null) { table = new List<string[]>(); doc.Blocks.Add(tableBlock = new Section()); }
+                    if (!Regex.IsMatch(line, @"^\s*\|[\s:|-]+\|\s*$")) table.Add(Cells(line));   // skip the separator row
+                    tableBlock.Blocks.Clear();
+                    tableBlock.Blocks.Add(TableBlock(table));
                     continue;
                 }
+                table = null;
                 if (para == null) { para = new Paragraph { Margin = new Thickness(0, 3, 0, 3) }; doc.Blocks.Add(para); }
                 else para.Inlines.Add(new LineBreak());
                 AddInlines(para, line);
             }
             if (code != null) doc.Blocks.Add(CodeBlock(code.ToString().TrimEnd('\n')));   // still streaming
             m.Box.Document = doc;
+        }
+
+        static string[] Cells(string line)
+        {
+            var t = line.Trim();
+            if (t.StartsWith("|")) t = t.Substring(1);
+            if (t.EndsWith("|")) t = t.Substring(0, t.Length - 1);
+            return t.Split('|').Select(c => c.Trim()).ToArray();
+        }
+
+        static Block TableBlock(List<string[]> rows)
+        {
+            int cols = rows.Max(r => r.Length);
+            var tbl = new Table { CellSpacing = 0, Margin = new Thickness(0, 4, 0, 4), BorderBrush = DimBrush, BorderThickness = new Thickness(0.5) };
+            for (int i = 0; i < cols; i++) tbl.Columns.Add(new TableColumn());
+            var group = new TableRowGroup();
+            for (int r = 0; r < rows.Count; r++)
+            {
+                var row = new TableRow();
+                if (r == 0) row.Background = CodeBack;
+                for (int c = 0; c < cols; c++)
+                {
+                    var p = new Paragraph { Margin = new Thickness(0), FontSize = 12.5 };
+                    if (r == 0) p.FontWeight = FontWeights.SemiBold;
+                    AddInlines(p, c < rows[r].Length ? rows[r][c] : "");
+                    row.Cells.Add(new TableCell(p) { Padding = new Thickness(5, 2, 5, 2), BorderBrush = DimBrush, BorderThickness = new Thickness(0.5) });
+                }
+                group.Rows.Add(row);
+            }
+            tbl.RowGroups.Add(group);
+            return tbl;
         }
 
         static Block CodeBlock(string text) => new Paragraph(new Run(text))
