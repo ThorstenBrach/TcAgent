@@ -76,6 +76,13 @@ namespace TcAgentBridge
                 SaveState(state);
                 CleanupOldVersions(log);
             }
+            catch (IOException ex) when (ex.Message.IndexOf("TcAgent.exe", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                // an AI client (Claude Desktop, Copilot ...) still runs the previous TcAgent.exe from this folder
+                log("Installer: " + ex);
+                notify("TcAgent could not be updated because TcAgent.exe is still in use by an AI client (e.g. Claude Desktop). " +
+                       "Quit the AI clients (Claude Desktop: tray icon > Quit), then click \"Set up clients\" in the TcAgent Chat window.");
+            }
             catch (Exception ex) { log("Installer: " + ex); notify("TcAgent setup: " + ex.Message); }
         }
 
