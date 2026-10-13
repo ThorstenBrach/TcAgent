@@ -56,7 +56,7 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
   Under a step, `EMBEDDED _aN010_active` names its embedded action (main/entry/exit) and `COMMENT ...` its comment: keep these
   lines when writing, also when renaming the step - otherwise the write is refused (the actions would lose their step).
 - Never delete action objects because they look empty: graphical actions (FBD/LD/CFC) and embedded step actions are shown
-  without text. `tc_delete` writes a backup (`%LOCALAPPDATA%\TcAgent\backup\delete`, restore with `tc_import kind=plcopen`).
+  without text. `tc_delete` writes a backup (`<solution>\.tcagent\backup\delete`, restore with `tc_import kind=plcopen`).
 - New chain: `tc_plc_create language=SFC`, then the actions (`tc_plc_create kind=action parentPath=<POU>`, ST code) and
   transitions with code if needed (`kind=transition`), then `tc_sfc action=write chain=...` with the complete chain.
   A transition line holds an ST condition (`bDone AND NOT bError`) or the name of a transition object.

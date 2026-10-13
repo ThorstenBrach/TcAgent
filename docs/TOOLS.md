@@ -127,7 +127,7 @@ Writes XML to a tree item (ConsumeXml) - changes configuration. Read the format 
 
 ### `tc_delete`
 
-Deletes a child item in the tree. A backup is written first to `%LOCALAPPDATA%\TcAgent\backup\delete` (PLC objects as PLCopen XML – restore with `tc_import kind=plcopen`, other items as ProduceXml).
+Deletes a child item in the tree. A backup is written first to `<solution>\.tcagent\backup\delete` (PLC objects as PLCopen XML – restore with `tc_import kind=plcopen`, other items as ProduceXml).
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

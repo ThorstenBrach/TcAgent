@@ -1462,8 +1462,17 @@ public sealed partial class ToolRegistry
     /// Returns the backup file or null.</summary>
     string BackupBeforeDelete(string parentPath, string name)
     {
-        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backup", "delete");
+        // next to the solution (visible for the IDE and the user); %LOCALAPPDATA% only without a solution
+        var sol = SolutionDir(2000) ?? lastSolutionDir;
+        var dir = sol != null ? Path.Combine(sol, ".tcagent", "backup", "delete")
+                              : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backup", "delete");
         Directory.CreateDirectory(dir);
+        try   // backups are not part of the project's Git repository
+        {
+            var ign = Path.Combine(Path.GetDirectoryName(dir)!, ".gitignore");
+            if (sol != null && !File.Exists(ign)) File.WriteAllText(ign, "# TcAgent backups - local only\n*\n");
+        }
+        catch { }
         var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff");
         var safe = string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
         var path = parentPath + "^" + name;
@@ -1481,7 +1490,18 @@ public sealed partial class ToolRegistry
                 var tmp = Path.Combine(Path.GetTempPath(), $"tcagent-del-{Guid.NewGuid():N}.xml");
                 var file = Path.Combine(dir, $"{stamp}_{safe}.xml");
                 ComCall.Invoke(it, "PlcOpenExport", tmp, string.Join(".", parts.Skip(i + 1)));
-                if (File.Exists(tmp)) { File.Copy(tmp, file, true); try { File.Delete(tmp); } catch { } return file; }
+                if (File.Exists(tmp))
+                {
+                    // restore into the same folder: TwinCAT imports objects without folder information into the project root
+                    try
+                    {
+                        var x = System.Xml.Linq.XDocument.Load(tmp);
+                        if (WrapInFolders(x, parts.Skip(i + 1).Take(parts.Length - i - 2).ToList())) x.Save(tmp);
+                    }
+                    catch (Exception ex) { Log.Info("tc_delete backup (folders): " + ex.Message); }
+                    File.Copy(tmp, file, true); try { File.Delete(tmp); } catch { }
+                    return file;
+                }
                 break;
             }
         }

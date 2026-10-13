@@ -9,7 +9,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ### Added
 - `tc_task action=assign`: PLC task reference and program call (process image) - feedback from agents.
-- `tc_delete` writes a backup before deleting (PLCopen XML / ProduceXml in `%LOCALAPPDATA%\TcAgent\backup\delete`).
+- `tc_delete` writes a backup before deleting (PLCopen XML / ProduceXml in `<solution>\.tcagent\backup\delete`).
 - `tc_sfc`: `EMBEDDED <action>` and `COMMENT <text>` lines under steps; embedded actions follow a renamed step.
 - **User manual** – `tc_userdoc`: manual of FBs, functions, interfaces and the structs/enums they use, in the style and
   format of example documents you provide (Markdown, AsciiDoc or HTML); missing comments are explained from the code.

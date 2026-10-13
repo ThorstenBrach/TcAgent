@@ -289,12 +289,26 @@ public sealed partial class ToolRegistry
         }
     }
 
+    /// <summary>Files under %LOCALAPPDATA% may be redirected for this process (packaged clients like Claude Desktop) and then
+    /// do not exist for the IDE: such files are copied to the temp folder (same file name) before the IDE opens them.</summary>
+    static string IdeVisible(string file)
+    {
+        var local = Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
+        if (!file.StartsWith(local, StringComparison.OrdinalIgnoreCase)) return file;
+        var dir = Path.Combine(Path.GetTempPath(), "tcagent-import-" + Guid.NewGuid().ToString("N")[..8]);
+        Directory.CreateDirectory(dir);
+        var copy = Path.Combine(dir, Path.GetFileName(file));
+        File.Copy(file, copy, true);
+        return copy;
+    }
+
     string Import(JsonObject a)
     {
         var kind = (Str(a, "kind") ?? "").ToLowerInvariant();
         var files = (Str(a, "file") ?? "").Split(';').Select(f => f.Trim()).Where(f => f.Length > 0).Select(Path.GetFullPath).ToList();
         if (files.Count == 0) throw new Exception("file is required");
         foreach (var f in files) if (!File.Exists(f)) throw new FileNotFoundException("not found", f);
+        files = files.Select(IdeVisible).ToList();
         switch (kind)
         {
             case "plcopen":
