@@ -30,6 +30,7 @@ public static class Confirm
         if (cls == ToolClass.Read) return false;
         if (args?["dryRun"] is JsonValue v && v.ToString().Equals("true", StringComparison.OrdinalIgnoreCase)) return false;
         if (tool == "tc_runtime_startup" && string.IsNullOrEmpty(args?["mode"]?.ToString())) return false;   // only shows the mode
+        if (tool == "tc_refactor") return false;     // asks per change itself (Apply / Apply all / Reject / Cancel)
         return Configured switch
         {
             Level.Off => false,
@@ -70,6 +71,48 @@ public static class Confirm
             return answer?["confirm"] is JsonValue c && c.ToString().Equals("true", StringComparison.OrdinalIgnoreCase);
         }
         return null;
+    }
+
+    /// <summary>Question with the answers apply / all (apply this and every following one) / reject / cancel (stop).
+    /// Returns null if nobody can be asked. In the TcAgent Chat (or when the client cannot ask) a dialog in Visual Studio,
+    /// otherwise the client's own question (MCP elicitation). No answer = cancel.</summary>
+    public static string Choose(string title, string text, int idePid)
+    {
+        bool fromChat = (Environment.GetEnvironmentVariable("TCAGENT_CLIENT") ?? "").StartsWith("chat:", StringComparison.OrdinalIgnoreCase)
+                        || TwinCatSession.StartedFrom(idePid);
+        string ViaBridge()
+        {
+            if (!BridgeClient.Available(idePid)) return null;
+            try
+            {
+                var r = BridgeClient.Call(idePid, "choice", new JsonObject { ["title"] = title, ["text"] = text }, 15 * 60_000);
+                return r["choice"]?.ToString();
+            }
+            catch (TimeoutException ex) { Log.Error("Choice via the bridge: " + ex.Message); return "cancel"; }
+            catch (Exception ex) { Log.Error("Choice via the bridge: " + ex.Message); return null; }     // e.g. older bridge without 'choice'
+        }
+        string ViaClient()
+        {
+            if (!Mcp.CanElicit) return null;
+            var schema = new JsonObject
+            {
+                ["type"] = "object",
+                ["properties"] = new JsonObject
+                {
+                    ["decision"] = new JsonObject
+                    {
+                        ["type"] = "string", ["title"] = "Decision",
+                        ["enum"] = new JsonArray("apply", "all", "reject", "cancel"),
+                        ["enumNames"] = new JsonArray("Apply", "Apply all (this and all following)", "Reject", "Cancel (stop)")
+                    }
+                },
+                ["required"] = new JsonArray("decision")
+            };
+            var answer = Mcp.Elicit(text, schema);
+            return answer?["decision"]?.ToString() ?? "cancel";
+        }
+        var choice = fromChat ? ViaBridge() ?? ViaClient() : ViaClient() ?? ViaBridge();
+        return choice is "apply" or "all" or "reject" or "cancel" ? choice : choice == null ? null : "cancel";
     }
 
     /// <summary>Readable description of the action for the question.</summary>

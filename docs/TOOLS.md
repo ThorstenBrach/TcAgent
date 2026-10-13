@@ -308,13 +308,40 @@ Lessons learned across sessions: solutions to hard problems while coding or conf
 | `max` | integer |  | search: max. results (default 5) |
 | `dryRun` | boolean |  | add: only show the entry |
 
-### `tc_doc`
+### `tc_userdoc`
 
-Program documentation of a PLC project (project memory). `action=outline` returns the call hierarchy (task -> program -> FBs/methods/functions), every object with its description, step chains (SFC and CASE state machines) and findings; `action=html` writes one self-contained HTML page with clickable call hierarchy, call graph, class diagram (EXTENDS/IMPLEMENTS, methods, properties), step chain diagrams, findings and a reference per object (description, explanation, inputs/outputs, calls, used by, code); `action=memory` returns the stored overview and explanations. Explanations are kept in `<solution>\.tcagent\doc-summaries.json` and reused by later runs and by `TcAgent.exe doc`. Diagrams use Mermaid (needs internet access in the browser; the hierarchy tree works offline).
+User manual of function blocks, functions, interfaces and their data types (how to use them). `action=templates` lists example manuals (`<solution>\.tcagent\doc-templates`, `%LOCALAPPDATA%\TcAgent\doc-templates`, `TCAGENT_DOC_TEMPLATES`); `action=template name=...` returns one – the agent imitates its structure, style and format (Markdown, AsciiDoc or HTML). `action=data objects=...` (names, tree paths, a folder or `selection`) returns descriptions, inputs/outputs/in-outs, public methods and properties with parameters and all STRUCTs/ENUMs/aliases they use, with existing comments and missing ones marked, plus the code. `action=write file=... content=...` saves the document (default `<solution>\doc\user`).
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `action` | string | yes | outline, html or memory |
+| `action` | string | yes | templates, template, data or write |
+| `name` | string |  | template: file name |
+| `objects` | string |  | data: names, tree paths, a folder path or `selection` |
+| `code` | boolean |  | data: include the implementation code (default true) |
+| `plcProjectPath` | string |  | PLC project (empty = the only one) |
+| `file` | string |  | write: file name/path (.md, .adoc, .html) |
+| `content` | string |  | write: the complete document |
+
+### `tc_refactor`
+
+Context-based refactoring of names and comments, always confirmed by the user per change (dialog in Visual Studio or the client's question: **Apply / Apply all / Reject / Cancel**). `action=analyze` (target = `selection`: the marked range or the object open/clicked in the editor – method, FB, function, struct, enum – or a name/tree path) returns numbered code, declarations with comments and findings: missing comments, unclear names, external use (callers/ADS, I/O `AT %`, TcLinkTo, persistent/retain, HMI files). `action=apply changes=[{object, kind: comment|rename, target: variable|member|pou|method, name, newName, comment, reason}]` asks per change and applies it: comments as `// ...` on the declaration line or `/// ...` above the header; renames as whole-word edits outside strings and comments in the object (and its members/derived FBs for FB variables) and – for names visible outside – in every object of TwinCAT's cross references (needs TcAgentBridge). `dryRun=true` shows all edits as diffs.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | analyze or apply |
+| `target` | string |  | analyze: `selection` (default), name or tree path |
+| `changes` | array |  | apply: list of changes |
+| `dryRun` | boolean |  | apply: only show the edits |
+
+### `tc_doc`
+
+Program documentation of a PLC project (project memory). `action=pending` lists every object (FB, method, property, action, function, interface) that has neither a comment description nor a stored explanation, with its code, so the agent writes a short description for each (`action=save summaries={...}` stores them without writing the page). The page also has an inheritance hierarchy (diagram and tree, library base classes included) and short descriptions in the call hierarchy. `action=outline` returns the call hierarchy (task -> program -> FBs/methods/functions), every object with its description, step chains (SFC and CASE state machines) and findings; `action=html` writes one self-contained HTML page with clickable call hierarchy, call graph, class diagram (EXTENDS/IMPLEMENTS, methods, properties), step chain diagrams, findings and a reference per object (description, explanation, inputs/outputs, calls, used by, code); `action=memory` returns the stored overview and explanations. Explanations are kept in `<solution>\.tcagent\doc-summaries.json` and reused by later runs and by `TcAgent.exe doc`. Diagrams use Mermaid (needs internet access in the browser; the hierarchy tree works offline).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | outline, pending, save, html or memory |
+| `max` | integer |  | pending: objects per call (default 15) |
+| `maxChars` | integer |  | pending: max. code characters per object (default 2500) |
 | `plcProjectPath` | string |  | PLC project, e.g. TIPC^MyPlc^MyPlc Project (empty = the only one) |
 | `file` | string |  | html: target file (default `<solution>\doc\<PLC project>.html`) |
 | `overview` | string |  | html: how the program works – tasks, main sequence, important blocks, interfaces |

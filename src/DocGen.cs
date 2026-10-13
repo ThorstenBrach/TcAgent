@@ -533,6 +533,26 @@ public sealed class PlcDoc
 
     static string Trim(string s, int n) { s = Regex.Replace(s ?? "", @"\s+", " ").Trim(); return s.Length <= n ? s : s[..(n - 3)] + "..."; }
 
+    // objects (POUs, methods, properties, actions, functions, interfaces) without comment description and without stored
+    // explanation - with declaration head and code, so the agent can write a short description for each
+    public string Pending(Summaries s, int max, int maxChars)
+    {
+        var todo = Pous.Values.Where(p => p.Kind is not ("DUT" or "GVL" or "TRANSITION") && p.Doc.Length == 0 && s.Get(p.Key) == null)
+                              .OrderBy(p => p.Owner ?? p.Key).ThenBy(p => p.Key).ToList();
+        if (todo.Count == 0) return "Every object has a description (comment or stored explanation). Write the page with tc_doc action=html.";
+        var o = new StringBuilder($"{todo.Count} objects without description - showing {Math.Min(max, todo.Count)}. Write 1-2 sentences each " +
+                                  "(what it does, not how; from the code and its use), then tc_doc action=save summaries={...} and call pending again:\n");
+        foreach (var p in todo.Take(max))
+        {
+            var code = (p.Decl.Trim() + "\n" + (p.SfcText ?? p.Impl).Trim()).Trim();
+            if (code.Length > maxChars) code = code[..maxChars] + "\n... (shortened)";
+            o.AppendLine($"\n### {p.Key}  [{p.Kind}]" + (p.Owner != null && Pous.TryGetValue(p.Owner, out var ow) && (s.Get(ow.Key) ?? ow.Doc).Length > 0
+                         ? $"  (member of {p.Owner}: {Trim(s.Get(ow.Key) ?? ow.Doc, 100)})" : ""));
+            o.AppendLine(code);
+        }
+        return o.ToString();
+    }
+
     // ================================================================== project memory
     public sealed class Summaries
     {
@@ -574,15 +594,18 @@ public sealed class PlcDoc
     static string Mid(string key) => "n" + Regex.Replace(key ?? "", @"[^\w]", "_");
     static string MLabel(string s) => (s ?? "").Replace("\"", "'").Replace("<", "&lt;").Replace(">", "&gt;").Replace("|", "/").Replace("[", "(").Replace("]", ")").Replace("{", "(").Replace("}", ")");
 
+    Summaries CurrentSummaries;
+
     public string Html(Summaries s, string generatedBy)
     {
+        CurrentSummaries = s;
         var o = new StringBuilder();
         o.Append("<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\"><meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">");
         o.Append($"<title>{H(Project)} – program documentation</title><style>{Css}</style></head><body>");
         o.Append($"<header><h1>{H(Project)}</h1><p class=\"meta\">Program documentation · generated {DateTime.Now:yyyy-MM-dd HH:mm} by {H(generatedBy)} · ");
         o.Append($"{Pous.Values.Count(p => p.Owner == null && p.Kind is not ("DUT" or "GVL"))} POUs, {Pous.Values.Count(p => p.Owner != null)} methods/properties/actions, ");
         o.Append($"{Pous.Values.Count(p => p.Kind == "DUT")} DUTs, {Pous.Values.Count(p => p.Kind == "GVL")} GVLs</p>");
-        o.Append("<nav><a href=\"#overview\">Overview</a><a href=\"#hierarchy\">Call hierarchy</a><a href=\"#graph\">Call graph</a><a href=\"#classes\">Classes</a>" +
+        o.Append("<nav><a href=\"#overview\">Overview</a><a href=\"#hierarchy\">Call hierarchy</a><a href=\"#graph\">Call graph</a><a href=\"#inheritance\">Inheritance</a><a href=\"#classes\">Classes</a>" +
                  "<a href=\"#chains\">Step chains</a><a href=\"#findings\">Findings</a><a href=\"#reference\">Reference</a>" +
                  "<input id=\"q\" placeholder=\"Filter objects…\" oninput=\"filter(this.value)\"></nav></header><main>");
 
@@ -646,6 +669,62 @@ public sealed class PlcDoc
             foreach (var e in edges) g.AppendLine("  " + e);
             foreach (var n in nodes) g.AppendLine($"  click {Mid(n)} href \"#{Id(n)}\"");
             o.Append(Mermaid(g.ToString()));
+        }
+        o.Append("</section>");
+
+        // inheritance hierarchy: base above, derived below; interfaces dashed; bases from libraries as grey nodes
+        o.Append("<section id=\"inheritance\"><h2>Inheritance hierarchy</h2>");
+        var inhDerived = Pous.Values.Where(p => p.Owner == null && (p.Extends != null || p.Implements.Count > 0)).ToList();
+        if (inhDerived.Count == 0) o.Append("<p class=\"muted\">No inheritance (EXTENDS) or interfaces (IMPLEMENTS) in the project.</p>");
+        else
+        {
+            var gi = new StringBuilder("flowchart BT\n");
+            var inhNodes = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            var inhExt = new SortedSet<string>(StringComparer.OrdinalIgnoreCase);
+            string Node(string name)
+            {
+                if (Pous.TryGetValue(name, out var t) && t.Owner == null) { inhNodes.Add(t.Key); return Mid(t.Key); }
+                inhExt.Add(name); return Mid("ext_" + name);
+            }
+            var inhLines = new List<string>();
+            foreach (var p in inhDerived.OrderBy(x => x.Key))
+            {
+                var me = Node(p.Key);
+                if (p.Extends != null) inhLines.Add($"  {me} --> {Node(p.Extends)}");
+                foreach (var i in p.Implements) inhLines.Add($"  {me} -.-> {Node(i)}");
+            }
+            foreach (var n in inhNodes)
+            {
+                var t = Pous[n];
+                gi.AppendLine(t.Kind == "INTERFACE" ? $"  {Mid(n)}{{{{\"{MLabel(n)}\"}}}}" : $"  {Mid(n)}[\"{MLabel(n)}\"]");
+            }
+            foreach (var e in inhExt) gi.AppendLine($"  {Mid("ext_" + e)}[\"{MLabel(e)} (library)\"]:::lib");
+            foreach (var l in inhLines) gi.AppendLine(l);
+            foreach (var n in inhNodes) gi.AppendLine($"  click {Mid(n)} href \"#{Id(n)}\"");
+            gi.AppendLine("  classDef lib fill:#eee,stroke:#999,color:#555,stroke-dasharray:3 3");
+            o.Append("<p class=\"muted\">Arrow = EXTENDS (derived → base), dashed = IMPLEMENTS (→ interface).</p>");
+            o.Append(inhLines.Count > 300 ? $"<p class=\"muted\">{inhLines.Count} relations – too many for one diagram; see the tree below.</p>" : Mermaid(gi.ToString()));
+            // the same as an indented tree: inhRoots = bases that are not inhDerived themselves
+            var inhChildren = inhDerived.Where(p => p.Extends != null).GroupBy(p => p.Extends, StringComparer.OrdinalIgnoreCase)
+                                  .ToDictionary(x => x.Key, x => x.OrderBy(p => p.Key).ToList(), StringComparer.OrdinalIgnoreCase);
+            var inhRoots = inhChildren.Keys.Where(k => !Pous.TryGetValue(k, out var t) || t.Extends == null)
+                                  .Concat(inhDerived.Where(p => p.Extends == null && !inhChildren.ContainsKey(p.Key)).Select(p => p.Key))   // only IMPLEMENTS
+                                  .Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(k => k).ToList();
+            void Branch(string name, int depth)
+            {
+                var desc = Pous.TryGetValue(name, out var t) ? (s.Get(t.Key) ?? t.Doc) : "";
+                o.Append($"<li>{(Pous.ContainsKey(name) ? Link(name) : H(name) + " <span class=\"muted\">(library)</span>")}" +
+                         (Pous.TryGetValue(name, out var t2) && t2.Implements.Count > 0 ? $" <small>IMPLEMENTS {string.Join(", ", t2.Implements.Select(Link))}</small>" : "") +
+                         (string.IsNullOrEmpty(desc) ? "" : $" <span class=\"muted\">– {H(Trim(desc, 120))}</span>"));
+                if (depth < 15 && inhChildren.TryGetValue(name, out var kids))
+                {
+                    o.Append("<ul>");
+                    foreach (var k in kids) Branch(k.Key, depth + 1);
+                    o.Append("</ul>");
+                }
+                o.Append("</li>");
+            }
+            if (inhRoots.Count > 0) { o.Append("<ul class=\"inh\">"); foreach (var r in inhRoots) Branch(r, 0); o.Append("</ul>"); }
         }
         o.Append("</section>");
 
@@ -782,7 +861,9 @@ public sealed class PlcDoc
         var recursion = !path.Add(key);
         var kids = depth < 12 && !recursion ? Callees(key).ToList() : new List<string>();
         var inst = depth < 12 && !recursion ? Instances(key) : new List<string>();
-        var label = $"<span class=\"k {kind.ToLowerInvariant()}\">{H(KindShort(kind))}</span> {Link(key)}" +
+        var tip = p != null ? (CurrentSummaries?.Get(p.Key) ?? p.Doc) : "";
+        var label = $"<span class=\"k {kind.ToLowerInvariant()}\" title=\"{H(tip)}\">{H(KindShort(kind))}</span> {Link(key)}" +
+                    (string.IsNullOrEmpty(tip) ? "" : $" <span class=\"muted tipd\">– {H(Trim(tip, 90))}</span>") +
                     (instance ? " <span class=\"muted\">(instance, not called directly)</span>" : "");
         if (recursion) label += " <span class=\"muted\">(recursion)</span>";
         else if (kids.Count + inst.Count > 0 && !done.Add(key)) { kids.Clear(); inst.Clear(); label += " <span class=\"muted\">(expanded above)</span>"; }
@@ -882,7 +963,7 @@ a{color:var(--accent)}.muted{color:var(--muted)}.k{display:inline-block;font:11p
 pre{background:var(--code);padding:10px;border-radius:6px;overflow:auto;font:12px/1.45 Consolas,monospace}code{font:12px Consolas,monospace}
 .pou{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:10px 0}.pou h4{margin:0;font-size:15px}.path{margin:2px 0;color:var(--muted);font-size:12px}
 .explain{border-left:3px solid var(--accent);padding-left:10px}.doc{font-style:italic}table{border-collapse:collapse;margin:6px 0;width:100%}
-td,th{border-bottom:1px solid var(--line);padding:3px 8px;text-align:left;vertical-align:top}td.sec{color:var(--muted);width:60px}.members{padding-left:18px}.calls{color:var(--muted);font-size:13px}
+td,th{border-bottom:1px solid var(--line);padding:3px 8px;text-align:left;vertical-align:top}td.sec{color:var(--muted);width:60px}.members{padding-left:18px}ul.inh,ul.inh ul{list-style:none;padding-left:18px;border-left:1px dotted var(--line)}ul.inh{border:0;padding-left:0}.calls{color:var(--muted);font-size:13px}
 footer{color:var(--muted);text-align:center;padding:16px;font-size:12px}";
 
     const string Js = @"
@@ -919,10 +1000,14 @@ public sealed partial class ToolRegistry
                       "(task -> program -> FBs/methods/functions), every object with its description, step chains (SFC, CASE state machines) " +
                       "and findings; action=html writes one HTML page with clickable call hierarchy, call graph, class diagram, step chain " +
                       "diagrams, findings and a reference per object (description, inputs/outputs, calls, used by, code); action=memory returns " +
-                      "the stored overview and explanations. Workflow: outline -> read important objects (tc_plc_read) -> html with overview " +
-                      "(how the program works, for a new colleague) and summaries {object: 1-3 sentences what it does}. Explanations are kept in " +
-                      "<solution>\\.tcagent\\doc-summaries.json and reused (pass only new or changed ones).",
-            Schema(Req(P("action", "string", "outline, html or memory")),
+                      "the stored overview and explanations; action=pending lists objects (FBs, methods, properties, functions ...) that have no " +
+                      "description yet, with their code; action=save stores summaries/overview without writing the page. Workflow: outline -> " +
+                      "pending -> save summaries {object: 1-2 sentences what it does} -> pending ... until none are left -> html with overview " +
+                      "(how the program works, for a new colleague). Existing comments (/// or header 'Description:') are used as they are. " +
+                      "Explanations are kept in <solution>\\.tcagent\\doc-summaries.json and reused. For a user manual of FBs use tc_userdoc.",
+            Schema(Req(P("action", "string", "outline, pending, save, html or memory")),
+                   P("max", "integer", "pending: objects per call (default 15)"),
+                   P("maxChars", "integer", "pending: max. code characters per object (default 2500)"),
                    P("plcProjectPath", "string", "PLC project, e.g. TIPC^MyPlc^MyPlc Project (empty = the only one)"),
                    P("file", "string", "html: target file (default <solution>\\doc\\<PLC project>.html)"),
                    P("overview", "string", "html: how the program works - tasks, main sequence, important blocks, interfaces to hardware/other systems"),
@@ -942,17 +1027,24 @@ public sealed partial class ToolRegistry
         }
         var doc = BuildDoc(Str(a, "plcProjectPath"));
         if (action == "outline") return doc.Outline(mem);
-        if (action != "html") throw new Exception("action: outline, html or memory");
+        if (action == "pending") return doc.Pending(mem, Int(a, "max", 15), Int(a, "maxChars", 2500));
+        if (action is not ("html" or "save")) throw new Exception("action: outline, pending, save, html or memory");
         if (Str(a, "overview") is { } ov && ov.Trim().Length > 0) mem.Overview = ov.Trim();
         if (a["summaries"] is JsonObject sums) foreach (var kv in sums) if (kv.Value != null) mem.Pous[kv.Key] = kv.Value.ToString().Trim();
         if (dir != null) mem.Save(dir);
+        if (action == "save")
+        {
+            var left = doc.Pous.Values.Count(p => p.Kind is not ("DUT" or "GVL" or "TRANSITION") && p.Doc.Length == 0 && mem.Get(p.Key) == null);
+            return $"Saved ({mem.Pous.Count} explanations in {PlcDoc.Summaries.FileFor(dir)}). {left} objects still without description" +
+                   (left > 0 ? " - continue with action=pending." : " - write the page with action=html.");
+        }
         var file = Str(a, "file") ?? Path.Combine(dir ?? Path.GetTempPath(), "doc", doc.Project + ".html");
         file = dir != null ? Path.GetFullPath(file, dir) : Path.GetFullPath(file);     // relative to the solution, not to the server's working directory
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         File.WriteAllText(file, doc.Html(mem, "TcAgent " + Program.ServerVersion), new UTF8Encoding(false));
-        var missing = doc.Pous.Values.Count(p => p.Kind is "PROGRAM" or "FUNCTION_BLOCK" or "FUNCTION" or "INTERFACE" && p.Doc.Length == 0 && mem.Get(p.Key) == null);
+        var missing = doc.Pous.Values.Count(p => p.Kind is not ("DUT" or "GVL" or "TRANSITION") && p.Doc.Length == 0 && mem.Get(p.Key) == null);
         return $"Documentation written: {file} ({new FileInfo(file).Length / 1024} KB)" +
-               (missing > 0 ? $"\n{missing} POUs/interfaces still without description or explanation - add summaries and call again." : "") +
+               (missing > 0 ? $"\n{missing} objects (POUs, methods, functions ...) still without description - tc_doc action=pending lists them with their code." : "") +
                $"\nProject memory: {PlcDoc.Summaries.FileFor(dir)}";
     }
 

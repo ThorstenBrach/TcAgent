@@ -25,7 +25,7 @@ namespace TcAgentBridge
     [Guid("86c8609c-4aac-4e7e-95e6-6b96179a3c4f")]
     public sealed class BridgePackage : AsyncPackage
     {
-        public const string BridgeVersion = "0.19.2";
+        public const string BridgeVersion = "0.20.0";
         internal static BridgePackage Instance;
         static readonly Guid ExportTypeGuid = new Guid("75161BEE-FB5F-434C-A3C6-86B7CEE2B8FC");
 
@@ -118,6 +118,7 @@ namespace TcAgentBridge
                         case "context": return Context();
                         case "chat_show": ShowChat(); return new Dictionary<string, object> { ["shown"] = true };
                         case "confirm": return ConfirmAction(Str(req, "title"), Str(req, "text"));
+                        case "choice": return ChoiceAction(Str(req, "title"), Str(req, "text"));
                         case "probe": return Probe();
                         case "libs": return Libs();
                         case "lib_export": return LibExport(Str(req, "library"), Str(req, "version"), Str(req, "refresh") == "True");
@@ -149,6 +150,53 @@ namespace TcAgentBridge
             Log("Confirmation '" + text + "': " + (ok ? "yes" : "no"));
             try { ChatControl.Instance?.Notice(ok ? "Confirmed: " + text : "Declined: " + text); } catch { }
             return new Dictionary<string, object> { ["confirmed"] = ok };
+        }
+
+        // ------------------------------------------------------------------ Choice: apply / apply all / reject / cancel
+        // Used for refactoring proposals (tc_refactor): every change is confirmed by the user.
+        Dictionary<string, object> ChoiceAction(string title, string text)
+        {
+            string result = "cancel";
+            var win = new System.Windows.Window
+            {
+                Title = title ?? "TcAgent",
+                SizeToContent = System.Windows.SizeToContent.WidthAndHeight,
+                ResizeMode = System.Windows.ResizeMode.NoResize,
+                ShowInTaskbar = false,
+                MaxWidth = 1000,
+                WindowStartupLocation = System.Windows.WindowStartupLocation.CenterOwner
+            };
+            var owner = System.Windows.Application.Current?.MainWindow;
+            if (owner != null) win.Owner = owner; else win.WindowStartupLocation = System.Windows.WindowStartupLocation.CenterScreen;
+            var panel = new System.Windows.Controls.StackPanel { Margin = new System.Windows.Thickness(16) };
+            panel.Children.Add(new System.Windows.Controls.TextBox
+            {
+                Text = text ?? "", IsReadOnly = true, BorderThickness = new System.Windows.Thickness(0), MinWidth = 520, MaxHeight = 520,
+                TextWrapping = System.Windows.TextWrapping.Wrap, FontFamily = new System.Windows.Media.FontFamily("Consolas"), FontSize = 12,
+                VerticalScrollBarVisibility = System.Windows.Controls.ScrollBarVisibility.Auto
+            });
+            var buttons = new System.Windows.Controls.StackPanel
+            {
+                Orientation = System.Windows.Controls.Orientation.Horizontal,
+                HorizontalAlignment = System.Windows.HorizontalAlignment.Right,
+                Margin = new System.Windows.Thickness(0, 14, 0, 0)
+            };
+            foreach (var (key, label) in new[] { ("apply", "_Apply"), ("all", "Apply a_ll"), ("reject", "_Reject"), ("cancel", "Cancel") })
+            {
+                var b = new System.Windows.Controls.Button
+                {
+                    Content = label, MinWidth = 96, Margin = new System.Windows.Thickness(8, 0, 0, 0), Padding = new System.Windows.Thickness(10, 3, 10, 3),
+                    IsCancel = key == "cancel"
+                };
+                b.Click += (s, e) => { result = key; win.Close(); };
+                buttons.Children.Add(b);
+            }
+            panel.Children.Add(buttons);
+            win.Content = panel;
+            win.ShowDialog();
+            Log("Choice '" + (title ?? "") + "': " + result);
+            try { ChatControl.Instance?.Notice((result == "apply" || result == "all" ? "Applied: " : result == "reject" ? "Rejected: " : "Cancelled: ") + (title ?? "")); } catch { }
+            return new Dictionary<string, object> { ["choice"] = result };
         }
 
         // ------------------------------------------------------------------ Chat window

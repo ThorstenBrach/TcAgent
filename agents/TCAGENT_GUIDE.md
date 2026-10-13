@@ -81,6 +81,8 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
 - "Explain / document the program": `tc_doc action=memory` first (stored overview and explanations), then
   `tc_doc action=outline` - call hierarchy task -> program -> FBs/methods, all objects with their description,
   step chains (SFC, CASE state machines) and findings (unused POUs, very long POUs, global coupling).
+- Short description for EVERY object (FBs, methods, properties, functions): `tc_doc action=pending` lists those without a
+  comment/explanation with their code - write 1-2 sentences each, `tc_doc action=save summaries={...}`, repeat until none are left.
 - Read the important objects (`tc_plc_read`, `tc_sfc action=read`), then `tc_doc action=html` with `overview`
   (how the program works: tasks, main sequence, important blocks, interfaces to hardware) and `summaries`
   `{"FB_Axis": "1-3 sentences what it does", "FB_Axis.MoveAbs": "..."}` - keys exactly as in the outline.
@@ -88,6 +90,26 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
 - Explanations are stored in `<solution>\.tcagent\doc-summaries.json` and reused - later pass only new or changed
   ones. The page (default `<solution>\doc\<PLC>.html`) has a clickable hierarchy, call graph, class diagram,
   step chain diagrams and a reference per object. In pipelines: `TcAgent.exe doc --solution X.sln`.
+
+## User manual (tc_userdoc)
+
+- For a manual of FBs/functions/libraries ("how to use"): `tc_userdoc action=templates` - if the user provided example
+  manuals, read the fitting one (`action=template name=...`) and imitate its structure, headings, tables, tone and language
+  and its format (Markdown, AsciiDoc or HTML). It is an example, not a form.
+- `tc_userdoc action=data objects=FB_Axis,E_AxisMode` (or a folder path, or `selection`) returns descriptions, inputs/outputs,
+  public methods/properties with parameters and all STRUCTs/ENUMs they use, with existing comments; missing ones are marked.
+  Explain missing ones from the code/context and mark them as derived. Write the result with `tc_userdoc action=write file=...`.
+- Afterwards offer to write the missing comments back into the code with `tc_refactor` (each one confirmed by the user).
+
+## Refactoring names and comments (tc_refactor)
+
+- Only on request and only for what the user marked or clicked (marked range, method, FB, function, struct, enum):
+  `tc_refactor action=analyze` (target=selection) shows the code, declarations, missing comments, unclear names and where a
+  name is used outside (callers, I/O, persistent, HMI).
+- Propose from the context: comments where missing (meaning, unit, range); new names only where the name is really unclear,
+  following the project's naming rules (`tc_coding_rules`). Then `tc_refactor action=apply changes=[...]` - the user confirms
+  EVERY change (Apply / Apply all / Reject / Cancel). Respect rejections; never rename I/O, persistent or HMI-bound names
+  without a strong reason. Run `tc_check` afterwards.
 
 ## Runtime (enabled targets only)
 

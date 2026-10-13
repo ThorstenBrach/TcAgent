@@ -5,9 +5,16 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.19.2] – not released yet
+## [0.20.0] – not released yet
 
 ### Added
+- **User manual** – `tc_userdoc`: manual of FBs, functions, interfaces and the structs/enums they use, in the style and
+  format of example documents you provide (Markdown, AsciiDoc or HTML); missing comments are explained from the code.
+- **Refactoring** – `tc_refactor`: meaningful names and comments for the marked range or the clicked method, FB, function,
+  struct or enum; every change is confirmed (Apply / Apply all / Reject / Cancel); renames update all usages (cross
+  references) and warn about I/O links, persistent data and HMI bindings.
+- **Program documentation**: short description for every FB, method, property and function (`tc_doc action=pending` /
+  `save`), inheritance hierarchy (diagram and tree, library base classes included), descriptions in the call hierarchy.
 - **Lessons learned** – `tc_lessons`: the agent saves hard-won solutions (what the problem was, why, how it was solved,
   what did not work) in a project, personal or team file and searches them; matching lessons are appended automatically
   when a tool fails or a build reports errors, and the agent is reminded to save one after repeated failed attempts.
@@ -105,7 +112,7 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.19.2...HEAD
-[0.19.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.19.2
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.0...HEAD
+[0.20.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.0
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0
