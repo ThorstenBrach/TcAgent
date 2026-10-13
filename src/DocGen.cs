@@ -752,7 +752,12 @@ public sealed class PlcDoc
 
     static string Para(string text) => string.Join("", (text ?? "").Replace("\r\n", "\n").Split("\n\n").Select(p => $"<p>{H(p).Replace("\n", "<br>")}</p>"));
 
-    static string Mermaid(string src) => $"<div class=\"diagram\"><pre class=\"mermaid\">{H(src)}</pre></div>";
+    static string Mermaid(string src) =>
+        "<div class=\"dwrap\"><div class=\"dtools\"><button data-z=\"in\" title=\"Zoom in (Ctrl+wheel)\">+</button>" +
+        "<button data-z=\"out\" title=\"Zoom out (Ctrl+wheel)\">&minus;</button><button data-z=\"fit\" title=\"Fit to width\">Fit</button>" +
+        "<button data-z=\"one\" title=\"Original size\">1:1</button><button data-z=\"full\" title=\"Full screen\">&#x26F6;</button>" +
+        "<span class=\"zl\"></span></div>" +
+        $"<div class=\"diagram\"><pre class=\"mermaid\">{H(src)}</pre></div></div>";
 
     static string FirstStep(string sfcText) => Regex.Match(sfcText ?? "", @"STEP\s+(\w+)\s+INITIAL").Groups[1].Value;
 
@@ -868,7 +873,12 @@ nav a{color:var(--accent);text-decoration:none}nav input{margin-left:auto;paddin
 main{max-width:1200px;margin:0 auto;padding:8px 24px 48px}section{padding-top:12px;border-bottom:1px solid var(--line)}h2{font-size:18px}
 a{color:var(--accent)}.muted{color:var(--muted)}.k{display:inline-block;font:11px/1.6 Consolas,monospace;padding:0 5px;border-radius:4px;background:var(--chip);color:var(--muted);min-width:28px;text-align:center}
 .k.program{color:#b45309}.k.function_block{color:#0b63ce}.k.function{color:#047857}.k.interface{color:#7c3aed}.k.task{color:#be123c}
-.tree details{margin-left:14px}.tree summary{cursor:pointer}.tree .leaf{margin-left:30px}.diagram{overflow:auto;padding:8px;border:1px solid var(--line);border-radius:8px;margin:8px 0}
+.tree details{margin-left:14px}.tree summary{cursor:pointer}.tree .leaf{margin-left:30px}.dwrap{border:1px solid var(--line);border-radius:8px;margin:8px 0;background:var(--bg)}
+.dtools{display:flex;gap:4px;align-items:center;padding:4px 6px;border-bottom:1px solid var(--line)}
+.dtools button{font:12px 'Segoe UI',sans-serif;min-width:30px;padding:2px 8px;border:1px solid var(--line);border-radius:5px;background:var(--chip);color:var(--fg);cursor:pointer}
+.dtools button:hover{border-color:var(--accent)}.dtools .zl{margin-left:auto;color:var(--muted);font-size:12px}
+.diagram{overflow:auto;padding:8px;max-height:75vh;cursor:grab;resize:vertical}.diagram.drag{cursor:grabbing;user-select:none}
+.diagram svg{max-width:none!important;display:block}.diagram pre.mermaid{overflow:visible;background:none;padding:0;margin:0;width:max-content}.dwrap:fullscreen{display:flex;flex-direction:column}.dwrap:fullscreen .diagram{max-height:none;flex:1}
 pre{background:var(--code);padding:10px;border-radius:6px;overflow:auto;font:12px/1.45 Consolas,monospace}code{font:12px Consolas,monospace}
 .pou{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:10px 0}.pou h4{margin:0;font-size:15px}.path{margin:2px 0;color:var(--muted);font-size:12px}
 .explain{border-left:3px solid var(--accent);padding-left:10px}.doc{font-style:italic}table{border-collapse:collapse;margin:6px 0;width:100%}
@@ -877,8 +887,28 @@ footer{color:var(--muted);text-align:center;padding:16px;font-size:12px}";
 
     const string Js = @"
 function filter(q){q=q.toLowerCase();document.querySelectorAll('article.pou').forEach(a=>{a.style.display=!q||a.dataset.name.includes(q)?'':'none'})}
-if(window.mermaid){mermaid.initialize({startOnLoad:true,securityLevel:'loose',theme:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'default',maxTextSize:200000})}
-else document.querySelectorAll('pre.mermaid').forEach(p=>p.insertAdjacentHTML('beforebegin','<p class=muted>Diagram needs internet access (Mermaid) - source:</p>'));";
+if(window.mermaid){mermaid.initialize({startOnLoad:false,securityLevel:'loose',theme:matchMedia('(prefers-color-scheme: dark)').matches?'dark':'default',maxTextSize:200000});
+ mermaid.run({querySelector:'pre.mermaid'}).then(zoomAll).catch(e=>{console.error(e);zoomAll()})}
+else document.querySelectorAll('pre.mermaid').forEach(p=>p.insertAdjacentHTML('beforebegin','<p class=muted>Diagram needs internet access (Mermaid) - source:</p>'));
+// zoom: buttons, Ctrl+wheel (around the cursor), double click; pan: drag with the mouse or the scroll bars
+function zoomAll(){document.querySelectorAll('.dwrap').forEach(w=>{const d=w.querySelector('.diagram'),svg=d.querySelector('svg');if(!svg)return;
+ const vb=svg.viewBox&&svg.viewBox.baseVal;const W=vb&&vb.width?vb.width:svg.getBBox().width,H=vb&&vb.height?vb.height:svg.getBBox().height;
+ svg.removeAttribute('style');let z=1;const lab=w.querySelector('.zl');
+ function set(nz,cx,cy){nz=Math.max(.1,Math.min(8,nz));const r=d.getBoundingClientRect();cx=cx??r.width/2;cy=cy??r.height/2;
+  const px=(d.scrollLeft+cx)/z,py=(d.scrollTop+cy)/z;z=nz;svg.setAttribute('width',W*z);svg.setAttribute('height',H*z);
+  d.scrollLeft=px*z-cx;d.scrollTop=py*z-cy;lab.textContent=Math.round(z*100)+' %'}
+ function fit(){const avail=d.clientWidth-16;set(Math.min(1.5,avail/W),0,0);d.scrollLeft=0;d.scrollTop=0}
+ fit();
+ w.querySelector('.dtools').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=b.dataset.z;
+  if(k=='in')set(z*1.25);else if(k=='out')set(z/1.25);else if(k=='fit')fit();else if(k=='one')set(1);
+  else if(k=='full'){if(document.fullscreenElement)document.exitFullscreen();else w.requestFullscreen&&w.requestFullscreen().then(()=>setTimeout(fit,100))}});
+ d.addEventListener('wheel',e=>{if(!e.ctrlKey)return;e.preventDefault();const r=d.getBoundingClientRect();set(z*(e.deltaY<0?1.15:1/1.15),e.clientX-r.left,e.clientY-r.top)},{passive:false});
+ d.addEventListener('dblclick',e=>{if(e.target.closest('a'))return;const r=d.getBoundingClientRect();set(z*(e.shiftKey?1/1.5:1.5),e.clientX-r.left,e.clientY-r.top)});
+ let drag=null;d.addEventListener('mousedown',e=>{if(e.button!==0||e.target.closest('a'))return;drag={x:e.clientX,y:e.clientY,l:d.scrollLeft,t:d.scrollTop,m:false}});
+ window.addEventListener('mousemove',e=>{if(!drag)return;const dx=e.clientX-drag.x,dy=e.clientY-drag.y;if(Math.abs(dx)+Math.abs(dy)>3){drag.m=true;d.classList.add('drag')}
+  d.scrollLeft=drag.l-dx;d.scrollTop=drag.t-dy});
+ window.addEventListener('mouseup',()=>{if(drag&&drag.m)setTimeout(()=>d.classList.remove('drag'),0);else d.classList.remove('drag');drag=null});
+ d.addEventListener('click',e=>{if(d.classList.contains('drag')){e.preventDefault();e.stopPropagation()}},true)})}";
 }
 
 public sealed partial class ToolRegistry

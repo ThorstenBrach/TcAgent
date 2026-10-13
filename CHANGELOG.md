@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.19.0] – not released yet
+## [0.19.1] – not released yet
 
 ### Added
 - **Lessons learned** – `tc_lessons`: the agent saves hard-won solutions (what the problem was, why, how it was solved,
@@ -16,7 +16,8 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   (unused POUs, very long POUs, global coupling) – as text for the agent and as one HTML page. The agent's explanations
   are kept as project memory (`.tcagent/doc-summaries.json`); pipeline command `TcAgent.exe doc`.
 - **SFC step chains** – `tc_sfc` reads a sequential function chart as text (steps, actions, transitions, alternative and
-  parallel branches, jumps) and writes it back from text (through PLCopen XML).
+  parallel branches, jumps) and writes it back from text (through PLCopen XML, in the format TwinCAT's import accepts;
+  checks that step names do not collide with variables; restores the previous version if the import fails).
 - **TwinCAT Package Manager** – `tc_packages` (installed, available, versions, outdated, details, feeds, settings) and
   `tc_packages_change` (install, upgrade, uninstall, repair, feeds; confirmed by the user, runs elevated).
 - **Real-time cores** – `tc_realtime` shows and sets cores for TwinCAT, isolated cores, real-time cores, base time, load
@@ -27,6 +28,10 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   to trace problems afterwards, e.g. after an IDE crash.
 
 ### Changed
+- `tc_doc` HTML: diagrams can be zoomed (buttons, Ctrl+mouse wheel, double click), moved by dragging and shown full screen;
+  FB instances that are not called directly (e.g. TcUnit suites) appear in the call hierarchy.
+- `tc_check` lists compiler messages only; messages without source position (imports, device descriptions) are shown
+  separately and do not count, INFO lines are left out.
 - Read-only actions of changing tools (`action=list/show/info/read`, e.g. `tc_task list`, `tc_scope list`, `tc_coe list`)
   count as reading: no confirmation, allowed in the `ask`/`propose` modes, not in the audit log.
 - `install-xaeshell.ps1` also installs into the 64-bit XAE Shell (VS 2022 base).
@@ -99,7 +104,7 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.19.0...HEAD
-[0.19.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.19.0
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.19.1...HEAD
+[0.19.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.19.1
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0

@@ -258,7 +258,7 @@ Searches declarations and implementations of all PLC objects (full text or regex
 
 ### `tc_sfc`
 
-Sequential function charts (SFC step chains) as text. `action=read` returns the chain (steps, actions with qualifiers, transitions, `ALTERNATIVE`/`PARALLEL` branches, jumps) and the action/transition objects of the POU with their code; `action=write` replaces the chain with the given text; `action=xml` shows the raw PLCopen SFC body. Works through PLCopen XML export/import of the POU. Create the POU with `tc_plc_create language=SFC`, actions/transitions with code with `tc_plc_create kind=action|transition`.
+Sequential function charts (SFC step chains) as text. `action=read` returns the chain (steps, actions with qualifiers, transitions, `ALTERNATIVE`/`PARALLEL` branches, jumps) and the action/transition objects of the POU with their code; `action=write` replaces the chain with the given text; `action=xml` shows the raw PLCopen SFC body. Works through PLCopen XML export/import of the POU (the POU is re-created in its folder; the previous version is restored if TwinCAT rejects the chain). Step names become variables of the POU – never name a step like a variable, action or keyword (use `S_Init`, `S_Move` …). Create the POU with `tc_plc_create language=SFC`, actions/transitions with code with `tc_plc_create kind=action|transition`.
 
 ```
 STEP Init INITIAL

@@ -2,7 +2,10 @@
 //
 // The Automation Interface reads and writes only ST text directly; graphical languages go through PLCopen XML
 // (Beckhoff: "SFC - possibility to implement via PLCopen XML"). tc_sfc exports the POU as PLCopen XML, turns the
-// <SFC> body into a structured text form and back, and imports the POU again (replace).
+// <SFC> body into a structured text form and back, deletes the POU and imports it again into its folder (the previous
+// version is restored if TwinCAT rejects the import). TwinCAT specifics (verified on 4026): transition conditions are
+// inVariables connected to the condition, every branch block has a convergence (jumps at branch ends connect to it),
+// step names become variables (Name.x, Name.t) and must not equal a variable, action or keyword (use S_Init ...).
 //
 // Text form (one element per line, indentation optional):
 //   STEP Init INITIAL                 step (INITIAL = initial step)
@@ -45,7 +48,8 @@ public sealed partial class ToolRegistry
                       "with the given text (same form as read: 'STEP Init INITIAL', 'ACTION N A_Init', 'TRANSITION bStart', 'ALTERNATIVE' / 'PARALLEL' " +
                       "with 'BRANCH' ... 'END_ALTERNATIVE' / 'END_PARALLEL', 'JUMP Init'); action=xml shows the raw PLCopen SFC body. " +
                       "Create the POU first with tc_plc_create language=SFC, actions/transitions with code with tc_plc_create kind=action/transition " +
-                      "(parentPath = the POU). Read before writing; check with tc_check afterwards.",
+                      "(parentPath = the POU). Step names become variables of the POU: never name a step like a variable, action or keyword " +
+                      "(Move, Error, Done ...) - use S_Init, S_Move ... Read before writing; check with tc_check afterwards.",
             Schema(Req(P("action", "string", "read, write or xml")),
                    Req(P("path", "string", "tree path of the SFC POU, e.g. TIPC^MyPlc^MyPlc Project^POUs^FB_Sequence")),
                    P("chain", "string", "write: the complete chain in the text form of action=read"),
@@ -94,16 +98,43 @@ public sealed partial class ToolRegistry
                 {
                     var chain = Str(a, "chain") ?? throw new Exception("chain is required (text form as returned by action=read)");
                     var root = ParseChain(chain);
+                    CheckStepNames(root, pou);
                     var transitionObjects = pou.Descendants().Where(e => e.Name.LocalName == "transition" && e.Parent?.Name.LocalName == "transitions")
                                                .Select(e => (string)e.Attribute("name")).Where(n => n != null);
+                    var original = new XDocument(doc);
                     var newSfc = BuildSfc(sfc, root, transitionObjects);
                     if (DryRun(a)) return "PROPOSAL (nothing written):\n" + newSfc;
                     sfc.ReplaceWith(newSfc);
-                    // keep only our POU in the file (the export may contain data types it references)
+                    FixSfcFlags(pou);
+                    // TwinCAT's import puts objects without folder information into the project root and does not replace an
+                    // object inside a folder: wrap the project structure in the POU's folders, delete the POU, import it new
+                    var folders = parts.Skip(projIdx + 1).Take(parts.Length - projIdx - 2).ToList();
+                    if (!WrapInFolders(doc, folders) || !WrapInFolders(original, folders))
+                        throw new Exception("the PLCopen export has no project structure - the POU cannot be re-imported into its folder; nothing was changed");
                     doc.Save(tmp);
-                    ComCall.Invoke(plc, "PlcOpenImport", tmp, 2 /* replace */);
+                    var backup = tmp + ".orig.xml";
+                    original.Save(backup);
+                    var parentPath = string.Join("^", parts.Take(parts.Length - 1));
+                    try { ((dynamic)tc.Item(parentPath)).DeleteChild(pouName); }
+                    catch { try { File.Delete(backup); } catch { } throw; }
+                    string failure = null;
+                    try { ComCall.Invoke(plc, "PlcOpenImport", tmp, 0); }
+                    catch (Exception ex) { failure = ex.InnerException?.Message ?? ex.Message; }
+                    if (failure == null && !ItemExists(path)) failure = "the POU was not created (see the TwinCAT error list)";
+                    if (failure != null)
+                    {
+                        // put the original back
+                        try { if (ItemExists(path)) ((dynamic)tc.Item(parentPath)).DeleteChild(pouName); } catch { }
+                        try { ComCall.Invoke(plc, "PlcOpenImport", backup, 0); } catch { }
+                        tc.InvalidatePlcIndex();
+                        var restored = ItemExists(path);
+                        if (restored) try { File.Delete(backup); } catch { }      // keep the backup if the restore failed
+                        throw new Exception($"TwinCAT did not accept the chain: {failure}. " +
+                                            (restored ? $"The previous version of {pouName} was restored."
+                                                      : $"The previous version of {pouName} could NOT be restored - re-import {backup} with tc_import kind=plcopen."));
+                    }
+                    try { File.Delete(backup); } catch { }
                     tc.InvalidatePlcIndex();
-                    // read back
                     var check = Sfc(new JsonObject { ["action"] = "read", ["path"] = path });
                     return $"SFC chain of {pouName} replaced. Check with tc_check.\n\n" + check;
                 }
@@ -142,6 +173,14 @@ public sealed partial class ToolRegistry
         if (cond == null) return "TRUE";
         var reference = cond.Descendants().FirstOrDefault(e => e.Name.LocalName == "reference");
         if (reference != null) return (string)reference.Attribute("name") ?? "?";
+        // TwinCAT format: <condition><connectionPointIn><connection refLocalId=".."/> -> <inVariable><expression>
+        var src = Inputs(cond).FirstOrDefault();
+        if (src != null && tr.Parent != null)
+        {
+            var v = tr.Parent.Elements().FirstOrDefault(e => LocalId(e) == src && e.Name.LocalName is "inVariable" or "inOutVariable");
+            var expr = v?.Elements().FirstOrDefault(e => e.Name.LocalName == "expression")?.Value;
+            if (!string.IsNullOrWhiteSpace(expr)) return Regex.Replace(expr, @"\s+", " ").Trim();
+        }
         var t = StText(cond);
         return string.IsNullOrWhiteSpace(t) ? "TRUE" : Regex.Replace(t, @"\s+", " ");
     }
@@ -153,6 +192,8 @@ public sealed partial class ToolRegistry
         {
             var id = LocalId(e);
             if (id.Length == 0) continue;
+            // condition sources of transitions (and other FBD elements) are not part of the step chain
+            if (e.Name.LocalName is "inVariable" or "outVariable" or "inOutVariable" or "block" or "comment") continue;
             if (e.Name.LocalName == "actionBlock")
             {
                 foreach (var stepId in Inputs(e))
@@ -164,7 +205,7 @@ public sealed partial class ToolRegistry
                         var dur = (string)act.Attribute("duration");
                         var name = (string)act.Descendants().FirstOrDefault(x => x.Name.LocalName == "reference")?.Attribute("name");
                         var inline = name == null ? StText(act.Descendants().FirstOrDefault(x => x.Name.LocalName == "inline")) : null;
-                        list.Add($"ACTION {q}{(dur != null ? " " + dur : "")} {name ?? "{" + Regex.Replace(inline ?? "", @"\s+", " ") + "}"}");
+                        list.Add($"ACTION {q}{(!string.IsNullOrEmpty(dur) ? " " + dur : "")} {name ?? "{" + Regex.Replace(inline ?? "", @"\s+", " ") + "}"}");
                     }
                 }
                 continue;
@@ -255,6 +296,76 @@ public sealed partial class ToolRegistry
                 o.AppendLine($"\n{kind.ToUpperInvariant()} OBJECT {(string)x.Attribute("name")}:\n{code}");
             }
         return o.Length > 0 ? "\nObjects of the POU (edit with tc_plc_read/tc_plc_write):" + o : "";
+    }
+
+    bool ItemExists(string path) { try { tc.Item(path); return true; } catch { return false; } }
+
+    // <ProjectStructure><Object Name="FB"> -> <Folder Name="a"><Folder Name="b"><Object Name="FB">
+    // returns false if the folders cannot be expressed (no ProjectStructure in the export)
+    static bool WrapInFolders(XDocument doc, List<string> folders)
+    {
+        if (folders.Count == 0) return true;
+        var ps = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "ProjectStructure");
+        if (ps == null) return false;
+        var objs = ps.Elements().Where(e => e.Name.LocalName == "Object").ToList();
+        if (objs.Count == 0) return true;                          // already inside <Folder> elements
+        foreach (var o in objs) o.Remove();
+        XElement inner = null, outer = null;
+        foreach (var f in folders)
+        {
+            var fe = new XElement(ps.Name.Namespace + "Folder", new XAttribute("Name", f));
+            if (inner == null) outer = fe; else inner.Add(fe);
+            inner = fe;
+        }
+        inner.Add(objs);
+        ps.Add(outer);
+        return true;
+    }
+
+    // step names become variables of the POU (Name.x, Name.t): they must not collide with variables or keywords
+    static readonly HashSet<string> SfcReserved = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "MOVE", "AND", "OR", "XOR", "NOT", "MOD", "IF", "THEN", "ELSE", "ELSIF", "END_IF", "CASE", "OF", "END_CASE", "FOR", "TO", "BY", "DO",
+        "END_FOR", "WHILE", "END_WHILE", "REPEAT", "UNTIL", "END_REPEAT", "RETURN", "EXIT", "CONTINUE", "TRUE", "FALSE", "STEP", "END_STEP",
+        "TRANSITION", "END_TRANSITION", "ACTION", "END_ACTION", "FROM", "INITIAL_STEP", "SEL", "MUX", "MIN", "MAX", "LIMIT", "ABS", "SQRT",
+        "THIS", "SUPER", "VAR", "END_VAR", "AT", "ARRAY", "STRING", "WSTRING", "BOOL", "BYTE", "WORD", "DWORD", "LWORD", "INT", "DINT", "REAL",
+        "LREAL", "TIME", "DATE", "TOD", "DT", "SIZEOF", "ADR", "REF", "NEW", "DELETE"
+    };
+
+    static void CheckStepNames(List<SfcNode> root, XElement pou)
+    {
+        var vars = new HashSet<string>(pou.Elements().Where(e => e.Name.LocalName == "interface").Descendants()
+                                          .Where(e => e.Name.LocalName == "variable").Select(e => (string)e.Attribute("name")).Where(n => n != null),
+                                       StringComparer.OrdinalIgnoreCase);
+        var objects = new HashSet<string>(pou.Descendants().Where(e => e.Name.LocalName is "action" or "transition" && e.Parent?.Name.LocalName is "actions" or "transitions")
+                                             .Select(e => (string)e.Attribute("name")).Where(n => n != null), StringComparer.OrdinalIgnoreCase);
+        var bad = new List<string>();
+        void Walk(List<SfcNode> seq)
+        {
+            foreach (var n in seq)
+            {
+                if (n.Kind == "step" && (vars.Contains(n.Name) || objects.Contains(n.Name) || SfcReserved.Contains(n.Name)))
+                    bad.Add(n.Name + (vars.Contains(n.Name) ? " (variable)" : objects.Contains(n.Name) ? " (action/transition)" : " (keyword/operator)"));
+                n.Branches.ForEach(Walk);
+            }
+        }
+        Walk(root);
+        if (bad.Count > 0)
+            throw new Exception("step names become variables of the POU and must be unique: " + string.Join(", ", bad) +
+                                " - rename the steps, e.g. S_" + bad[0].Split(' ')[0] + " (and the JUMP targets).");
+    }
+
+    // SFC flags that are 'used' but not declared break the build ("SFC flag variable 'SFCInit' is not defined")
+    static void FixSfcFlags(XElement pou)
+    {
+        var flags = pou.Descendants().FirstOrDefault(e => e.Name.LocalName == "Flags");
+        if (flags == null) return;
+        var vars = new HashSet<string>(pou.Elements().Where(e => e.Name.LocalName == "interface").Descendants()
+                                          .Where(e => e.Name.LocalName == "variable").Select(e => (string)e.Attribute("name")).Where(n => n != null),
+                                       StringComparer.OrdinalIgnoreCase);
+        foreach (var f in flags.Elements())
+            if ((string)f.Attribute("Use") == "true" && (string)f.Attribute("Declare") != "true" && !vars.Contains("SFC" + f.Name.LocalName))
+                f.SetAttributeValue("Use", "false");
     }
 
     // ================================================================== text -> model
@@ -364,6 +475,7 @@ public sealed partial class ToolRegistry
             if (seq.Count == 0 || seq[0].Kind != "step") throw new Exception("the chain starts with the initial STEP");
             if (!seq[0].Initial) seq[0].Initial = true;
         }
+        static bool AllJump(SfcNode n) => n.Kind == "alternative" && n.Branches.All(b => b[^1].Kind == "jump" || AllJump(b[^1]));
         string last = null;
         foreach (var n in seq)
         {
@@ -386,7 +498,7 @@ public sealed partial class ToolRegistry
             if (n.Kind == "parallel" && n.Branches.Any(b => b.Count == 0)) throw new Exception("empty BRANCH");
             last = lastOf;
             if (n.Kind == "parallel") last = "step";
-            if (n.Kind == "alternative" && n.Branches.All(b => b[^1].Kind == "jump")) last = "end";
+            if (AllJump(n)) last = "end";
         }
     }
 
@@ -475,10 +587,17 @@ public sealed partial class ToolRegistry
                     e.Add(Pos(b, x));
                     if (prev.Count > 0) e.Add(In(b, prev));
                     e.Add(OutPt(b));
-                    // name of a transition object of the POU -> reference, otherwise an ST expression (variable or condition)
-                    e.Add(new XElement(b.Ns + "condition", b.TransitionObjects.Contains(n.Name)
-                        ? new XElement(b.Ns + "reference", new XAttribute("name", n.Name))
-                        : new XElement(b.Ns + "inline", new XAttribute("name", "_T" + id), StBody(b, n.Name))));
+                    // name of a transition object of the POU -> reference; otherwise an ST expression. TwinCAT ignores inline ST in
+                    // <condition>: the expression is an inVariable connected to the condition (the format of its own export)
+                    if (b.TransitionObjects.Contains(n.Name))
+                        e.Add(new XElement(b.Ns + "condition", new XElement(b.Ns + "reference", new XAttribute("name", n.Name))));
+                    else
+                    {
+                        var vid = (b.NextId++).ToString();
+                        b.Out.Add(new XElement(b.Ns + "inVariable", new XAttribute("localId", vid), Pos(b, x + 100), OutPt(b),
+                                               new XElement(b.Ns + "expression", n.Name)));
+                        e.Add(new XElement(b.Ns + "condition", In(b, new[] { vid })));
+                    }
                     b.Out.Add(e);
                     prev = new List<string> { id };
                     break;
@@ -488,7 +607,7 @@ public sealed partial class ToolRegistry
                     var e = new XElement(b.Ns + "jumpStep", new XAttribute("localId", id), new XAttribute("targetName", n.Name), Pos(b, x));
                     if (prev.Count > 0) e.Add(In(b, prev));
                     b.Out.Add(e);
-                    prev = new List<string>();
+                    prev = new List<string> { id };       // inside a branch TwinCAT connects the jump to the convergence
                     break;
                 }
                 case "alternative":
@@ -506,7 +625,8 @@ public sealed partial class ToolRegistry
                         ends.AddRange(EmitSeq(b, br, new List<string> { id }, bx));
                         bx += 200;
                     }
-                    if (ends.Count == 0) { prev = new List<string>(); break; }      // all branches jump
+                    // TwinCAT needs the convergence also when branches end with a jump (else: "An item with the same key has
+                    // already been added"); if all branches jump, nothing follows it
                     var convId = (b.NextId++).ToString();
                     var conv = new XElement(b.Ns + (alt ? "selectionConvergence" : "simultaneousConvergence"), new XAttribute("localId", convId), Pos(b, x));
                     foreach (var end in ends) conv.Add(In(b, new[] { end }));

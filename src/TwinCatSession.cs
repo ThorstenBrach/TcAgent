@@ -511,13 +511,26 @@ public sealed class TwinCatSession
         if (plcs.Count == 0) return "No PLC project found.";
         foreach (var plc in plcs)
             if (!CheckAllObjects(plc)) info.AppendLine($"Check all objects not available: {plc.Name} - use tc_build instead");
-        var (compile, runtime) = ReadErrorList(1000);
+        var (all, runtime) = ReadErrorList(1000);
+        // compiler messages carry a source position; entries without one (import results, device descriptions, older
+        // messages of other tools) are listed separately and do not count; INFO lines are progress noise
+        static bool FromCompiler(ErrorEntry e) => !string.IsNullOrEmpty(e.File) && !e.File.StartsWith(":") || !string.IsNullOrEmpty(e.Project);
+        var compile = all.Where(e => e.Level != "INFO" && FromCompiler(e)).ToList();
+        var other = all.Where(e => e.Level is "ERROR" or "WARN" && !FromCompiler(e)).ToList();
         int errs = compile.Count(e => e.Level == "ERROR"), warns = compile.Count(e => e.Level == "WARN");
         var o = new StringBuilder($"Check {(errs == 0 ? "OK" : "ERRORS")}: {errs} compiler errors, {warns} warnings " +
                                   $"({string.Join(", ", plcs.Select(p => p.Name))}; " +
                                   System.FormattableString.Invariant($"{sw.Elapsed.TotalSeconds:0.0} s)") + "\n");
         o.Append(info);
-        foreach (var e in compile) o.AppendLine(e.ToString());
+        foreach (var e in compile.Where(e => e.Level == "ERROR")) o.AppendLine(e.ToString());
+        var shownWarn = compile.Where(e => e.Level == "WARN").Take(40).ToList();
+        foreach (var e in shownWarn) o.AppendLine(e.ToString());
+        if (warns > shownWarn.Count) o.AppendLine($"... {warns - shownWarn.Count} more warnings (tc_errors kind=compile)");
+        if (other.Count > 0)
+        {
+            o.AppendLine($"\nOther messages in the error list without source position ({other.Count}, not counted - e.g. from an import or older):");
+            foreach (var e in other.Take(10)) o.AppendLine("  " + e.Level + " " + e.Text.Replace("\n", " "));
+        }
         if (runtime.Count > 0)
             o.AppendLine($"({runtime.Count} runtime/TcUnit messages hidden - see tc_errors kind=runtime or tc_test_results)");
         return o.ToString();

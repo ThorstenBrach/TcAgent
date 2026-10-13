@@ -58,7 +58,8 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
   A transition line holds an ST condition (`bDone AND NOT bError`) or the name of a transition object.
 - Rules: steps and transitions alternate; ALTERNATIVE follows a step and every branch starts with a TRANSITION;
   PARALLEL follows a transition and every branch starts with a STEP; branches end with a STEP (alternative also JUMP);
-  the chain ends with TRANSITION + JUMP. Read first, write the whole chain, then `tc_check`.
+  the chain ends with TRANSITION + JUMP. Step names become variables of the POU (`S_Move.x`): never name a step like a
+  variable, action or keyword (`Move`, `Error`, `Done`) - use `S_Init`, `S_Move` ... Read first, write the whole chain, then `tc_check`.
 
 ## Lessons learned - remember hard-won solutions
 
