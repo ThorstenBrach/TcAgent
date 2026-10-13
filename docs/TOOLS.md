@@ -100,12 +100,25 @@ Reports a problem, missing feature or improvement suggestion to TcAgent developm
 
 ### `tc_tree`
 
-Shows the TwinCAT project tree (name, type, path). Without path: all roots (TIPC=PLC, TIID=I/O, TIRT=tasks ...).
+Shows the TwinCAT project tree (name, type, path). Without path: all roots (TIPC=PLC, TIID=I/O, TIRT=tasks, TISC=TwinSAFE if present ...).
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `path` | string |  | Start path, e.g. TIPC or TIID^Device 1 (EtherCAT) |
 | `depth` | integer |  | Depth (default 2) |
+
+### `tc_safety`
+
+TwinSAFE, **read only**. `action=list` (default) shows the safety configuration: the tree below `TISC` (the SAFETY node; also listed by `tc_tree` without path) with type/subtype/path per item and the values recognized in each item's ProduceXml – FSoE address, watchdog, connection ID, safe parameters (module fault is ComError, ErrAck ...), CRC/checksums – then summaries of TwinSAFE groups, alias devices, connections, safety parameters and CRCs, and the safety terminals of the I/O configuration (EL69xx, EL19xx/EL29xx, EK1960 ... by product name). If nothing is recognized, the shortened raw XML of the safety node is returned. Without a `TISC` node the project files on disk are read instead (`*.splcproj`, `*.sal` = group application, `*.sds` = alias device). `action=show path=...` returns one item with all recognized values, its children and the shortened ProduceXml; `action=files` reads the safety project files on disk.
+
+Writing safety configuration is intentionally **not supported**: tc_safety never calls ConsumeXml, CreateChild, DeleteChild or a download, and every changing tool (`tc_xml_set`, `tc_delete`, `tc_link` ...) refuses paths in the `TISC` subtree. Changes, verification (CRC) and download of a TwinSAFE project belong to a person in the TwinSAFE editor. The online CRC of the safety logic on the target is not read.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string |  | list (default), show or files |
+| `path` | string |  | show: tree path of a safety item (from action=list) |
+| `depth` | integer |  | list: tree depth below the safety node (default 4) |
+| `maxChars` | integer |  | max. characters of raw XML per item (default 3000) |
 
 ### `tc_xml_get`
 
@@ -361,10 +374,34 @@ Context-based refactoring of names and comments, always confirmed by the user pe
 
 Program documentation of a PLC project (project memory). `action=pending` lists every object (FB, method, property, action, function, interface) that has neither a comment description nor a stored explanation, with its code, so the agent writes a short description for each (`action=save summaries={...}` stores them without writing the page). The page also has an inheritance hierarchy (diagram and tree, library base classes included) and short descriptions in the call hierarchy. `action=outline` returns the call hierarchy (task -> program -> FBs/methods/functions), every object with its description, step chains (SFC and CASE state machines) and findings; `action=html` writes one self-contained HTML page with clickable call hierarchy, call graph, class diagram (EXTENDS/IMPLEMENTS, methods, properties), step chain diagrams, findings and a reference per object (description, explanation, inputs/outputs, calls, used by, code); `action=memory` returns the stored overview and explanations. Explanations are kept in `<solution>\.tcagent\doc-summaries.json` and reused by later runs and by `TcAgent.exe doc`. Diagrams use Mermaid (needs internet access in the browser; the hierarchy tree works offline).
 
+Tasks: the PLC task references (TcTTO items directly below the PLC project) with their program calls are read, cycle time and priority come from the real-time task of the same name under TIRT; outline and page show `task (cycle 10 ms, priority 20) -> programs`, other TIRT tasks are listed separately. Findings: "PLC project has no task reference - no process image (tc_task action=assign)", task reference without TIRT task, task without program call, tasks with the same priority.
+
+`action=risks` runs static, text based risk rules on the ST code (no compiler; results also in the outline as counts with the high ones, and as section **Risks** of the HTML page). Each entry: severity (high/medium/low), object, line (in the implementation; `(decl)` = declaration), rule id and explanation. Rules only report what they can resolve (declared variables of the object, its FB, base FBs, GVLs); unknown identifiers (library constants, enum values) are never reported.
+
+| Rule | Severity | What is reported |
+|---|---|---|
+| `div-zero` | high/medium | `a / b`, `a MOD b` with a declared variable `b` that the object never compares (`b <> 0`, `IF b = 0` ...) or limits (MAX/LIMIT/SEL). High for integer/TIME (exception, PLC stop), medium for REAL/LREAL and structure members |
+| `array-index` | high/medium | `arr[i]` on an ARRAY where `i` is no FOR loop variable, no constant and never compared or limited (LIMIT/MIN/MAX/MOD) in the object. High for writes, medium for reads. Off when the project has `CheckBounds` |
+| `pointer-deref` | high/medium | `p^` on a POINTER without `p <> 0` check in the FB/object (high); REFERENCE TO used without `__ISVALIDREF` (medium). Once per FB |
+| `loop-exit` | medium | WHILE/REPEAT without EXIT/RETURN whose body neither assigns nor calls a variable of the condition (conditions with function calls are skipped) |
+| `global-multi-task` | high | a GVL or PROGRAM variable written by objects reached from more than one task (task -> programs -> call graph) |
+| `output-multi-write` | medium | an output `AT %Q` (PROGRAM or GVL) written in more than one object (program, action, method, FB) |
+| `unused-var` | low | locals never used, inputs never read (PROGRAM/FB including methods, actions, properties, derived FBs; METHOD locals). Skipped: AT-mapped, `{attribute}` above, FBs extending another FB (TcUnit suites), graphical code |
+| `timer-in-method` | high | TON/TOF/TP/R_TRIG/F_TRIG/CTU... in VAR/VAR_TEMP of a METHOD or FUNCTION (re-initialized on every call) |
+| `timer-conditional` | medium | a timer/edge instance of a PROGRAM/FB that is only called inside IF/CASE/loops |
+| `case-else` | low | CASE without ELSE |
+| `magic-number` | low | CASE with 3 or more numeric labels (use an ENUM) |
+| `long-code` | low/medium | more than 300 code lines (POU) / 150 (method, action, property); more than twice: medium |
+| `deep-nesting` | low/medium | IF/CASE/FOR/WHILE/REPEAT nested deeper than 5 (low) / 7 (medium) |
+
+Pipeline: `TcAgent.exe doc --solution X.sln --risks [--fail-on high]` prints the list and returns exit code 1 when there are risks of that severity or higher.
+
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `action` | string | yes | outline, pending, save, html or memory |
-| `max` | integer |  | pending: objects per call (default 15) |
+| `action` | string | yes | outline, pending, save, html, memory or risks |
+| `max` | integer |  | pending: objects per call (default 15); risks: max. entries (default 200) |
+| `minSeverity` | string |  | risks: high, medium or low (default low = all) |
+| `filter` | string |  | risks: only this object (part of the name) or this rule id, e.g. div-zero |
 | `maxChars` | integer |  | pending: max. code characters per object (default 2500) |
 | `plcProjectPath` | string |  | PLC project, e.g. TIPC^MyPlc^MyPlc Project (empty = the only one) |
 | `file` | string |  | html: target file (default `<solution>\doc\<PLC project>.html`) |

@@ -93,7 +93,7 @@ public sealed class Policy
     public static ToolClass ClassOf(string tool) => Classes.TryGetValue(tool, out var c) ? c : ToolClass.Read;
 
     // read-only actions of otherwise changing tools (tc_task list, tc_realtime show, tc_coe list, tc_scope list ...)
-    static readonly HashSet<string> ReadActions = new(StringComparer.OrdinalIgnoreCase) { "list", "show", "info", "read", "runtimes", "controls", "xml", "outline", "memory", "pending", "analyze", "data", "templates", "template" };
+    static readonly HashSet<string> ReadActions = new(StringComparer.OrdinalIgnoreCase) { "list", "show", "info", "read", "runtimes", "controls", "xml", "outline", "memory", "pending", "risks", "analyze", "data", "templates", "template" };
 
     /// <summary>Class of a concrete call: read-only actions count as Read (no confirmation, allowed in ask/propose mode).</summary>
     public static ToolClass ClassOf(string tool, JsonObject args)
@@ -126,6 +126,11 @@ public sealed class Policy
         var cls = ClassOf(tool, args);
         if (cls != ToolClass.Read && Mode == AgentMode.Ask)
             throw new UnauthorizedAccessException($"{tool} blocked: TcAgent is running in mode 'ask' (read only).");
+        // TwinSAFE configuration is never changed by TcAgent (tc_safety is read only): no write tool may address the TISC subtree
+        if (cls != ToolClass.Read && args != null &&
+            args.Any(kv => kv.Value is JsonValue jv && System.Text.RegularExpressions.Regex.IsMatch(jv.ToString(), @"(?:^|\n|=>)\s*TISC(?:\^|\s*$)",
+                                                                                                    System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline)))
+            throw new UnauthorizedAccessException($"{tool} blocked: the TwinSAFE configuration (TISC) is read only in TcAgent - change, verify and download it in the TwinSAFE editor.");
         if (cls != ToolClass.Read && Mode == AgentMode.Propose && tool is not ("tc_plc_write" or "tc_plc_create"))
             throw new UnauthorizedAccessException($"{tool} blocked: TcAgent is running in mode 'propose' - changes only as a proposal via tc_plc_write/tc_plc_create (diff).");
         if (cls == ToolClass.RuntimeWrite)

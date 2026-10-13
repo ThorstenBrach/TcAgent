@@ -146,7 +146,7 @@ public sealed partial class ToolRegistry
         Add("tc_version", "Shows the version of the TcAgent server.", Schema(), a => $"TcAgent {Program.ServerVersion}");
 
         // ---------------------------------------------------------- Tree / XML
-        Add("tc_tree", "Shows the TwinCAT project tree (name, type, path). Without path: all roots (TIPC=PLC, TIID=I/O, TIRT=tasks ...).",
+        Add("tc_tree", "Shows the TwinCAT project tree (name, type, path). Without path: all roots (TIPC=PLC, TIID=I/O, TIRT=tasks, TISC=TwinSAFE if present ...).",
             Schema(P("path", "string", "Start path, e.g. TIPC or TIID^Device 1 (EtherCAT)"), P("depth", "integer", "Depth (default 2)")),
             a => tc.Sta.Run(() => tc.Tree(Str(a, "path"), Int(a, "depth", 2))));
 
@@ -194,6 +194,7 @@ public sealed partial class ToolRegistry
         RegisterLessons();
         RegisterUserDoc();
         RegisterRefactor();
+        RegisterSafety();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +

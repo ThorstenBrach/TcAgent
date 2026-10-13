@@ -462,7 +462,7 @@ public sealed class TwinCatSession
             foreach (var c in Children(it)) Walk(c, level + 1);
         }
         if (string.IsNullOrEmpty(path))
-            foreach (var root in new[] { "TIRC", "TIRS", "TIRT", "TIPC", "TIID", "TINC", "TICC", "TIAC" })
+            foreach (var root in new[] { "TIRC", "TIRS", "TIRT", "TIPC", "TIID", "TINC", "TICC", "TIAC", "TISC" })   // TISC = SAFETY (TwinSAFE), if present
             {
                 ITcSmTreeItem r = null;
                 try { r = RequireSysMan().LookupTreeItem(root); } catch { }

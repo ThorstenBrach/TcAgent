@@ -26,9 +26,9 @@ public static partial class Cli
 
     sealed class Options
     {
-        public string Command, Solution, Attach, Junit, Target, ProgId, Out, Sarif, Settings, ScopePath;
+        public string Command, Solution, Attach, Junit, Target, ProgId, Out, Sarif, Settings, ScopePath, FailOn;
         public int Seconds = 10;
-        public bool Install;
+        public bool Install, Risks;
         public readonly List<string> Plc = new();
         public readonly List<string> Allow = new();
         public bool KeepRunning;
@@ -222,8 +222,19 @@ public static partial class Cli
             file = Path.GetFullPath(file);
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             File.WriteAllText(file, d.Html(mem, "TcAgent " + Program.ServerVersion), new System.Text.UTF8Encoding(false));
-            Say($"DOC OK: {file} ({d.Pous.Count} objects, {d.Findings().Count} findings)");
+            Say($"DOC OK: {file} ({d.Pous.Count} objects, {d.Findings().Count} findings, risks: {PlcDoc.RiskCounts(d.Risks())})");
         }
+        // static risk rules (tc_doc action=risks): list and optionally fail the step
+        var failed = false;
+        if (o.Risks || o.FailOn != null)
+            foreach (var d in docs)
+            {
+                var rk = d.Risks();
+                Say($"RISKS {d.Project}: {PlcDoc.RiskCounts(rk)}");
+                foreach (var x in rk) Console.WriteLine("  " + x);
+                if (o.FailOn != null && rk.Any(x => x.Rank <= PlcDoc.SeverityRank(o.FailOn))) failed = true;
+            }
+        if (failed) { Say($"DOC FAILED: risks with severity {o.FailOn} or higher"); return Failed; }
         return Ok;
     }
 
@@ -569,6 +580,8 @@ public static partial class Cli
                 case "--sarif": o.Sarif = Val(); break;
                 case "--settings": o.Settings = Val(); break;
                 case "--install": o.Install = true; break;
+                case "--risks": o.Risks = true; break;
+                case "--fail-on": o.FailOn = Val().ToLowerInvariant(); break;
                 case "--scope": o.ScopePath = Val(); break;
                 case "--seconds": o.Seconds = int.Parse(Val()); break;
                 case "--target": o.Target = Val(); break;
@@ -599,6 +612,7 @@ public static partial class Cli
         if (o.Seconds < 1) throw new Exception("--seconds must be at least 1");
         if (o.Command is "library" or "archive" or "scope" && o.Out == null) throw new Exception($"{o.Command} needs --out <file>");
         ValidateTestRunArgs(o);
+        if (o.FailOn != null && o.FailOn is not ("high" or "medium" or "low")) throw new Exception("--fail-on: high, medium or low");
         return o;
     }
 
@@ -622,8 +636,10 @@ public static partial class Cli
   TcAgent.exe scope --solution <sln> --out <file.csv|.svdx> [--scope <project/scope>] [--seconds <n>]
       Records with a Scope configuration of the solution (TE130x) for n seconds (default 10) and exports the data.
 
-  TcAgent.exe doc --solution <sln> [--out <file.html>] [--plc <names>]
-      Program documentation as HTML: call hierarchy, call graph, class diagram, step chains, reference per object.
+  TcAgent.exe doc --solution <sln> [--out <file.html>] [--plc <names>] [--risks] [--fail-on high|medium|low]
+      Program documentation as HTML: call hierarchy, call graph, class diagram, step chains, risks, reference per object.
+      --risks prints the static risk list (as tc_doc action=risks); --fail-on fails the step (exit 1) on risks of that
+      severity or higher.
       Uses the explanations the agent stored with tc_doc (<solution>\.tcagent\doc-summaries.json).
       Default output: <solution folder>\doc\<PLC project>.html
 
@@ -666,6 +682,8 @@ Options
   --sarif <file>           analyze: SARIF output
   --settings <file.csa>    analyze: static analysis settings to load first
   --install                library: also install into the library repository
+  --risks                  doc: print the static risk list
+  --fail-on <severity>     doc: exit code 1 when there are risks of this severity or higher (high, medium, low)
   --scope <path>           scope, sil/hil: '<measurement project>/<scope>' (default: the only one); sil/hil record
                            during the test run when --scope or --out is given
   --seconds <n>            scope: recording time (default 10)

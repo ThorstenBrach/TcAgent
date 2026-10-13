@@ -93,7 +93,13 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
 
 - "Explain / document the program": `tc_doc action=memory` first (stored overview and explanations), then
   `tc_doc action=outline` - call hierarchy task -> program -> FBs/methods, all objects with their description,
-  step chains (SFC, CASE state machines) and findings (unused POUs, very long POUs, global coupling).
+  step chains (SFC, CASE state machines) and findings (unused POUs, very long POUs, global coupling, missing task
+  reference). Tasks are shown with cycle time and priority (task -> programs).
+- Risks / code review: `tc_doc action=risks` (optional `minSeverity=high`, `filter=<object or rule>`) - static rules with
+  severity, object, line, rule: division without zero check, unchecked array index, pointer without check, loop without
+  exit, global written in several tasks, output written in several places, unused variables, timer in a method or called
+  conditionally, CASE without ELSE, numeric states, long code, deep nesting. Text based: verify each one in the code
+  (`tc_plc_read`) before you report or change it. Pipeline: `TcAgent.exe doc --risks --fail-on high`.
 - Short description for EVERY object (FBs, methods, properties, functions): `tc_doc action=pending` lists those without a
   comment/explanation with their code - write 1-2 sentences each, `tc_doc action=save summaries={...}`, repeat until none are left.
 - Read the important objects (`tc_plc_read`, `tc_sfc action=read`), then `tc_doc action=html` with `overview`
@@ -103,6 +109,13 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
 - Explanations are stored in `<solution>\.tcagent\doc-summaries.json` and reused - later pass only new or changed
   ones. The page (default `<solution>\doc\<PLC>.html`) has a clickable hierarchy, call graph, class diagram,
   step chain diagrams and a reference per object. In pipelines: `TcAgent.exe doc --solution X.sln`.
+
+## TwinSAFE (read only)
+
+- `tc_safety` lists safety projects (tree node TISC, otherwise the *.splcproj files), groups, alias devices, connections
+  (FSoE address, watchdog), safety parameters, CRCs and the safety terminals; `action=show path=...` one item with raw XML.
+- Never change safety configuration: TcAgent refuses writes to TISC. Changes, verification and download are done by a
+  person in the TwinSAFE editor - tell the user what to change instead.
 
 ## User manual (tc_userdoc)
 
