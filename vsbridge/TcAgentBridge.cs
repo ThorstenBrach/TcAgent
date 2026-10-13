@@ -123,6 +123,10 @@ namespace TcAgentBridge
                         case "libs": return Libs();
                         case "lib_export": return LibExport(Str(req, "library"), Str(req, "version"), Str(req, "refresh") == "True");
                         case "goto": return Goto(Str(req, "name"));
+                        case "open": return Open(Str(req, "path"), Str(req, "part"), int.TryParse(Str(req, "line"), out var ol) ? ol : 0,
+                                                 int.TryParse(Str(req, "column"), out var oc) ? oc : 1);
+                        case "caret": return Caret(Str(req, "path"), Str(req, "part"), int.TryParse(Str(req, "line"), out var cl2) ? cl2 : 0,
+                                                   int.TryParse(Str(req, "column"), out var cc2) ? cc2 : 1);
                         case "xref": return Xref(Str(req, "name"), int.TryParse(Str(req, "max"), out var xm) ? xm : 300);
                         case "lm_call": return LmCall(Str(req, "target"), Str(req, "method"), req.TryGetValue("args", out var ar) ? ar as ArrayList ?? new ArrayList((ar as object[]) ?? new object[0]) : new ArrayList());
                         case "lm_export": return LmExport(Str(req, "library"), int.TryParse(Str(req, "max"), out var mx) ? mx : 100000);
@@ -769,11 +773,74 @@ namespace TcAgentBridge
 
         // ------------------------------------------------------------------ Navigation: go to definition / cross references
         // Current object in the editor (for name resolution in the correct scope)
+        // Order: active editor view -> editor of the active VS document frame (stays set while the chat or another
+        // tool window has the focus) -> last editor object seen.
+        (int ph, Guid obj) lastObject;
         (int ph, Guid obj) ActiveObject()
         {
-            var view = SafeGet(SafeGet(EnvProp("Engine"), "Frame"), "ActiveView");
+            var r = ObjOf(SafeGet(SafeGet(EnvProp("Engine"), "Frame"), "ActiveView"));
+            if (r.obj == Guid.Empty)
+            {
+                var dv = ActiveDocView(out _);
+                r = ObjOf(SafeGet(dv, "EditorView"));
+                if (r.obj == Guid.Empty) r = ObjOf(dv);
+            }
+            if (r.obj != Guid.Empty) lastObject = r;
+            else if (lastObject.obj != Guid.Empty) r = lastObject;
+            return r;
+        }
+
+        // Project handle and object GUID of an editor view (properties or IEditorView.GetSelection)
+        static (int ph, Guid obj) ObjOf(object view)
+        {
+            if (view == null) return (0, Guid.Empty);
             var g = SafeGet(view, "ObjectGuid"); var h = SafeGet(view, "ProjectHandle");
-            return (h is int i ? i : 0, g is Guid gg ? gg : Guid.Empty);
+            if (g is Guid gg && gg != Guid.Empty) return (h is int i ? i : 0, gg);
+            var m = AllMethods(view.GetType()).FirstOrDefault(x => x.Name == "GetSelection" && x.GetParameters().Length == 5 && x.GetParameters().All(p => p.ParameterType.IsByRef));
+            if (m != null)
+                try
+                {
+                    var a = new object[5];
+                    m.Invoke(view, a);
+                    if (a[2] is Guid sg && sg != Guid.Empty) return (Convert.ToInt32(a[1]), sg);
+                }
+                catch { }
+            return (0, Guid.Empty);
+        }
+
+        // DocView and document moniker of the active VS document frame (also while a tool window has the focus)
+        static object ActiveDocView(out string document)
+        {
+            document = null;
+            try
+            {
+                var mon = (IVsMonitorSelection)Package.GetGlobalService(typeof(SVsShellMonitorSelection));
+                mon.GetCurrentElementValue(2 /* SEID_DocumentFrame */, out object fo);
+                if (fo is IVsWindowFrame frame)
+                {
+                    frame.GetProperty((int)__VSFPROPID.VSFPROPID_pszMkDocument, out object doc); document = doc?.ToString();
+                    frame.GetProperty((int)__VSFPROPID.VSFPROPID_DocView, out object dv);
+                    return dv;
+                }
+            }
+            catch { }
+            return null;
+        }
+
+        // All open project handles (TwinCAT: one per PLC project) - for lookups without editor context
+        List<int> ProjectHandles()
+        {
+            var list = new List<int>();
+            try { if (SafeCall(EnvProp("ObjectMgr"), "GetProjectHandles") is int[] hs) list.AddRange(hs); } catch { }
+            try
+            {
+                var projects = SafeGet(EnvProp("Engine"), "Projects");
+                if (SafeGet(projects, "Projects") is IEnumerable ps)
+                    foreach (var p in ps) if (SafeGet(p, "Handle") is int h) list.Add(h);
+                if (SafeGet(SafeGet(projects, "PrimaryProject"), "Handle") is int hp) list.Add(hp);
+            }
+            catch { }
+            return list.Distinct().ToList();
         }
 
         string ObjectPath(int ph, Guid g)
@@ -859,6 +926,14 @@ namespace TcAgentBridge
             {
                 var hits = FindByName(lm, ph, obj, first).Take(10).Select(x => (object)SigInfo(x, ph)).ToList();
                 if (hits.Count == 0 && parts.Length > 1) hits = FindByName(lm, ph, obj, parts[parts.Length - 1]).Take(10).Select(x => (object)SigInfo(x, ph)).ToList();
+                // No hit (e.g. no editor context because the chat window is active): search at project level -
+                // every PLC project including its libraries (library types such as MC_MoveAxesAbsoluteFB)
+                if (hits.Count == 0)
+                    foreach (var h in ProjectHandles())
+                    {
+                        hits = FindByName(lm, h, Guid.Empty, first).Take(10).Select(x => (object)SigInfo(x, h)).ToList();
+                        if (hits.Count > 0) { r["resolvedAt"] = "project"; r["projectHandle"] = h; break; }
+                    }
                 r["signatures"] = hits;
             }
             // 3) Dotted names (GVL.Variable, instance.input, a.b.c): resolve member by member through the types
@@ -891,6 +966,131 @@ namespace TcAgentBridge
                 r["members"] = chain;
             }
             return r;
+        }
+
+        // ------------------------------------------------------------------ Navigation: open an object in the editor (like F12)
+        // Opens the object of a TwinCAT tree path via the Solution Explorer (like a double-click) and sets the cursor.
+        Dictionary<string, object> Open(string path, string part, int line, int column)
+        {
+            if (string.IsNullOrWhiteSpace(path)) throw new Exception("path missing");
+            var r = new Dictionary<string, object> { ["path"] = path };
+            var dte = Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE80.DTE2 ?? throw new Exception("DTE not available");
+            var item = FindUiItem(dte, path.Split('^'), r);
+            if (item == null) throw new Exception("Object not found in Solution Explorer: " + path);
+            item.Select(EnvDTE.vsUISelectionType.vsUISelectionTypeSelect);
+            dte.ToolWindows.SolutionExplorer.DoDefaultAction();
+            r["opened"] = true; r["via"] = "SolutionExplorer";
+            if (line > 0) foreach (var kv in Caret(path, part, line, column)) r[kv.Key] = kv.Value;
+            return r;
+        }
+
+        // Set the cursor in the active TwinCAT editor. line counts within the part (declaration/implementation) from 1, like tc_plc_read.
+        Dictionary<string, object> Caret(string path, string part, int line, int column)
+        {
+            var r = new Dictionary<string, object>();
+            var dv = ActiveDocView(out var doc);
+            r["document"] = doc;
+            var last = (path ?? "").Split('^').LastOrDefault() ?? "";
+            if (dv == null || !DocMatches(doc, last))
+            {
+                r["lineSet"] = false; r["lineError"] = "editor for '" + last + "' not active (yet); active document: " + (doc ?? "-");
+                return r;
+            }
+            bool impl = part != null && part.StartsWith("impl", StringComparison.OrdinalIgnoreCase);
+            // In IVsTextView TwinCAT counts lines continuously across declaration + implementation
+            var cds = SafeGet(dv, "EditorView") ?? SafeGet(SafeGet(EnvProp("Engine"), "Frame"), "ActiveView");
+            int declLines = 0;
+            System.Windows.Forms.Control target = null;
+            foreach (var pn in new[] { "InterfaceEditorView", "ImplementationEditorView" })
+            {
+                if (!(SafeGet(cds, pn) is System.Windows.Forms.Control ctl)) continue;
+                var syn = ctl.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0 ? ctl
+                        : Descendants(ctl).FirstOrDefault(c => c.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0);
+                if (syn == null) continue;
+                if (pn == "InterfaceEditorView") declLines = (SafeGet(syn, "Text") as string ?? "").Replace("\r\n", "\n").Split('\n').Length;
+                if ((pn == "ImplementationEditorView") == impl) target = syn;
+            }
+            r["part"] = impl ? "implementation" : "declaration"; r["line"] = line;
+            if (impl && declLines == 0) { r["lineSet"] = false; r["lineError"] = "line count of the declaration part not available"; return r; }
+            int vsLine = (impl ? declLines : 0) + line - 1;   // 0-based
+            try { target?.Focus(); } catch { }
+            int hr = -1;
+            try { hr = Convert.ToInt32(Call(dv, "SetCaretPos", vsLine, Math.Max(0, column - 1))); }
+            catch (Exception ex) { r["lineError"] = "SetCaretPos: " + Inner(ex); }
+            try { Call(dv, "CenterLines", Math.Max(0, vsLine - 5), 11); } catch { }
+            var a2 = new object[2];
+            if (TryInvoke(dv, "GetCaretPos", a2, out _))
+            {
+                int now = Convert.ToInt32(a2[0]);
+                r["caretVsLine"] = now + 1;
+                r["lineSet"] = now == vsLine;
+                if (now != vsLine && !r.ContainsKey("lineError")) r["lineError"] = $"caret is on VS line {now + 1} instead of {vsLine + 1}";
+            }
+            else r["lineSet"] = hr == 0;
+            return r;
+        }
+
+        // Document moniker matches the object: "...\FB.TcPOU" (POU/DUT/GVL) or "...\FB.TcPOU@Method"
+        static bool DocMatches(string doc, string name)
+        {
+            if (string.IsNullOrEmpty(doc) || string.IsNullOrEmpty(name)) return false;
+            var at = doc.LastIndexOf('@');
+            if (at > 0)
+            {
+                var m = doc.Substring(at + 1);
+                return string.Equals(m, name, StringComparison.OrdinalIgnoreCase) || m.EndsWith("." + name, StringComparison.OrdinalIgnoreCase);
+            }
+            return string.Equals(Path.GetFileNameWithoutExtension(doc), name, StringComparison.OrdinalIgnoreCase);
+        }
+
+        // Solution Explorer node for a TwinCAT tree path (TIPC^MyPlc^MyPlc Project^POUs^FB^Method).
+        // TwinCAT shows POUs with a type suffix ("MAIN (PRG)", "FB_Axis (FB)"). First find the PLC node (2nd segment) in the
+        // upper levels, then descend segment by segment. Nodes expanded only for the search are collapsed again.
+        static EnvDTE.UIHierarchyItem FindUiItem(EnvDTE80.DTE2 dte, string[] segs, Dictionary<string, object> r)
+        {
+            if (segs.Length < 2) return null;
+            var expanded = new List<EnvDTE.UIHierarchyItems>();
+            bool Is(EnvDTE.UIHierarchyItem it, string seg)
+            {
+                string n;
+                try { n = it.Name ?? ""; } catch { return false; }
+                return string.Equals(n, seg, StringComparison.OrdinalIgnoreCase) || n.StartsWith(seg + " (", StringComparison.OrdinalIgnoreCase);
+            }
+            List<EnvDTE.UIHierarchyItem> Kids(EnvDTE.UIHierarchyItem it)
+            {
+                var list = new List<EnvDTE.UIHierarchyItem>();
+                try
+                {
+                    var k = it.UIHierarchyItems;
+                    if (k == null) return list;
+                    if (!k.Expanded) { k.Expanded = true; expanded.Add(k); }
+                    foreach (EnvDTE.UIHierarchyItem c in k) list.Add(c);
+                }
+                catch { }
+                return list;
+            }
+            // PLC node (e.g. "MyPlc") below Solution > TwinCAT project > PLC (breadth-first, depth <= 4)
+            var level = new List<EnvDTE.UIHierarchyItem>();
+            foreach (EnvDTE.UIHierarchyItem it in dte.ToolWindows.SolutionExplorer.UIHierarchyItems) level.Add(it);
+            EnvDTE.UIHierarchyItem cur = null;
+            for (int depth = 0; depth < 4 && cur == null && level.Count > 0; depth++)
+            {
+                cur = level.FirstOrDefault(x => Is(x, segs[1]));
+                if (cur == null) level = level.SelectMany(x => (IEnumerable<EnvDTE.UIHierarchyItem>)Kids(x)).ToList();
+            }
+            for (int i = 2; cur != null && i < segs.Length; i++)
+            {
+                var seg = segs[i];
+                cur = Kids(cur).FirstOrDefault(x => Is(x, seg));
+            }
+            // collapse nodes expanded for the search that are not on the way to the target
+            var keep = new HashSet<EnvDTE.UIHierarchyItems>();
+            try { for (var p = cur?.Collection?.Parent as EnvDTE.UIHierarchyItem; p != null; p = p.Collection?.Parent as EnvDTE.UIHierarchyItem) keep.Add(p.UIHierarchyItems); }
+            catch { }
+            foreach (var e in expanded)
+                if (!keep.Contains(e)) try { e.Expanded = false; } catch { }
+            if (cur == null) r["uiError"] = "tree node not found in Solution Explorer (path: " + string.Join(" > ", segs) + ")";
+            return cur;
         }
 
         IEnumerable<object> FindByName(object lm, int ph, Guid obj, string name)

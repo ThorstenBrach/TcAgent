@@ -681,10 +681,15 @@ public sealed class TwinCatSession
 
         var selected = new List<string>();
         try { foreach (SelectedItem si in dte.SelectedItems) { var n = S(() => si.Name); if (n.Length > 0) selected.Add(n); } } catch { }
-        if (selected.Count > 0) { o.AppendLine("Selected in Solution Explorer: " + string.Join(", ", selected)); names.AddRange(selected); }
+        if (selected.Count > 0) o.AppendLine("Selected in Solution Explorer: " + string.Join(", ", selected));
 
-        // Map window/document names to TwinCAT tree paths so that tc_plc_read can be used directly
-        var paths = ResolvePlcPaths(names);
+        // Map window/document names to TwinCAT tree paths so that tc_plc_read can be used directly.
+        // The active document comes first and is resolved uniquely from its file path ("...\FB.TcPOU@Method") -
+        // a plain name like "Start" can occur in several FBs.
+        var docPaths = doc != null ? ResolveDocPath(S(() => doc.FullName)) : new List<string>();
+        var paths = docPaths.Count > 0
+            ? docPaths.Concat(ResolvePlcPaths(selected).Where(p => !docPaths.Contains(p))).ToList()
+            : ResolvePlcPaths(names.Concat(selected));
         o.AppendLine(paths.Count > 0 ? "Tree path(s):\n  " + string.Join("\n  ", paths) : "Tree path: cannot be determined unambiguously");
         return o.ToString();
     }
@@ -705,6 +710,33 @@ public sealed class TwinCatSession
     }
 
     public List<string> ResolvePlcPathsPublic(string dottedName) => ResolvePlcPaths(new[] { dottedName });
+
+    /// <summary>
+    /// Tree path(s) of an editor document: "C:\...\POUs\Sdk\SdkControlFB.TcPOU@Start" -> ...^SdkControlFB^Start.
+    /// Objects with the same name (e.g. two FBs in different PLC projects) are told apart by the folder names
+    /// in the file path. Empty list if the document is not a PLC object.
+    /// </summary>
+    public List<string> ResolveDocPath(string fullName)
+    {
+        var res = new List<string>();
+        if (string.IsNullOrWhiteSpace(fullName) || fullName.StartsWith("(")) return res;
+        var at = fullName.LastIndexOf('@');
+        var file = at > 0 ? fullName[..at] : fullName;
+        var member = at > 0 ? fullName[(at + 1)..] : "";
+        var ext = System.IO.Path.GetExtension(file);
+        if (!new[] { ".TcPOU", ".TcDUT", ".TcGVL", ".TcIO", ".TcTTO" }.Contains(ext, StringComparer.OrdinalIgnoreCase)) return res;
+        var segs = new List<string> { System.IO.Path.GetFileNameWithoutExtension(file) };
+        if (member.Length > 0) segs.AddRange(member.Split('.', StringSplitOptions.RemoveEmptyEntries));
+        var tail = "^" + string.Join("^", segs);
+        var cands = PlcIndex().Select(x => x.Path).Where(p => p.EndsWith(tail, StringComparison.OrdinalIgnoreCase)).Distinct().ToList();
+        if (cands.Count <= 1) return cands;
+        // ambiguous: candidate whose tree folders match the folders in the file path best
+        var dirs = (System.IO.Path.GetDirectoryName(file) ?? "").Split('\\', '/').Where(d => d.Length > 0)
+                   .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        int Score(string p) => p.Split('^').Count(dirs.Contains);
+        var best = cands.Max(Score);
+        return cands.Where(p => Score(p) == best).ToList();
+    }
 
     List<string> ResolvePlcPaths(IEnumerable<string> rawNames)
     {

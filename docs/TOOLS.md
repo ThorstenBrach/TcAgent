@@ -435,13 +435,33 @@ Pipeline: `TcAgent.exe doc --solution X.sln --risks [--fail-on high]` prints the
 
 Shows what the user is currently working on in the IDE: active window/document, selected items, tree paths derived from them (usable directly with tc_plc_read) and - with the VS extension TcAgentBridge - cursor and selection. Use when the user talks about 'here', 'this FB' or 'the method'.
 
+The first tree path is always the active document, resolved uniquely from its file path (`...\SdkControlFB.TcPOU@Start` -> `...^SdkControlFB^Start`), so two methods with the same name in different FBs are not mixed up; the code excerpt is taken from that object. With TcAgentBridge the DTE hint "cursor/selection not available" is dropped. A selection that ends at column 1 of the following line is reported as whole lines (e.g. `implementation, lines 12-14 (whole lines)`).
+
 ### `tc_goto_definition`
 
 Go to definition: resolves a name the way TwinCAT itself does - in the scope of the object open in the editor. Without symbol, the word at the cursor (or the selection) is used. For variables returns type, declaration site and resolved type; for types/POUs the location in the project (tree path) or the library. Without an open editor, POUs/DUTs/GVLs and their members are looked up in the project tree. Requires the VS extension TcAgentBridge.
 
+If no object is active in the editor (e.g. the TcAgent chat window has the focus), the bridge uses the last active editor document; if there is none, types are resolved at project level in every PLC project including its libraries (e.g. `MC_MoveAxesAbsoluteFB`). If nothing is found (or the bridge is not running), project objects with that name and the cached library signatures of `tc_lib_signatures` are searched; otherwise the referenced libraries are listed.
+
+With `open=true` the definition is opened in the IDE editor and the cursor is put on the declaration line (variable declaration, or the header of the POU/DUT/GVL), like F12 - see `tc_editor_open`. Library objects cannot be opened.
+
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `symbol` | string |  | Name, e.g. _startTime, MC_MoveLinearAbsoluteFB, GVL_Progress.Progress (empty = word at cursor) |
+| `open` | boolean |  | Also open the resolved object in the IDE editor at the declaration line (like F12) |
+
+### `tc_editor_open`
+
+Opens a PLC object (POU, method, property accessor, action, DUT, GVL) in the IDE editor - like a double-click in the Solution Explorer - and optionally puts the cursor on a line. Line numbers count per part, as in `tc_plc_read` / `tc_plc_search` / `tc_find_references`. Changes nothing in the project (read class, also allowed in `ask`/`propose` mode).
+
+With TcAgentBridge (bridge actions `open` and `caret`) the cursor is set in the declaration or implementation editor and verified; the answer says "Opened ... cursor on implementation line N" or why the cursor could not be placed. Without the bridge the object is opened via DTE (Solution Explorer) and the cursor is usually not placed (the TwinCAT editor offers no DTE text selection).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `path` | string | yes | Tree path of the object, e.g. TIPC^MyPlc^MyPlc Project^POUs^FB_Axis^Start |
+| `line` | integer |  | Line in the part (1-based); empty = only open |
+| `part` | string |  | declaration (default) or implementation |
+| `column` | integer |  | Column (1-based, default 1) |
 
 ### `tc_find_references`
 
