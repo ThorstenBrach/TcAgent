@@ -185,6 +185,7 @@ public sealed partial class ToolRegistry
         RegisterSystemConfig();
         RegisterSfc();
         RegisterDoc();
+        RegisterLessons();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +
@@ -1301,9 +1302,17 @@ public sealed partial class ToolRegistry
 
     bool rulesSeen;
 
-    string SolutionDir()
+    string lastSolutionDir;
+
+    string SolutionDir(int timeoutMs = 600_000)
     {
-        try { return tc.Sta.Run(() => Path.GetDirectoryName((string)tc.RequireDte().Solution.FullName)); } catch { return null; }
+        try
+        {
+            var d = tc.Sta.Run(() => Path.GetDirectoryName((string)tc.RequireDte().Solution.FullName), timeoutMs);
+            if (!string.IsNullOrEmpty(d)) lastSolutionDir = d;
+            return d;
+        }
+        catch { return null; }
     }
 
     public JsonObject Call(string name, JsonObject args)
@@ -1347,6 +1356,16 @@ public sealed partial class ToolRegistry
         }
         catch (Exception ex) { text = "Error: " + (ex.InnerException?.Message ?? ex.Message); isError = true; Log.Error($"{name}: {ex}"); }
         finally { try { File.Delete(busy); } catch { } }
+        // lessons learned: recall known solutions for this error, remind to save one after a hard-won success
+        if (name != "tc_lessons" && Environment.GetEnvironmentVariable("TCAGENT_LESSONS_RECALL") != "0")
+        {
+            var plain = text;
+            // after an error the STA may still be blocked (IDE dialog, hang) or the IDE gone: short timeout, then the last known solution
+            if (isError) text += Lessons.Recall(SolutionDir(2000) ?? lastSolutionDir, name, text) ?? "";
+            else if ((name is "tc_check" or "tc_build" or "tc_errors") && Lessons.HasCompileErrors(text))
+                text += Lessons.Recall(SolutionDir(), name, text) ?? "";
+            text += Lessons.Track(name, isError, plain) ?? "";
+        }
         var callClass = Policy.ClassOf(name, args);
         if (callClass != ToolClass.Read || isError) policy.Audit(name, args, !isError, text, sw.ElapsedMilliseconds);
         if (callClass != ToolClass.Read && !isError) tc.InvalidatePlcIndex();

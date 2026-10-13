@@ -25,6 +25,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Your context** | The agent knows the object, line and selection you are working on – ask "what does *this* do?" | `tc_editor_context` |
 | **PLC code** | Read, change (optionally as a diff to approve), create POUs, methods, properties, DUTs, GVLs; implement interfaces in one step | `tc_plc_read`, `tc_plc_write`, `tc_plc_create` |
 | **SFC step chains** | Read and write sequential function charts as text – steps, actions, transitions, alternative and parallel branches, jumps | `tc_sfc` |
+| **Lessons learned** | The agent remembers hard-won solutions – what the problem was, why, and how it was solved – and recalls them by itself when the same error comes up again (project, personal or team file) | `tc_lessons` |
 | **Program documentation** | Explains the project: call hierarchy, call graph, class diagram, step chains (SFC and CASE), description per object, findings – one HTML page, explanations kept as project memory | `tc_doc` |
 | **Navigation** | Go to definition and find references (read/write) – resolved like TwinCAT itself, across inheritance | `tc_goto_definition`, `tc_find_references`, `tc_plc_search` |
 | **Library APIs** | Full interfaces of referenced libraries – also compiled libraries – so the agent never invents an API | `tc_lib_signatures`, `tc_plc_references` |
@@ -43,7 +44,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Your rules** | Coding rules per project/person/company; "remember that I want X" becomes a rule | `tc_coding_rules`, `tc_coding_rules_add` |
 | **Documentation** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 
-All 79 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 80 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 ## In your CI pipeline
 

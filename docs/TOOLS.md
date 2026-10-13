@@ -288,6 +288,26 @@ JUMP Init
 
 ## Editor context and navigation (TcAgentBridge)
 
+### `tc_lessons`
+
+Lessons learned across sessions: solutions to hard problems while coding or configuring TwinCAT. Each lesson records **what** the problem was (`symptom`: exact error text/code, behaviour), **why** (`cause`: explanation/background) and **how** it was solved (`solution`: concrete steps, values, code), optionally what did not work (`avoid`). Stored as Markdown, editable by hand: `<solution>\.tcagent\lessons.md` (project, versioned with Git), `%LOCALAPPDATA%\TcAgent\lessons.md` (personal), `TCAGENT_LESSONS` (team file). When a tool fails or `tc_check`/`tc_build` reports errors, matching lessons are appended to the result automatically (`TCAGENT_LESSONS_RECALL=0` turns this off); when a call succeeds after repeated failures the agent is reminded to save a lesson.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | search, list, add or remove |
+| `query` | string |  | search: error text, error code or topic |
+| `tool` | string |  | search: ranks lessons of this tool higher; add: tool(s) involved |
+| `title` | string |  | add: short, searchable title |
+| `symptom` | string |  | add (required): the problem – exact error text/code, behaviour, situation |
+| `cause` | string |  | add (required): why it happens – explanation, background; "unclear" if not known |
+| `solution` | string |  | add (required): exactly how it was solved – steps, parameters, values, code |
+| `avoid` | string |  | add: what did not work |
+| `tags` | string |  | add: comma-separated |
+| `scope` | string |  | add: project (default), personal or team |
+| `id` | string |  | add: update this lesson; remove: lesson to delete |
+| `max` | integer |  | search: max. results (default 5) |
+| `dryRun` | boolean |  | add: only show the entry |
+
 ### `tc_doc`
 
 Program documentation of a PLC project (project memory). `action=outline` returns the call hierarchy (task -> program -> FBs/methods/functions), every object with its description, step chains (SFC and CASE state machines) and findings; `action=html` writes one self-contained HTML page with clickable call hierarchy, call graph, class diagram (EXTENDS/IMPLEMENTS, methods, properties), step chain diagrams, findings and a reference per object (description, explanation, inputs/outputs, calls, used by, code); `action=memory` returns the stored overview and explanations. Explanations are kept in `<solution>\.tcagent\doc-summaries.json` and reused by later runs and by `TcAgent.exe doc`. Diagrams use Mermaid (needs internet access in the browser; the hierarchy tree works offline).

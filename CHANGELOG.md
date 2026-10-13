@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 ## [0.19.0] – not released yet
 
 ### Added
+- **Lessons learned** – `tc_lessons`: the agent saves hard-won solutions (what the problem was, why, how it was solved,
+  what did not work) in a project, personal or team file and searches them; matching lessons are appended automatically
+  when a tool fails or a build reports errors, and the agent is reminded to save one after repeated failed attempts.
 - **Program documentation** – `tc_doc` explains a PLC project: call hierarchy (task -> program -> FBs, methods,
   functions), call graph, class diagram, step chains (SFC and CASE state machines), description per object, findings
   (unused POUs, very long POUs, global coupling) – as text for the agent and as one HTML page. The agent's explanations

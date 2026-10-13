@@ -60,6 +60,20 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
   PARALLEL follows a transition and every branch starts with a STEP; branches end with a STEP (alternative also JUMP);
   the chain ends with TRANSITION + JUMP. Read first, write the whole chain, then `tc_check`.
 
+## Lessons learned - remember hard-won solutions
+
+- Before a non-trivial task (new hardware, SFC, motion, HMI, unusual errors): `tc_lessons action=search query=<topic or error>`.
+  When a tool fails or a build reports errors, TcAgent appends matching lessons by itself - check whether they apply.
+- After you solved something that took several attempts, a workaround, a non-obvious parameter/setting or the user's help,
+  save it right away with `tc_lessons action=add` - exactly:
+  - `symptom`: WHAT the problem was - exact error text/code, observed behaviour, situation
+  - `cause`: WHY - the explanation/background (TwinCAT behaviour, data type, order of steps, setting); "unclear" if not known
+  - `solution`: HOW it was solved - concrete steps, parameters, values, code before/after
+  - `avoid`: what did not work; `tags`, `tool`; `scope` project (this project/hardware) or personal (general TwinCAT knowledge)
+- Only verified solutions, phrased so they help next time; no passwords or customer secrets. Tell the user in one sentence
+  what you saved. A wrong or outdated lesson: `action=add id=...` (update) or `action=remove id=...`.
+- TcAgent reminds you ("This worked after N failed attempts ...") when a call succeeds after repeated failures.
+
 ## Program documentation (project memory)
 
 - "Explain / document the program": `tc_doc action=memory` first (stored overview and explanations), then
