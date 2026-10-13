@@ -194,6 +194,7 @@ public sealed partial class ToolRegistry
         RegisterLessons();
         RegisterUserDoc();
         RegisterRefactor();
+        RegisterEditorNav();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +
@@ -268,8 +269,10 @@ public sealed partial class ToolRegistry
                 catch (Exception ex) { return text + "\nTcAgentBridge: " + ex.Message + "\n"; }
             });
 
-        Add("tc_goto_definition", "Go to definition: resolves a name the way TwinCAT itself does - in the scope of the object open in the editor. Without symbol the word at the cursor (or the selection) is used. For variables returns type, declaration location and the resolved type; for types/POUs the location in the project (tree path) or the library. Without an open editor, POUs/DUTs/GVLs and their members are looked up in the project tree. Requires the VS extension TcAgentBridge.",
-            Schema(P("symbol", "string", "Name, e.g. _startTime, MC_MoveLinearAbsoluteFB, GVL_Progress.Progress (empty = word at cursor)")),
+        Add("tc_goto_definition", "Go to definition: resolves a name the way TwinCAT itself does - in the scope of the object open in the editor. Without symbol the word at the cursor (or the selection) is used. For variables returns type, declaration location and the resolved type; for types/POUs the location in the project (tree path) or the library. Without an open editor, POUs/DUTs/GVLs and their members are looked up in the project tree and types (incl. library types) at project level. Requires the VS extension TcAgentBridge. " +
+                                      "open=true also opens the definition in the IDE editor and puts the cursor on the declaration line (like F12).",
+            Schema(P("symbol", "string", "Name, e.g. _startTime, MC_MoveLinearAbsoluteFB, GVL_Progress.Progress (empty = word at cursor)"),
+                   P("open", "boolean", "Also open the resolved object in the IDE editor at the declaration line (like F12). Library objects cannot be opened.")),
             a => GotoDefinition(a));
 
         Add("tc_find_references", "Finds all usages of a symbol: cross references as in TwinCAT's cross reference list plus a whole-word text search as a cross-check.",
@@ -584,7 +587,12 @@ public sealed partial class ToolRegistry
     Cursor AnalyzeCursor(JsonObject b, string dteText)
     {
         string V(string k) => b[k]?.ToString();
-        var path = dteText.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.StartsWith("TIPC^"));
+        // Object resolved uniquely from the file path of the active document reported by the bridge
+        // ("...\\FB.TcPOU@Method"); otherwise the first tree path of the DTE context
+        string path = null;
+        if (V("document") is { Length: > 0 } bdoc)
+            try { path = tc.Sta.Run(() => tc.ResolveDocPath(bdoc)).FirstOrDefault(); } catch { }
+        path ??= dteText.Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.StartsWith("TIPC^"));
         string decl = null, impl = null;
         if (path != null)
             try
@@ -604,8 +612,9 @@ public sealed partial class ToolRegistry
             var ap = act["part"]?.ToString();
             int.TryParse(act["column"]?.ToString(), out var acol);
             var st = act["selectedText"]?.ToString();
-            return new Cursor(path, ap, al, Math.Max(1, acol), ap == "implementation" ? il : dl,
-                              string.IsNullOrEmpty(st) ? null : $"{ap}, line {al}", string.IsNullOrEmpty(st) ? null : st);
+            var code = ap == "implementation" ? il : dl;
+            return new Cursor(path, ap, al, Math.Max(1, acol), code,
+                              string.IsNullOrEmpty(st) ? null : SelectionRange(ap, code, al, Math.Max(1, acol), st), string.IsNullOrEmpty(st) ? null : st);
         }
         int offset = dl.Length;
         var selFirst = (V("selectedText") ?? "").Replace("\r\n", "\n").Split('\n')[0].Trim();
@@ -620,8 +629,37 @@ public sealed partial class ToolRegistry
         var line = cl > offset ? cl - offset : cl;
         string sel = null;
         if (int.TryParse(V("selStartLine"), out var s1) && int.TryParse(V("selEndLine"), out var s2) && (s1 != s2 || V("selStartColumn") != V("selEndColumn")))
-            sel = $"{(s1 > offset ? "implementation" : "declaration")}, line {(s1 > offset ? s1 - offset : s1)}:{V("selStartColumn")} to {(s2 > offset ? s2 - offset : s2)}:{V("selEndColumn")}";
+        {
+            int.TryParse(V("selStartColumn"), out var c1); int.TryParse(V("selEndColumn"), out var c2);
+            if (s1 > s2 || (s1 == s2 && c1 > c2)) { (s1, s2) = (s2, s1); (c1, c2) = (c2, c1); }
+            int L(int x) => x > offset ? x - offset : x;
+            var p1 = s1 > offset ? "implementation" : "declaration";
+            // selection up to column 1 of the following line = whole lines (the following line is not part of it)
+            if (c2 <= 1 && s2 > s1)
+                sel = $"{p1}, lines {L(s1)}-{L(s2 - 1)}" + (c1 <= 1 ? " (whole lines)" : $" (from column {c1})");
+            else
+                sel = $"{p1}, line {L(s1)}:{c1} to {L(s2)}:{c2}";
+        }
         return new Cursor(path, part, line, int.TryParse(V("caretColumn"), out var cc) ? cc : 1, part == "implementation" ? il : dl, sel, V("selectedText"));
+    }
+
+    // Line range of a selection from cursor position and selected text. If the text ends with a line break
+    // (selection up to column 1 of the next line) the lines count as whole lines. The cursor can be at the end
+    // (selected downwards) or at the start (selected upwards) - decided by comparing with the code.
+    static string SelectionRange(string part, string[] code, int caretLine, int caretCol, string selText)
+    {
+        var t = selText.Replace("\r\n", "\n");
+        bool whole = t.EndsWith("\n");
+        var sl = (whole ? t[..^1] : t).Split('\n');
+        int n = sl.Length;
+        bool Fits(int s) => s >= 1 && code != null && s + n - 1 <= code.Length
+                            && code[s - 1].Contains(sl[0].Trim(), StringComparison.Ordinal)
+                            && code[s + n - 2].Contains(sl[^1].Trim(), StringComparison.Ordinal);
+        int down = (whole && caretCol <= 1 ? caretLine - 1 : caretLine) - n + 1;   // cursor at the end of the selection
+        int up = caretLine;                                                        // cursor at the start
+        int start = Fits(down) ? down : Fits(up) ? up : Math.Max(1, down);
+        if (n == 1 && !whole) return $"{part}, line {start}";
+        return $"{part}, lines {start}-{start + n - 1}" + (whole ? " (whole lines)" : "");
     }
 
     string BridgeContext(JsonObject b, string dteText)
@@ -671,29 +709,56 @@ public sealed partial class ToolRegistry
             name = m.Success ? m.Value : WordAt(c);
             if (string.IsNullOrEmpty(name)) return "No identifier at the cursor - specify symbol or click on a name in the editor.";
         }
-        var r = BridgeClient.Call(pid, "goto", new JsonObject { ["name"] = name });
-        var o = new StringBuilder($"'{name}' (resolved in context {r["context"]}):\n");
+        JsonObject r;
+        try { r = BridgeClient.Call(pid, "goto", new JsonObject { ["name"] = name }); }
+        catch (Exception ex) { return GotoWithoutBridge(name, Bool(a, "open", false), ex.Message); }
+        var ctx = r["context"]?.ToString();
+        var o = new StringBuilder(string.IsNullOrEmpty(ctx)
+            ? $"'{name}' (no object open in the editor - resolved at project level):\n"
+            : $"'{name}' (resolved in context {ctx}):\n");
+        static bool IsLib(JsonNode s) => s?["isLibrary"]?.ToString() is "true" or "True";
+        List<string> PathsOf(JsonNode s)
+        {
+            var op = s?["objectPath"]?.ToString();
+            return string.IsNullOrEmpty(op) || IsLib(s) ? new List<string>() : tc.Sta.Run(() => tc.ResolvePlcPathsPublic(op));
+        }
         string Where(JsonNode s)
         {
             if (s == null) return "?";
-            if (s["isLibrary"]?.ToString() == "true" || s["isLibrary"]?.ToString() == "True")
+            if (IsLib(s))
                 return $"Library {s["library"]} -> tc_lib_signatures library={s["library"]?.ToString().Split(',')[0]} symbol={s["name"]}";
-            var op = s["objectPath"]?.ToString();
-            var paths = string.IsNullOrEmpty(op) ? new List<string>() : tc.Sta.Run(() => tc.ResolvePlcPathsPublic(op));
-            return paths.Count > 0 ? "Project: " + string.Join(" | ", paths) + "  (tc_plc_read)" : "Project: " + op;
+            var paths = PathsOf(s);
+            return paths.Count > 0 ? "Project: " + string.Join(" | ", paths) + "  (tc_plc_read)" : "Project: " + s["objectPath"];
         }
+        // Jump target for open=true: object that holds the declaration and the name whose declaration line is searched
+        (JsonNode Owner, string Name, bool IsVar)? target = null;
+        string treeTarget = null;    // tree path from the project-tree fallback (no editor open)
+        bool found = false;
         if (r["variable"] is JsonObject v)
         {
+            found = true;
             o.AppendLine($"Variable {v["name"]} : {v["type"]}  [{v["flags"]}]" + (string.IsNullOrWhiteSpace(v["doc"]?.ToString()) ? "" : $"  // {v["doc"]?.ToString().Trim()}"));
             o.AppendLine($"  declared in {v["declaredIn"]?["kind"]} {v["declaredIn"]?["name"]}: {Where(v["declaredIn"])}");
+            target = (v["declaredIn"], v["name"]?.ToString(), true);
             if (r["type"] is JsonObject t)
                 o.AppendLine($"  Type {t["name"]} ({t["kind"]}{(string.IsNullOrEmpty(t["extends"]?.ToString()) ? "" : " EXTENDS " + t["extends"])}): {Where(t)}");
         }
         else if (r["signatures"] is JsonArray sigs && sigs.Count > 0)
+        {
+            found = true;
             foreach (var s in sigs)
+            {
                 o.AppendLine($"{s?["kind"]} {s?["name"]}{(string.IsNullOrEmpty(s?["extends"]?.ToString()) ? "" : " EXTENDS " + s?["extends"])}: {Where(s)}");
-        else if (string.IsNullOrEmpty(r["context"]?.ToString()) && GotoByTree(name) is { } byTree)
+                if (target == null && !IsLib(s)) target = (s, s?["name"]?.ToString(), false);
+            }
+            target ??= (sigs[0], sigs[0]?["name"]?.ToString(), false);
+        }
+        else if (string.IsNullOrEmpty(ctx) && GotoByTree(name) is { } byTree)
+        {
+            found = true;
             o.Append(byTree);    // no editor open: the language model has no scope - look the name up in the project tree
+            treeTarget = tc.Sta.Run(() => tc.ResolvePlcPathsPublic(name.Split('.')[0])).FirstOrDefault();
+        }
         else o.AppendLine("Not found (neither a variable in the current object nor a type/POU). For text search: tc_plc_search.");
         if (r["members"] is JsonArray mem)
             foreach (var mm in mem)
@@ -701,9 +766,20 @@ public sealed partial class ToolRegistry
                 if (mm?["notFoundIn"] != null) { o.AppendLine($"  .{mm["name"]}: not found in {mm["notFoundIn"]?["name"]}"); continue; }
                 o.AppendLine($"  .{mm?["name"]} : {mm?["type"]}  [{mm?["flags"]}]" + (string.IsNullOrWhiteSpace(mm?["doc"]?.ToString()) ? "" : $"  // {mm?["doc"]?.ToString().Trim()}"));
                 o.AppendLine($"      declared in {mm?["declaredIn"]?["kind"]} {mm?["declaredIn"]?["name"]}: {Where(mm?["declaredIn"])}");
+                target = (mm?["declaredIn"], mm?["name"]?.ToString(), true);
             }
         if (r["memberType"] is JsonObject mt)
             o.AppendLine($"  Type {mt["name"]} ({mt["kind"]}{(string.IsNullOrEmpty(mt["extends"]?.ToString()) ? "" : " EXTENDS " + mt["extends"])}): {Where(mt)}");
+        // Nothing found: project objects with that name and cached library signatures (tc_lib_signatures)
+        if (!found) o.Append(GotoFallbackText(name));
+        if (Bool(a, "open", false))
+        {
+            if (target is not { } tg)
+                o.AppendLine(treeTarget != null ? OpenAtDeclaration(treeTarget, name.Split('.')[0], false) : "Not opened: nothing resolved.");
+            else if (IsLib(tg.Owner)) o.AppendLine($"Not opened: '{tg.Name}' is declared in library {tg.Owner?["library"]} - library code cannot be opened in the editor; use tc_lib_signatures.");
+            else if (PathsOf(tg.Owner).FirstOrDefault() is not { } tp) o.AppendLine($"Not opened: no tree path found for '{tg.Owner?["objectPath"]}'.");
+            else o.AppendLine(OpenAtDeclaration(tp, tg.Name, tg.IsVar));
+        }
         return o.ToString();
     }
 

@@ -23,6 +23,8 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
    (e.g. `TIPC^MyPlc^MyPlc Project`), the instance is `type=57` (`...^MyPlc Instance`).
    **Navigate:** `tc_goto_definition` resolves a name the way TwinCAT does (no argument: word at cursor/selection;
    also `GVL.Variable`, `instance.Input`) - variable with type and declaration site, or POU/type with tree path or library.
+   `open=true` also opens the definition in the IDE editor at the declaration line (like F12). To show the user a place
+   in the code: `tc_editor_open path=... line=N part=implementation` (opens the object, sets the cursor; changes nothing).
    `tc_find_references` returns all usages with access kind (declaration/read/write), tree path and line -
    always call it before renaming or changing an interface. `tc_plc_search` for free text/regex search;
    `tc_plc_references` shows libraries with resolved versions.
