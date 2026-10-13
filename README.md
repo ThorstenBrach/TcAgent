@@ -14,6 +14,12 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 <img alt="MCP" src="https://img.shields.io/badge/MCP-server-22d3ee">
 </p>
 
+<p align="center">
+<a href="docs/img/tcagent-demo.mp4"><img src="docs/img/demo-video-poster.jpg" width="900" alt="Video (60 s): from the device manual to the HMI page with one prompt - TcAgent reads the manual, adds and links the EL6001, writes the driver FB, tests it with TcUnit and builds the HMI page"></a><br>
+<sub><b>▶ Watch the 60-second video</b> – one prompt: device manual → I/O → driver FB → TcUnit tests → HMI.<br>
+<i>The video is a generated visualization to illustrate the workflow more clearly – in practice TcAgent works exactly like this.</i></sub>
+</p>
+
 <p align="center"><img src="docs/img/demo.svg" width="900" alt="Animated demo: Ctrl+Shift+Q in the TwinCAT editor, the agent creates a function block that implements an interface and checks all objects"></p>
 
 ---
