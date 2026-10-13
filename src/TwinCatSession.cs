@@ -723,6 +723,9 @@ public sealed class TwinCatSession
             bool rt = string.IsNullOrEmpty(e.FileName) && m.Success;
             var entry = new ErrorEntry(lvl, e.Project, e.FileName, e.Line, e.Column, rt ? text.Substring(m.Length) : text, rt,
                                        rt ? ParseStamp(m.Groups["ts"].Value)?.AddMilliseconds(m.Groups["ms"].Success ? int.Parse(m.Groups["ms"].Value) : 0) : null);
+            // HMI projects log their build steps (nuget restore, virtual mappings ...) as warnings - not compiler messages
+            if (!rt && lvl != "ERROR" && ((e.Project ?? "").EndsWith(".hmiproj", StringComparison.OrdinalIgnoreCase) ||
+                                          (e.FileName ?? "").EndsWith(".hmiproj", StringComparison.OrdinalIgnoreCase))) continue;
             (rt ? runtime : compile).Add(entry);
         }
         return (compile, runtime);

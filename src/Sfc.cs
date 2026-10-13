@@ -642,12 +642,14 @@ public sealed partial class ToolRegistry
                         if (keep != null && ed != keep) throw new Exception($"STEP {n.Name}: its EMBEDDED actions belonged to different steps - keep them together");
                         keep = ed;
                     }
-                    if (keep == null && n.Embedded.Count == 0 && b.StepData.TryGetValue(n.Name, out var byName)) keep = byName;
+                    if (keep == null && n.Embedded.Count == 0 && b.StepData.TryGetValue(n.Name, out var byName) && !b.EmbeddedData.Values.Contains(byName)) keep = byName;
                     if (keep != null && !b.UsedData.Add(keep))
                     {
                         if (n.Embedded.Count > 0) throw new Exception($"STEP {n.Name}: the embedded actions {string.Join(", ", n.Embedded)} are already used by another step");
                         keep = null;                                                    // renamed step kept its data elsewhere
                     }
+                    if (keep == null && !string.IsNullOrEmpty(n.Comment))
+                        throw new Exception($"STEP {n.Name}: COMMENT works only for existing steps (set comments of new steps in the IDE)");
                     if (keep != null)
                     {
                         var data = new XElement(keep);
@@ -655,7 +657,7 @@ public sealed partial class ToolRegistry
                         {
                             var g = ((string)at.Attribute("guid") ?? "").ToLowerInvariant();
                             if (g == NameGuid) at.Value = n.Name;
-                            else if (g == CommentGuid && n.Comment != null) at.Value = n.Comment;
+                            else if (g == CommentGuid && n.Comment != null && Regex.Replace(at.Value.Trim(), @"\s+", " ") != n.Comment) at.Value = n.Comment;
                         }
                         e.Add(data);
                     }

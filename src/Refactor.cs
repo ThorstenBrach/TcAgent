@@ -439,7 +439,9 @@ public sealed partial class ToolRegistry
             if (string.IsNullOrEmpty(text)) continue;
             var existing = plan.Edits.FirstOrDefault(e => e.Path == path && e.Part == part);
             var src = existing?.New ?? text;
-            var res = ReplaceIdentifier(src, name, newName, mode, qualifier);
+            var res = part == "sfc"      // chart text: COMMENT lines are prose, not code
+                ? string.Join("\n", src.Split('\n').Select(l => l.TrimStart().StartsWith("COMMENT ") ? l : ReplaceIdentifier(l, name, newName, mode, qualifier)))
+                : ReplaceIdentifier(src, name, newName, mode, qualifier);
             if (res == src) continue;
             if (existing != null) plan.Edits.Remove(existing);
             plan.Edits.Add(new Edit(path, part, existing?.Old ?? text, res));

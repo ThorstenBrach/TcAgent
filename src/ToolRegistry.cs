@@ -1186,8 +1186,18 @@ public sealed partial class ToolRegistry
             var plan = (tref == null ? $"create task reference {plc.PathName}^{taskName}\n" : "") + (hasCall ? "" : $"add program call {program}\n");
             if (plan.Length == 0) return $"{program} is already called by {taskName} in {plc.PathName} - nothing to do.";
             if (DryRun(a)) return "PROPOSAL (nothing changed):\n" + plan;
-            if (tref == null) tref = (ITcSmTreeItem)((dynamic)plc).CreateChild(taskName, 621, "", null);
-            if (!hasCall) ((dynamic)tref).CreateChild(program, 650, "", null);
+            if (tref == null)
+            {
+                ((dynamic)plc).CreateChild(taskName, 621, "", null);
+                tref = TwinCatSession.Children(plc).FirstOrDefault(c => string.Equals(c.Name, taskName, StringComparison.OrdinalIgnoreCase))
+                       ?? throw new Exception($"the task reference {taskName} was not created in {plc.PathName}");
+            }
+            if (!hasCall)
+            {
+                ((dynamic)tref).CreateChild(program, 650, "", null);
+                if (!TwinCatSession.Children(tref).Any(c => string.Equals(c.Name, program, StringComparison.OrdinalIgnoreCase)))
+                    throw new Exception($"the program call {program} was not created below {tref.PathName} - is {program} a PROGRAM of this PLC project?");
+            }
             tc.InvalidatePlcIndex();
             return "Done:\n" + plan + $"Program calls of {taskName}: {string.Join(", ", TwinCatSession.Children(tref).Select(c => c.Name))}\n" +
                    "Build (tc_build) to generate the process image; takes effect on the target after tc_activate.";
@@ -1200,7 +1210,7 @@ public sealed partial class ToolRegistry
             task = (ITcSmTreeItem)((dynamic)rt).CreateChild(name, Bool(a, "withImage", false) ? 0 : 1, null, null);
         }
         else if (action == "set") task = tc.Item(Str(a, "path") ?? throw new Exception("path missing"));
-        else throw new Exception("action: list, create or set");
+        else throw new Exception("action: list, create, set or assign");
         var res = $"{(action == "create" ? "created" : "Task")}: {task.PathName}";
         // Replace values in the task's own XML - this guarantees the tag names are correct
         var changes = new List<(string Tag, string Val)>();
@@ -1454,7 +1464,7 @@ public sealed partial class ToolRegistry
     {
         var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backup", "delete");
         Directory.CreateDirectory(dir);
-        var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss-fff");
         var safe = string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
         var path = parentPath + "^" + name;
         var parts = path.Split('^');
