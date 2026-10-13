@@ -60,7 +60,8 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
   transitions with code if needed (`kind=transition`), then `tc_sfc action=write chain=...` with the complete chain.
   A transition line holds an ST condition (`bDone AND NOT bError`) or the name of a transition object.
 - Rules: steps and transitions alternate; ALTERNATIVE follows a step and every branch starts with a TRANSITION;
-  PARALLEL follows a transition and every branch starts with a STEP; branches end with a STEP (alternative also JUMP);
+  PARALLEL follows a transition and every branch starts with a STEP; branches end with a STEP (alternative also JUMP,
+  or all alternative branches end with a TRANSITION and a STEP follows END_ALTERNATIVE - the form TwinCAT draws);
   the chain ends with TRANSITION + JUMP. Step names become variables of the POU (`S_Move.x`): never name a step like a
   variable, action or keyword (`Move`, `Error`, `Done`) - use `S_Init`, `S_Move` ... Read first, write the whole chain, then `tc_check`.
 

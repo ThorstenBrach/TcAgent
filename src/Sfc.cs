@@ -21,7 +21,8 @@
 //     BRANCH
 //       TRANSITION bDone
 //       STEP Done
-//   END_ALTERNATIVE                   followed by a TRANSITION (nothing, if every branch ends with JUMP)
+//   END_ALTERNATIVE                   followed by a TRANSITION (nothing, if every branch ends with JUMP);
+//                                     or: every branch ends with a TRANSITION and a STEP follows (TwinCAT editor form)
 //   PARALLEL                          simultaneous branch after a transition - every BRANCH starts with a STEP
 //     BRANCH ... END_PARALLEL         followed by a TRANSITION
 //   JUMP Init                         jump to a step (ends the chain or a branch)
@@ -481,7 +482,6 @@ public sealed partial class ToolRegistry
         {
             if (last == "end") throw new Exception("nothing may follow an ALTERNATIVE whose branches all end with JUMP");
             var first = n.Kind switch { "alternative" => "transition", "parallel" => "step", "jump" => "jump", _ => n.Kind };
-            var lastOf = n.Kind switch { "alternative" => "step", "parallel" => "step", _ => n.Kind };
             if (last == first && first != "jump") throw new Exception($"two {first}s in a row (at {n.Name ?? n.Kind}) - steps and transitions alternate");
             if (n.Kind == "alternative" && last != "step") throw new Exception("ALTERNATIVE must follow a STEP");
             if (n.Kind == "parallel" && last != "transition") throw new Exception("PARALLEL must follow a TRANSITION");
@@ -491,16 +491,29 @@ public sealed partial class ToolRegistry
                 if (b.Count == 0) throw new Exception("empty BRANCH");
                 var want = n.Kind == "alternative" ? "transition" : "step";
                 if (b[0].Kind != want) throw new Exception($"every {n.Kind} BRANCH starts with a {want.ToUpperInvariant()}");
-                if (b[^1].Kind == "transition") throw new Exception($"a {n.Kind} BRANCH ends with a STEP (or JUMP), not with a TRANSITION");
                 if (n.Kind == "parallel" && b[^1].Kind == "jump") throw new Exception("a PARALLEL BRANCH cannot end with JUMP");
                 ValidateChain(b, false);
             }
-            if (n.Kind == "parallel" && n.Branches.Any(b => b.Count == 0)) throw new Exception("empty BRANCH");
-            last = lastOf;
-            if (n.Kind == "parallel") last = "step";
+            last = n.Kind is "alternative" or "parallel" ? BlockEnd(n) : n.Kind;
             if (AllJump(n)) last = "end";
         }
     }
+
+    // what a branch block ends with: alternative branches may end with a STEP (a TRANSITION follows END_ALTERNATIVE) or
+    // all with a TRANSITION (a STEP follows - the form TwinCAT's editor draws); jumps do not count
+    static string BlockEnd(SfcNode n)
+    {
+        var ends = n.Branches.Select(b => EndKind(b[^1])).Where(k => k != "jump").Distinct().ToList();
+        if (ends.Count > 1) throw new Exception($"the branches of an {n.Kind.ToUpperInvariant()} must all end with a STEP or all with a TRANSITION (or JUMP)");
+        if (n.Kind == "parallel" && ends.FirstOrDefault() == "transition") throw new Exception("PARALLEL branches end with a STEP");
+        return ends.FirstOrDefault() ?? "end";
+    }
+
+    static string EndKind(SfcNode n) => n.Kind switch
+    {
+        "alternative" or "parallel" => n.Branches.All(b => b[^1].Kind == "jump") ? "jump" : BlockEnd(n),
+        _ => n.Kind
+    };
 
     // ================================================================== model -> PLCopen SFC
     sealed class SfcBuilder
@@ -510,6 +523,7 @@ public sealed partial class ToolRegistry
         public readonly List<XElement> Out = new();
         public XElement StepTpl, TransTpl;
         public HashSet<string> TransitionObjects = new(StringComparer.OrdinalIgnoreCase);
+        public readonly Dictionary<string, XElement> StepData = new(StringComparer.OrdinalIgnoreCase);   // addData of existing steps (embedded actions, comment)
     }
 
     static XElement BuildSfc(XElement oldSfc, List<SfcNode> chain, IEnumerable<string> transitionObjects = null)
@@ -521,6 +535,9 @@ public sealed partial class ToolRegistry
             StepTpl = oldSfc.Elements().FirstOrDefault(e => e.Name.LocalName == "step"),
             TransTpl = oldSfc.Elements().FirstOrDefault(e => e.Name.LocalName == "transition")
         };
+        foreach (var st in oldSfc.Elements().Where(e => e.Name.LocalName == "step"))
+            if ((string)st.Attribute("name") is { } nm && st.Elements().FirstOrDefault(e => e.Name.LocalName == "addData") is { } ad)
+                b.StepData[nm] = ad;
         EmitSeq(b, chain, new List<string>(), 0);
         var sfc = new XElement(oldSfc.Name, oldSfc.Attributes(), b.Out);
         return sfc;
@@ -561,6 +578,7 @@ public sealed partial class ToolRegistry
                     e.Add(Pos(b, x));
                     if (prev.Count > 0) e.Add(In(b, prev));
                     e.Add(new XElement(b.Ns + "connectionPointOut", new XAttribute("formalParameter", "sfc")));
+                    if (b.StepData.TryGetValue(n.Name, out var keep)) e.Add(new XElement(keep));     // embedded step actions, comment
                     b.Out.Add(e);
                     if (n.Actions.Count > 0)
                     {

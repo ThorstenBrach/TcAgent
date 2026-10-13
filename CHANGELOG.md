@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.19.1] – not released yet
+## [0.19.2] – not released yet
 
 ### Added
 - **Lessons learned** – `tc_lessons`: the agent saves hard-won solutions (what the problem was, why, how it was solved,
@@ -17,7 +17,8 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   are kept as project memory (`.tcagent/doc-summaries.json`); pipeline command `TcAgent.exe doc`.
 - **SFC step chains** – `tc_sfc` reads a sequential function chart as text (steps, actions, transitions, alternative and
   parallel branches, jumps) and writes it back from text (through PLCopen XML, in the format TwinCAT's import accepts;
-  checks that step names do not collide with variables; restores the previous version if the import fails).
+  checks that step names do not collide with variables; keeps embedded step actions; accepts alternative branches that
+  end with a transition; restores the previous version if the import fails).
 - **TwinCAT Package Manager** – `tc_packages` (installed, available, versions, outdated, details, feeds, settings) and
   `tc_packages_change` (install, upgrade, uninstall, repair, feeds; confirmed by the user, runs elevated).
 - **Real-time cores** – `tc_realtime` shows and sets cores for TwinCAT, isolated cores, real-time cores, base time, load
@@ -104,7 +105,7 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.19.1...HEAD
-[0.19.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.19.1
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.19.2...HEAD
+[0.19.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.19.2
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0
