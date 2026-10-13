@@ -77,6 +77,9 @@ public sealed class Policy
         var cls = ClassOf(tool);
         if (cls == ToolClass.ProjectWrite && args?["action"] is JsonValue v && ReadActions.Contains(v.ToString())) return ToolClass.Read;
         if (cls == ToolClass.ProjectWrite && args?["action"] == null && tool is "tc_userdoc" or "tc_refactor" or "tc_motion") return ToolClass.Read;   // default action: data / analyze / list
+        // tc_sfc comments/flags without values only list the step comments / SFC flags
+        if (cls == ToolClass.ProjectWrite && tool == "tc_sfc" && args?["action"] is JsonValue sa && sa.ToString().ToLowerInvariant() is "comments" or "flags"
+            && args["comments"] == null && args["flags"] == null) return ToolClass.Read;
         return cls;
     }
 

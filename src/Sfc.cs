@@ -52,13 +52,46 @@ public sealed partial class ToolRegistry
                       "Action objects shown as graphical or embedded are never 'empty/unused' - do not delete them. " +
                       "Create the POU first with tc_plc_create language=SFC, actions/transitions with code with tc_plc_create kind=action/transition " +
                       "(parentPath = the POU). Step names become variables of the POU: never name a step like a variable, action or keyword " +
-                      "(Move, Error, Done ...) - use S_Init, S_Move ... Read before writing; check with tc_check afterwards.",
-            Schema(Req(P("action", "string", "read, write or xml")),
+                      "(Move, Error, Done ...) - use S_Init, S_Move ... Read before writing; check with tc_check afterwards. " +
+                      "New steps get 'Duplicate on copy' (embedded actions are copied, not referenced, when the step is copied in the editor; duplicate=all " +
+                      "also for existing steps, duplicate=none = TwinCAT default). " +
+                      "action=renumber renames steps systematically (prefix + number: start, step, digits; default keeps the prefix, e.g. N010, N020 ...), " +
+                      "optionally only 'steps' (list or range N020..N070), order=main (main sequence first, then the branches) or chain; it updates " +
+                      "JUMP targets, step references in conditions and in the POU's action/transition code (N010.t), keeps embedded actions and comments " +
+                      "and renames embedded actions _aN010_active -> _aN020_active (renameActions=false keeps them); always dryRun=true first and show the user the table. " +
+                      "action=comments lists the steps with their comments plus the project's coding guidelines; with comments={\"N010\":\"text\"} it sets " +
+                      "step comments (existing steps; write them in the language the guidelines require). " +
+                      "action=flags shows the SFC flags (SFCInit, SFCReset, SFCError, SFCQuitError, SFCPause, SFCTrans, SFCCurrentStep, SFCTip, SFCTipMode, " +
+                      "SFCErrorStep, SFCErrorPOU, SFCEnableLimit, SFCErrorAnalyzation ...); flags={\"SFCInit\":true} sets them - an enabled flag is also declared " +
+                      "(Declare=true or a variable in the declaration), the result says which. All writes keep the previous version if TwinCAT rejects them.",
+            Schema(Req(P("action", "string", "read, write, xml, renumber, comments or flags")),
                    Req(P("path", "string", "tree path of the SFC POU, e.g. TIPC^MyPlc^MyPlc Project^POUs^FB_Sequence")),
                    P("chain", "string", "write: the complete chain in the text form of action=read"),
-                   P("dryRun", "boolean", "write: only show the generated PLCopen XML"),
-                   P("force", "boolean", "write: also when embedded step actions would lose their step (only after asking the user)")),
+                   P("dryRun", "boolean", "write/renumber/comments/flags: only show what would change"),
+                   P("force", "boolean", "write: also when embedded step actions would lose their step; renumber: also when code outside the POU " +
+                                         "references renamed steps; comments: also when they do not look like the language the guidelines require (only after asking the user)"),
+                   P("duplicate", "string", "write: new (default) = new steps get 'Duplicate on copy', all = also existing steps, none = TwinCAT default"),
+                   P("prefix", "string", "renumber: name prefix (default: the existing prefix of the steps, e.g. N)"),
+                   P("start", "integer", "renumber: first number (default 10)"),
+                   P("step", "integer", "renumber: increment (default 10)"),
+                   P("digits", "integer", "renumber: minimum digits, zero-padded (default 3 -> N010)"),
+                   P("steps", "string", "renumber: only these steps - comma-separated (N020,N030) or a range in the chosen order (N020..N070); default all"),
+                   P("order", "string", "renumber: main (default: main sequence first, then the branches in order) or chain (order of action=read)"),
+                   P("renameActions", "boolean", "renumber: rename embedded step actions _a<old>_active -> _a<new>_active (default true)"),
+                   P("comments", "object", "comments: {\"N010\": \"Wait for part present\", ...} - empty text removes a comment"),
+                   P("flags", "object", "flags: {\"SFCInit\": true, \"SFCReset\": false, ...}")),
             a => tc.Sta.Run(() => Sfc(a), 300_000));
+    }
+
+    // one exported SFC POU (PLCopen) with everything the write path needs
+    sealed class SfcCtx
+    {
+        public string Path, PouName, Tmp;
+        public string[] Parts;
+        public int ProjIdx;
+        public ITcSmTreeItem Plc;
+        public XDocument Doc;
+        public XElement Pou, Sfc;
     }
 
     string Sfc(JsonObject a)
@@ -92,64 +125,76 @@ public sealed partial class ToolRegistry
                 var lang = body?.Elements().FirstOrDefault()?.Name.LocalName ?? "?";
                 throw new Exception($"{pouName} is not written in SFC (body: {lang}). Create an SFC POU with tc_plc_create language=SFC.");
             }
+            var ctx = new SfcCtx { Path = path, PouName = pouName, Tmp = tmp, Parts = parts, ProjIdx = projIdx, Plc = plc, Doc = doc, Pou = pou, Sfc = sfc };
             switch (action)
             {
                 case "xml":
                     return Shorten(sfc.ToString(), 60_000);
                 case "read":
-                    return $"SFC {pouName}\n" + SfcToText(sfc) + SfcObjects(pou);
+                    return $"SFC {pouName}\n" + SfcToText(sfc) + DuplicationInfo(sfc) + SfcObjects(pou);
                 case "write":
                 {
                     var chain = Str(a, "chain") ?? throw new Exception("chain is required (text form as returned by action=read)");
+                    var duplicate = (Str(a, "duplicate") ?? "new").ToLowerInvariant();
+                    if (duplicate is not ("new" or "all" or "none")) throw new Exception("duplicate: new (default), all or none");
                     var root = ParseChain(chain);
                     CheckStepNames(root, pou);
                     var transitionObjects = pou.Descendants().Where(e => e.Name.LocalName == "transition" && e.Parent?.Name.LocalName == "transitions")
                                                .Select(e => (string)e.Attribute("name")).Where(n => n != null);
                     var original = new XDocument(doc);
-                    var newSfc = BuildSfc(sfc, root, transitionObjects, out var orphans);
+                    var newSfc = BuildSfc(sfc, root, transitionObjects, out var orphans, duplicate);
                     if (orphans.Count > 0 && !Bool(a, "force", false))
                         throw new Exception($"Nothing was changed: the embedded step actions {string.Join(", ", orphans)} would no longer belong to any step. " +
                                             "Keep the 'EMBEDDED <name>' lines from action=read under the (renamed) step. If they really should go, " +
                                             "ask the user first, then write with force=true - their code is NOT deleted (action objects stay); never delete them as 'empty'.");
                     if (DryRun(a)) return "PROPOSAL (nothing written):\n" + newSfc;
                     sfc.ReplaceWith(newSfc);
-                    FixSfcFlags(pou);
-                    // TwinCAT's import puts objects without folder information into the project root and does not replace an
-                    // object inside a folder: wrap the project structure in the POU's folders, delete the POU, import it new
-                    var folders = parts.Skip(projIdx + 1).Take(parts.Length - projIdx - 2).ToList();
-                    if (!WrapInFolders(doc, folders) || !WrapInFolders(original, folders))
-                        throw new Exception("the PLCopen export has no project structure - the POU cannot be re-imported into its folder; nothing was changed");
-                    doc.Save(tmp);
-                    var backup = tmp + ".orig.xml";
-                    original.Save(backup);
-                    var parentPath = string.Join("^", parts.Take(parts.Length - 1));
-                    try { ((dynamic)tc.Item(parentPath)).DeleteChild(pouName); }
-                    catch { try { File.Delete(backup); } catch { } throw; }
-                    string failure = null;
-                    try { ComCall.Invoke(plc, "PlcOpenImport", tmp, 0); }
-                    catch (Exception ex) { failure = ex.InnerException?.Message ?? ex.Message; }
-                    if (failure == null && !ItemExists(path)) failure = "the POU was not created (see the TwinCAT error list)";
-                    if (failure != null)
-                    {
-                        // put the original back
-                        try { if (ItemExists(path)) ((dynamic)tc.Item(parentPath)).DeleteChild(pouName); } catch { }
-                        try { ComCall.Invoke(plc, "PlcOpenImport", backup, 0); } catch { }
-                        tc.InvalidatePlcIndex();
-                        var restored = ItemExists(path);
-                        if (restored) try { File.Delete(backup); } catch { }      // keep the backup if the restore failed
-                        throw new Exception($"TwinCAT did not accept the chain: {failure}. " +
-                                            (restored ? $"The previous version of {pouName} was restored."
-                                                      : $"The previous version of {pouName} could NOT be restored - re-import {backup} with tc_import kind=plcopen."));
-                    }
-                    try { File.Delete(backup); } catch { }
-                    tc.InvalidatePlcIndex();
-                    var check = Sfc(new JsonObject { ["action"] = "read", ["path"] = path });
-                    return $"SFC chain of {pouName} replaced. Check with tc_check.\n\n" + check;
+                    return SfcReimport(ctx, original, $"SFC chain of {pouName} replaced.");
                 }
-                default: throw new Exception("action: read, write or xml");
+                case "renumber": return SfcRenumber(ctx, a);
+                case "comments": return SfcComments(ctx, a);
+                case "flags": return SfcFlags(ctx, a);
+                default: throw new Exception("action: read, write, xml, renumber, comments or flags");
             }
         }
         finally { try { File.Delete(tmp); } catch { } }
+    }
+
+    // The write path of every changing action: the modified export (c.Doc) replaces the POU. TwinCAT's import puts objects
+    // without folder information into the project root and does not replace an object inside a folder: wrap the project
+    // structure in the POU's folders, delete the POU, import it new; if TwinCAT rejects it, the original export is imported again.
+    string SfcReimport(SfcCtx c, XDocument original, string done)
+    {
+        FixSfcFlags(c.Pou);
+        var folders = c.Parts.Skip(c.ProjIdx + 1).Take(c.Parts.Length - c.ProjIdx - 2).ToList();
+        if (!WrapInFolders(c.Doc, folders) || !WrapInFolders(original, folders))
+            throw new Exception("the PLCopen export has no project structure - the POU cannot be re-imported into its folder; nothing was changed");
+        c.Doc.Save(c.Tmp);
+        var backup = c.Tmp + ".orig.xml";
+        original.Save(backup);
+        var parentPath = string.Join("^", c.Parts.Take(c.Parts.Length - 1));
+        try { ((dynamic)tc.Item(parentPath)).DeleteChild(c.PouName); }
+        catch { try { File.Delete(backup); } catch { } throw; }
+        string failure = null;
+        try { ComCall.Invoke(c.Plc, "PlcOpenImport", c.Tmp, 0); }
+        catch (Exception ex) { failure = ex.InnerException?.Message ?? ex.Message; }
+        if (failure == null && !ItemExists(c.Path)) failure = "the POU was not created (see the TwinCAT error list)";
+        if (failure != null)
+        {
+            // put the original back
+            try { if (ItemExists(c.Path)) ((dynamic)tc.Item(parentPath)).DeleteChild(c.PouName); } catch { }
+            try { ComCall.Invoke(c.Plc, "PlcOpenImport", backup, 0); } catch { }
+            tc.InvalidatePlcIndex();
+            var restored = ItemExists(c.Path);
+            if (restored) try { File.Delete(backup); } catch { }      // keep the backup if the restore failed
+            throw new Exception($"TwinCAT did not accept the change: {failure}. " +
+                                (restored ? $"The previous version of {c.PouName} was restored."
+                                          : $"The previous version of {c.PouName} could NOT be restored - re-import {backup} with tc_import kind=plcopen."));
+        }
+        try { File.Delete(backup); } catch { }
+        tc.InvalidatePlcIndex();
+        var check = Sfc(new JsonObject { ["action"] = "read", ["path"] = c.Path });
+        return $"{done} Check with tc_check.\n\n" + check;
     }
 
     // ================================================================== PLCopen SFC -> text
@@ -230,11 +275,59 @@ public sealed partial class ToolRegistry
         return g;
     }
 
-    // step attributes in addData (TwinCAT): name, comment, embedded actions (main/entry/exit) ...
-    const string NameGuid = "38391c6d-6d4a-42f8-8ee7-9f45e5adafa8", CommentGuid = "7d894980-aeea-405c-a0f6-e2b26429c58f";
+    // element attributes in addData (TwinCAT 4026; the attribute descriptions are stored in the editor XML of the .TcPOU):
+    //   38391c6d Name, 7d894980 Comment, 01580b27 Exclude (from build), bc882c11 Symbol (configuration), 6844a48e InitStep,
+    //   62e1754b Duplication ("Duplicate on copy": copies the implementation of step actions/transitions with the element instead
+    //   of referencing it), cacf1a68 MinTime, b693554c MaxTime, 700a583f MainAction, a6b08bd8 EntryAction, a2621e18 ExitAction,
+    //   8294df19 Monitoring (transitions), 23bdaa98 Parallel (branches), e174fc0d Qualifier (action associations)
+    const string NameGuid = "38391c6d-6d4a-42f8-8ee7-9f45e5adafa8", CommentGuid = "7d894980-aeea-405c-a0f6-e2b26429c58f",
+                 ExcludeGuid = "01580b27-6378-448b-8ecb-0e4b795b58d6", SymbolGuid = "bc882c11-1e91-4dd8-a6b8-2075724ed18b",
+                 InitStepGuid = "6844a48e-46c2-4cc8-a185-a478f3b99cc0", DuplicationGuid = "62e1754b-7629-4e63-9cec-10ae0c536f1f";
     static IEnumerable<(string Guid, string Value)> StepAttributes(XElement step) =>
         step.Elements().Where(x => x.Name.LocalName == "addData").Descendants().Where(x => x.Name.LocalName == "attribute")
             .Select(x => (((string)x.Attribute("guid") ?? "").ToLowerInvariant(), x.Value.Trim()));
+
+    /// <summary>The attribute element with this guid in the addData of a step/element (or below an addData element), else null.</summary>
+    static XElement ElementAttr(XElement container, string guid) =>
+        container.Descendants().FirstOrDefault(x => x.Name.LocalName == "attribute" && string.Equals((string)x.Attribute("guid"), guid, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Sets an addData attribute, adds it to the attribute list if missing (a comment right after the name); false without a list.</summary>
+    static bool SetElementAttr(XElement container, string guid, string value)
+    {
+        if (ElementAttr(container, guid) is { } at) { at.Value = value; return true; }
+        var list = container.Descendants().FirstOrDefault(x => x.Name.LocalName == "attributes");
+        if (list == null) return false;
+        var ne = new XElement(list.Name.Namespace + "attribute", new XAttribute("guid", guid), value);
+        var name = guid == CommentGuid ? ElementAttr(list, NameGuid) : null;
+        if (name != null) name.AddAfterSelf(ne); else list.Add(ne);
+        return true;
+    }
+
+    /// <summary>addData of a new step in the form of TwinCAT's own export.</summary>
+    static XElement NewStepData(XNamespace ns, string name, bool initial, string comment, bool duplicate)
+    {
+        var list = new XElement("attributes", new XElement("attribute", new XAttribute("guid", NameGuid), name));
+        if (!string.IsNullOrEmpty(comment)) list.Add(new XElement("attribute", new XAttribute("guid", CommentGuid), comment));
+        list.Add(new XElement("attribute", new XAttribute("guid", ExcludeGuid), "FALSE"),
+                 new XElement("attribute", new XAttribute("guid", SymbolGuid), "0"),
+                 new XElement("attribute", new XAttribute("guid", InitStepGuid), initial ? "TRUE" : "FALSE"),
+                 new XElement("attribute", new XAttribute("guid", DuplicationGuid), duplicate ? "TRUE" : "FALSE"));
+        return new XElement(ns + "addData",
+                            new XElement(ns + "data", new XAttribute("name", "http://www.3s-software.com/plcopenxml/sfc/element"),
+                                         new XAttribute("handleUnknown", "implementation"), list));
+    }
+
+    // read: which steps copy their embedded actions when copied in the editor ("Duplicate on copy")
+    static string DuplicationInfo(XElement sfc)
+    {
+        var on = new List<string>(); var off = new List<string>();
+        foreach (var st in sfc.Elements().Where(e => e.Name.LocalName == "step"))
+            (string.Equals(ElementAttr(st, DuplicationGuid)?.Value.Trim(), "TRUE", StringComparison.OrdinalIgnoreCase) ? on : off).Add((string)st.Attribute("name") ?? "?");
+        if (on.Count + off.Count == 0) return "";
+        if (off.Count == 0) return "// Duplicate on copy: on for all steps\n";
+        return "// Duplicate on copy (copying a step in the editor copies its embedded actions instead of referencing them): " +
+               $"on: {(on.Count > 0 ? string.Join(", ", on) : "-")}; off: {string.Join(", ", off)} - action=write duplicate=all switches it on for all steps\n";
+    }
 
     static HashSet<string> ActionObjectNames(XElement sfc)
     {
@@ -568,15 +661,17 @@ public sealed partial class ToolRegistry
         public readonly Dictionary<string, XElement> StepData = new(StringComparer.OrdinalIgnoreCase);   // addData of existing steps (embedded actions, comment)
         public readonly Dictionary<string, XElement> EmbeddedData = new(StringComparer.OrdinalIgnoreCase);   // embedded action name -> addData of its step
         public readonly HashSet<XElement> UsedData = new();
+        public string Duplicate = "new";          // new: new steps get "Duplicate on copy"; all: also existing steps; none: TwinCAT default
     }
 
     static XElement BuildSfc(XElement oldSfc, List<SfcNode> chain, IEnumerable<string> transitionObjects = null) =>
         BuildSfc(oldSfc, chain, transitionObjects, out _);
 
-    static XElement BuildSfc(XElement oldSfc, List<SfcNode> chain, IEnumerable<string> transitionObjects, out List<string> orphans)
+    static XElement BuildSfc(XElement oldSfc, List<SfcNode> chain, IEnumerable<string> transitionObjects, out List<string> orphans, string duplicate = "new")
     {
         var b = new SfcBuilder
         {
+            Duplicate = duplicate ?? "new",
             TransitionObjects = new HashSet<string>(transitionObjects ?? Enumerable.Empty<string>(), StringComparer.OrdinalIgnoreCase),
             Ns = oldSfc.Name.Namespace,
             StepTpl = oldSfc.Elements().FirstOrDefault(e => e.Name.LocalName == "step"),
@@ -648,8 +743,8 @@ public sealed partial class ToolRegistry
                         if (n.Embedded.Count > 0) throw new Exception($"STEP {n.Name}: the embedded actions {string.Join(", ", n.Embedded)} are already used by another step");
                         keep = null;                                                    // renamed step kept its data elsewhere
                     }
-                    if (keep == null && !string.IsNullOrEmpty(n.Comment))
-                        throw new Exception($"STEP {n.Name}: COMMENT works only for existing steps (set comments of new steps in the IDE)");
+                    if (keep == null && !string.IsNullOrEmpty(n.Comment) && b.Duplicate == "none")
+                        throw new Exception($"STEP {n.Name}: with duplicate=none COMMENT works only for existing steps (set comments of new steps in the IDE)");
                     if (keep != null)
                     {
                         var data = new XElement(keep);
@@ -658,9 +753,14 @@ public sealed partial class ToolRegistry
                             var g = ((string)at.Attribute("guid") ?? "").ToLowerInvariant();
                             if (g == NameGuid) at.Value = n.Name;
                             else if (g == CommentGuid && n.Comment != null && Regex.Replace(at.Value.Trim(), @"\s+", " ") != n.Comment) at.Value = n.Comment;
+                            else if (g == InitStepGuid) at.Value = n.Initial ? "TRUE" : "FALSE";        // the kept data may come from a former initial step
                         }
+                        if (!string.IsNullOrEmpty(n.Comment) && ElementAttr(data, CommentGuid) == null) SetElementAttr(data, CommentGuid, n.Comment);
+                        if (b.Duplicate == "all") SetElementAttr(data, DuplicationGuid, "TRUE");
                         e.Add(data);
                     }
+                    else if (b.Duplicate != "none")
+                        e.Add(NewStepData(b.Ns, n.Name, n.Initial, n.Comment, true));      // user preference: embedded actions are duplicated on copy
                     b.Out.Add(e);
                     if (n.Actions.Count > 0)
                     {
