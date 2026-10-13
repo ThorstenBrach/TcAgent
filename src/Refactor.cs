@@ -427,6 +427,8 @@ public sealed partial class ToolRegistry
                 return acc;
             }));
         else parts.Add((p.Path, "implementation", p.Impl));
+        if (p.Lang != "ST" && string.IsNullOrEmpty(p.Impl) && p.Kind is "PROGRAM" or "FUNCTION_BLOCK" or "FUNCTION" or "METHOD" or "ACTION")
+            plan.Warnings.Add($"{p.Key} has a graphical body ({p.Lang}) - it is not changed; check transition conditions there by hand (tc_sfc read)");
         foreach (var (path, part, text) in parts)
         {
             if (string.IsNullOrEmpty(text)) continue;
@@ -500,6 +502,25 @@ public sealed partial class ToolRegistry
     }
 
     // '// comment' at the end of the declaration line of a variable, struct field or enum value (replacing a trailing comment)
+    // aligns a new trailing comment with the comments of the neighbouring declarations in the same VAR block
+    static string CommentPad(string[] lines, int at, int codeLen)
+    {
+        foreach (var dir in new[] { -1, 1 })
+            for (int j = at + dir; j >= 0 && j < lines.Length; j += dir)
+            {
+                var l = lines[j];
+                if (l == null) continue;
+                if (Regex.IsMatch(l, @"^\s*(END_)?(VAR\w*|STRUCT|TYPE)\b", RegexOptions.IgnoreCase)) break;
+                var m = Regex.Match(l, @"^(\s*\w[^/]*?;)(\s*)//");
+                if (m.Success && !l.Contains('\t'))
+                {
+                    int col = m.Groups[1].Length + m.Groups[2].Length;
+                    if (col > codeLen) return new string(' ', col - codeLen);
+                }
+            }
+        return "   ";
+    }
+
     internal static string SetLineComment(string decl, string name, string comment, bool dut)
     {
         var nl = decl.Contains("\r\n") ? "\r\n" : "\n";
@@ -516,7 +537,7 @@ public sealed partial class ToolRegistry
             if (Regex.IsMatch(code, $@"^\s*{Regex.Escape(name)}\s*,", RegexOptions.IgnoreCase) && Regex.IsMatch(code, @":(?!=)")) continue;   // 'a, b : INT;' - skip multi-declarations
             // a /// line directly above documents the variable as well - drop it, the new comment replaces it
             if (i > 0 && lines[i - 1].TrimStart().StartsWith("///")) lines[i - 1] = null;
-            lines[i] = code.TrimEnd() + "\t// " + comment;
+            lines[i] = code.TrimEnd() + CommentPad(lines, i, code.TrimEnd().Length) + "// " + comment;
             return string.Join(nl, lines.Where(x => x != null));
         }
         return decl;

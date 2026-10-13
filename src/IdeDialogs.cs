@@ -51,6 +51,8 @@ public static class IdeDialogs
             // classic message boxes always count; other owned windows only while the main window is blocked
             if (!isMessageBox && !(modal && GetWindow(h, GW_OWNER) != IntPtr.Zero && IsWindowEnabled(h))) return true;
             var title = TextOf(h);
+            // TcAgent's own confirmations (tc_refactor choice, confirm) wait for the user on purpose - not a blocking IDE dialog
+            if (title.StartsWith("TcAgent", StringComparison.OrdinalIgnoreCase)) return true;
             var texts = new List<string>(); var buttons = new List<string>();
             EnumChildWindows(h, (c, __) =>
             {

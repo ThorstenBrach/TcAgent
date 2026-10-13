@@ -65,6 +65,9 @@ public sealed class PlcDoc
             string decl = null, impl = null;
             try { if (it is ITcPlcDeclaration dd) decl = dd.DeclarationText; } catch { }
             try { if (it is ITcPlcImplementation ii) impl = ii.ImplementationText; } catch { }
+            // graphical bodies: ImplementationText may return the internal editor XML (<SFC><XmlArchive>...) instead of ""
+            string xmlLang = null;
+            if (impl != null && Regex.Match(impl.TrimStart(), @"^<(SFC|CFC|FBD|LD|UML\w*)\b") is { Success: true } gm) { xmlLang = gm.Groups[1].Value.ToUpperInvariant(); impl = ""; }
             var parentPath = path.Contains('^') ? path[..path.LastIndexOf('^')] : "";
             var kind = KindOf(decl, type);
             if (kind == null)
@@ -89,8 +92,8 @@ public sealed class PlcDoc
             }
             if (string.IsNullOrWhiteSpace(impl) && kind is "PROGRAM" or "FUNCTION_BLOCK" or "FUNCTION" or "METHOD" or "ACTION")
             {
-                pou.Lang = "GRAPHIC";        // no text implementation: SFC, FBD, LD or CFC
-                try
+                pou.Lang = xmlLang ?? "GRAPHIC";        // no text implementation: SFC, FBD, LD or CFC
+                if (xmlLang == null) try
                 {
                     var lang = ComCall.Get(it, "Language")?.ToString() ?? "";
                     lang = Regex.Replace(lang, @"^.*_", "").ToUpperInvariant();
