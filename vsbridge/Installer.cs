@@ -104,9 +104,20 @@ namespace TcAgentBridge
             foreach (var d in Directory.GetDirectories(root))
             {
                 if (string.Equals(Path.GetFileName(d), BridgePackage.BridgeVersion, StringComparison.OrdinalIgnoreCase)) continue;
+                // a client (TcAgent Chat, Claude Desktop ...) may still run TcAgent.exe from there: a recursive delete would remove
+                // the not yet loaded DLLs under the running process and break it (every tool then fails with an empty error)
+                if (InUse(Path.Combine(d, "TcAgent.exe"))) { log("old version still in use, kept: " + d); continue; }
                 try { Directory.Delete(d, true); log("old version removed: " + d); }
                 catch { /* still in use by a client - next time */ }
             }
+        }
+
+        static bool InUse(string exe)
+        {
+            if (!File.Exists(exe)) return false;
+            try { using (new FileStream(exe, FileMode.Open, FileAccess.ReadWrite, FileShare.None)) return false; }
+            catch (IOException) { return true; }
+            catch (UnauthorizedAccessException) { return true; }
         }
 
         static (int, string) RunSetup()

@@ -53,6 +53,10 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
 
 - `tc_sfc action=read path=<POU>` shows the chain as text: `STEP Init INITIAL`, `ACTION N A_Init`, `TRANSITION bStart`,
   `ALTERNATIVE`/`PARALLEL` with `BRANCH` ... `END_ALTERNATIVE`/`END_PARALLEL`, `JUMP Init`, plus the action/transition objects.
+  Under a step, `EMBEDDED _aN010_active` names its embedded action (main/entry/exit) and `COMMENT ...` its comment: keep these
+  lines when writing, also when renaming the step - otherwise the write is refused (the actions would lose their step).
+- Never delete action objects because they look empty: graphical actions (FBD/LD/CFC) and embedded step actions are shown
+  without text. `tc_delete` writes a backup (`%LOCALAPPDATA%\TcAgent\backup\delete`, restore with `tc_import kind=plcopen`).
 - New chain: `tc_plc_create language=SFC`, then the actions (`tc_plc_create kind=action parentPath=<POU>`, ST code) and
   transitions with code if needed (`kind=transition`), then `tc_sfc action=write chain=...` with the complete chain.
   A transition line holds an ST condition (`bDone AND NOT bError`) or the name of a transition object.
@@ -142,6 +146,7 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
 ## Tasks, boot project, startup mode, licenses
 
 - `tc_task action=list|create|set` - create real-time tasks or set cycle time (`cycleUs`), priority, AutoStart; takes effect after `tc_activate`.
+- `tc_task action=assign name=PlcTask program=MAIN` - PLC task reference + program call; without it the PLC has no process image (no links).
 - `tc_boot_project` - PLC boot project autostart on/off (`autostart`), generate boot project (`generate`).
 - `tc_runtime_startup mode=run|config` - runtime startup mode after boot (local only so far, needs admin rights).
 - `tc_licenses` - read the solution's license node; change via `tc_xml_set`. **Only the user activates trial licenses**

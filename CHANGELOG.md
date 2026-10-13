@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 ## [0.20.2] – not released yet
 
 ### Added
+- `tc_task action=assign`: PLC task reference and program call (process image) - feedback from agents.
+- `tc_delete` writes a backup before deleting (PLCopen XML / ProduceXml in `%LOCALAPPDATA%\TcAgent\backup\delete`).
+- `tc_sfc`: `EMBEDDED <action>` and `COMMENT <text>` lines under steps; embedded actions follow a renamed step.
 - **User manual** – `tc_userdoc`: manual of FBs, functions, interfaces and the structs/enums they use, in the style and
   format of example documents you provide (Markdown, AsciiDoc or HTML); missing comments are explained from the code.
 - **Refactoring** – `tc_refactor`: meaningful names and comments for the marked range or the clicked method, FB, function,
@@ -45,6 +48,11 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - `install-xaeshell.ps1` also installs into the 64-bit XAE Shell (VS 2022 base).
 
 ### Fixed
+- Data loss (agent feedback): `tc_sfc write` with renamed steps detached their embedded actions, `read` showed graphical
+  actions as empty, and the agent then deleted them. Now the write is refused when embedded actions would lose their step,
+  graphical actions are labelled, and `tc_delete` keeps a backup.
+- Installing an update removed the previous version's folder although a TcAgent Chat process still ran from it - every tool
+  of that process then failed with an empty `Error:`. Folders in use are kept; errors are never empty and name the cause.
 - `tc_refactor` rename: transition conditions and embedded code of SFC charts are renamed too (chart rewritten via `tc_sfc write`).
 - `tc_check` no longer counts the build log of HMI projects (nuget restore, virtual mappings ...) as warnings.
 - TcAgent's own confirmation dialogs (refactoring choice) were treated as blocking IDE dialogs - the call aborted early.

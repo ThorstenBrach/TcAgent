@@ -158,9 +158,15 @@ public sealed partial class ToolRegistry
             Schema(Req(P("path", "string", "Tree path")), Req(P("xml", "string", "XML in the format of ProduceXml (only the parts to change)"))),
             a => tc.Sta.Run(() => { ((dynamic)tc.Item(Str(a, "path"))).ConsumeXml(Str(a, "xml")); return "OK"; }));
 
-        Add("tc_delete", "Deletes a child item in the tree.",
+        Add("tc_delete", "Deletes a child item in the tree. A backup is written first (PLC objects as PLCopen XML, restorable with " +
+                         "tc_import kind=plcopen). Never delete PLC objects only because they look empty (graphical code, embedded SFC actions).",
             Schema(Req(P("parentPath", "string", "Path of the parent item")), Req(P("name", "string", "Name of the child"))),
-            a => tc.Sta.Run(() => { ((dynamic)tc.Item(Str(a, "parentPath"))).DeleteChild(Str(a, "name")); return "deleted"; }));
+            a => tc.Sta.Run(() =>
+            {
+                var backup = BackupBeforeDelete(Str(a, "parentPath"), Str(a, "name"));
+                ((dynamic)tc.Item(Str(a, "parentPath"))).DeleteChild(Str(a, "name"));
+                return "deleted" + (backup != null ? $" - backup: {backup}" : " (no backup possible)");
+            }));
 
         // ---------------------------------------------------------- Create I/O devices
         Add("tc_io_add", "Creates I/O configuration: devices under TIID (e.g. EtherCAT master), below them boxes/couplers/terminals by " +
@@ -341,9 +347,12 @@ public sealed partial class ToolRegistry
             Schema(), a => tc.Sta.Run(() => tc.TestResults()));
 
         // ---------------------------------------------------------- Tasks, boot project, startup mode, licenses
-        Add("tc_task", "Real-time tasks: list, create (name, cycleUs, priority, withImage) or set (path, cycleUs, priority, autoStart, cores). " +
-                       "Takes effect only after tc_activate. The PLC task assignment is in the PLC instance (tc_tree/tc_xml_get).",
-            Schema(Req(P("action", "string", "list, create or set")),
+        Add("tc_task", "Real-time tasks: list, create (name, cycleUs, priority, withImage), set (path, cycleUs, priority, autoStart, cores) or " +
+                       "assign (name = TIRT task, program = POU called by it, default MAIN, plcProjectPath): creates the PLC task reference " +
+                       "and the program call - without it a PLC has no process image and nothing can be linked. Takes effect only after tc_activate.",
+            Schema(Req(P("action", "string", "list, create, set or assign")),
+                   P("program", "string", "assign: program called by the task (default MAIN)"),
+                   P("plcProjectPath", "string", "assign: PLC project, e.g. TIPC^MyPlc^MyPlc Project (empty = the only one)"),
                    P("name", "string", "create: task name"), P("path", "string", "set: tree path of the task, e.g. TIRT^PlcTask"),
                    P("cycleUs", "integer", "Cycle time in microseconds, e.g. 1000 = 1 ms"),
                    P("priority", "integer", "Priority (lower = higher)"), P("autoStart", "boolean", "Start task automatically"),
@@ -1165,6 +1174,24 @@ public sealed partial class ToolRegistry
             }
             return o.Length == 0 ? "No tasks under TIRT." : o.ToString();
         }
+        if (action == "assign")
+        {
+            // PLC task reference (<task>.TcTTO in the PLC project, linked by name to TIRT^<task>) plus the program call
+            var taskName = Str(a, "name") ?? throw new Exception("name is required: the TIRT task, e.g. PlcTask");
+            try { tc.Item("TIRT^" + taskName); } catch { throw new Exception($"task TIRT^{taskName} not found - create it first with action=create"); }
+            var plc = PlcProject(Str(a, "plcProjectPath"));
+            var program = Str(a, "program") ?? "MAIN";
+            var tref = TwinCatSession.Children(plc).FirstOrDefault(c => string.Equals(c.Name, taskName, StringComparison.OrdinalIgnoreCase));
+            var hasCall = tref != null && TwinCatSession.Children(tref).Any(c => string.Equals(c.Name, program, StringComparison.OrdinalIgnoreCase));
+            var plan = (tref == null ? $"create task reference {plc.PathName}^{taskName}\n" : "") + (hasCall ? "" : $"add program call {program}\n");
+            if (plan.Length == 0) return $"{program} is already called by {taskName} in {plc.PathName} - nothing to do.";
+            if (DryRun(a)) return "PROPOSAL (nothing changed):\n" + plan;
+            if (tref == null) tref = (ITcSmTreeItem)((dynamic)plc).CreateChild(taskName, 621, "", null);
+            if (!hasCall) ((dynamic)tref).CreateChild(program, 650, "", null);
+            tc.InvalidatePlcIndex();
+            return "Done:\n" + plan + $"Program calls of {taskName}: {string.Join(", ", TwinCatSession.Children(tref).Select(c => c.Name))}\n" +
+                   "Build (tc_build) to generate the process image; takes effect on the target after tc_activate.";
+        }
         ITcSmTreeItem task;
         if (action == "create")
         {
@@ -1356,7 +1383,7 @@ public sealed partial class ToolRegistry
             text = RunWatchingDialogs(name, () => t.Handler(args));
             Log.Info($"{name} done ({sw.ElapsedMilliseconds} ms)");
         }
-        catch (Exception ex) { text = "Error: " + (ex.InnerException?.Message ?? ex.Message); isError = true; Log.Error($"{name}: {ex}"); }
+        catch (Exception ex) { text = "Error: " + ErrorText(ex); isError = true; Log.Error($"{name}: {ex}"); }
         finally { try { File.Delete(busy); } catch { } }
         // lessons learned: recall known solutions for this error, remind to save one after a hard-won success
         if (name != "tc_lessons" && Environment.GetEnvironmentVariable("TCAGENT_LESSONS_RECALL") != "0")
@@ -1399,6 +1426,62 @@ public sealed partial class ToolRegistry
                                 "Further TwinCAT calls wait until then.");
         }
         return task.GetAwaiter().GetResult();
+    }
+
+    /// <summary>Readable error text - never empty (FileNotFoundException etc. have an empty Message).</summary>
+    static string ErrorText(Exception ex)
+    {
+        var e = ex;
+        while ((e is AggregateException || e is System.Reflection.TargetInvocationException) && e.InnerException != null) e = e.InnerException;
+        if (e.InnerException != null && string.IsNullOrWhiteSpace(e.Message)) e = e.InnerException;
+        var msg = e.Message;
+        if (e is FileNotFoundException or FileLoadException)
+        {
+            var file = (e as FileNotFoundException)?.FileName ?? (e as FileLoadException)?.FileName;
+            msg = $"{e.GetType().Name}: {file} {msg}".Trim();
+            if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "TcAgent.dll")) && !File.Exists(Path.Combine(AppContext.BaseDirectory, "TcAgent.exe")) ||
+                file?.StartsWith("System.", StringComparison.Ordinal) == true)
+                msg += " - the files of this running TcAgent were removed or replaced (update while it was running). " +
+                       "Restart the AI client: TcAgent Chat (close/reopen the chat window or restart Visual Studio), Claude Desktop (tray icon > Quit).";
+        }
+        if (string.IsNullOrWhiteSpace(msg)) msg = e.GetType().Name;
+        return msg;
+    }
+
+    /// <summary>Saves the item before tc_delete: PLC objects as PLCopen XML (tc_import kind=plcopen), others as ProduceXml.
+    /// Returns the backup file or null.</summary>
+    string BackupBeforeDelete(string parentPath, string name)
+    {
+        var dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backup", "delete");
+        Directory.CreateDirectory(dir);
+        var stamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
+        var safe = string.Concat(name.Select(c => Path.GetInvalidFileNameChars().Contains(c) ? '_' : c));
+        var path = parentPath + "^" + name;
+        var parts = path.Split('^');
+        try
+        {
+            for (int i = 1; i < parts.Length - 1; i++)
+            {
+                var candidate = string.Join("^", parts.Take(i + 1));
+                ITcSmTreeItem it;
+                try { it = tc.Item(candidate); } catch { continue; }
+                if (it.ItemType != 600) continue;                       // PLC project
+                var file = Path.Combine(dir, $"{stamp}_{safe}.xml");
+                ComCall.Invoke(it, "PlcOpenExport", file, string.Join(".", parts.Skip(i + 1)));
+                if (File.Exists(file)) return file;
+                break;
+            }
+        }
+        catch (Exception ex) { Log.Info("tc_delete backup (PLCopen): " + ex.Message); }
+        try
+        {
+            string xml = ((dynamic)tc.Item(path)).ProduceXml(true);
+            var file = Path.Combine(dir, $"{stamp}_{safe}.producexml.xml");
+            File.WriteAllText(file, xml);
+            return file;
+        }
+        catch (Exception ex) { Log.Info("tc_delete backup (ProduceXml): " + ex.Message); }
+        return null;
     }
 
     static (string name, JsonObject def, bool req) P(string name, string type, string desc) =>

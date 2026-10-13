@@ -47,14 +47,17 @@ public sealed partial class ToolRegistry
         Add("tc_sfc", "Sequential function charts (SFC step chains): action=read returns the chain as text (steps, actions, transitions, " +
                       "ALTERNATIVE/PARALLEL branches, jumps) plus the action/transition objects with their code; action=write replaces the chain " +
                       "with the given text (same form as read: 'STEP Init INITIAL', 'ACTION N A_Init', 'TRANSITION bStart', 'ALTERNATIVE' / 'PARALLEL' " +
-                      "with 'BRANCH' ... 'END_ALTERNATIVE' / 'END_PARALLEL', 'JUMP Init'); action=xml shows the raw PLCopen SFC body. " +
+                      "with 'BRANCH' ... 'END_ALTERNATIVE' / 'END_PARALLEL', 'JUMP Init'; under a step 'EMBEDDED _aN010_active' = its embedded action (keep " +
+                      "these lines - also when renaming the step - or the action loses its step) and 'COMMENT text'); action=xml shows the raw PLCopen SFC body. " +
+                      "Action objects shown as graphical or embedded are never 'empty/unused' - do not delete them. " +
                       "Create the POU first with tc_plc_create language=SFC, actions/transitions with code with tc_plc_create kind=action/transition " +
                       "(parentPath = the POU). Step names become variables of the POU: never name a step like a variable, action or keyword " +
                       "(Move, Error, Done ...) - use S_Init, S_Move ... Read before writing; check with tc_check afterwards.",
             Schema(Req(P("action", "string", "read, write or xml")),
                    Req(P("path", "string", "tree path of the SFC POU, e.g. TIPC^MyPlc^MyPlc Project^POUs^FB_Sequence")),
                    P("chain", "string", "write: the complete chain in the text form of action=read"),
-                   P("dryRun", "boolean", "write: only show the generated PLCopen XML")),
+                   P("dryRun", "boolean", "write: only show the generated PLCopen XML"),
+                   P("force", "boolean", "write: also when embedded step actions would lose their step (only after asking the user)")),
             a => tc.Sta.Run(() => Sfc(a), 300_000));
     }
 
@@ -103,7 +106,11 @@ public sealed partial class ToolRegistry
                     var transitionObjects = pou.Descendants().Where(e => e.Name.LocalName == "transition" && e.Parent?.Name.LocalName == "transitions")
                                                .Select(e => (string)e.Attribute("name")).Where(n => n != null);
                     var original = new XDocument(doc);
-                    var newSfc = BuildSfc(sfc, root, transitionObjects);
+                    var newSfc = BuildSfc(sfc, root, transitionObjects, out var orphans);
+                    if (orphans.Count > 0 && !Bool(a, "force", false))
+                        throw new Exception($"Nothing was changed: the embedded step actions {string.Join(", ", orphans)} would no longer belong to any step. " +
+                                            "Keep the 'EMBEDDED <name>' lines from action=read under the (renamed) step. If they really should go, " +
+                                            "ask the user first, then write with force=true - their code is NOT deleted (action objects stay); never delete them as 'empty'.");
                     if (DryRun(a)) return "PROPOSAL (nothing written):\n" + newSfc;
                     sfc.ReplaceWith(newSfc);
                     FixSfcFlags(pou);
@@ -223,9 +230,24 @@ public sealed partial class ToolRegistry
         return g;
     }
 
+    // step attributes in addData (TwinCAT): name, comment, embedded actions (main/entry/exit) ...
+    const string NameGuid = "38391c6d-6d4a-42f8-8ee7-9f45e5adafa8", CommentGuid = "7d894980-aeea-405c-a0f6-e2b26429c58f";
+    static IEnumerable<(string Guid, string Value)> StepAttributes(XElement step) =>
+        step.Elements().Where(x => x.Name.LocalName == "addData").Descendants().Where(x => x.Name.LocalName == "attribute")
+            .Select(x => (((string)x.Attribute("guid") ?? "").ToLowerInvariant(), x.Value.Trim()));
+
+    static HashSet<string> ActionObjectNames(XElement sfc)
+    {
+        var pou = sfc.Ancestors().FirstOrDefault(e => e.Name.LocalName == "pou");
+        return new HashSet<string>(pou?.Descendants().Where(e => e.Name.LocalName == "action" && e.Parent?.Name.LocalName == "actions")
+                                       .Select(e => (string)e.Attribute("name")).Where(n => n != null) ?? Enumerable.Empty<string>(),
+                                   StringComparer.OrdinalIgnoreCase);
+    }
+
     static string SfcToText(XElement sfc)
     {
         var g = Graph(sfc);
+        var actionObjects = ActionObjectNames(sfc);
         var o = new StringBuilder();
         var start = g.Nodes.Values.FirstOrDefault(e => e.Name.LocalName == "step" && ((string)e.Attribute("initialStep")) == "true")
                     ?? g.Nodes.Values.FirstOrDefault(e => !Inputs(e).Any(i => g.Nodes.ContainsKey(i)))
@@ -248,6 +270,11 @@ public sealed partial class ToolRegistry
                 {
                     case "step":
                         o.AppendLine($"{ind}STEP {(string)e.Attribute("name")}{(((string)e.Attribute("initialStep")) == "true" ? " INITIAL" : "")}");
+                        foreach (var (guid, val) in StepAttributes(e))
+                        {
+                            if (guid == CommentGuid && val.Length > 0) o.AppendLine($"{ind}  COMMENT {Regex.Replace(val, @"\s+", " ")}");
+                            else if (guid != NameGuid && actionObjects.Contains(val)) o.AppendLine($"{ind}  EMBEDDED {val}");
+                        }
                         if (g.ActionsOf.TryGetValue(id, out var acts)) foreach (var x in acts) o.AppendLine($"{ind}  {x}");
                         break;
                     case "transition":
@@ -293,7 +320,11 @@ public sealed partial class ToolRegistry
         foreach (var kind in new[] { "action", "transition" })
             foreach (var x in pou.Descendants().Where(e => e.Name.LocalName == kind && e.Parent?.Name.LocalName == kind + "s"))
             {
-                var code = StText(x.Elements().FirstOrDefault(e => e.Name.LocalName == "body"));
+                var body = x.Elements().FirstOrDefault(e => e.Name.LocalName == "body");
+                var lang = body?.Elements().FirstOrDefault(e => e.Name.LocalName != "addData")?.Name.LocalName ?? "?";
+                string code;
+                if (lang == "ST") { code = StText(body); if (string.IsNullOrWhiteSpace(code)) code = "(empty)"; }
+                else code = $"(code in {lang} - graphical, not shown as text; it is NOT empty if the IDE shows elements - never delete it as unused)";
                 o.AppendLine($"\n{kind.ToUpperInvariant()} OBJECT {(string)x.Attribute("name")}:\n{code}");
             }
         return o.Length > 0 ? "\nObjects of the POU (edit with tc_plc_read/tc_plc_write):" + o : "";
@@ -376,6 +407,8 @@ public sealed partial class ToolRegistry
         public string Name;                       // step name, condition, jump target
         public bool Initial;
         public readonly List<(string q, string dur, string action)> Actions = new();
+        public readonly List<string> Embedded = new();   // embedded step actions (main/entry/exit) - action objects like _aN010_active
+        public string Comment;                            // step comment
         public readonly List<List<SfcNode>> Branches = new();
     }
 
@@ -416,6 +449,15 @@ public sealed partial class ToolRegistry
                         list[^1].Actions.Add((m.Groups[1].Value.ToUpperInvariant(), m.Groups[3].Success ? m.Groups[3].Value : null, m.Groups[4].Value));
                         break;
                     }
+                    case "EMBEDDED":
+                        if (list.Count == 0 || list[^1].Kind != "step") throw new Exception($"line '{l}': EMBEDDED must follow a STEP");
+                        if (!Regex.IsMatch(rest, @"^[A-Za-z_][A-Za-z0-9_]*$")) throw new Exception($"line '{l}': EMBEDDED <action object name>, e.g. EMBEDDED _aN010_active");
+                        list[^1].Embedded.Add(rest);
+                        break;
+                    case "COMMENT":
+                        if (list.Count == 0 || list[^1].Kind != "step") throw new Exception($"line '{l}': COMMENT must follow a STEP");
+                        list[^1].Comment = rest;
+                        break;
                     case "TRANSITION":
                         list.Add(new SfcNode { Kind = "transition", Name = rest.Length == 0 ? "TRUE" : rest.TrimEnd(';') });
                         break;
@@ -439,7 +481,7 @@ public sealed partial class ToolRegistry
                         break;
                     }
                     default:
-                        throw new Exception($"line '{l}': unknown keyword {kw} (STEP, ACTION, TRANSITION, ALTERNATIVE, PARALLEL, BRANCH, END_ALTERNATIVE, END_PARALLEL, JUMP)");
+                        throw new Exception($"line '{l}': unknown keyword {kw} (STEP, ACTION, EMBEDDED, COMMENT, TRANSITION, ALTERNATIVE, PARALLEL, BRANCH, END_ALTERNATIVE, END_PARALLEL, JUMP)");
                 }
             }
             return list;
@@ -524,9 +566,14 @@ public sealed partial class ToolRegistry
         public XElement StepTpl, TransTpl;
         public HashSet<string> TransitionObjects = new(StringComparer.OrdinalIgnoreCase);
         public readonly Dictionary<string, XElement> StepData = new(StringComparer.OrdinalIgnoreCase);   // addData of existing steps (embedded actions, comment)
+        public readonly Dictionary<string, XElement> EmbeddedData = new(StringComparer.OrdinalIgnoreCase);   // embedded action name -> addData of its step
+        public readonly HashSet<XElement> UsedData = new();
     }
 
-    static XElement BuildSfc(XElement oldSfc, List<SfcNode> chain, IEnumerable<string> transitionObjects = null)
+    static XElement BuildSfc(XElement oldSfc, List<SfcNode> chain, IEnumerable<string> transitionObjects = null) =>
+        BuildSfc(oldSfc, chain, transitionObjects, out _);
+
+    static XElement BuildSfc(XElement oldSfc, List<SfcNode> chain, IEnumerable<string> transitionObjects, out List<string> orphans)
     {
         var b = new SfcBuilder
         {
@@ -538,8 +585,16 @@ public sealed partial class ToolRegistry
         foreach (var st in oldSfc.Elements().Where(e => e.Name.LocalName == "step"))
             if ((string)st.Attribute("name") is { } nm && st.Elements().FirstOrDefault(e => e.Name.LocalName == "addData") is { } ad)
                 b.StepData[nm] = ad;
+        var actionObjects = ActionObjectNames(oldSfc);
+        foreach (var st in oldSfc.Elements().Where(e => e.Name.LocalName == "step"))
+            if (st.Elements().FirstOrDefault(e => e.Name.LocalName == "addData") is { } ad)
+                foreach (var (guid, val) in StepAttributes(st))
+                    if (guid != NameGuid && actionObjects.Contains(val)) b.EmbeddedData[val] = ad;
         EmitSeq(b, chain, new List<string>(), 0);
         var sfc = new XElement(oldSfc.Name, oldSfc.Attributes(), b.Out);
+        // embedded step actions that are no longer attached to any step would be orphaned (their code stays, but nothing runs it)
+        var still = new HashSet<string>(sfc.Elements().Where(e => e.Name.LocalName == "step").SelectMany(st => StepAttributes(st)).Select(a => a.Value), StringComparer.OrdinalIgnoreCase);
+        orphans = b.EmbeddedData.Keys.Where(k => !still.Contains(k)).OrderBy(k => k).ToList();
         return sfc;
     }
 
@@ -578,7 +633,32 @@ public sealed partial class ToolRegistry
                     e.Add(Pos(b, x));
                     if (prev.Count > 0) e.Add(In(b, prev));
                     e.Add(new XElement(b.Ns + "connectionPointOut", new XAttribute("formalParameter", "sfc")));
-                    if (b.StepData.TryGetValue(n.Name, out var keep)) e.Add(new XElement(keep));     // embedded step actions, comment
+                    // embedded step actions and comment: follow the EMBEDDED names (also when the step was renamed), else the step name
+                    XElement keep = null;
+                    foreach (var emb in n.Embedded)
+                    {
+                        if (!b.EmbeddedData.TryGetValue(emb, out var ed))
+                            throw new Exception($"STEP {n.Name}: EMBEDDED {emb} is not an embedded action of any step of this chart - attach new embedded actions in the IDE");
+                        if (keep != null && ed != keep) throw new Exception($"STEP {n.Name}: its EMBEDDED actions belonged to different steps - keep them together");
+                        keep = ed;
+                    }
+                    if (keep == null && n.Embedded.Count == 0 && b.StepData.TryGetValue(n.Name, out var byName)) keep = byName;
+                    if (keep != null && !b.UsedData.Add(keep))
+                    {
+                        if (n.Embedded.Count > 0) throw new Exception($"STEP {n.Name}: the embedded actions {string.Join(", ", n.Embedded)} are already used by another step");
+                        keep = null;                                                    // renamed step kept its data elsewhere
+                    }
+                    if (keep != null)
+                    {
+                        var data = new XElement(keep);
+                        foreach (var at in data.Descendants().Where(d => d.Name.LocalName == "attribute"))
+                        {
+                            var g = ((string)at.Attribute("guid") ?? "").ToLowerInvariant();
+                            if (g == NameGuid) at.Value = n.Name;
+                            else if (g == CommentGuid && n.Comment != null) at.Value = n.Comment;
+                        }
+                        e.Add(data);
+                    }
                     b.Out.Add(e);
                     if (n.Actions.Count > 0)
                     {

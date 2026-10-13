@@ -127,7 +127,7 @@ Writes XML to a tree item (ConsumeXml) - changes configuration. Read the format 
 
 ### `tc_delete`
 
-Deletes a child item in the tree.
+Deletes a child item in the tree. A backup is written first to `%LOCALAPPDATA%\TcAgent\backup\delete` (PLC objects as PLCopen XML – restore with `tc_import kind=plcopen`, other items as ProduceXml).
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -259,6 +259,8 @@ Searches declarations and implementations of all PLC objects (full text or regex
 ### `tc_sfc`
 
 Sequential function charts (SFC step chains) as text. `action=read` returns the chain (steps, actions with qualifiers, transitions, `ALTERNATIVE`/`PARALLEL` branches, jumps) and the action/transition objects of the POU with their code; `action=write` replaces the chain with the given text; `action=xml` shows the raw PLCopen SFC body. Works through PLCopen XML export/import of the POU (the POU is re-created in its folder; the previous version is restored if TwinCAT rejects the chain). Step names become variables of the POU – never name a step like a variable, action or keyword (use `S_Init`, `S_Move` …). Create the POU with `tc_plc_create language=SFC`, actions/transitions with code with `tc_plc_create kind=action|transition`.
+
+Under a step, `EMBEDDED <action>` names an embedded step action (main/entry/exit, e.g. `_aN010_active`) and `COMMENT <text>` the step comment. Keep these lines when writing – also when renaming the step; a write that would detach embedded actions is refused unless `force=true`. Graphical action objects are listed as such, not as empty.
 
 ```
 STEP Init INITIAL
@@ -816,7 +818,7 @@ Switches the TwinCAT runtime of the target to config mode (needed for the I/O sc
 
 ### `tc_task`
 
-Real-time tasks: `action=list`, `create` (`name`, `cycleUs`, `priority`, `withImage`) or `set` (`path`, `cycleUs`, `priority`, `autoStart`, `cores` = real-time core(s) of the task, e.g. `1`). Takes effect after `tc_activate`.
+Real-time tasks: `action=list`, `create` (`name`, `cycleUs`, `priority`, `withImage`), `set` (`path`, `cycleUs`, `priority`, `autoStart`, `cores` = real-time core(s) of the task, e.g. `1`) or `assign` (`name` = TIRT task, `program` = called POU, default `MAIN`, `plcProjectPath`): creates the PLC task reference and the program call – without it the PLC has no process image. Takes effect after `tc_activate`.
 
 ### `tc_boot_project`
 
