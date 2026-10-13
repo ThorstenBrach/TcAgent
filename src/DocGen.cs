@@ -8,6 +8,7 @@
 //                           The agent adds an overview and a short explanation per object (summaries); they are kept in
 //                           <solution>\.tcagent\doc-summaries.json as project memory and reused by later runs and the CLI.
 //   tc_doc action=memory    the stored overview and explanations (project memory) - read this before explaining the project
+//   tc_doc action=risks     static risk rules on the ST code (DocRisks.cs); tasks with cycle time/priority: DocTasks.cs
 //
 // The analysis is done on the source text (declarations and implementations through the Automation Interface,
 // SFC through PLCopen XML): calls are resolved through the declared types of instances, EXTENDS chains and GVLs.
@@ -24,7 +25,7 @@ using TCatSysManagerLib;
 
 namespace TcAgent;
 
-public sealed class PlcDoc
+public sealed partial class PlcDoc
 {
     public sealed class Var { public string Section, Name, Type, Comment; }
 
@@ -104,21 +105,8 @@ public sealed class PlcDoc
             d.Pous[pou.Key] = pou;
             byPath[path] = pou;
         }
-        // tasks of the PLC project: a node without declaration whose children are program calls (e.g. ...^PlcTask^MAIN);
-        // folders are skipped and a child must not be the program object itself (a folder "POUs" holding MAIN is no task)
-        foreach (var it in items)
-        {
-            string path; try { path = it.PathName; if (it.ItemType == 601) continue; } catch { continue; }
-            if (byPath.ContainsKey(path)) continue;
-            var progs = new List<string>();
-            List<ITcSmTreeItem> kids;
-            try { kids = TwinCatSession.Children(it).ToList(); } catch { continue; }
-            foreach (var c in kids)
-            {
-                try { if (d.Pous.TryGetValue(c.Name, out var p) && p.Kind == "PROGRAM" && !p.Path.Equals(c.PathName, StringComparison.OrdinalIgnoreCase)) progs.Add(p.Key); } catch { }
-            }
-            if (progs.Count > 0) d.Tasks[it.Name] = progs;
-        }
+        // tasks: PLC task references (TcTTO) with their program calls, cycle time and priority from TIRT (DocTasks.cs)
+        d.CollectTasks(tc, plcProject, items, byPath);
         // SFC charts (graphical - through PLCopen XML); other graphical languages are only listed
         foreach (var p in d.Pous.Values.Where(p => p.Owner == null && (p.Lang is "SFC" or "GRAPHIC")).ToList())
         {
@@ -473,8 +461,16 @@ public sealed class PlcDoc
                                   $"{Pous.Values.Count(p => p.Owner != null)} methods/properties/actions, {Pous.Values.Count(p => p.Kind == "DUT")} DUTs, {Pous.Values.Count(p => p.Kind == "GVL")} GVLs\n");
         o.AppendLine("\nCall hierarchy:");
         var done = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var t in Tasks) { o.AppendLine($"Task {t.Key}"); foreach (var r in t.Value) Tree(o, r, 1, new HashSet<string>(StringComparer.OrdinalIgnoreCase), done); }
+        foreach (var t in Tasks)
+        {
+            o.AppendLine($"Task {TaskLabel(t.Key)}");
+            if (t.Value.Count == 0) o.AppendLine("  (no program call)");
+            foreach (var r in t.Value) Tree(o, r, 1, new HashSet<string>(StringComparer.OrdinalIgnoreCase), done);
+        }
+        if (Tasks.Count == 0) o.AppendLine("(no task reference in this PLC project)");
         foreach (var r in Roots().Where(r => !Tasks.Values.Any(v => v.Contains(r, StringComparer.OrdinalIgnoreCase)))) Tree(o, r, 0, new HashSet<string>(StringComparer.OrdinalIgnoreCase), done);
+        if (OtherRtTasks.Count > 0)
+            o.AppendLine("Other real-time tasks (not used by this PLC project): " + string.Join(", ", OtherRtTasks.Select(t => t.Name + (t.Cycle != null ? $" ({t.Cycle}, priority {t.Priority ?? "?"})" : ""))));
 
         o.AppendLine("\nObjects (description from comments | stored explanation):");
         foreach (var p in Pous.Values.Where(p => p.Kind is not ("DUT" or "GVL")).OrderBy(p => p.Key))
@@ -495,6 +491,9 @@ public sealed class PlcDoc
         }
         var f = Findings();
         if (f.Count > 0) { o.AppendLine("\nFindings:"); foreach (var x in f) o.AppendLine("  - " + x); }
+        var rk = Risks();
+        o.AppendLine($"\nRisks (static rules on the ST code - list: tc_doc action=risks): {RiskCounts(rk)}");
+        foreach (var x in rk.Where(y => y.Severity == "high").Take(5)) o.AppendLine("  - " + x);
         o.AppendLine("\nNext: explain the objects that have no description (read them with tc_plc_read if needed) and call " +
                      "tc_doc action=html with overview (how the program works) and summaries {object: explanation}.");
         return o.ToString();
@@ -518,7 +517,7 @@ public sealed class PlcDoc
 
     public List<string> Findings()
     {
-        var f = new List<string>();
+        var f = TaskFindings();
         var unused = Unused();
         if (unused.Count > 0) f.Add($"Not called from any task (unused or only used dynamically): {string.Join(", ", unused.Take(30))}{(unused.Count > 30 ? " ..." : "")}");
         foreach (var p in Pous.Values.Where(p => p.Lines > 400).OrderByDescending(p => p.Lines).Take(10))
@@ -610,7 +609,7 @@ public sealed class PlcDoc
         o.Append($"{Pous.Values.Count(p => p.Owner == null && p.Kind is not ("DUT" or "GVL"))} POUs, {Pous.Values.Count(p => p.Owner != null)} methods/properties/actions, ");
         o.Append($"{Pous.Values.Count(p => p.Kind == "DUT")} DUTs, {Pous.Values.Count(p => p.Kind == "GVL")} GVLs</p>");
         o.Append("<nav><a href=\"#overview\">Overview</a><a href=\"#hierarchy\">Call hierarchy</a><a href=\"#graph\">Call graph</a><a href=\"#inheritance\">Inheritance</a><a href=\"#classes\">Classes</a>" +
-                 "<a href=\"#chains\">Step chains</a><a href=\"#findings\">Findings</a><a href=\"#reference\">Reference</a>" +
+                 "<a href=\"#chains\">Step chains</a><a href=\"#findings\">Findings</a><a href=\"#risks\">Risks</a><a href=\"#reference\">Reference</a>" +
                  "<input id=\"q\" placeholder=\"Filter objects…\" oninput=\"filter(this.value)\"></nav></header><main>");
 
         // overview
@@ -619,9 +618,18 @@ public sealed class PlcDoc
         if (Tasks.Count > 0)
         {
             o.Append("<h3>Tasks</h3><ul>");
-            foreach (var t in Tasks) o.Append($"<li><b>{H(t.Key)}</b> calls {string.Join(", ", t.Value.Select(Link))}</li>");
+            foreach (var t in Tasks)
+            {
+                var ti = TaskInfos.TryGetValue(t.Key, out var info) ? info : null;
+                var meta = ti == null ? "" : string.Join(", ", new[] { ti.Cycle != null ? "cycle " + ti.Cycle : null, string.IsNullOrEmpty(ti.Priority) ? null : "priority " + ti.Priority }.Where(x => x != null));
+                o.Append($"<li><b>{H(t.Key)}</b>{(meta.Length > 0 ? $" <span class=\"muted\">({H(meta)})</span>" : "")} " +
+                         (t.Value.Count > 0 ? $"calls {string.Join(", ", t.Value.Select(Link))}" : "<span class=\"muted\">calls no program</span>") + "</li>");
+            }
             o.Append("</ul>");
+            if (OtherRtTasks.Count > 0)
+                o.Append($"<p class=\"muted\">Other real-time tasks (not used by this PLC project): {H(string.Join(", ", OtherRtTasks.Select(x => x.Name + (x.Cycle != null ? $" ({x.Cycle}, priority {x.Priority ?? "?"})" : ""))))}</p>");
         }
+        else o.Append("<p class=\"muted\">No task reference in this PLC project – no process image (tc_task action=assign).</p>");
         o.Append("</section>");
 
         // hierarchy tree (works without JavaScript)
@@ -629,7 +637,7 @@ public sealed class PlcDoc
         var done = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var t in Tasks)
         {
-            o.Append($"<details open><summary><span class=\"k task\">task</span> {H(t.Key)}</summary>");
+            o.Append($"<details open><summary><span class=\"k task\">task</span> {H(TaskLabel(t.Key))}</summary>");
             foreach (var r in t.Value) TreeHtml(o, r, new HashSet<string>(StringComparer.OrdinalIgnoreCase), 0, done);
             o.Append("</details>");
         }
@@ -653,7 +661,7 @@ public sealed class PlcDoc
                 nodes.Add(from); nodes.Add(to);
             }
         }
-        foreach (var t in Tasks) foreach (var r in t.Value) { edges.Add($"{Mid("task " + t.Key)}([\"{MLabel(t.Key)}\"]) --> {Mid(r)}"); nodes.Add(r); }
+        foreach (var t in Tasks) foreach (var r in t.Value) { edges.Add($"{Mid("task " + t.Key)}([\"{MLabel(TaskLabel(t.Key))}\"]) --> {Mid(r)}"); nodes.Add(r); }
         if (edges.Count == 0) o.Append("<p class=\"muted\">No calls found.</p>");
         else if (edges.Count > 250) o.Append($"<p class=\"muted\">{edges.Count} connections – too many for one graph; use the hierarchy above.</p>");
         else
@@ -792,6 +800,9 @@ public sealed class PlcDoc
         var f = Findings();
         o.Append(f.Count == 0 ? "<p class=\"muted\">Nothing noticeable.</p>" : "<ul>" + string.Join("", f.Select(x => $"<li>{H(x)}</li>")) + "</ul>");
         o.Append("</section>");
+
+        // risks (static rules, DocRisks.cs)
+        RisksHtml(o);
 
         // reference
         o.Append("<section id=\"reference\"><h2>Reference</h2>");
@@ -968,7 +979,9 @@ pre{background:var(--code);padding:10px;border-radius:6px;overflow:auto;font:12p
 .pou{border:1px solid var(--line);border-radius:8px;padding:10px 14px;margin:10px 0}.pou h4{margin:0;font-size:15px}.path{margin:2px 0;color:var(--muted);font-size:12px}
 .explain{border-left:3px solid var(--accent);padding-left:10px}.doc{font-style:italic}table{border-collapse:collapse;margin:6px 0;width:100%}
 td,th{border-bottom:1px solid var(--line);padding:3px 8px;text-align:left;vertical-align:top}td.sec{color:var(--muted);width:60px}.members{padding-left:18px}ul.inh,ul.inh ul{list-style:none;padding-left:18px;border-left:1px dotted var(--line)}ul.inh{border:0;padding-left:0}.calls{color:var(--muted);font-size:13px}
-footer{color:var(--muted);text-align:center;padding:16px;font-size:12px}";
+footer{color:var(--muted);text-align:center;padding:16px;font-size:12px}
+.sev{display:inline-block;font:11px/1.6 Consolas,monospace;padding:0 6px;border-radius:4px;background:var(--chip);min-width:56px;text-align:center}
+.sev.high{color:#dc2626;font-weight:600}.sev.medium{color:#d97706}.sev.low{color:var(--muted)}table.risks td:nth-child(3){white-space:nowrap}";
 
     const string Js = @"
 function filter(q){q=q.toLowerCase();document.querySelectorAll('article.pou').forEach(a=>{a.style.display=!q||a.dataset.name.includes(q)?'':'none'})}
@@ -1005,12 +1018,18 @@ public sealed partial class ToolRegistry
                       "and findings; action=html writes one HTML page with clickable call hierarchy, call graph, class diagram, step chain " +
                       "diagrams, findings and a reference per object (description, inputs/outputs, calls, used by, code); action=memory returns " +
                       "the stored overview and explanations; action=pending lists objects (FBs, methods, properties, functions ...) that have no " +
-                      "description yet, with their code; action=save stores summaries/overview without writing the page. Workflow: outline -> " +
+                      "description yet, with their code; action=save stores summaries/overview without writing the page; action=risks runs static, " +
+                      "text based risk rules on the ST code (division by a variable without zero check, unchecked array index, pointer " +
+                      "dereference without check, loops without exit, globals written in several tasks, outputs written in several places, " +
+                      "unused variables, timers in methods or called conditionally, CASE without ELSE, numeric states, long code, deep " +
+                      "nesting) with severity, object, line, rule and explanation. Tasks are shown with cycle time and priority. Workflow: outline -> " +
                       "pending -> save summaries {object: 1-2 sentences what it does} -> pending ... until none are left -> html with overview " +
                       "(how the program works, for a new colleague). Existing comments (/// or header 'Description:') are used as they are. " +
                       "Explanations are kept in <solution>\\.tcagent\\doc-summaries.json and reused. For a user manual of FBs use tc_userdoc.",
-            Schema(Req(P("action", "string", "outline, pending, save, html or memory")),
-                   P("max", "integer", "pending: objects per call (default 15)"),
+            Schema(Req(P("action", "string", "outline, pending, save, html, memory or risks")),
+                   P("max", "integer", "pending: objects per call (default 15); risks: max. entries (default 200)"),
+                   P("minSeverity", "string", "risks: high, medium or low (default low = all)"),
+                   P("filter", "string", "risks: only this object (part of the name) or this rule id, e.g. div-zero"),
                    P("maxChars", "integer", "pending: max. code characters per object (default 2500)"),
                    P("plcProjectPath", "string", "PLC project, e.g. TIPC^MyPlc^MyPlc Project (empty = the only one)"),
                    P("file", "string", "html: target file (default <solution>\\doc\\<PLC project>.html)"),
@@ -1032,7 +1051,8 @@ public sealed partial class ToolRegistry
         var doc = BuildDoc(Str(a, "plcProjectPath"));
         if (action == "outline") return doc.Outline(mem);
         if (action == "pending") return doc.Pending(mem, Int(a, "max", 15), Int(a, "maxChars", 2500));
-        if (action is not ("html" or "save")) throw new Exception("action: outline, pending, save, html or memory");
+        if (action == "risks") return doc.RisksText(Str(a, "minSeverity"), Int(a, "max", 200), Str(a, "filter"));
+        if (action is not ("html" or "save")) throw new Exception("action: outline, pending, save, html, memory or risks");
         if (Str(a, "overview") is { } ov && ov.Trim().Length > 0) mem.Overview = ov.Trim();
         if (a["summaries"] is JsonObject sums) foreach (var kv in sums) if (kv.Value != null) mem.Pous[kv.Key] = kv.Value.ToString().Trim();
         if (dir != null) mem.Save(dir);
