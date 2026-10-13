@@ -17,6 +17,7 @@ exit code, JUnit XML and inline annotations.
 | `TcAgent.exe test --solution X.sln` | builds, activates on the test target, starts the PLC, waits for TcUnit, collects the results | every push to `main`, nightly |
 | `TcAgent.exe sil --solution X.sln --plc Tests` | software in the loop: like `test` on the runtime of the build PC, checks Run mode, starts the PLC if needed, optional Scope recording, always cleans up | every push / pull request |
 | `TcAgent.exe hil --solution X.sln --target 5.1.2.3.1.1 --allow 5.1.2.3.1.1` | hardware in the loop: the same on a remote test PLC with real I/O – only with an explicit allowance | nightly, release candidates |
+| `TcAgent.exe feedback --open --markdown feedback.md` | Markdown report of the agents' `tc_feedback` entries (grouped by tool, ready for GitHub issues); `--summary` for counts, `--path` for another store; no IDE needed | weekly triage of a shared feedback folder |
 
 ```powershell
 TcAgent.exe check --solution .\MyMachine.sln --junit results\check.xml

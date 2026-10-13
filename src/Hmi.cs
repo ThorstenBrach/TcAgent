@@ -45,6 +45,8 @@ public sealed partial class ToolRegistry
                    P("width", "integer", "content: width in px (default 1024)"), P("height", "integer", "content: height in px (default 600)"),
                    P("startup", "boolean", "view: make it the start view"),
                    P("project", "string", "HMI project (empty = the only one)"),
+                   P("reload", "boolean", "If the HMI project is open in Visual Studio it is unloaded for the change and reloaded automatically (default true). " +
+                                          "false = leave it unloaded - then ask the user to reload it (right-click > Reload Project). Use false with a 32-bit TcXaeShell and a large solution."),
                    P("dryRun", "boolean", "Only show what would be created")),
             a => HmiWrite(a, () => HmiPage(a)));
 
@@ -62,18 +64,23 @@ public sealed partial class ToolRegistry
                    P("writeValue", "string", "Value for writeSymbol (true/false/number/text, default true)"),
                    P("events", "array", "Trigger list as in the file: [{\"event\":\"<id>.onPressed\",\"actions\":[...]}] (replaces existing)"),
                    P("project", "string", "HMI project (empty = the only one)"),
+                   P("reload", "boolean", "If the HMI project is open in Visual Studio it is unloaded for the change and reloaded automatically (default true). " +
+                                          "false = leave it unloaded - then ask the user to reload it (right-click > Reload Project). Use false with a 32-bit TcXaeShell and a large solution."),
                    P("dryRun", "boolean", "Only show the resulting HTML")),
             a => HmiWrite(a, () => HmiControl(a)));
 
         Add("tc_hmi_symbol", "Server symbols of the HMI: list, map (PLC variables -> HMI symbols in TcHmiSrv.Config.default.json, type read via ADS " +
                              "if not given), unmap, runtimes (ADS runtimes PLC1 ...), add_runtime. Alternative without mapping by hand: PLC attribute " +
-                             "{attribute 'TcHmiSymbol.AddSymbol'} + 'Map Automap Symbols' in Visual Studio. Best edit while the HMI project is not open.",
+                             "{attribute 'TcHmiSymbol.AddSymbol'} + 'Map Automap Symbols' in Visual Studio. Best edit while the HMI project is not open; if it is open " +
+                             "it is unloaded and reloaded (reload=false: left unloaded for the user to reload).",
             Schema(Req(P("action", "string", "list, map, unmap, runtimes or add_runtime")),
                    P("symbols", "string", "map/unmap: PLC variables separated by ',' e.g. MAIN.bStart,MAIN.nSpeed (optionally with type: MAIN.nSpeed:INT)"),
                    P("runtime", "string", "ADS runtime name (default PLC1)"),
                    P("type", "string", "map: data type for all symbols without own type, e.g. BOOL, INT, LREAL, STRING(80)"),
                    P("netId", "string", "add_runtime: AmsNetId (default 127.0.0.1.1.1)"), P("port", "integer", "add_runtime: ADS port (default 851)"),
                    P("project", "string", "HMI project (empty = the only one)"),
+                   P("reload", "boolean", "If the HMI project is open in Visual Studio it is unloaded for the change and reloaded automatically (default true). " +
+                                          "false = leave it unloaded - then ask the user to reload it (right-click > Reload Project). Use false with a 32-bit TcXaeShell and a large solution."),
                    P("dryRun", "boolean", "Only show what would change")),
             a => (Str(a, "action") ?? "").ToLowerInvariant() is "list" or "runtimes" ? HmiSymbol(a) : HmiWrite(a, () => HmiSymbol(a)));
     }
@@ -84,13 +91,24 @@ public sealed partial class ToolRegistry
     {
         if (DryRun(a)) return write();
         var p = FindHmi(Str(a, "project"));
+        var reload = Bool(a, "reload", true);
         return tc.Sta.Run(() =>
         {
             pinnedHmi = p;   // while unloaded, Visual Studio no longer reports the project - keep the resolved one
             try
             {
-                var r = tc.EditUnloaded(p.ProjFile, write, out var note);
+                // the 32-bit memory guard runs before the unload and again before the reload (TwinCatSession.EditUnloaded)
+                var r = tc.EditUnloaded(p.ProjFile, write, out var note, reload);
                 return r + note;
+            }
+            catch (Exception ex) when (ex is not IdeLostException && TwinCatSession.IsIdeLost(ex))
+            {
+                // e.g. RPC 0x800706BE while saving/closing the HMI documents: the IDE process is gone
+                tc.MarkLost();
+                throw new IdeLostException($"The IDE was lost while changing the HMI project {p.Name} ({ex.Message}): TcXaeShell/Visual Studio " +
+                                           "crashed or was closed. Tell the user to restart the IDE and open the solution, then call tc_attach and check " +
+                                           $"the change (tc_hmi action=info) - do not repeat it blindly. Backups: %LOCALAPPDATA%\\TcAgent\\backup\\hmi. " +
+                                           "With a 32-bit TcXaeShell and a large solution use reload=false.", ex);
             }
             finally { pinnedHmi = null; }
         }, 300_000);

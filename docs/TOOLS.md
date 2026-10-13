@@ -81,20 +81,39 @@ Adds a knowledge source (URL, folder, network drive). Parameters: `source` (requ
 ### `tc_policy`
 
 Shows the guardrails: target systems enabled for runtime actions, read-only mode, audit log path.
-
-### `tc_feedback`
-
-Reports a problem, missing feature or improvement suggestion to TcAgent development. Always use it when a tool fails, behaves unexpectedly, a task could only be solved via a workaround, or a tool is missing.
+`action=audit_check` (read-only) compares the day's TcAgent log (`%LOCALAPPDATA%\TcAgent\logs\tcagent-<date>.log`, every tool call of every TcAgent process, with action/dryRun) with the audit log(s) and lists changing or failed calls that have no audit entry, each with the likely reason: the call never ended in its process (IDE dialog/hang, client closed, process killed - the audit is written when a call ends), an audit write error in the log, a different audit file of that process (`TCAGENT_AUDIT`, or `%LOCALAPPDATA%` redirected for packaged clients: `%LOCALAPPDATA%\Packages\<package>\LocalCache\Local\TcAgent`, which is read as well), or - in logs of older versions without the action - a possibly read-only action. Also lists calls audited in another file than expected and the processes of the day (version, client, audit path, mode).
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `type` | string | yes | bug / missing_feature / usability / docs |
-| `summary` | string | yes | One sentence: what is the problem / what is missing |
-| `tool` | string |  | Affected tool, e.g. tc_plc_create |
+| `action` | string |  | `show` (default) or `audit_check` |
+| `date` | string |  | audit_check: day, e.g. `2026-10-12`, `12.10.` or `yesterday` (default today) |
+| `max` | integer |  | audit_check: max. listed calls (default 100) |
+
+Audit entries now also contain `pid`, `client` and - for late outcomes - `note` (e.g. "completed after an IDE dialog", "job rf1-... finished"). The audit, the daily log and the feedback files are appended with shared access and retries, so several TcAgent processes no longer lose lines to write conflicts. Failed calls are always audited; a call that ended after an IDE dialog (reported as error) gets a second entry with its real outcome.
+
+### `tc_feedback`
+
+Reports a problem, missing feature or improvement suggestion to TcAgent development. Always use it when a tool fails, behaves unexpectedly, a task could only be solved via a workaround, or a tool is missing. Without `action` (= `report`) `type` and `summary` are required (backward compatible). Every entry gets a stable id (`FB-1A2B3C4D`), status `open`, the TcAgent version (`serverVersion`), client and machine name.
+
+For maintainers (control loop): `action=list` lists entries grouped by tool (most first) and severity - default the open ones; `action=summary` counts by status, severity, type, tool and version; `action=resolve id=FB-...[,FB-...] note=... version=0.21.0 [status=resolved|wontfix|duplicate|open]` marks entries (status changes are appended as own records; the newest wins). Entries of older versions without id get a stable id derived from time, tool and summary. The Markdown report for GitHub issues comes from the CLI: `TcAgent.exe feedback [--open] [--markdown out.md] [--summary] [--path <file|folder>]`.
+
+Store (`TCAGENT_FEEDBACK`): not set = `<install>\..\..\feedback\feedback.jsonl` (VSIX: `%LOCALAPPDATA%\TcAgent\feedback`); a `.jsonl` file = that file; a folder or UNC path (e.g. `\\server\share\tcagent-feedback`) = shared team location: every machine writes its own file per day (`feedback-<yyyyMMdd>-<MACHINE>.jsonl`, no write conflicts), all `*.jsonl` there are read.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string |  | `report` (default), `list`, `summary` or `resolve` |
+| `type` | string | report | bug / missing_feature / usability / docs |
+| `summary` | string | report | One sentence: what is the problem / what is missing |
+| `tool` | string |  | report: affected tool, e.g. tc_plc_create; list: only tools containing this text |
 | `details` | string |  | Call/arguments, error message, context (TwinCAT version, project type) |
 | `expected` | string |  | What should have happened |
 | `workaround` | string |  | How the task was solved anyway (if at all) |
 | `severity` | string |  | blocker / major / minor |
+| `status` | string |  | list: open (default), resolved, wontfix, duplicate or all; resolve: new status (default resolved) |
+| `id` | string |  | resolve: entry id(s), comma-separated |
+| `note` | string |  | resolve: what was done / why |
+| `version` | string |  | resolve: TcAgent version with the fix |
+| `max` | integer |  | list: max. entries (default 200) |
 
 ## Project tree, configuration, I/O
 
@@ -327,7 +346,7 @@ JUMP Init
 
 ### `tc_lessons`
 
-Lessons learned across sessions: solutions to hard problems while coding or configuring TwinCAT. Each lesson records **what** the problem was (`symptom`: exact error text/code, behaviour), **why** (`cause`: explanation/background) and **how** it was solved (`solution`: concrete steps, values, code), optionally what did not work (`avoid`). Stored as Markdown, editable by hand: `<solution>\.tcagent\lessons.md` (project, versioned with Git), `%LOCALAPPDATA%\TcAgent\lessons.md` (personal), `TCAGENT_LESSONS` (team file). When a tool fails or `tc_check`/`tc_build` reports errors, matching lessons are appended to the result automatically (`TCAGENT_LESSONS_RECALL=0` turns this off); when a call succeeds after repeated failures the agent is reminded to save a lesson.
+Lessons learned across sessions: solutions to hard problems while coding or configuring TwinCAT. Each lesson records **what** the problem was (`symptom`: exact error text/code, behaviour), **why** (`cause`: explanation/background) and **how** it was solved (`solution`: concrete steps, values, code), optionally what did not work (`avoid`). Stored as Markdown, editable by hand: `<solution>\.tcagent\lessons.md` (project, versioned with Git), `%LOCALAPPDATA%\TcAgent\lessons.md` (personal), `TCAGENT_LESSONS` (team file). When a tool fails or `tc_check`/`tc_build` reports errors, matching lessons are appended to the result automatically (`TCAGENT_LESSONS_RECALL=0` turns this off); when a call succeeds after repeated failures the agent is reminded to save a lesson. `add`/`remove` count as project changes (audited, blocked in `ask` mode); `search`/`list` are read-only.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -363,12 +382,16 @@ User manual of function blocks, functions, interfaces and their data types (how 
 
 Context-based refactoring of names and comments, always confirmed by the user per change (dialog in Visual Studio or the client's question: **Apply / Apply all / Reject / Cancel**). `action=analyze` (target = `selection`: the marked range or the object open/clicked in the editor – method, FB, function, struct, enum – or a name/tree path) returns numbered code, declarations with comments and findings: missing comments, unclear names, external use (callers/ADS, I/O `AT %`, TcLinkTo, persistent/retain, HMI files). `action=apply changes=[{object, kind: comment|rename, target: variable|member|pou|method, name, newName, comment, reason}]` asks per change and applies it: comments as `// ...` on the declaration line or `/// ...` above the header; renames as whole-word edits outside strings and comments in the object (and its members/derived FBs for FB variables) and – for names visible outside – in every object of TwinCAT's cross references (needs TcAgentBridge). `dryRun=true` shows all edits as diffs.
 
+`apply` runs as a background job, so a client behind a remote bridge with a call timeout (~60 s) does not lose the report while the user is still clicking: if not every change is decided after `waitSeconds` (default 45, `TCAGENT_JOB_WAIT`), the call returns *"Still waiting for the user's decisions - k of n done ... call tc_refactor action=result job=<id>"* (with the report so far) and the job keeps running; `action=result job=<id>` waits up to `waitSeconds` again and returns the final report (or the progress). It also returns early when a modal IDE dialog blocks the job. Only one apply job runs at a time; the last 5 jobs are kept in memory (not across a TcAgent restart). The confirmations run on the job thread (bridge dialog or MCP elicitation - answers are routed to it while the server keeps handling calls), every edit runs on the STA thread; an object that was changed after its change was planned is not overwritten (that change is reported as failed). A job that finished after its apply call returned is audited separately (`note: job ... finished`).
+
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `action` | string | yes | analyze or apply |
+| `action` | string | yes | analyze, apply or result |
 | `target` | string |  | analyze: `selection` (default), name or tree path |
 | `changes` | array |  | apply: list of changes |
 | `dryRun` | boolean |  | apply: only show the edits |
+| `job` | string |  | result: job id from apply (default: the latest job) |
+| `waitSeconds` | integer |  | apply/result: max. wait for the user's decisions before returning the progress (default 45) |
 
 ### `tc_doc`
 
@@ -776,6 +799,7 @@ Creates a view (.view) or content (.content) in the HMI project and registers it
 | `height` | integer |  | content: height in px (default 600) |
 | `startup` | boolean |  | view: make it the start view |
 | `project` | string |  | HMI project (empty = the only one) |
+| `reload` | boolean |  | If the HMI project is open it is unloaded for the change and reloaded (default true); `false` leaves it unloaded - ask the user to reload it |
 | `dryRun` | boolean |  | Only show what would be created |
 
 ### `tc_hmi_control`
@@ -798,11 +822,14 @@ Adds, changes or removes a control in a view/content. Attributes without the dat
 | `writeValue` | string |  | Value for writeSymbol (true/false/number/text, default true) |
 | `events` | array |  | Trigger list as in the file: [{"event":"<id>.onPressed","actions":[...]}] (replaces existing) |
 | `project` | string |  | HMI project (empty = the only one) |
+| `reload` | boolean |  | If the HMI project is open it is unloaded for the change and reloaded (default true); `false` leaves it unloaded - ask the user to reload it |
 | `dryRun` | boolean |  | Only show the resulting HTML |
 
 ### `tc_hmi_symbol`
 
 Server symbols of the HMI: list, map (PLC variables -> HMI symbols in TcHmiSrv.Config.default.json, type read via ADS if not given), unmap, runtimes (ADS runtimes PLC1 ...), add_runtime. Alternative without mapping by hand: PLC attribute {attribute 'TcHmiSymbol.AddSymbol'} + 'Map Automap Symbols' in Visual Studio. Best edit while the HMI project is not open.
+
+Changing actions of `tc_hmi_page`, `tc_hmi_control` and `tc_hmi_symbol` unload an open HMI project, edit the files and reload it. The 32-bit memory guard of the XAE Shell runs before the unload **and again before the reload**; if it trips, the change is kept and the project stays unloaded (the result says so). `reload=false` skips the automatic reload - then ask the user to reload the project (right-click > Reload Project) or to close and reopen the solution. If the IDE dies on the way (RPC `0x800706BE`/`0x800706BA`, `RPC_E_DISCONNECTED`) the call fails with a clear "IDE was lost" message (what was written, restart the IDE, `tc_attach`, do not repeat blindly) and TcAgent does not reconnect on its own for 30 s.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -813,6 +840,7 @@ Server symbols of the HMI: list, map (PLC variables -> HMI symbols in TcHmiSrv.C
 | `netId` | string |  | add_runtime: AmsNetId (default 127.0.0.1.1.1) |
 | `port` | integer |  | add_runtime: ADS port (default 851) |
 | `project` | string |  | HMI project (empty = the only one) |
+| `reload` | boolean |  | If the HMI project is open it is unloaded for the change and reloaded (default true); `false` leaves it unloaded - ask the user to reload it |
 | `dryRun` | boolean |  | Only show what would change |
 
 ## Motion

@@ -139,6 +139,9 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
   following the project's naming rules (`tc_coding_rules`). Then `tc_refactor action=apply changes=[...]` - the user confirms
   EVERY change (Apply / Apply all / Reject / Cancel). Respect rejections; never rename I/O, persistent or HMI-bound names
   without a strong reason. Run `tc_check` afterwards.
+- `apply` waits for the user's clicks. If they take longer than ~45 s it returns "still waiting - k of n done" with a job id:
+  tell the user the dialog is waiting, then call `tc_refactor action=result job=<id>` (repeat until the final report).
+  Never call `apply` again for the same changes.
 
 ## Runtime (enabled targets only)
 
@@ -148,6 +151,7 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
 - `ads_symbols` (with `filter`), `ads_read`, `ads_write` - symbol paths like `MAIN.nCounter` or `GVL_X.y`.
 - `tc_policy` shows the mode (agent / propose / ask) and enabled target systems. If a tool blocks a target, do NOT work around it;
   ask the user. Targets are enabled via TCAGENT_ALLOW_TARGETS in their MCP configuration.
+  `tc_policy action=audit_check date=12.10.` (read-only) lists changing calls of that day that are missing in the audit log.
 - Always ask the user before `tc_activate`, `stop` or `ads_write` on a target with real hardware.
 
 ## I/O and configuration
@@ -245,6 +249,9 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
 - Changes are written while the HMI project is unloaded in the IDE and reloaded afterwards. Change one thing per call -
   do not run several HMI/Scope changes in parallel. In the TwinCAT XAE Shell (32-bit) prefer few, larger changes; if TcAgent
   reports that the IDE is low on memory, ask the user to save and restart it - never retry blindly. `tc_hmi action=build` checks the project; the user publishes.
+- `reload=false` (tc_hmi_page/control/symbol) leaves the HMI project unloaded after the change - then ask the user to reload it
+  (right-click > Reload Project). If a call reports "The IDE was lost" (RPC 0x800706BE), tell the user to restart the IDE and
+  open the solution, then `tc_attach` and check the change - do not repeat it; next time use `reload=false`.
 
 ## Dialogs and confirmations
 
@@ -280,3 +287,5 @@ Fields: `summary` (one sentence), `tool`, `details` (call, arguments, error mess
 `severity` (blocker/major/minor). No secrets or customer data in the report. One report per problem;
 then continue working normally. Feedback is collected, evaluated and goes into the next
 TcAgent version.
+Only when the user (a TcAgent maintainer) asks: `tc_feedback action=list|summary` shows the collected entries,
+`action=resolve id=FB-... note=... version=...` marks them fixed.

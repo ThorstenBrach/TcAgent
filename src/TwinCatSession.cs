@@ -277,8 +277,10 @@ public sealed class TwinCatSession
 
     /// <summary>Runs an edit of a project's files while the project is unloaded in Visual Studio, then reloads it.
     /// Designers such as TwinCAT HMI and Scope keep their files in memory and overwrite or choke on changes made from outside.
-    /// Open documents of the project are saved and closed first. Must run on the STA thread.</summary>
-    public T EditUnloaded<T>(string projectFile, Func<T> edit, out string note)
+    /// Open documents of the project are saved and closed first. Must run on the STA thread.
+    /// reload=false leaves the project unloaded (the user reloads it). Before the reload the 32-bit memory guard runs again;
+    /// if the IDE dies during unload/reload (RPC 0x800706BE ...) an <see cref="IdeLostException"/> is thrown.</summary>
+    public T EditUnloaded<T>(string projectFile, Func<T> edit, out string note, bool reload = true)
     {
         note = "";
         var dte = RequireDte();
@@ -286,7 +288,8 @@ public sealed class TwinCatSession
         foreach (Project p in dte.Solution.Projects)
             try { if (string.Equals(p.FullName, projectFile, StringComparison.OrdinalIgnoreCase)) proj = p; } catch { }
         if (proj == null) return edit();   // not loaded in the IDE - plain file edit
-        CheckIdeMemory("unloading and reloading " + Path.GetFileName(projectFile));
+        var file = Path.GetFileName(projectFile);
+        CheckIdeMemory("unloading and reloading " + file);
         var dir = Path.GetDirectoryName(projectFile) ?? "";
         foreach (Document d in dte.Documents.Cast<Document>().ToList())
         {
@@ -296,6 +299,7 @@ public sealed class TwinCatSession
                 if (!d.Saved) d.Save();
                 d.Close(vsSaveChanges.vsSaveChangesNo);
             }
+            catch (Exception ex) when (IsIdeLost(ex)) { throw Lost(ex, $"closing the documents of {file} (nothing was changed)"); }
             catch { }
         }
         var slnName = Path.GetFileNameWithoutExtension(dte.Solution.FullName);
@@ -316,19 +320,72 @@ public sealed class TwinCatSession
             try { dte.ExecuteCommand(command); }
             catch (Exception ex) { throw new Exception($"{command} for '{projName}' failed ({ex.Message}) - is the Solution Explorer visible?", ex); }
         }
-        SelectProject();
-        Run("Project.UnloadProject");
-        try { return edit(); }
-        finally
+        try { SelectProject(); Run("Project.UnloadProject"); }
+        catch (Exception ex) when (IsIdeLost(ex)) { throw Lost(ex, $"unloading {projName} (nothing was changed)"); }
+        T result = default;
+        Exception editError = null;
+        try { result = edit(); }
+        catch (Exception ex) { editError = ex; }
+        var written = editError == null ? "the file change was written before" : "the file change failed (" + editError.Message + ")";
+        if (!reload)
+            note = $" ({projName} was unloaded for the change and left UNLOADED (reload=false) - ask the user to reload it: " +
+                   "Solution Explorer > right-click the project > Reload Project, or close and reopen the solution)";
+        else
         {
             try
             {
+                CheckIdeMemory("reloading " + file);      // the reload is the step that crashes a 32-bit IDE that is out of memory
                 SelectProject();
                 Run("Project.ReloadProject");
                 note = $" ({projName} unloaded for the change and reloaded)";
             }
-            catch (Exception ex) { note = $" ({projName} could not be reloaded automatically: {ex.Message} - right-click > Reload Project in Visual Studio)"; }
+            catch (Exception ex) when (IsIdeLost(ex)) { throw Lost(ex, $"reloading {projName} - {written}"); }
+            catch (Exception ex)
+            {
+                note = $" ({projName} NOT reloaded automatically: {ex.Message} - {(editError == null ? "the change is written; " : "")}ask the user to " +
+                       "reload it: Solution Explorer > right-click the project > Reload Project (or restart the IDE and open the solution))";
+            }
         }
+        if (editError != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(editError).Throw();
+        return result;
+    }
+
+    static readonly int[] LostCodes =
+    {
+        unchecked((int)0x800706BE), unchecked((int)0x800706BA), unchecked((int)0x80010108),
+        unchecked((int)0x80010007), unchecked((int)0x80010012)
+    };
+
+    /// <summary>The IDE process is gone or no longer answers: RPC_S_CALL_FAILED (0x800706BE), RPC_S_SERVER_UNAVAILABLE (0x800706BA),
+    /// RPC_E_DISCONNECTED (0x80010108), RPC_E_SERVER_DIED(_DNE) or a COM object separated from its process.</summary>
+    public static bool IsIdeLost(Exception ex)
+    {
+        for (var e = ex; e != null; e = e.InnerException)
+        {
+            if (e is IdeLostException or InvalidComObjectException) return true;
+            if (Array.IndexOf(LostCodes, e.HResult) >= 0) return true;
+            var m = e.Message ?? "";
+            if (m.Contains("0x800706BE", StringComparison.OrdinalIgnoreCase) || m.Contains("0x800706BA", StringComparison.OrdinalIgnoreCase) ||
+                m.Contains("0x80010108", StringComparison.OrdinalIgnoreCase)) return true;
+            if (e is AggregateException ag && ag.InnerExceptions.Count > 0 && ag.InnerExceptions.Any(IsIdeLost)) return true;
+        }
+        return false;
+    }
+
+    /// <summary>Forget the dead IDE connection; no automatic reconnect for a short time (see EnsureConnected).</summary>
+    public void MarkLost()
+    {
+        Log.Info("Connection to the IDE lost (RPC failure)");
+        Dte = null; SysMan = null; InstanceInfo = "not connected"; lostAt = DateTime.Now;
+    }
+
+    IdeLostException Lost(Exception ex, string during)
+    {
+        MarkLost();
+        var code = ex is COMException || ex.InnerException is COMException ? $" (0x{(ex as COMException ?? (COMException)ex.InnerException!).HResult:X8})" : "";
+        return new IdeLostException($"The IDE was lost while {during}{code}: TcXaeShell/Visual Studio crashed or was closed. Tell the user to " +
+                                    "restart the IDE and open the solution, then call tc_attach and check the result - do not repeat the change blindly. " +
+                                    "With a 32-bit TcXaeShell and a large solution prefer reload=false (the user reloads the project).", ex);
     }
 
     static UIHierarchyItem FindNode(UIHierarchyItems items, string name, int depth = 0)
@@ -356,6 +413,14 @@ public sealed class TwinCatSession
     /// </summary>
     public void CheckIdeMemory(string what)
     {
+        if (AttachedPid <= 0)      // e.g. after tc_open: find the IDE process through the running object table
+            try
+            {
+                var sln = Dte?.Solution?.FullName;
+                if (!string.IsNullOrEmpty(sln))
+                    AttachedPid = ListInstances().FirstOrDefault(i => string.Equals(i.Solution, sln, StringComparison.OrdinalIgnoreCase))?.Pid ?? 0;
+            }
+            catch { }
         if (AttachedPid <= 0) return;
         string problem = null;
         try
@@ -781,4 +846,10 @@ public sealed class TwinCatSession
 
     [DllImport("ole32.dll")] static extern int GetRunningObjectTable(int reserved, out IRunningObjectTable prot);
     [DllImport("ole32.dll")] static extern int CreateBindCtx(int reserved, out IBindCtx ppbc);
+}
+
+/// <summary>The IDE process crashed or was closed during a call (RPC failure) - the message says what to tell the user.</summary>
+public sealed class IdeLostException : Exception
+{
+    public IdeLostException(string message, Exception inner) : base(message, inner) { }
 }
