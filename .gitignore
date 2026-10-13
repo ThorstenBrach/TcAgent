@@ -22,3 +22,6 @@ build-vsix.log
 vsbridge/LICENSE.txt
 vsbridge/icon.png
 vsbridge/tcagent/
+
+# Local working notes (overall plan)
+PLAN.md
