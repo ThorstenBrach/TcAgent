@@ -261,7 +261,9 @@ public sealed partial class ToolRegistry
                 var t = target == "method" && name != null && doc.Pous.TryGetValue((pou.Owner ?? pou.Name) + "." + name, out var m) ? m : pou;
                 plan.Title = $"Description of {t.Key}";
                 plan.Summary = $"/// {comment}";
-                plan.Edits.Add(new Edit(t.Path, "declaration", t.Decl, SetDocComment(t.Decl, comment)));
+                if (t.Decl.Trim().Length > 0) plan.Edits.Add(new Edit(t.Path, "declaration", t.Decl, SetDocComment(t.Decl, comment)));
+                else if (t.Lang == "ST") plan.Edits.Add(new Edit(t.Path, "implementation", t.Impl, SetTopComment(t.Impl, comment)));   // action/transition: no declaration part
+                else throw new Exception($"{t.Key} has no declaration and a graphical body ({t.Lang}) - no place for a description");
             }
             else
             {
@@ -483,6 +485,16 @@ public sealed partial class ToolRegistry
         var docLines = Wrap(comment.Replace("\r\n", "\n"), 100).Select(l => "/// " + l).ToList();
         lines.RemoveRange(start, h - start);
         lines.InsertRange(start, docLines.Concat(keep));
+        return string.Join(nl, lines);
+    }
+
+    // /// block at the top of an implementation (actions, transitions) - replaces an existing one
+    internal static string SetTopComment(string impl, string comment)
+    {
+        var nl = impl.Contains("\r\n") ? "\r\n" : "\n";
+        var lines = impl.Replace("\r\n", "\n").Split('\n').ToList();
+        while (lines.Count > 0 && lines[0].TrimStart().StartsWith("///")) lines.RemoveAt(0);
+        lines.InsertRange(0, Wrap(comment.Replace("\r\n", "\n"), 100).Select(l => "/// " + l));
         return string.Join(nl, lines);
     }
 

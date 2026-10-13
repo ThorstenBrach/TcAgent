@@ -1392,7 +1392,7 @@ public sealed partial class ToolRegistry
             try { dialogs = IdeDialogs.Find(tc.AttachedPid); } catch { dialogs = new(); }
             seen = dialogs.Count > 0 ? seen + 1 : 0;
             if (seen < 3) continue;
-            task.ContinueWith(x => Log.Info($"{name} finished after dialog: " + (x.IsFaulted ? x.Exception?.InnerException?.Message : "ok")));
+            task.ContinueWith(x => Log.Info($"{name} finished after dialog: " + (x.IsFaulted ? x.Exception?.InnerException?.Message : "ok\n" + (x.Result.Length > 2000 ? x.Result[..2000] + "..." : x.Result))));
             throw new Exception("The IDE is showing a dialog and waiting for input - " + name + " will only complete afterwards:\n  " +
                                 string.Join("\n  ", dialogs) +
                                 "\nAsk the user to read and close the dialog (or tc_dialogs action=close, which corresponds to Cancel/X). " +

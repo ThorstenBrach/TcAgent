@@ -222,7 +222,8 @@ public sealed class PlcDoc
     static string DocOf(string decl, string impl)
     {
         decl = (decl ?? "").Replace("\r\n", "\n");
-        var lines = decl.Split('\n');
+        // actions and transitions have no declaration: their description is the /// block at the top of the code
+        var lines = (decl.Trim().Length > 0 ? decl : (impl ?? "").Replace("\r\n", "\n")).Split('\n');
         var doc = new List<string>();
         foreach (var l in lines)
         {

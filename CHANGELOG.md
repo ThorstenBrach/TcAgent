@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.20.0] – not released yet
+## [0.20.1] – not released yet
 
 ### Added
 - **User manual** – `tc_userdoc`: manual of FBs, functions, interfaces and the structs/enums they use, in the style and
@@ -45,6 +45,10 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - `install-xaeshell.ps1` also installs into the 64-bit XAE Shell (VS 2022 base).
 
 ### Fixed
+- TcAgent's own confirmation dialogs (refactoring choice) were treated as blocking IDE dialogs - the call aborted early.
+- SFC bodies (ImplementationText returns the editor XML) are recognized as SFC again instead of shown as code.
+- `tc_refactor`: descriptions of actions/transitions (no declaration part) go as `///` block on top of their code;
+  new trailing comments are aligned with the neighbouring comments.
 - TwinCAT XAE Shell (32-bit): before a project is unloaded and reloaded for a Scope/HMI change, TcAgent checks the shell's
   memory and refuses the step when it is close to the 32-bit limit - reloading then crashed the shell (OutOfMemoryException).
 
@@ -112,7 +116,7 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.0...HEAD
-[0.20.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.0
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.1...HEAD
+[0.20.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.1
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0
