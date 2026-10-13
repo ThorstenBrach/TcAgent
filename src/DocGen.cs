@@ -427,8 +427,20 @@ public sealed class PlcDoc
     }
 
     // callees of an object: its own calls plus the calls of its members (for an FB: what its body and methods call)
+    // callees of an object: what its code calls (for an FB body also its own methods)
     IEnumerable<string> Callees(string key) =>
-        Pous.TryGetValue(key, out var p) ? p.Calls.Where(c => !c.StartsWith(p.Name + ".", StringComparison.OrdinalIgnoreCase) || p.Owner != null) : Enumerable.Empty<string>();
+        Pous.TryGetValue(key, out var p) ? p.Calls : Enumerable.Empty<string>();
+
+    // FB instances declared in a program/FB that its code does not call directly - e.g. TcUnit test suites run by
+    // TcUnit.RUN(), or instances used only through their outputs/methods called elsewhere
+    List<string> Instances(string key)
+    {
+        if (!Pous.TryGetValue(key, out var p) || p.Owner != null || p.Kind is not ("PROGRAM" or "FUNCTION_BLOCK")) return new();
+        var called = new HashSet<string>(p.Calls.Select(c => c.Split('.')[0]), StringComparer.OrdinalIgnoreCase);
+        return p.Vars.Where(v => v.Section is "VAR" or "VAR_STAT" or "VAR_INST")
+                     .Select(v => TypeOf(v.Type)).Where(t => t != null && t.Kind == "FUNCTION_BLOCK" && !called.Contains(t.Key))
+                     .Select(t => t.Key).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
 
     public List<string> Unused()
     {
@@ -493,9 +505,11 @@ public sealed class PlcDoc
         if (!path.Add(key)) { o.AppendLine($"{ind}{key} (recursion)"); return; }
         var kind = Pous.TryGetValue(key, out var p) ? p.Kind.ToLowerInvariant().Replace("function_block", "FB") : "?";
         var kids = Callees(key).ToList();
-        if (kids.Count > 0 && !done.Add(key)) { o.AppendLine($"{ind}{key}  [{kind}] (see above)"); return; }
+        var inst = Instances(key);
+        if (kids.Count + inst.Count > 0 && !done.Add(key)) { o.AppendLine($"{ind}{key}  [{kind}] (see above)"); return; }
         o.AppendLine($"{ind}{key}  [{kind}]");
         foreach (var c in kids) Tree(o, c, depth + 1, new HashSet<string>(path, StringComparer.OrdinalIgnoreCase), done);
+        if (inst.Count > 0) o.AppendLine($"{ind}  instances (not called directly, e.g. TcUnit suites): {string.Join(", ", inst)}");
     }
 
     public List<string> Findings()
@@ -757,17 +771,20 @@ public sealed class PlcDoc
         return sd.ToString();
     }
 
-    void TreeHtml(StringBuilder o, string key, HashSet<string> path, int depth, HashSet<string> done)
+    void TreeHtml(StringBuilder o, string key, HashSet<string> path, int depth, HashSet<string> done, bool instance = false)
     {
         var kind = Pous.TryGetValue(key, out var p) ? p.Kind : "?";
         var recursion = !path.Add(key);
         var kids = depth < 12 && !recursion ? Callees(key).ToList() : new List<string>();
-        var label = $"<span class=\"k {kind.ToLowerInvariant()}\">{H(KindShort(kind))}</span> {Link(key)}";
+        var inst = depth < 12 && !recursion ? Instances(key) : new List<string>();
+        var label = $"<span class=\"k {kind.ToLowerInvariant()}\">{H(KindShort(kind))}</span> {Link(key)}" +
+                    (instance ? " <span class=\"muted\">(instance, not called directly)</span>" : "");
         if (recursion) label += " <span class=\"muted\">(recursion)</span>";
-        else if (kids.Count > 0 && !done.Add(key)) { kids.Clear(); label += " <span class=\"muted\">(expanded above)</span>"; }
-        if (kids.Count == 0) { o.Append($"<div class=\"leaf\">{label}</div>"); return; }
+        else if (kids.Count + inst.Count > 0 && !done.Add(key)) { kids.Clear(); inst.Clear(); label += " <span class=\"muted\">(expanded above)</span>"; }
+        if (kids.Count + inst.Count == 0) { o.Append($"<div class=\"leaf\">{label}</div>"); return; }
         o.Append($"<details{(depth < 2 ? " open" : "")}><summary>{label}</summary>");
         foreach (var c in kids) TreeHtml(o, c, new HashSet<string>(path, StringComparer.OrdinalIgnoreCase), depth + 1, done);
+        foreach (var c in inst) TreeHtml(o, c, new HashSet<string>(path, StringComparer.OrdinalIgnoreCase), depth + 1, done, true);
         o.Append("</details>");
     }
 
