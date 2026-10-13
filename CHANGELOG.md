@@ -5,6 +5,44 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.21.0] – not released yet
+
+### Added
+- **SIL / HIL test runs** – `TcAgent.exe sil` runs TcUnit on the runtime of the build PC (Run-mode check, PLC login/start
+  fallback, optional Scope recording, clean-up that always runs: runtime to Config mode, target, I/O and autostart
+  restored); `TcAgent.exe hil` does the same on a remote test PLC, only with explicit allowance (`TCAGENT_ALLOW_TARGETS`
+  or `--allow`), with ADS route check and broadcast-search diagnostics. Library and its tests as two PLC projects in one
+  solution: docs and ready-made pipelines (`docs/pipeline/library-*.yml`).
+- **Risk analysis** – `tc_doc action=risks`: static analysis of the ST code with 13 documented rules (division without
+  zero check, unguarded array index and pointer dereference, loops without exit, globals written in several tasks, timers
+  in methods, CASE without ELSE …); "Risks" section in the HTML page, counts in the outline; `TcAgent.exe doc --risks
+  [--fail-on high|medium|low]`.
+- `tc_doc`: tasks from the PLC task references with cycle time and priority; finding "PLC project has no task reference".
+- **TwinSAFE, read only** – `tc_safety`: safety projects, groups, alias devices, connections (FSoE address, watchdog),
+  safety parameters, CRCs and safety terminals. Writing TwinSAFE configuration is intentionally not supported; all write
+  tools refuse the TwinSAFE subtree.
+- **Open in editor** – `tc_editor_open` opens a PLC object in the IDE editor at a declaration/implementation line;
+  `tc_goto_definition open=true` jumps there like F12.
+- `tc_sfc action=renumber` (systematic step names, marked steps, jump targets, step references and embedded actions
+  renamed), `action=comments` (step comments following the coding guidelines), `action=flags` (SFCInit, SFCReset …,
+  always declared); new steps get "Duplicate on copy".
+- `tc_link`: a PLC struct/array is linked to a PDO group in one step, element by element (`dryRun` lists the pairs).
+- `tc_motion action=link`: links an NC axis to its drive, with read-back check.
+- `tc_feedback`: stable ids, status, machine; shared team folder (`TCAGENT_FEEDBACK`); `action=list|summary|resolve`;
+  `TcAgent.exe feedback --open --markdown out.md`.
+- `tc_policy action=audit_check`: changing calls from the daily log that are missing in the audit log, with the likely reason.
+
+### Changed
+- `tc_refactor apply` runs as a job: after `waitSeconds` (default 45) it returns "still waiting – k of n done" with a job id,
+  `action=result` returns the report - for AI clients that reach the PC through a bridge with a call timeout.
+- `tc_realtime show`: available cores, cores left to Windows and the other real-time settings.
+- `tc_editor_context`: the tree path comes from the active document's file (no mix-up of same-named methods); a selection
+  ending at column 1 of the next line counts as whole lines. `tc_goto_definition` resolves library types at project level
+  also while the chat window has the focus.
+- HMI tools: `reload=false`; memory check also before the reload; a lost IDE during unload/reload gives a clear message.
+- Audit, log and feedback files are appended with shared access and retries (several TcAgent processes); audit entries
+  include pid, client and the action-based class; `tc_lessons` add/remove counts as a project change.
+
 ## [0.20.4] – 2026-10-13
 
 ### Added
@@ -134,7 +172,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.21.0...HEAD
+[0.21.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.21.0
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0

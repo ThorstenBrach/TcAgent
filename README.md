@@ -28,16 +28,16 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 |---|---|---|
 | **Your context** | The agent knows the object, line and selection you are working on – ask "what does *this* do?" | `tc_editor_context` |
 | **PLC code** | Read, change (optionally as a diff to approve), create POUs, methods, properties, DUTs, GVLs; implement interfaces in one step | `tc_plc_read`, `tc_plc_write`, `tc_plc_create` |
-| **SFC step chains** | Read and write sequential function charts as text – steps, actions, transitions, alternative and parallel branches, jumps | `tc_sfc` |
+| **SFC step chains** | Read and write sequential function charts as text – steps, actions, transitions, alternative and parallel branches, jumps; renumber steps, step comments, SFC flags | `tc_sfc` |
 | **Lessons learned** | The agent remembers hard-won solutions – what the problem was, why, and how it was solved – and recalls them by itself when the same error comes up again (project, personal or team file) | `tc_lessons` |
-| **Program documentation** | Explains the project: call hierarchy, call graph, inheritance hierarchy, class diagram, step chains (SFC and CASE), a short description for every FB, method and function (from comments or derived from the code), findings – one HTML page with zoomable diagrams, explanations kept as project memory | `tc_doc` |
+| **Program documentation** | Explains the project: call hierarchy, call graph, inheritance hierarchy, class diagram, step chains (SFC and CASE), a short description for every FB, method and function (from comments or derived from the code), findings – one HTML page with zoomable diagrams, explanations kept as project memory; task overview with cycle times and a static risk analysis | `tc_doc` |
 | **User manual** | Manual of FBs, functions and their structs/enums – in the style of your own example documents (Markdown, AsciiDoc or HTML), missing comments explained from the code | `tc_userdoc` |
 | **Refactoring** | Meaningful names and comments for what you marked or clicked – every change confirmed by you (Apply / Apply all / Reject) | `tc_refactor` |
-| **Navigation** | Go to definition and find references (read/write) – resolved like TwinCAT itself, across inheritance | `tc_goto_definition`, `tc_find_references`, `tc_plc_search` |
+| **Navigation** | Go to definition and find references (read/write) – resolved like TwinCAT itself, across inheritance; opens the object in the editor at the right line | `tc_goto_definition`, `tc_editor_open`, `tc_find_references`, `tc_plc_search` |
 | **Library APIs** | Full interfaces of referenced libraries – also compiled libraries – so the agent never invents an API | `tc_lib_signatures`, `tc_plc_references` |
 | **Check & build** | "Check all objects" without generating code; real build before activation; compiler vs. runtime messages separated | `tc_check`, `tc_build`, `tc_errors` |
 | **Tests** | Evaluate TcUnit results | `tc_test_results` |
-| **I/O & system** | Scan EtherCAT and assign adapters, add masters, couplers and terminals offline, link variables in bulk, tasks, boot project, config/run mode, licenses (read) | `tc_io_scan`, `tc_io_add`, `tc_link`, `tc_task`, `tc_runtime_mode` |
+| **I/O & system** | Scan EtherCAT and assign adapters, add masters, couplers and terminals offline, link variables in bulk (structs to PDO groups element by element), tasks and PLC task assignment, boot project, config/run mode, licenses (read) | `tc_io_scan`, `tc_io_add`, `tc_link`, `tc_task`, `tc_runtime_mode` |
 | **Projects & files** | New solutions and PLC projects, PLCopen/XTI export and import, libraries (references, placeholders, repositories, save as library), mapping export/import, archive, TwinCAT version, target platform, variants | `tc_new_solution`, `tc_plc_project_add`, `tc_export`, `tc_import`, `tc_library`, `tc_library_save` |
 | **Quality** | Static analysis (TE1200) with SARIF export | `tc_static_analysis` |
 | **Network** | ADS broadcast search, add routes, TcCOM module instances | `tc_route_search`, `tc_route_add`, `tc_tccom` |
@@ -45,12 +45,13 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **IDE dialogs** | Modal IDE dialogs are detected and reported instead of blocking silently | `tc_dialogs` |
 | **Scope** | Scope configurations (TE130x): charts, axes, channels on PLC variables, record, export CSV/SVDX – also from the pipeline | `tc_scope_new`, `tc_scope` |
 | **HMI** | TwinCAT HMI (TE2000) pages and regions, controls with PLC bindings and button actions, symbol mapping, build – directly in the project files | `tc_hmi`, `tc_hmi_page`, `tc_hmi_control`, `tc_hmi_symbol` |
-| **Motion** | NC tasks and axes (first step of the motion configuration) | `tc_motion`, `tc_motion_add` |
+| **Motion** | NC tasks and axes, link an axis to its drive | `tc_motion`, `tc_motion_add` |
+| **TwinSAFE** | Safety projects, groups, alias devices, connections, CRCs – read only, writing is intentionally not supported | `tc_safety` |
 | **Runtime** | Activate, login/start/stop, read/write variables via ADS – only on allowed targets | `tc_activate`, `tc_plc_online`, `ads_read`, `ads_write` |
 | **Your rules** | Coding rules per project/person/company; "remember that I want X" becomes a rule | `tc_coding_rules`, `tc_coding_rules_add` |
 | **Documentation** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 
-All 82 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 84 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 ## In your CI pipeline
 
@@ -155,8 +156,10 @@ folders and network shares per project (`<solution>\.tcagent\knowledge.md`, `.tc
 
 ## Feedback loop
 
-Agents report problems, missing features and unclear descriptions through `tc_feedback` into `feedback/feedback.jsonl`
-(with version, client and solution). That is where the next improvements come from – see [CONTRIBUTING.md](CONTRIBUTING.md).
+Agents report problems, missing features and unclear descriptions through `tc_feedback` (with version, client, machine and
+solution) – into a local file or a shared team folder (`TCAGENT_FEEDBACK`). `tc_feedback action=list|summary|resolve` and
+`TcAgent.exe feedback --open --markdown feedback.md` turn them into a triage list for GitHub issues. That is where the next
+improvements come from – see [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ## Build from source
 
@@ -189,9 +192,9 @@ docs/                   installation, tool reference, CI pipelines (docs/pipelin
 
 ## Roadmap
 
-* SIL/HIL test runs (simulated I/O, test PLCs on the network)
-* Motion: drive links and axis parameters
-* TwinSAFE: read, analyze, propose – never download
+* SIL/HIL: first version available (`TcAgent.exe sil` / `hil`, see [docs/PIPELINE.md](docs/PIPELINE.md)) – simulated I/O next
+* Motion: axis parameters (drive links are available)
+* TwinSAFE: analyze and propose on top of the read-only view – never download
 
 ## Known limitations
 

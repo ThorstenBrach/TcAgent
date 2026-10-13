@@ -1,6 +1,6 @@
 [$RootKey$\InstalledProducts\TcAgentBridge]
 @="TcAgentBridge"
-"PID"="0.20.4"
+"PID"="0.21.0"
 "ProductDetails"="TcAgent - TwinCAT 3 for AI coding agents"
 [$RootKey$\Packages\{86c8609c-4aac-4e7e-95e6-6b96179a3c4f}]
 @="TcAgentBridge.BridgePackage"
