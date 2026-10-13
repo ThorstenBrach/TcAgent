@@ -1359,7 +1359,7 @@ public sealed partial class ToolRegistry
         var t = tools.FirstOrDefault(x => x.Name == name) ?? throw new Exception("Unknown tool: " + name);
         // Safety net: if there are coding guidelines and the agent has not read them yet, the first writing
         // code call is not executed; the guidelines are returned instead (once per session).
-        if (!rulesSeen && (name is "tc_plc_write" or "tc_plc_create") && !DryRun(args)
+        if (!rulesSeen && (name is "tc_plc_write" or "tc_plc_create" || name == "tc_refactor" && string.Equals(Str(args, "action"), "apply", StringComparison.OrdinalIgnoreCase)) && !DryRun(args)
             && Environment.GetEnvironmentVariable("TCAGENT_RULES_GATE") != "0")
         {
             rulesSeen = true;
@@ -1476,13 +1476,37 @@ public sealed partial class ToolRegistry
                 ITcSmTreeItem it;
                 try { it = tc.Item(candidate); } catch { continue; }
                 if (it.ItemType != 600) continue;                       // PLC project
+                // export through the temp folder: the IDE may not see folders this process creates under %LOCALAPPDATA%
+                // (packaged clients like Claude Desktop redirect new AppData folders)
+                var tmp = Path.Combine(Path.GetTempPath(), $"tcagent-del-{Guid.NewGuid():N}.xml");
                 var file = Path.Combine(dir, $"{stamp}_{safe}.xml");
-                ComCall.Invoke(it, "PlcOpenExport", file, string.Join(".", parts.Skip(i + 1)));
-                if (File.Exists(file)) return file;
+                ComCall.Invoke(it, "PlcOpenExport", tmp, string.Join(".", parts.Skip(i + 1)));
+                if (File.Exists(tmp)) { File.Copy(tmp, file, true); try { File.Delete(tmp); } catch { } return file; }
                 break;
             }
         }
         catch (Exception ex) { Log.Info("tc_delete backup (PLCopen): " + ex.Message); }
+        try
+        {
+            // PLC object: declaration and code as text (object and all sub-objects)
+            var sb = new StringBuilder();
+            void Dump(ITcSmTreeItem x, int depth)
+            {
+                string d = null, c = null;
+                try { if (x is ITcPlcDeclaration xd) d = xd.DeclarationText; } catch { }
+                try { if (x is ITcPlcImplementation xi) c = xi.ImplementationText; } catch { }
+                if (d != null || c != null) sb.AppendLine($"(* ===== {x.PathName} ===== *)").AppendLine(d ?? "").AppendLine("(* ----- implementation ----- *)").AppendLine(c ?? "");
+                if (depth < 6) foreach (var ch in TwinCatSession.Children(x)) Dump(ch, depth + 1);
+            }
+            Dump(tc.Item(path), 0);
+            if (sb.Length > 0)
+            {
+                var file = Path.Combine(dir, $"{stamp}_{safe}.st.txt");
+                File.WriteAllText(file, sb.ToString());
+                return file;
+            }
+        }
+        catch (Exception ex) { Log.Info("tc_delete backup (text): " + ex.Message); }
         try
         {
             string xml = ((dynamic)tc.Item(path)).ProduceXml(true);

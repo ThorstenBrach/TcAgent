@@ -128,6 +128,13 @@ public sealed partial class ToolRegistry
         o.AppendLine($"\n{nComment} missing comments/descriptions, {nName} possibly unclear names. Propose changes with action=apply " +
                      "changes=[{object, kind, target, name, newName, comment, reason}] - only where it improves understanding; " +
                      "the user confirms each one. Names flagged 'visible outside', I/O, persistent or HMI need a strong reason.");
+        if (CodingRules.Text(SolutionDir()) is { } rules)
+        {
+            rulesSeen = true;
+            o.AppendLine("\nCoding guidelines of this project - names, comment language and comment placement MUST follow them " +
+                         $"(variable comments are written {(CommentAbove(null) ? "as /// lines above the variable" : "at the end of the line")}; " +
+                         "override per change with style=above|trailing):\n" + rules);
+        }
         return o.ToString();
     }
 
@@ -270,8 +277,9 @@ public sealed partial class ToolRegistry
             {
                 if (string.IsNullOrEmpty(name)) throw new Exception("name is required");
                 plan.Title = $"Comment for {pou.Key}.{name}";
-                plan.Summary = $"{name}  // {comment}";
-                var nd = SetLineComment(pou.Decl, name, comment, pou.Kind == "DUT");
+                bool above = CommentAbove(S("style"));
+                plan.Summary = above ? $"/// {comment}\n{name}" : $"{name}  // {comment}";
+                var nd = above ? SetAboveComment(pou.Decl, name, comment, pou.Kind == "DUT") : SetLineComment(pou.Decl, name, comment, pou.Kind == "DUT");
                 if (nd == pou.Decl) throw new Exception($"declaration of {name} not found in {pou.Key}");
                 plan.Edits.Add(new Edit(pou.Path, "declaration", pou.Decl, nd));
             }
@@ -312,7 +320,7 @@ public sealed partial class ToolRegistry
             }
             if (isDutMember && !plan.Edits.Any(e => e.Path == pou.Path)) throw new Exception($"{name} is not declared in {pou.Key}");
             if (comment2 != null && plan.Edits.FirstOrDefault(e => e.Path == pou.Path && e.Part == "declaration") is { } de)
-            { plan.Edits.Remove(de); plan.Edits.Add(de with { New = SetLineComment(de.New, newName, comment2, isDutMember) }); }
+            { plan.Edits.Remove(de); plan.Edits.Add(de with { New = CommentAbove(S("style")) ? SetAboveComment(de.New, newName, comment2, isDutMember) : SetLineComment(de.New, newName, comment2, isDutMember) }); }
             // visible outside: callers (inst.name, named arguments), program/GVL access, struct members (x.name)
             bool outside = isDutMember || (v != null && IsVisibleOutside(pou, v.Section)) ||
                            (pou.Kind is "METHOD" or "PROPERTY" && v?.Section is "VAR_INPUT" or "VAR_OUTPUT" or "VAR_IN_OUT");
@@ -536,6 +544,40 @@ public sealed partial class ToolRegistry
                 }
             }
         return "   ";
+    }
+
+    /// <summary>Placement of variable comments: style=above|trailing, otherwise from the coding guidelines (/// mentioned = above).</summary>
+    bool CommentAbove(string style) => style?.ToLowerInvariant() switch
+    {
+        "above" or "doc" => true,
+        "trailing" or "line" => false,
+        _ => CodingRules.Text(SolutionDir())?.Contains("///") == true
+    };
+
+    // '/// comment' line(s) above the declaration of a variable, struct field or enum value (replacing /// lines there
+    // and a trailing comment on the line)
+    internal static string SetAboveComment(string decl, string name, string comment, bool dut)
+    {
+        var nl = decl.Contains("\r\n") ? "\r\n" : "\n";
+        var lines = decl.Replace("\r\n", "\n").Split('\n').ToList();
+        comment = comment.Replace("\r\n", "\n");
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var l = lines[i];
+            if (!Regex.IsMatch(l, $@"^\s*{Regex.Escape(name)}\s*(,|:|AT\b|\(|$)", RegexOptions.IgnoreCase) &&
+                !(dut && Regex.IsMatch(l, $@"^\s*(\(\s*)?{Regex.Escape(name)}\s*(:=|,|\)|$)", RegexOptions.IgnoreCase))) continue;
+            var (code, old) = UserDoc.SplitComment(l);
+            if (old != null && Regex.Replace(l[code.Length..], @"\(\*.*?\*\)|//.*", "").Trim().Length > 0) code = l;
+            if (Regex.IsMatch(code, $@"^\s*{Regex.Escape(name)}\s*,", RegexOptions.IgnoreCase) && Regex.IsMatch(code, @":(?!=)")) continue;
+            var indent = Regex.Match(l, @"^\s*").Value;
+            lines[i] = code.TrimEnd();
+            int start = i;
+            while (start > 0 && lines[start - 1].TrimStart().StartsWith("///")) start--;
+            lines.RemoveRange(start, i - start);
+            lines.InsertRange(start, Wrap(comment, 100).Select(c => indent + "/// " + c));
+            return string.Join(nl, lines);
+        }
+        return decl;
     }
 
     internal static string SetLineComment(string decl, string name, string comment, bool dut)
