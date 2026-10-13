@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.20.1] – not released yet
+## [0.20.2] – not released yet
 
 ### Added
 - **User manual** – `tc_userdoc`: manual of FBs, functions, interfaces and the structs/enums they use, in the style and
@@ -45,6 +45,8 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - `install-xaeshell.ps1` also installs into the 64-bit XAE Shell (VS 2022 base).
 
 ### Fixed
+- `tc_refactor` rename: transition conditions and embedded code of SFC charts are renamed too (chart rewritten via `tc_sfc write`).
+- `tc_check` no longer counts the build log of HMI projects (nuget restore, virtual mappings ...) as warnings.
 - TcAgent's own confirmation dialogs (refactoring choice) were treated as blocking IDE dialogs - the call aborted early.
 - SFC bodies (ImplementationText returns the editor XML) are recognized as SFC again instead of shown as code.
 - `tc_refactor`: descriptions of actions/transitions (no declaration part) go as `///` block on top of their code;
@@ -116,7 +118,7 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.1...HEAD
-[0.20.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.1
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.2...HEAD
+[0.20.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.2
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0

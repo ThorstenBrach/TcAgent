@@ -515,6 +515,10 @@ public sealed class TwinCatSession
         // compiler messages carry a source position; entries without one (import results, device descriptions, older
         // messages of other tools) are listed separately and do not count; INFO lines are progress noise
         static bool FromCompiler(ErrorEntry e) => !string.IsNullOrEmpty(e.File) && !e.File.StartsWith(":") || !string.IsNullOrEmpty(e.Project);
+        // HMI projects write their build log (nuget restore, virtual mappings ...) into the error list - not PLC messages
+        static bool FromHmi(ErrorEntry e) => (e.Project ?? "").EndsWith(".hmiproj", StringComparison.OrdinalIgnoreCase) ||
+                                            (e.File ?? "").EndsWith(".hmiproj", StringComparison.OrdinalIgnoreCase);
+        all = all.Where(e => !FromHmi(e)).ToList();
         var compile = all.Where(e => e.Level != "INFO" && FromCompiler(e)).ToList();
         var other = all.Where(e => e.Level is "ERROR" or "WARN" && !FromCompiler(e)).ToList();
         int errs = compile.Count(e => e.Level == "ERROR"), warns = compile.Count(e => e.Level == "WARN");

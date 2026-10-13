@@ -219,13 +219,14 @@ public sealed partial class ToolRegistry
                 tc.Sta.Run(() =>
                 {
                     if (plan.TreeRenamePath != null) ((dynamic)tc.Item(plan.TreeRenamePath)).Name = plan.TreeRenameTo;
-                    foreach (var e in plan.Edits)
+                    foreach (var e in plan.Edits.OrderBy(x => x.Part == "sfc" ? 1 : 0))     // SFC chart last: its re-import takes the new declaration
                     {
                         var path = e.Path;
                         if (plan.TreeRenamePath != null && path.Equals(plan.TreeRenamePath, StringComparison.OrdinalIgnoreCase))
                             path = path[..(path.LastIndexOf('^') + 1)] + plan.TreeRenameTo;
                         else if (plan.TreeRenamePath != null && path.StartsWith(plan.TreeRenamePath + "^", StringComparison.OrdinalIgnoreCase))
                             path = plan.TreeRenamePath[..(plan.TreeRenamePath.LastIndexOf('^') + 1)] + plan.TreeRenameTo + path[plan.TreeRenamePath.Length..];
+                        if (e.Part == "sfc") { Sfc(new JsonObject { ["action"] = "write", ["path"] = path, ["chain"] = e.New }); continue; }
                         var it = tc.Item(path);
                         if (e.Part == "declaration") ((ITcPlcDeclaration)it).DeclarationText = e.New;
                         else ((ITcPlcImplementation)it).ImplementationText = e.New;
@@ -331,7 +332,7 @@ public sealed partial class ToolRegistry
                 if (hmi.Any(h => Regex.IsMatch(h, $@"\.{Regex.Escape(name)}\b"))) plan.Warnings.Add($"'{name}' appears in HMI files - bindings to this symbol must be adapted by hand");
                 plan.Warnings.Add("visible outside: ADS clients, HMI or other PLCs that use the symbol name are not changed");
             }
-            plan.Summary = $"{name} -> {newName}" + (comment2 != null ? $"  // {comment2}" : "") + $"\nAffected: {string.Join(", ", plan.Edits.Select(e => e.Path.Split('^').Last() + " (" + e.Part[..4] + ")").Distinct())}";
+            plan.Summary = $"{name} -> {newName}" + (comment2 != null ? $"  // {comment2}" : "") + $"\nAffected: {string.Join(", ", plan.Edits.Select(e => e.Path.Split('^').Last() + " (" + (e.Part.Length > 4 ? e.Part[..4] : e.Part) + ")").Distinct())}";
             return plan;
         }
         if (target is "pou" or "method")
@@ -369,7 +370,7 @@ public sealed partial class ToolRegistry
             plan.Warnings.Add("the object is renamed in the project tree; libraries/other projects that use the old name are not changed");
             if (t.Kind is "FUNCTION_BLOCK" or "PROGRAM" && hmi.Any(h => h.Contains("." + oldName + ".") || h.Contains(oldName + ".")))
                 plan.Warnings.Add($"'{oldName}' appears in HMI files - bindings must be adapted by hand");
-            plan.Summary = $"{oldName} -> {newName}\nAffected: {string.Join(", ", plan.Edits.Select(e => e.Path.Split('^').Last() + " (" + e.Part[..4] + ")").Distinct())}";
+            plan.Summary = $"{oldName} -> {newName}\nAffected: {string.Join(", ", plan.Edits.Select(e => e.Path.Split('^').Last() + " (" + (e.Part.Length > 4 ? e.Part[..4] : e.Part) + ")").Distinct())}";
             return plan;
         }
         throw new Exception("target: variable, member, pou or method");
@@ -429,8 +430,10 @@ public sealed partial class ToolRegistry
                 return acc;
             }));
         else parts.Add((p.Path, "implementation", p.Impl));
-        if (p.Lang != "ST" && string.IsNullOrEmpty(p.Impl) && p.Kind is "PROGRAM" or "FUNCTION_BLOCK" or "FUNCTION" or "METHOD" or "ACTION")
-            plan.Warnings.Add($"{p.Key} has a graphical body ({p.Lang}) - it is not changed; check transition conditions there by hand (tc_sfc read)");
+        // SFC: transition conditions and embedded code live in the chart - rewritten through tc_sfc write (after the declaration)
+        if (p.Lang == "SFC" && !string.IsNullOrEmpty(p.SfcText) && !p.SfcText.StartsWith("(chart")) parts.Add((p.Path, "sfc", p.SfcText));
+        else if (p.Lang != "ST" && string.IsNullOrEmpty(p.Impl) && p.Kind is "PROGRAM" or "FUNCTION_BLOCK" or "FUNCTION" or "METHOD" or "ACTION")
+            plan.Warnings.Add($"{p.Key} has a graphical body ({p.Lang}) - it is not changed; check it by hand");
         foreach (var (path, part, text) in parts)
         {
             if (string.IsNullOrEmpty(text)) continue;
