@@ -20,8 +20,6 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 <i>The video is a generated visualization to illustrate the workflow more clearly – in practice TcAgent works exactly like this.</i></sub>
 </p>
 
-<p align="center"><img src="docs/img/demo.svg" width="900" alt="Animated demo: Ctrl+Shift+Q in the TwinCAT editor, the agent creates a function block that implements an interface and checks all objects"></p>
-
 ---
 
 ## What the agent can do
