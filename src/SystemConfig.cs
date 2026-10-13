@@ -75,7 +75,7 @@ public sealed partial class ToolRegistry
         if (cores.Count == 0) throw new Exception("cores: at least one real-time core, e.g. cores='1'");
         if (cores.Any(c => c < 0 || c >= 64)) throw new Exception("cores: 0 ... 63");
         if (isolated is int iso && (iso < 0 || iso > max)) throw new Exception("isolated must be between 0 and maxCpus");
-        var avail = int.TryParse((Child(def, "AvailableCPUs") ?? Child(def, "AvailabeCPUs"))?.Value, out var av) ? av : 0;
+        var avail = int.TryParse(AvailableCoresInXml(def).Value, out var av) ? av : 0;    // only a count from the project, never this PC's
         if (avail > 0 && max > avail) throw new Exception($"maxCpus {max} > available cores {avail}");
 
         // new complete RTimeSetDef: MaxCPUs (+NonWindowsCPUs), Affinity, CPUs for the real-time cores
@@ -131,11 +131,20 @@ public sealed partial class ToolRegistry
     static string DescribeRealtime(XElement def)
     {
         var o = new StringBuilder();
-        var avail = (Child(def, "AvailableCPUs") ?? Child(def, "AvailabeCPUs"))?.Value;
+        var (avail, availSource) = AvailableCoresInXml(def);
         var max = Child(def, "MaxCPUs");
         var aff = Child(def, "Affinity")?.Value;
-        o.AppendLine($"Available cores: {avail ?? "?"}");
-        o.AppendLine($"Cores for TwinCAT (MaxCPUs): {max?.Value ?? "?"}" + (max?.Attribute("NonWindowsCPUs") is { } nw ? $", isolated from Windows: {nw.Value}" : ""));
+        int? isolated = int.TryParse(max?.Attribute("NonWindowsCPUs")?.Value, out var iso) ? iso : null;
+        if (avail != null)
+            o.AppendLine($"Available cores: {avail} (real-time settings, {availSource})");
+        else
+            o.AppendLine($"Available cores: {Environment.ProcessorCount} logical processors on this PC (Windows; the real-time settings contain " +
+                         "no core count - if the target is a remote system its core count may differ, read it there with 'Read from target' in the IDE)");
+        int total = int.TryParse(avail, out var tv) ? tv : Environment.ProcessorCount;
+        o.AppendLine($"Cores for TwinCAT (MaxCPUs): {max?.Value ?? "?"}" + (isolated is int nw ? $", isolated from Windows: {nw}" : ", isolated from Windows: 0 (no NonWindowsCPUs)"));
+        if (isolated is int isoCount)
+            o.AppendLine($"Cores left to Windows: {Math.Max(0, total - isoCount)} of {total}" +
+                         (int.TryParse(max?.Value, out var maxN) ? $"; shared TwinCAT cores (Windows + real time): {Math.Max(0, maxN - isoCount)}" : ""));
         o.AppendLine($"Real-time cores (Affinity {aff ?? "?"}): {string.Join(", ", CoresFromAffinity(aff))}");
         if (Child(def, "CPUs") is { } cpus)
             foreach (var c in cpus.Elements())
@@ -146,7 +155,33 @@ public sealed partial class ToolRegistry
             }
         if (def.Descendants().FirstOrDefault(e => e.Name.LocalName == "CpuConfigValidOnTarget") is { } v)
             o.AppendLine($"Configuration valid on target: {v.Value}");
+        // everything else the real-time settings contain (so nothing relevant stays hidden)
+        var known = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "MaxCPUs", "Affinity", "CPUs", "CpuConfigValidOnTarget", availSource ?? "" };
+        var other = def.Attributes().Select(x => $"@{x.Name.LocalName}={x.Value}")
+            .Concat(def.Elements().Where(e => !known.Contains(e.Name.LocalName))
+                       .Select(e => e.HasElements
+                           ? e.Name.LocalName + "{" + string.Join(", ", e.Descendants().Where(d => !d.HasElements).Take(8).Select(d => d.Name.LocalName + "=" + d.Value)) + "}"
+                           : e.Name.LocalName + "=" + e.Value))
+            .ToList();
+        if (other.Count > 0) o.AppendLine("Other settings: " + Shorten(string.Join(", ", other), 800));
         return o.ToString().TrimEnd();
+    }
+
+    /// <summary>Number of cores as stored in the real-time settings (element or attribute anywhere in the TIRS XML);
+    /// (null, null) if the XML has none. Element names seen/expected: AvailableCPUs (also misspelt AvailabeCPUs), CpuCount ...</summary>
+    static (string Value, string Source) AvailableCoresInXml(XElement def)
+    {
+        var names = new[] { "AvailableCPUs", "AvailabeCPUs", "AvailableCores", "AvailableCpuCount", "CpuCount", "CPUCount", "NumberOfCPUs",
+                            "NumOfCPUs", "NumberOfCores", "TotalCPUs", "SystemCPUs", "CoreCount" };
+        bool IsName(string n) => names.Any(x => x.Equals(n, StringComparison.OrdinalIgnoreCase));
+        var root = def.Document?.Root ?? def;
+        foreach (var e in root.DescendantsAndSelf())
+        {
+            if (IsName(e.Name.LocalName) && !e.HasElements && int.TryParse(e.Value.Trim(), out _)) return (e.Value.Trim(), e.Name.LocalName);
+            foreach (var at in e.Attributes())
+                if (IsName(at.Name.LocalName) && int.TryParse(at.Value.Trim(), out _)) return (at.Value.Trim(), at.Name.LocalName);
+        }
+        return (null, null);
     }
 
     static string Shorten(string s, int n) => s.Length <= n ? s : s[..n] + "...";

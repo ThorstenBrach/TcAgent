@@ -30,6 +30,7 @@ public static class Confirm
         if (cls == ToolClass.Read) return false;
         if (args?["dryRun"] is JsonValue v && v.ToString().Equals("true", StringComparison.OrdinalIgnoreCase)) return false;
         if (tool == "tc_runtime_startup" && string.IsNullOrEmpty(args?["mode"]?.ToString())) return false;   // only shows the mode
+        if (tool == "tc_motion" && args?["dryRun"] == null) return false;   // action=link is a dry run unless dryRun=false
         if (tool == "tc_refactor") return false;     // asks per change itself (Apply / Apply all / Reject / Cancel)
         return Configured switch
         {

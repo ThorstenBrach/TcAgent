@@ -199,10 +199,15 @@ public sealed partial class ToolRegistry
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +
                        "Paths as in the tree, e.g. 'TIPC^MyPlc^MyPlc Instance^PlcTask Inputs^MAIN.bIn' and " +
                        "'TIID^Device 1 (EtherCAT)^Term 2 (EL1008)^Channel 1^Input'. Determine paths with tc_io_vars first. " +
+                       "Structures/groups in one step: if both sides have sub-items (PLC STRUCT/ARRAY variable and a PDO group such as " +
+                       "'...^Term 2 (EL6001)^COM Inputs', or two structs) the pair is linked element-wise - members by equal name, the rest " +
+                       "in order (arrays element by element); every single link is reported, dryRun shows the pairs first. If source " +
+                       "elements remain unmatched nothing is linked for that pair. " +
                        "PLC variables only appear after a real build (tc_build, not tc_check), if they are declared with AT %I*/%Q*.",
-            Schema(P("source", "string", "First variable path"), P("target", "string", "Second variable path"),
+            Schema(P("source", "string", "First variable path (variable, struct/array variable or group)"), P("target", "string", "Second variable path"),
                    P("pairs", "string", "Multiple links, one per line: '<path> => <path>'"),
-                   P("dryRun", "boolean", "Only check whether all paths exist")),
+                   P("elementwise", "boolean", "Expand struct/group pairs into single links (default true; false = link exactly the given items)"),
+                   P("dryRun", "boolean", "Only check the paths and show every single link that would be created")),
             a => tc.Sta.Run(() => Link(a)));
 
         Add("tc_io_vars", "Lists linkable variables below a tree item with type - e.g. all channels of a terminal " +
@@ -1118,38 +1123,7 @@ public sealed partial class ToolRegistry
         foreach (var c in TwinCatSession.Children(it)) { yield return c; foreach (var d in Descendants(c)) yield return d; }
     }
 
-    // ------------------------------------------------------------------ Linking
-    string Link(JsonObject a)
-    {
-        var list = new List<(string S, string T)>();
-        if (!string.IsNullOrEmpty(Str(a, "source")) && !string.IsNullOrEmpty(Str(a, "target"))) list.Add((Str(a, "source").Trim(), Str(a, "target").Trim()));
-        foreach (var line in (Str(a, "pairs") ?? "").Split('\n'))
-        {
-            var l = line.Trim();
-            if (l.Length == 0) continue;
-            var parts = l.Split(new[] { "=>", "<=>", "->" }, StringSplitOptions.None);
-            if (parts.Length != 2) throw new Exception("Line not in the format '<path> => <path>': " + l);
-            list.Add((parts[0].Trim(), parts[1].Trim()));
-        }
-        if (list.Count == 0) throw new Exception("specify source+target or pairs");
-        var sm = (dynamic)tc.RequireSysMan();
-        var o = new StringBuilder();
-        int ok = 0;
-        foreach (var (src, dst) in list)
-        {
-            try
-            {
-                // Check existence - gives a clear error message instead of a COM error
-                foreach (var p in new[] { src, dst })
-                    try { tc.Item(p); } catch { throw new Exception("Path not found: " + p); }
-                if (!DryRun(a)) sm.LinkVariables(src, dst);
-                ok++;
-                o.AppendLine($"{(DryRun(a) ? "OK (dryRun)" : "linked")}: {src} <=> {dst}");
-            }
-            catch (Exception ex) { o.AppendLine($"ERROR: {src} <=> {dst}: {ex.InnerException?.Message ?? ex.Message}"); }
-        }
-        return $"{ok}/{list.Count} {(DryRun(a) ? "checkable" : "linked")}\n" + o;
-    }
+    // ------------------------------------------------------------------ Linking: see LinkGroups.cs
 
     // Leaves below an item = variables/channels; type and size from ProduceXml where available
     string IoVars(string path, string filter, int max)

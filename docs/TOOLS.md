@@ -172,12 +172,15 @@ Takes over a device found by `tc_io_scan`: creates it, or – with `devicePath` 
 
 Links PLC variables to I/O channels, one at a time or many at once. PLC variables only appear after `tc_build` if declared with `AT %I*`/`AT %Q*`.
 
+Structures and groups in one step (like "Change Multi Link" in the IDE): if both sides of a pair have sub-items - a PLC STRUCT/ARRAY variable and a PDO group (e.g. `MAIN.SerialCom.ComIn` => `...^Term 2 (EL6001)^COM Inputs`) or two structured variables - the pair is expanded into single links: members with the same name first (`Status` => `Status`), the rest in tree order, arrays element by element (`D[0..21]` => `Data In 0..21`). Every single link is reported with how it was matched (by name / by order); `dryRun=true` shows all pairs without linking. If source elements remain unmatched, nothing is linked for that pair and the pairs found so far are listed for an explicit `pairs` call; extra target entries are reported as left unlinked. Struct members are taken from the tree children of the variable, or from flat siblings named `<var>.<member>`.
+
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `source` | string |  | First variable path |
+| `source` | string |  | First variable path (variable, struct/array variable or group) |
 | `target` | string |  | Second variable path |
-| `pairs` | string |  | several links, one `<path> => <path>` per line |
-| `dryRun` | boolean |  | only check whether all paths exist |
+| `pairs` | string |  | several links, one `<path> => <path>` per line (each line is expanded the same way) |
+| `elementwise` | boolean |  | expand struct/group pairs into single links (default true; false = link exactly the given items) |
+| `dryRun` | boolean |  | only check the paths and show every single link that would be created |
 
 ### `tc_io_vars`
 
@@ -602,7 +605,7 @@ TcCOM module instances: list, or add an instance of a module class (class id GUI
 
 ### `tc_realtime`
 
-Real-time settings (cores): `action=show` (available cores, cores for TwinCAT, isolated cores, real-time cores, base time / load limit / latency warning per core) or `set`. Changes the project; takes effect with `tc_activate`. Isolating cores additionally needs "Set on target" in the IDE and a reboot of the target.
+Real-time settings (cores): `action=show` (available cores, cores for TwinCAT, isolated cores, cores left to Windows, real-time cores, base time / load limit / latency warning per core, plus any other values of the settings XML) or `set`. "Available cores" comes from the real-time settings XML if it contains a core count; otherwise the logical processor count of this PC is shown and labelled as such (a remote target may differ). Changes the project; takes effect with `tc_activate`. Isolating cores additionally needs "Set on target" in the IDE and a reboot of the target.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -760,11 +763,18 @@ Server symbols of the HMI: list, map (PLC variables -> HMI symbols in TcHmiSrv.C
 
 ### `tc_motion`
 
-Lists the motion configuration: NC tasks and their axes (name, type, tree path). Read only.
+Motion configuration. `action=list` (default, read only): NC tasks and their axes (name, type, tree path, linked I/O item). `action=link`: links an NC axis with its drive, like "Link To I/O..." in the axis settings - `ConsumeXml` on the axis with `<TreeItem><NcAxisDef><IoItem><PathName>TIID^...</PathName></IoItem></NcAxisDef></TreeItem>` (format from the Automation Interface sample "How to create/change a linkage of a nc axis, encoder or drive to an I/O device, box or terminal"). Because that sample is old and not yet verified on every TwinCAT 3 version, `link` is a dry run unless `dryRun=false` is passed; after writing, the axis XML is read back and the result says LINKED or WRITTEN, BUT NOT VERIFIED (with the I/O related XML of the axis). Changes the project only; takes effect with `tc_activate`.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string |  | `list` (default) or `link` |
+| `axis` | string |  | link: NC axis, e.g. `TINC^NC-Task 1 SAF^Axes^Axis 1` |
+| `drive` | string |  | link: I/O item of the drive below TIID, e.g. `TIID^Device 1 (EtherCAT)^Term 1 (EK1100)^Term 4 (EL7201)` |
+| `dryRun` | boolean |  | link: default true = only show the XML; false = write |
 
 ### `tc_motion_add`
 
-Creates an NC task (`kind=nc_task`) or NC axes (`kind=axis`, several with `count`) under the Axes folder of an NC task. Parameters afterwards with `tc_xml_get`/`tc_xml_set`; the drive link is done in the IDE or via `tc_xml_set` on the axis. Takes effect after `tc_activate`.
+Creates an NC task (`kind=nc_task`) or NC axes (`kind=axis`, several with `count`) under the Axes folder of an NC task. Parameters afterwards with `tc_xml_get`/`tc_xml_set`; the drive link with `tc_motion action=link`. Takes effect after `tc_activate`.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

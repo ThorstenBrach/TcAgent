@@ -145,6 +145,9 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
 - `tc_link source target` links variables, e.g.
   `TIPC^MyPlc^MyPlc Instance^PlcTask Inputs^MAIN.bIn` with `TIID^Device 1 (EtherCAT)^Term 2 (EL1008)^Channel 1^Input`.
   Determine paths with `tc_tree` first.
+- **Struct to PDO group in one step:** `tc_link source=<PLC struct/array variable> target=<PDO group or struct>` (e.g.
+  `...^PlcTask Inputs^MAIN.SerialCom.ComIn` => `...^Term 2 (EL6001)^COM Inputs`) links element-wise - same names first,
+  the rest in order, arrays element by element. Run it with `dryRun=true` first and check the reported pairs.
 
 ## Tasks, boot project, startup mode, licenses
 
@@ -175,7 +178,7 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
 
 ## Real-time cores, CoE startup list, packages
 
-- `tc_realtime action=show` shows cores and base times; `action=set maxCpus=.. isolated=.. cores=.. baseTimeUs=..` changes the project
+- `tc_realtime action=show` shows cores (available / for TwinCAT / isolated / left to Windows) and base times; `action=set maxCpus=.. isolated=.. cores=.. baseTimeUs=..` changes the project
   (first with `dryRun=true`). Isolated cores need "Set on target" and a reboot - tell the user, never reboot a target yourself.
   Which core a task runs on: `tc_task action=set path=TIRT^PlcTask cores=1`.
 - `tc_coe action=list path=<terminal>` shows the CoE startup list; `add index=0x8000 subIndex=0x06 value=1 dataType=BOOL`
@@ -195,7 +198,9 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
 ## Motion
 
 - `tc_motion` lists NC tasks and axes, `tc_motion_add` creates an NC task (it appears as `<name> SAF`) and axes.
-  Drive links and axis parameters are not automated yet - use `tc_xml_get`/`tc_xml_set` and tell the user.
+  Drive link: `tc_motion action=link axis=<axis path> drive=<I/O path of the drive>` - first without dryRun (shows the XML),
+  then with `dryRun=false`; if the answer says NOT VERIFIED, tell the user to check "Link To I/O" in the IDE.
+  Axis parameters: `tc_xml_get`/`tc_xml_set`.
 
 ## Scope (TE130x Scope View)
 
