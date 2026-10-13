@@ -3,6 +3,8 @@
 //   TcAgent.exe check --solution <sln>             "Check all objects": compiler errors, no code generated
 //   TcAgent.exe build --solution <sln>             build the solution
 //   TcAgent.exe test  --solution <sln>             build, activate on the test target, run TcUnit, collect the results
+//   TcAgent.exe sil   --solution <sln>             like test, on the runtime of this PC, with clean-up (CliTestRun.cs)
+//   TcAgent.exe hil   --solution <sln> --target <AmsNetId> --allow <AmsNetId>   like sil, on an explicitly allowed remote PLC
 //
 // Exit codes: 0 = OK, 1 = compiler errors / failed tests, 2 = wrong call, 3 = infrastructure problem (IDE, activation, timeout).
 // Without arguments TcAgent.exe is the MCP server as before.
@@ -15,12 +17,12 @@ using TCatSysManagerLib;
 
 namespace TcAgent;
 
-public static class Cli
+public static partial class Cli
 {
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "analyze" or "library" or "archive" or "scope" or "doc" or "help" or "--help" or "-h" or "/?" or "version" or "--version";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "help" or "--help" or "-h" or "/?" or "version" or "--version";
 
     sealed class Options
     {
@@ -28,6 +30,8 @@ public static class Cli
         public int Seconds = 10;
         public bool Install;
         public readonly List<string> Plc = new();
+        public readonly List<string> Allow = new();
+        public bool KeepRunning;
         public bool Visible, KeepOpen, Rebuild, CheckAll, WarningsAsErrors, NoBuild, NoBootProject;
         public bool? DisableIo;
         public bool CloseDialogs = true;
@@ -84,6 +88,8 @@ public static class Cli
                 "doc" => Doc(o, tc),
                 "build" => Build(o, tc),
                 "test" => Test(o, tc, ownIde),
+                "sil" => TestRun(o, tc, ownIde, hil: false),
+                "hil" => TestRun(o, tc, ownIde, hil: true),
                 _ => Usage
             };
         }
@@ -292,51 +298,13 @@ public static class Cli
 
         // 2) disable I/O devices (no hardware on the CI machine) - by default only in a Visual Studio started by TcAgent
         bool disableIo = o.DisableIo ?? ownIde;
-        if (disableIo)
-        {
-            var n = tc.Sta.Run(() =>
-            {
-                int count = 0;
-                foreach (var dev in TwinCatSession.Children(tc.Item("TIID")))
-                    if (dev.Disabled == DISABLED_STATE.SMDS_NOT_DISABLED) { dev.Disabled = DISABLED_STATE.SMDS_DISABLED; count++; }
-                return count;
-            });
-            Say($"I/O devices disabled for the test: {n}");
-        }
+        if (disableIo) Say($"I/O devices disabled for the test: {DisableIoDevices(tc).Count}");
 
         // 3) build
-        if (!o.NoBuild)
-        {
-            var (failedProjects, compile) = tc.Sta.Run(() => BuildSolution(tc, o), o.TimeoutSec * 1000);
-            int errors = compile.Count(e => e.Level == "ERROR");
-            foreach (var e in compile.Where(e => e.Level == "ERROR")) Console.WriteLine(JUnit.Annotation(e, true));
-            Say($"Build: {errors} error(s), {compile.Count(e => e.Level == "WARN")} warning(s)");
-            if (errors > 0 || failedProjects > 0)
-            {
-                Say("TEST NOT RUN: build failed");
-                if (o.Junit != null)
-                    WriteJunit(o.Junit, "TcAgent test", new[] { JUnit.CompileSuite(Path.GetFileNameWithoutExtension(SolutionName(tc)) + " (build)", compile, false, sw.Elapsed.TotalSeconds) });
-                return Failed;
-            }
-        }
+        if (!o.NoBuild && BuildBeforeTest(o, tc, sw, "TcAgent test") is int buildRc) return buildRc;
 
         // 4) PLC projects start by themselves after activation: boot project with autostart
-        var plcNames = tc.Sta.Run(() =>
-        {
-            var names = new List<string>();
-            foreach (var plc in TwinCatSession.Children(tc.Item("TIPC")))
-            {
-                if (o.Plc.Count > 0 && !o.Plc.Any(p => plc.Name.Equals(p, StringComparison.OrdinalIgnoreCase))) continue;
-                if (!o.NoBootProject)
-                {
-                    dynamic d = plc;
-                    d.BootProjectAutostart = true;
-                    d.GenerateBootProject(true);
-                }
-                names.Add(plc.Name);
-            }
-            return names;
-        }, o.TimeoutSec * 1000);
+        var plcNames = PrepareBootProjects(o, tc).Select(b => b.Name).ToList();
         if (plcNames.Count == 0) return InfraError(o, "plc", "No matching PLC project" + (o.Plc.Count > 0 ? " for --plc " + string.Join(",", o.Plc) : "") + ".");
         Say("PLC: " + string.Join(", ", plcNames) + (o.NoBootProject ? "" : " (boot project with autostart)"));
 
@@ -360,7 +328,60 @@ public static class Cli
         Say("Configuration activated, TwinCAT restarting in run mode - waiting for TcUnit ...");
         policy.Audit("cli test", new JsonObject { ["solution"] = SolutionName(tc), ["target"] = target }, true, "activated", (long)sw.Elapsed.TotalMilliseconds);
 
-        // 6) wait for TcUnit: "TESTS FINISHED RUNNING", then until the messages stop changing (TcUnit logs a few lines per cycle)
+        // 6) + 7) wait for TcUnit, report
+        return WaitForTcUnit(o, tc, started, suites, "TcAgent test");
+    }
+
+    /// <summary>Disables all enabled I/O devices (no hardware on the CI machine). Returns the tree paths of the disabled devices.</summary>
+    static List<string> DisableIoDevices(TwinCatSession tc) => tc.Sta.Run(() =>
+    {
+        var paths = new List<string>();
+        foreach (var dev in TwinCatSession.Children(tc.Item("TIID")))
+            if (dev.Disabled == DISABLED_STATE.SMDS_NOT_DISABLED) { dev.Disabled = DISABLED_STATE.SMDS_DISABLED; paths.Add(dev.PathName); }
+        return paths;
+    });
+
+    /// <summary>Builds before a test run. null = build OK, otherwise the exit code (compiler errors in the log and the JUnit file).</summary>
+    static int? BuildBeforeTest(Options o, TwinCatSession tc, Stopwatch sw, string junitName)
+    {
+        var (failedProjects, compile) = tc.Sta.Run(() => BuildSolution(tc, o), o.TimeoutSec * 1000);
+        int errors = compile.Count(e => e.Level == "ERROR");
+        foreach (var e in compile.Where(e => e.Level == "ERROR")) Console.WriteLine(JUnit.Annotation(e, true));
+        Say($"Build: {errors} error(s), {compile.Count(e => e.Level == "WARN")} warning(s)");
+        if (errors == 0 && failedProjects == 0) return null;
+        Say("TEST NOT RUN: build failed");
+        if (o.Junit != null)
+            WriteJunit(o.Junit, junitName, new[] { JUnit.CompileSuite(Path.GetFileNameWithoutExtension(SolutionName(tc)) + " (build)", compile, false, sw.Elapsed.TotalSeconds) });
+        return Failed;
+    }
+
+    /// <summary>Selected PLC projects (outer TIPC items); unless --no-boot-project: autostart on and boot project generated.
+    /// Returns name, tree path and the autostart value before (null = not changed / not readable) for restoring it.</summary>
+    static List<(string Name, string Path, bool? AutostartBefore)> PrepareBootProjects(Options o, TwinCatSession tc) => tc.Sta.Run(() =>
+    {
+        var list = new List<(string Name, string Path, bool? AutostartBefore)>();
+        foreach (var plc in TwinCatSession.Children(tc.Item("TIPC")))
+        {
+            if (o.Plc.Count > 0 && !o.Plc.Any(p => plc.Name.Equals(p, StringComparison.OrdinalIgnoreCase))) continue;
+            bool? before = null;
+            if (!o.NoBootProject)
+            {
+                dynamic d = plc;
+                try { before = (bool)d.BootProjectAutostart; } catch { }
+                d.BootProjectAutostart = true;
+                d.GenerateBootProject(true);
+            }
+            list.Add((plc.Name, plc.PathName, before));
+        }
+        return list;
+    }, o.TimeoutSec * 1000);
+
+    /// <summary>Waits for TcUnit ("TESTS FINISHED RUNNING", then until the messages stop changing), writes the JUnit file and
+    /// returns the exit code. tick runs after every poll (e.g. to start the PLC if nothing happens), beforeReport once
+    /// before the JUnit file is written (it may add suites).</summary>
+    static int WaitForTcUnit(Options o, TwinCatSession tc, DateTime started, List<XElement> suites, string junitName,
+                             Action<TcUnitResults> tick = null, Action beforeReport = null)
+    {
         var deadline = DateTime.Now.AddSeconds(o.TimeoutSec);
         TcUnitResults r = null;
         int lastCount = -1, stable = 0;
@@ -377,6 +398,7 @@ public static class Cli
             }
             catch (Exception ex) { Say("Reading the error list failed, retrying: " + Msg(ex)); continue; }
             r = TcUnitResults.Parse(lines);
+            tick?.Invoke(r);
             if (!r.Finished)
             {
                 // TwinCAT reported an error in a dialog (e.g. "Target system reports a fatal error") and TcUnit has not
@@ -395,16 +417,17 @@ public static class Cli
             if ((stable >= 2 && r.TestCount != null) || stable >= 5) break;
         }
 
+        beforeReport?.Invoke();
         if (r == null || !r.Finished)
         {
             var hint = r != null && r.Lines.Count > 0 ? "TcUnit started but did not finish" : "no TcUnit output - is TcUnit running in the PLC (TcUnit.RUN())?";
             Say($"TIMEOUT after {o.TimeoutSec} s: {hint}");
             suites.Add(JUnit.ErrorSuite("TcUnit", "run", $"TcUnit did not finish within {o.TimeoutSec} s: {hint}", r != null ? string.Join("\n", r.Lines) : null));
-            if (o.Junit != null) WriteJunit(o.Junit, "TcAgent test", suites);
+            if (o.Junit != null) WriteJunit(o.Junit, junitName, suites);
             return Infra;
         }
 
-        // 7) report
+        // report
         foreach (var s in r.Suites.Where(x => x.Tests != null && x.Cases.Count > 0 && x.Cases.Count != x.Tests))
             Say($"Note: suite {s.Name} reports {s.Tests} tests, {s.Cases.Count} were assigned to it - the error list order may be off.");
         foreach (var s in r.Suites)
@@ -420,7 +443,7 @@ public static class Cli
         if (o.Junit != null)
         {
             suites.AddRange(JUnit.TestSuites(r, Path.GetFileNameWithoutExtension(SolutionName(tc))));
-            WriteJunit(o.Junit, "TcAgent test", suites);
+            WriteJunit(o.Junit, junitName, suites);
             Say("JUnit: " + Path.GetFullPath(o.Junit));
         }
         return failed == 0 ? Ok : Failed;
@@ -563,6 +586,8 @@ public static class Cli
                 case "--disable-io": o.DisableIo = true; break;
                 case "--keep-io": o.DisableIo = false; break;
                 case "--keep-dialogs": o.CloseDialogs = false; break;
+                case "--allow": o.Allow.AddRange(Val().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)); break;
+                case "--keep-running": o.KeepRunning = true; break;
                 default: throw new Exception("Unknown option " + a);
             }
         }
@@ -573,6 +598,7 @@ public static class Cli
         if (o.TimeoutSec < 10) throw new Exception("--timeout is in seconds (min. 10)");
         if (o.Seconds < 1) throw new Exception("--seconds must be at least 1");
         if (o.Command is "library" or "archive" or "scope" && o.Out == null) throw new Exception($"{o.Command} needs --out <file>");
+        ValidateTestRunArgs(o);
         return o;
     }
 
@@ -605,11 +631,25 @@ public static class Cli
       Builds, activates the configuration on the test target, starts the PLC via boot project with autostart,
       waits for TcUnit and writes the results. Only targets allowed by TCAGENT_ALLOW_TARGETS (default: this PC).
 
+  TcAgent.exe sil --solution <sln> [--target local|<AmsNetId>] [--plc <names>] [--timeout <s>] [--junit <file>]
+                  [--scope <project/scope>] [--out <file>] [--keep-running]
+      Software in the loop on the runtime of this PC (local XAR, or a usermode runtime allowed via TCAGENT_ALLOW_TARGETS):
+      like test, plus: runtime reachable and in Run mode after the activation, PLC login + start if TcUnit does not start
+      by itself, optional Scope recording, and a clean-up that always runs (Scope stopped, runtime to Config mode,
+      target system / I/O devices / autostart restored in an attached IDE).
+
+  TcAgent.exe hil --solution <sln> --target <AmsNetId> [--allow <AmsNetId>] [same options as sil]
+      Hardware in the loop on a remote test PLC: like sil, I/O devices stay enabled. The target must be allowed
+      explicitly (TCAGENT_ALLOW_TARGETS or --allow) - a pipeline cannot confirm, so it is refused otherwise (exit 2).
+      The ADS route to the target must exist; if not, a broadcast search tells whether only the route is missing.
+
 Options
   --solution, -s <sln>     solution to open in a new, hidden Visual Studio (closed afterwards, nothing is saved)
   --attach [pid|name]      use an already running Visual Studio instead (developer machine)
   --junit, -o <file>       write JUnit XML (GitHub Actions, Azure DevOps, Jenkins, GitLab)
-  --target <AmsNetId>      test target (default: the target set in the project); must be allowed
+  --target <AmsNetId>      test target (default: the target set in the project; sil: local); must be allowed
+  --allow <a,b>            hil: allow these AmsNetIds for this run in addition to TCAGENT_ALLOW_TARGETS
+  --keep-running           sil/hil: leave TwinCAT in Run mode at the end (default: Config mode, PLC stopped)
   --plc <a,b>              only these PLC projects (default: all)
   --timeout <s>            max. time for build and for the test run (default 1800)
   --load-timeout <s>       max. time to open the solution (default 300)
@@ -618,18 +658,21 @@ Options
   --rebuild                clean before building
   --check-all              build: also 'check all objects' (finds errors in unused POUs)
   --warnings-as-errors     warnings fail the step
-  --no-build               test: use the existing build
-  --no-boot-project        test: do not create a boot project (PLC must start by itself)
-  --disable-io / --keep-io test: disable all I/O devices (default: only in a Visual Studio started by TcAgent)
-  --out <file>             library/archive/scope/doc: output file
+  --no-build               test/sil/hil: use the existing build
+  --no-boot-project        test/sil/hil: do not create a boot project (test: PLC must start by itself)
+  --disable-io / --keep-io test/sil/hil: disable all I/O devices (default: test/sil only in a Visual Studio
+                           started by TcAgent, hil never)
+  --out <file>             library/archive/scope/doc: output file; sil/hil: Scope export (default scope-<sil|hil>.csv)
   --sarif <file>           analyze: SARIF output
   --settings <file.csa>    analyze: static analysis settings to load first
   --install                library: also install into the library repository
-  --scope <path>           scope: '<measurement project>/<scope>' (default: the only one)
+  --scope <path>           scope, sil/hil: '<measurement project>/<scope>' (default: the only one); sil/hil record
+                           during the test run when --scope or --out is given
   --seconds <n>            scope: recording time (default 10)
   --keep-dialogs           do not close dialogs of the IDE (default: closed like Cancel/X and logged - they block the IDE)
   --progid <id>            COM ProgID of the IDE, e.g. TcXaeShell.DTE.17.0 (default: VS 2022, then TcXaeShell)
 
-Exit codes: 0 OK, 1 compiler errors or failed tests, 2 wrong call, 3 infrastructure problem (IDE, activation, timeout).
+Exit codes: 0 OK, 1 compiler errors or failed tests, 2 wrong call or refused (sil/hil: target not allowed),
+            3 infrastructure problem (IDE, route, activation, Run mode, timeout).
 Without arguments TcAgent.exe runs as MCP server for AI clients.";
 }

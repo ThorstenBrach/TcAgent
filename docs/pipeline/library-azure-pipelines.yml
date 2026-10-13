@@ -1,0 +1,50 @@
+# Library + tests in one solution: check -> build (candidate) -> sil -> library, with TcAgent on a self-hosted Windows agent.
+# Solution layout (see docs/PIPELINE.md, "Library and its tests in one solution"):
+#   MyLib        PLC project with the library code (no test code, nothing is removed or disabled before saving)
+#   MyLib_Tests  PLC project with TcUnit test suites, references MyLib (version '*' = newest installed)
+# The agent must run as a user, one job at a time per machine (see docs/PIPELINE.md).
+trigger:
+  branches: { include: [main] }
+  tags: { include: ['v*'] }
+pr:
+  branches: { include: ['*'] }
+
+pool:
+  name: TwinCAT                                        # your self-hosted pool
+
+variables:
+  SOLUTION: MyLib.sln
+  LIB_PLC: MyLib
+  TEST_PLC: MyLib_Tests
+  TCAGENT: C:\Tools\TcAgent\TcAgent.exe
+  TCAGENT_ALLOW_TARGETS: local
+  RESULTS: $(Build.ArtifactStagingDirectory)\results
+
+steps:
+  - checkout: self
+
+  - powershell: '& "$(TCAGENT)" check --solution "$(SOLUTION)" --junit "$(RESULTS)\check.xml"; exit $LASTEXITCODE'
+    displayName: Check all objects (both PLC projects)
+
+  - powershell: '& "$(TCAGENT)" library --solution "$(SOLUTION)" --plc "$(LIB_PLC)" --install --out "$(Agent.TempDirectory)\candidate.library"; exit $LASTEXITCODE'
+    displayName: Build and install the library candidate (build machine only)
+
+  - powershell: '& "$(TCAGENT)" sil --solution "$(SOLUTION)" --plc "$(TEST_PLC)" --junit "$(RESULTS)\sil.xml" --timeout 600; exit $LASTEXITCODE'
+    displayName: SIL - TcUnit tests of the test project on the local runtime
+
+  - powershell: '& "$(TCAGENT)" library --solution "$(SOLUTION)" --plc "$(LIB_PLC)" --out "$(Build.ArtifactStagingDirectory)\library\$(LIB_PLC).library"; exit $LASTEXITCODE'
+    displayName: Save the library from the library project
+
+  - task: PublishTestResults@2
+    condition: always()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: '$(RESULTS)\*.xml'
+      testRunTitle: TwinCAT library
+
+  - publish: $(Build.ArtifactStagingDirectory)\library
+    artifact: library
+
+# HIL on a test bench (optional, e.g. nightly): the test PLC must be allowed explicitly.
+#  - powershell: '& "$(TCAGENT)" hil --solution "$(SOLUTION)" --plc "$(TEST_PLC)" --target 5.80.201.232.1.1 --allow 5.80.201.232.1.1 --junit "$(RESULTS)\hil.xml"; exit $LASTEXITCODE'
+#    displayName: HIL - TcUnit on the test bench

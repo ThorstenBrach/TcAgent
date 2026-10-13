@@ -1,0 +1,56 @@
+# Library + tests in one solution: check -> build (candidate) -> sil -> library, with TcAgent on a self-hosted Windows runner.
+# Solution layout (see docs/PIPELINE.md, "Library and its tests in one solution"):
+#   MyLib        PLC project with the library code (no test code, nothing is removed or disabled before saving)
+#   MyLib_Tests  PLC project with TcUnit test suites, references MyLib (version '*' = newest installed)
+# Copy to .github/workflows/library.yml and adjust the env values.
+name: TwinCAT library
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+
+env:
+  SOLUTION: MyLib.sln
+  LIB_PLC: MyLib                                       # PLC project that becomes the library
+  TEST_PLC: MyLib_Tests                                # PLC project with the TcUnit tests
+  TCAGENT: C:\Tools\TcAgent\TcAgent.exe
+  TCAGENT_ALLOW_TARGETS: local                         # sil runs on the runtime of this PC only
+
+defaults:
+  run:
+    shell: powershell
+
+# One TwinCAT runtime per machine: install only one runner per TwinCAT machine (a runner runs one job at a time).
+
+jobs:
+  library:
+    runs-on: [self-hosted, windows, twincat]
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check all objects (both PLC projects)
+        run: '& $env:TCAGENT check --solution $env:SOLUTION --junit results/check.xml; exit $LASTEXITCODE'
+
+      - name: Build and install the library candidate (build machine only)
+        run: '& $env:TCAGENT library --solution $env:SOLUTION --plc $env:LIB_PLC --install --out build/candidate.library; exit $LASTEXITCODE'
+
+      - name: SIL - TcUnit tests of the test project on the local runtime
+        run: '& $env:TCAGENT sil --solution $env:SOLUTION --plc $env:TEST_PLC --junit results/sil.xml --timeout 600; exit $LASTEXITCODE'
+
+      - name: Save the library from the library project
+        run: '& $env:TCAGENT library --solution $env:SOLUTION --plc $env:LIB_PLC --out artifacts/$($env:LIB_PLC).library; exit $LASTEXITCODE'
+
+      - name: Upload the library
+        uses: actions/upload-artifact@v4
+        with:
+          name: library
+          path: artifacts/
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: results/
