@@ -262,6 +262,14 @@ Sequential function charts (SFC step chains) as text. `action=read` returns the 
 
 Under a step, `EMBEDDED <action>` names an embedded step action (main/entry/exit, e.g. `_aN010_active`) and `COMMENT <text>` the step comment. Keep these lines when writing – also when renaming the step; a write that would detach embedded actions is refused unless `force=true`. Graphical action objects are listed as such, not as empty.
 
+**Duplicate on copy.** The step property "Duplication" (addData attribute `62e1754b-…`, identified from the attribute descriptions TwinCAT stores in the editor XML of the `.TcPOU`) decides whether copying a step in the editor copies its embedded actions or only references them. `action=write` gives new steps this property (`duplicate=new`, default); `duplicate=all` also switches it on for existing steps, `duplicate=none` keeps the TwinCAT default (off). `action=read` lists which steps have it (`// Duplicate on copy: …` line, ignored when the text is written back). New steps also accept `COMMENT` lines now (except with `duplicate=none`).
+
+**Renumber** (`action=renumber`): renames steps to `<prefix><number>` (`start`, `step`, `digits`; prefix default = the existing one). Order `main` numbers the main sequence first, then each branch in order (recursively); `order=chain` uses the order of `action=read`; `steps` limits it to marked steps (list or range). The export is edited in place: step names, `JUMP` targets, step references in transition conditions and in the code of the POU's actions/transitions (`N010.t` → `N020.t`, all names at once, so swapped numbers stay correct), embedded step actions `_aN010_active` → `_aN020_active` (object and step attribute together; only if exactly this step uses the action and the new name is free – otherwise the name is kept and the result says why); comments, times, entry/exit actions and all other step data stay. New names are checked against steps that keep their names, variables, actions/transitions and keywords. References from outside the POU (`fbSeq.N010.x`) are listed and block the write unless `force=true` – fix them afterwards. Always run `dryRun=true` first: it shows the old → new table and the new chain.
+
+**Comments** (`action=comments`): without `comments` it lists every step with its comment and embedded actions plus the project's coding guidelines (`tc_coding_rules`) so the agent can propose comments; with `comments={"N010": "…"}` it sets the comments of existing steps. If the guidelines require English, comments that look German are refused (`force=true` after asking the user).
+
+**Flags** (`action=flags`): shows the SFC flags of the POU (`SFCInit`, `SFCReset`, `SFCQuitError`, `SFCPause`, `SFCError`, `SFCTrans`, `SFCErrorStep`, `SFCErrorPOU`, `SFCCurrentStep`, `SFCTip`, `SFCTipMode`, `SFCEnableLimit`, `SFCErrorAnalyzation`, `SFCErrorAnalyzationTable`) with Use/Declare, whether the variable is declared in the POU and the matching VSProperties of the POU item (ProduceXml). `flags={"SFCInit": true}` sets them: through the POU's VSProperties (ConsumeXml with only the changed properties) if TwinCAT offers them for all requested flags, otherwise through the SFC settings of the PLCopen export (re-import with rollback). A flag with Use=true and Declare=false breaks the build ("SFC flag variable 'SFCInit' is not defined") unless the variable is declared: enabling sets Declare=true (PLCopen path, or a matching Declare VSProperty) or adds `SFCInit : BOOL;` to the first `VAR` block of the declaration (VSProperty path without Declare property); if the variable is already declared, Declare stays false. The result says which. `UseDefaults=true` is switched off, otherwise the POU ignores its own flags.
+
 ```
 STEP Init INITIAL
   ACTION N A_Init
@@ -283,10 +291,21 @@ JUMP Init
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `action` | string | yes | read, write or xml |
+| `action` | string | yes | read, write, xml, renumber, comments or flags |
 | `path` | string | yes | tree path of the SFC POU, e.g. TIPC^MyPlc^MyPlc Project^POUs^FB_Sequence |
 | `chain` | string |  | write: the complete chain in the text form of action=read |
-| `dryRun` | boolean |  | write: only show the generated PLCopen XML |
+| `dryRun` | boolean |  | write/renumber/comments/flags: only show what would change |
+| `force` | boolean |  | write: also when embedded step actions would lose their step; renumber: also when code outside the POU references renamed steps; comments: also when they do not look like the language the guidelines require (only after asking the user) |
+| `duplicate` | string |  | write: `new` (default) = new steps get "Duplicate on copy", `all` = also existing steps, `none` = TwinCAT default |
+| `prefix` | string |  | renumber: name prefix (default: the existing prefix, e.g. `N`) |
+| `start` | integer |  | renumber: first number (default 10) |
+| `step` | integer |  | renumber: increment (default 10) |
+| `digits` | integer |  | renumber: minimum digits, zero-padded (default 3 → `N010`) |
+| `steps` | string |  | renumber: only these steps – comma-separated (`N020,N030`) or a range in the chosen order (`N020..N070`); default all |
+| `order` | string |  | renumber: `main` (default: main sequence first, then the branches in order) or `chain` (order of action=read) |
+| `renameActions` | boolean |  | renumber: rename embedded step actions `_a<old>_active` → `_a<new>_active` (default true) |
+| `comments` | object |  | comments: `{"N010": "Wait for part present", ...}` – empty text removes a comment |
+| `flags` | object |  | flags: `{"SFCInit": true, "SFCReset": false, ...}` |
 
 ## Editor context and navigation (TcAgentBridge)
 

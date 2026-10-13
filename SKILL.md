@@ -58,6 +58,15 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
   `ALTERNATIVE`/`PARALLEL` with `BRANCH` ... `END_ALTERNATIVE`/`END_PARALLEL`, `JUMP Init`, plus the action/transition objects.
   Under a step, `EMBEDDED _aN010_active` names its embedded action (main/entry/exit) and `COMMENT ...` its comment: keep these
   lines when writing, also when renaming the step - otherwise the write is refused (the actions would lose their step).
+- Renumber steps: `tc_sfc action=renumber path=<POU> start=10 step=10 digits=3 dryRun=true` (prefix kept, e.g. N010, N020 ...;
+  `steps=N020..N070` or a list for marked steps, `order=main|chain`), show the old -> new table, then without dryRun. Jumps,
+  `N010.t` references in the POU, comments and embedded actions (`_aN010_active` -> `_aN020_active`) follow; references from
+  outside the POU block the write (`force=true` only after asking).
+- Step comments: `tc_sfc action=comments path=<POU>` lists steps, comments and the coding guidelines; propose comments in the
+  language the guidelines require, then `comments={"N010": "..."}` (dryRun first).
+- SFC flags: `tc_sfc action=flags path=<POU>` shows them; `flags={"SFCInit": true}` enables them and also declares the variable
+  (Declare=true or `SFCInit : BOOL;` in the declaration - the result says which).
+- New steps written by `tc_sfc write` get "Duplicate on copy" (embedded actions copied, not referenced); `duplicate=all` for all steps.
 - Never delete action objects because they look empty: graphical actions (FBD/LD/CFC) and embedded step actions are shown
   without text. `tc_delete` writes a backup (`<solution>\.tcagent\backup\delete`, restore with `tc_import kind=plcopen`).
 - New chain: `tc_plc_create language=SFC`, then the actions (`tc_plc_create kind=action parentPath=<POU>`, ST code) and
