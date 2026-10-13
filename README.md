@@ -15,8 +15,8 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 </p>
 
 <p align="center">
-<a href="docs/img/tcagent-demo.mp4"><img src="docs/img/demo-video-poster.jpg" width="900" alt="Video (60 s): from the device manual to the HMI page with one prompt - TcAgent reads the manual, adds and links the EL6001, writes the driver FB, tests it with TcUnit and builds the HMI page"></a><br>
-<sub><b>▶ Watch the 60-second video</b> – one prompt: device manual → I/O → driver FB → TcUnit tests → HMI.<br>
+<a href="docs/img/tcagent-demo.mp4"><img src="docs/img/tcagent-demo.gif" width="900" alt="Video (60 s): from the device manual to the HMI page with one prompt - TcAgent reads the manual, adds and links the EL6001, writes the driver FB, tests it with TcUnit and builds the HMI page"></a><br>
+<sub><b>▶ Click for the video in full quality</b> – one prompt: device manual → I/O → driver FB → TcUnit tests → HMI.<br>
 <i>The video is a generated visualization to illustrate the workflow more clearly – in practice TcAgent works exactly like this.</i></sub>
 </p>
 
