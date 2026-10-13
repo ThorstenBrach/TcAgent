@@ -460,14 +460,33 @@ public sealed partial class ToolRegistry
         var item = tc.Item(path);
         var sb = new StringBuilder($"# {item.Name}  [sub={item.ItemSubType}]\n");
         if (item is ITcPlcDeclaration d) sb.Append("## Declaration\n").Append(d.DeclarationText).Append('\n');
-        if (item is ITcPlcImplementation i) sb.Append("## Implementation\n").Append(i.ImplementationText).Append('\n');
+        if (item is ITcPlcImplementation i) sb.Append("## Implementation\n").Append(ImplText(i.ImplementationText, item.PathName)).Append('\n');
         foreach (var c in TwinCatSession.Children(item))
         {
             sb.Append($"\n### {c.Name}  [sub={c.ItemSubType}]  {c.PathName}\n");
             if (c is ITcPlcDeclaration cd) sb.Append(cd.DeclarationText).Append('\n');
-            if (c is ITcPlcImplementation ci) sb.Append("--- Implementation ---\n").Append(ci.ImplementationText).Append('\n');
+            if (c is ITcPlcImplementation ci) sb.Append("--- Implementation ---\n").Append(ImplText(ci.ImplementationText, c.PathName)).Append('\n');
         }
         return sb.ToString();
+    }
+
+    static readonly Regex GraphicalBody = new(@"^\s*<(SFC|CFC|FBD|LD|UML\w*)\b", RegexOptions.Compiled);
+
+    // graphical bodies come back as the internal editor XML (SFC: tens of thousands of characters) - SFC as chain text instead
+    string ImplText(string text, string path)
+    {
+        var m = GraphicalBody.Match(text ?? "");
+        if (!m.Success) return text;
+        var lang = m.Groups[1].Value.ToUpperInvariant();
+        if (lang == "SFC")
+            try
+            {
+                var chain = Sfc(new JsonObject { ["action"] = "read", ["path"] = path });
+                var cut = chain.IndexOf("\nObjects of the POU", StringComparison.Ordinal);
+                return $"(SFC chart - as text; change it with tc_sfc action=write, never with tc_plc_write)\n{(cut >= 0 ? chain[..cut] : chain)}";
+            }
+            catch { }
+        return $"({lang} body - graphical, not readable as text)";
     }
 
     static string PlcWrite(ITcSmTreeItem item, string decl, string impl)
@@ -481,6 +500,10 @@ public sealed partial class ToolRegistry
         if (impl != null)
         {
             if (item is not ITcPlcImplementation i) throw new Exception("Object has no implementation part");
+            string current = null; try { current = i.ImplementationText; } catch { }
+            if (current != null && GraphicalBody.IsMatch(current) && !GraphicalBody.IsMatch(impl))
+                throw new Exception("this object has a graphical body (SFC/CFC/FBD/LD) - its implementation cannot be written as text. " +
+                                    "SFC: tc_sfc action=write; step actions and transitions are own objects (tc_plc_write on them).");
             i.ImplementationText = impl; done.Add("implementation");
         }
         return done.Count == 0 ? "nothing changed" : string.Join(" + ", done) + " written";

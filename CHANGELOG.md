@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.20.3] – not released yet
+## [0.20.4] – not released yet
 
 ### Added
 - `tc_task action=assign`: PLC task reference and program call (process image) - feedback from agents.
@@ -48,6 +48,10 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - `install-xaeshell.ps1` also installs into the 64-bit XAE Shell (VS 2022 base).
 
 ### Fixed
+- `tc_plc_read` shows SFC POUs as chain text instead of the internal editor XML (tens of thousands of characters);
+  `tc_plc_write` refuses text for graphical bodies.
+- `tc_delete` backups go to `<solution>\.tcagent\backup\delete` (git-ignored) and restore into the original folder;
+  `tc_import` copies files from a redirected `%LOCALAPPDATA%` to the temp folder so that the IDE can open them.
 - `tc_refactor` follows the coding guidelines: they are part of `analyze`, `apply` is held back until they were read, and
   variable comments go as `///` lines above the variable when the guidelines say so (`style=above|trailing` per change).
 - `tc_delete` backup: PLCopen export through the temp folder (the IDE did not see the new backup folder), otherwise
@@ -130,7 +134,7 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.3...HEAD
-[0.20.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.3
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...HEAD
+[0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0
