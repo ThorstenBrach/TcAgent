@@ -10,6 +10,8 @@
 //         "name": "x1", "newName": "bDoorClosed", "comment": "Door closed (sensor S12)", "reason": "..." }
 //       each change is shown with its reason, the affected objects and warnings and only applied after the user's answer.
 //       dryRun=true shows all edits as diffs without asking or writing.
+//       apply runs as a background job (RefactorJobs.cs): if the user has not decided everything after waitSeconds (default 45)
+//       the call returns "still waiting - k of n done" with a job id; action=result job=<id> returns the final report.
 //
 // Renames are whole-word edits outside string literals: locals in the object (+ methods/actions/properties of an FB and
 // derived FBs for FB variables); names visible outside (inputs/outputs, program/GVL variables, FBs, methods, functions,
@@ -34,16 +36,23 @@ public sealed partial class ToolRegistry
                            "comments where missing (what it means, unit, range), and better names only where the name is really unclear - keep the " +
                            "project's naming convention (tc_coding_rules) - and call action=apply changes=[{object, kind: comment|rename, target: " +
                            "variable|member|pou|method, name, newName, comment, reason}]. Each change is asked separately; respect a rejection. " +
-                           "Renames update all usages (outside the object via TwinCAT's cross references). Run tc_check afterwards.",
-            Schema(Req(P("action", "string", "analyze or apply")),
+                           "Renames update all usages (outside the object via TwinCAT's cross references). Run tc_check afterwards. " +
+                           "apply runs as a job: if the user has not answered everything within waitSeconds (default 45) it returns 'still waiting " +
+                           "- k of n done' with a job id; then call action=result job=<id> (waits again) until the final report comes - never " +
+                           "call apply again for the same changes.",
+            Schema(Req(P("action", "string", "analyze, apply or result")),
                    P("target", "string", "analyze: 'selection' (default) or object name / tree path"),
                    P("changes", "array", "apply: [{object, kind: comment|rename, target: variable|member|pou|method, name, newName, comment, reason}]"),
-                   P("dryRun", "boolean", "apply: only show the edits as diffs, ask nothing, write nothing")),
+                   P("dryRun", "boolean", "apply: only show the edits as diffs, ask nothing, write nothing"),
+                   P("job", "string", "result: job id returned by apply (default: the latest job)"),
+                   P("waitSeconds", "integer", "apply/result: how long the call waits for the user's decisions before it returns the progress " +
+                                                 "(default 45 or TCAGENT_JOB_WAIT; keep it below the client's call timeout)")),
             a => (Str(a, "action") ?? "analyze").ToLowerInvariant() switch
             {
                 "analyze" => RefactorAnalyze(a),
-                "apply" => RefactorApply(a),
-                _ => throw new Exception("action: analyze or apply")
+                "apply" => RefactorStartJob(a),
+                "result" => RefactorJobResult(a),
+                _ => throw new Exception("action: analyze, apply or result")
             });
     }
 
@@ -185,7 +194,9 @@ public sealed partial class ToolRegistry
         public string TreeRenamePath, TreeRenameTo;
     }
 
-    string RefactorApply(JsonObject a)
+    /// <summary>Runs on the job thread (never on the STA: it waits for the user); COM work goes through tc.Sta.Run.
+    /// job (optional) receives the progress for action=result.</summary>
+    string RefactorApply(JsonObject a, RefactorJob job = null)
     {
         var changes = a["changes"] as JsonArray ?? throw new Exception("changes is required: [{object, kind, target, name, newName, comment, reason}]");
         bool dry = DryRun(a);
@@ -195,8 +206,10 @@ public sealed partial class ToolRegistry
         int applied = 0, rejected = 0, failed = 0;
         var dir = SolutionDir();
         var hmi = HmiTexts(dir);
+        job?.Begin(changes.Count);
         for (int i = 0; i < changes.Count; i++)
         {
+            job?.Progress(i, o.ToString(), null);
             if (changes[i] is not JsonObject c) continue;
             string S(string k) => c[k] is JsonValue v ? v.ToString().Trim() : null;
             RefactorPlan plan;
@@ -213,6 +226,7 @@ public sealed partial class ToolRegistry
                 foreach (var w in plan.Warnings) question.AppendLine("WARNING: " + w);
                 var d = diff.ToString();
                 question.AppendLine("\n" + (d.Length > 3000 ? d[..3000] + "\n... (" + plan.Edits.Count + " objects)" : d));
+                job?.Progress(i, o.ToString(), $"change {i + 1} of {changes.Count}: {plan.Title}");
                 var choice = Confirm.Choose("TcAgent refactoring - " + plan.Title, question.ToString(), pid);
                 if (choice == null)
                     return o + $"\nNo way to ask the user (no dialog in Visual Studio, client cannot ask). Nothing more was changed. " +
@@ -225,6 +239,15 @@ public sealed partial class ToolRegistry
             {
                 tc.Sta.Run(() =>
                 {
+                    // the user may have taken minutes to decide and the agent may have kept working meanwhile:
+                    // never overwrite an object that changed since the change was planned
+                    foreach (var e in plan.Edits.Where(x => x.Part is "declaration" or "implementation"))
+                    {
+                        var cur = tc.Item(e.Path);
+                        var now = e.Part == "declaration" ? (cur as ITcPlcDeclaration)?.DeclarationText : (cur as ITcPlcImplementation)?.ImplementationText;
+                        if (now != null && Norm(now) != Norm(e.Old))
+                            throw new Exception($"{e.Path} ({e.Part}) was changed after this change was planned - nothing written; run analyze/apply again");
+                    }
                     if (plan.TreeRenamePath != null) ((dynamic)tc.Item(plan.TreeRenamePath)).Name = plan.TreeRenameTo;
                     foreach (var e in plan.Edits.OrderBy(x => x.Part == "sfc" ? 1 : 0))     // SFC chart last: its re-import takes the new declaration
                     {
@@ -249,6 +272,8 @@ public sealed partial class ToolRegistry
         return (dry ? "PROPOSAL (nothing written, nothing asked):\n" : $"{applied} applied, {rejected} rejected, {failed} not possible.\n") + o +
                (applied > 0 ? "\nCheck with tc_check." : "");
     }
+
+    static string Norm(string t) => (t ?? "").Replace("\r\n", "\n").TrimEnd();
 
     RefactorPlan PlanChange(JsonObject c, int pid, List<string> hmi)
     {

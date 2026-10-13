@@ -34,6 +34,7 @@ public static class Program
             var method = req["method"]?.GetValue<string>();
             var prm = req["params"] as JsonObject ?? new JsonObject();
             if (id == null) continue; // Notification (e.g. notifications/initialized)
+            if (method == null) continue; // late answer to a request of ours (e.g. an elicitation that timed out) - not a request
 
             JsonNode result = null; JsonObject error = null;
             try
@@ -104,40 +105,69 @@ public static class Mcp
         }) { IsBackground = true, Name = "stdin" }.Start();
     }
 
+    // answers to our own elicitation requests: whoever reads a line from stdin (main loop or a waiting Elicit, e.g. of a
+    // background tc_refactor job) hands an answer over to the thread that waits for it
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, byte> waiting = new();
+    static readonly System.Collections.Concurrent.ConcurrentDictionary<string, JsonObject> answers = new();
+
+    static bool RouteAnswer(string line)
+    {
+        if (waiting.IsEmpty || line.IndexOf("tcagent-elicit-", StringComparison.Ordinal) < 0) return false;
+        JsonObject m = null;
+        try { m = JsonNode.Parse(line) as JsonObject; } catch { }
+        var id = m?["id"]?.ToString();
+        if (m == null || m["method"] != null || id == null || !waiting.ContainsKey(id)) return false;
+        answers[id] = m;
+        return true;
+    }
+
     public static string Next()
     {
-        lock (deferred) if (deferred.Count > 0) return deferred.Dequeue();
-        return inbox.TryTake(out var l, Timeout.Infinite) ? l : null;
+        while (true)
+        {
+            lock (deferred) if (deferred.Count > 0) return deferred.Dequeue();
+            // short timeout: lines set aside by a concurrently waiting Elicit (deferred) are picked up as well
+            if (!inbox.TryTake(out var l, 500)) { if (inbox.IsCompleted) { lock (deferred) return deferred.Count > 0 ? deferred.Dequeue() : null; } continue; }
+            if (!RouteAnswer(l)) return l;
+        }
     }
 
     public static void Send(JsonObject msg) { lock (writeLock) stdout.WriteLine(msg.ToJsonString()); }
 
-    /// <summary>Asks the user via the client (elicitation/create). null = not supported, declined or no answer.</summary>
+    /// <summary>Asks the user via the client (elicitation/create). null = not supported, declined or no answer.
+    /// Works from the tool call itself and from a background job (the main loop then forwards the answer).</summary>
     public static JsonObject Elicit(string message, JsonObject schema, int timeoutMs = 300_000)
     {
         if (!CanElicit) return null;
         var id = "tcagent-elicit-" + Interlocked.Increment(ref nextId);
-        Send(new JsonObject
+        waiting[id] = 0;
+        try
         {
-            ["jsonrpc"] = "2.0", ["id"] = id, ["method"] = "elicitation/create",
-            ["params"] = new JsonObject { ["message"] = message, ["requestedSchema"] = schema }
-        });
-        var sw = System.Diagnostics.Stopwatch.StartNew();
-        while (sw.ElapsedMilliseconds < timeoutMs)
-        {
-            if (!inbox.TryTake(out var l, (int)Math.Max(1, timeoutMs - sw.ElapsedMilliseconds))) break;
-            JsonObject m = null;
-            try { m = JsonNode.Parse(l) as JsonObject; } catch { }
-            if (m != null && m["method"] == null && m["id"]?.ToString() == id)
+            Send(new JsonObject
             {
-                if (m["error"] != null) { Log.Info("Elicitation declined: " + m["error"]?.ToJsonString()); return null; }
-                var r = m["result"] as JsonObject;
-                return r?["action"]?.ToString() == "accept" ? r["content"] as JsonObject : null;
+                ["jsonrpc"] = "2.0", ["id"] = id, ["method"] = "elicitation/create",
+                ["params"] = new JsonObject { ["message"] = message, ["requestedSchema"] = schema }
+            });
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            while (sw.ElapsedMilliseconds < timeoutMs)
+            {
+                if (answers.TryRemove(id, out var a)) return Evaluate(a);
+                if (!inbox.TryTake(out var l, 200)) { if (inbox.IsCompleted) break; continue; }
+                if (RouteAnswer(l)) continue;
+                lock (deferred) deferred.Enqueue(l);
             }
-            lock (deferred) deferred.Enqueue(l);
+            if (answers.TryRemove(id, out var late)) return Evaluate(late);
+            Log.Info("Elicitation without answer");
+            return null;
         }
-        Log.Info("Elicitation without answer");
-        return null;
+        finally { waiting.TryRemove(id, out _); answers.TryRemove(id, out _); }
+
+        static JsonObject Evaluate(JsonObject m)
+        {
+            if (m["error"] != null) { Log.Info("Elicitation declined: " + m["error"]?.ToJsonString()); return null; }
+            var r = m["result"] as JsonObject;
+            return r?["action"]?.ToString() == "accept" ? r["content"] as JsonObject : null;
+        }
     }
 }
 
@@ -161,10 +191,11 @@ public static class Log
             lock (gate)
             {
                 Directory.CreateDirectory(dir);
-                File.AppendAllText(Path.Combine(dir, $"tcagent-{now:yyyyMMdd}.log"),
-                    $"{now:HH:mm:ss.fff} [{Environment.ProcessId}{(client.Length > 0 ? " " + client : "")}] {m}{Environment.NewLine}");
+                // shared append with retries: several TcAgent processes (chat, other clients, CLI) write the same daily file
+                SharedFile.Append(Path.Combine(dir, $"tcagent-{now:yyyyMMdd}.log"),
+                    $"{now:HH:mm:ss.fff} [{Environment.ProcessId}{(client.Length > 0 ? " " + client : "")}] {m}{Environment.NewLine}", 5);
             }
         }
-        catch { /* another TcAgent process is writing at this moment - stderr has it */ }
+        catch { /* file still locked after the retries - stderr has it */ }
     }
 }

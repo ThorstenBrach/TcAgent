@@ -3,6 +3,7 @@
 //   TcAgent.exe check --solution <sln>             "Check all objects": compiler errors, no code generated
 //   TcAgent.exe build --solution <sln>             build the solution
 //   TcAgent.exe test  --solution <sln>             build, activate on the test target, run TcUnit, collect the results
+//   TcAgent.exe feedback [--open] [--markdown f]   report of the tc_feedback entries (Markdown for GitHub issues) - no IDE needed
 //
 // Exit codes: 0 = OK, 1 = compiler errors / failed tests, 2 = wrong call, 3 = infrastructure problem (IDE, activation, timeout).
 // Without arguments TcAgent.exe is the MCP server as before.
@@ -20,7 +21,7 @@ public static class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "analyze" or "library" or "archive" or "scope" or "doc" or "help" or "--help" or "-h" or "/?" or "version" or "--version";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version";
 
     sealed class Options
     {
@@ -36,6 +37,8 @@ public static class Cli
 
     public static int Run(string[] args)
     {
+        // works on the feedback files only - no solution, no IDE
+        if (args[0].Equals("feedback", StringComparison.OrdinalIgnoreCase)) return Feedback.RunCli(args);
         Options o;
         try { o = ParseArgs(args); }
         catch (Exception ex) { Console.Error.WriteLine("Error: " + ex.Message); Console.Error.WriteLine("TcAgent.exe help shows the usage."); return Usage; }
@@ -600,6 +603,11 @@ public static class Cli
       Program documentation as HTML: call hierarchy, call graph, class diagram, step chains, reference per object.
       Uses the explanations the agent stored with tc_doc (<solution>\.tcagent\doc-summaries.json).
       Default output: <solution folder>\doc\<PLC project>.html
+
+  TcAgent.exe feedback [--open] [--markdown <file.md>] [--summary] [--path <file|folder>]
+      Report of the tc_feedback entries (TCAGENT_FEEDBACK or the default store), grouped by tool, as Markdown
+      ready to paste into GitHub issues - to stdout or into the file. --open: only open entries; --summary: counts only.
+      No IDE needed.
 
   TcAgent.exe test --solution <sln> [--target <AmsNetId>] [--plc <names>] [--timeout <s>] [--junit <file>]
       Builds, activates the configuration on the test target, starts the PLC via boot project with autostart,

@@ -184,5 +184,6 @@ In addition, every client can require confirmation of individual tool calls – 
 | XAE Shell crashes during HMI/Scope changes (event log: `OutOfMemoryException`, TcXaeShell.exe) | The XAE Shell is a 32-bit process; a large project with HMI and Scope open exhausts its memory, reloading a project then crashes it. Restart the shell regularly, close designers you do not need, or use Visual Studio 2022 (64-bit) for HMI/Scope work. TwinCAT 4026 also offers a 64-bit XAE Shell (TcPkg setting `useTcXaeShell64`, see the TwinCAT installation documentation); TcAgent and `install-xaeshell.ps1` support it. TcAgent refuses unload/reload when the 32-bit shell is close to the limit. |
 | `vsbridge\build.ps1`: CS1705 (version conflict) | Several versions of a VS assembly installed; the script uses the highest. Please report as an issue, with output. |
 
-Logs: `%LOCALAPPDATA%\TcAgent\` (`audit.jsonl`, `bridge\bridge.log`, `libcache\`). Agent feedback:
-`feedback\feedback.jsonl` in the TcAgent folder.
+Logs: `%LOCALAPPDATA%\TcAgent\` (`audit.jsonl`, `logs\tcagent-<date>.log`, `bridge\bridge.log`, `libcache\`). Agent feedback:
+`feedback\feedback.jsonl` in the TcAgent folder - or a shared team folder/UNC path via `TCAGENT_FEEDBACK` (one file per day
+and machine); report with `TcAgent.exe feedback --open --markdown feedback.md`. Missing audit entries: `tc_policy action=audit_check`.

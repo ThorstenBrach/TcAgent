@@ -114,35 +114,6 @@ public sealed partial class ToolRegistry
                 return $"{res}\nFile: {file}";
             });
 
-        Add("tc_policy", "Shows the guardrails: approved target systems for runtime operations, read-only mode, path of the audit log.",
-            Schema(), a => policy.Describe());
-
-        Add("tc_feedback", "Reports a problem, a missing feature or a suggestion for improvement to the TcAgent developers. " +
-                           "Please always use it when a tool fails, behaves unexpectedly, a task could only be solved via a workaround, or a tool is missing.",
-            Schema(Req(P("type", "string", "bug | missing_feature | usability | docs")),
-                   Req(P("summary", "string", "One sentence: what is the problem / what is missing")),
-                   P("tool", "string", "Affected tool, e.g. tc_plc_create"),
-                   P("details", "string", "Call/arguments, error message, context (TwinCAT version, project type)"),
-                   P("expected", "string", "What should have happened"),
-                   P("workaround", "string", "How the task was solved anyway (if at all)"),
-                   P("severity", "string", "blocker | major | minor")),
-            a =>
-            {
-                var path = Environment.GetEnvironmentVariable("TCAGENT_FEEDBACK") ??
-                           Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "feedback", "feedback.jsonl"));
-                Directory.CreateDirectory(Path.GetDirectoryName(path)!);
-                var entry = new JsonObject
-                {
-                    ["time"] = DateTime.Now.ToString("o"), ["serverVersion"] = Program.ServerVersion, ["client"] = Program.ClientName,
-                    ["solution"] = tc.InstanceInfo, ["status"] = "open"
-                };
-                foreach (var k in new[] { "type", "severity", "tool", "summary", "details", "expected", "workaround" })
-                    if (Str(a, k) != null) entry[k] = Str(a, k);
-                File.AppendAllText(path, entry.ToJsonString(new System.Text.Json.JsonSerializerOptions
-                    { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + Environment.NewLine);
-                return "Thanks - feedback saved to " + path;
-            });
-
         Add("tc_version", "Shows the version of the TcAgent server.", Schema(), a => $"TcAgent {Program.ServerVersion}");
 
         // ---------------------------------------------------------- Tree / XML
@@ -194,6 +165,8 @@ public sealed partial class ToolRegistry
         RegisterLessons();
         RegisterUserDoc();
         RegisterRefactor();
+        RegisterFeedback();
+        RegisterPolicy();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +
@@ -1387,6 +1360,8 @@ public sealed partial class ToolRegistry
         {
             rulesSeen = true;
             if (CodingRules.Text(SolutionDir()) is { } rt)
+            {
+                Log.Info($"{name} not executed: coding guidelines not read yet");
                 return new JsonObject
                 {
                     ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] =
@@ -1394,6 +1369,7 @@ public sealed partial class ToolRegistry
                         "Align the code with them and then repeat the call (next time call tc_coding_rules first).\n\n" + rt }),
                     ["isError"] = true
                 };
+            }
         }
         string text; bool isError = false;
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -1412,8 +1388,9 @@ public sealed partial class ToolRegistry
                 if (ok == false) throw new OperationCanceledException("Rejected by the user: " + what + " - do not retry without asking.");
                 if (ok == null) Log.Info("No confirmation possible (no channel) - " + what);
             }
-            Log.Info($"{name} started");
-            text = RunWatchingDialogs(name, () => t.Handler(args));
+            Log.Info($"{name} started{LogAttrs(args)}");
+            // tc_refactor apply/result wait for the user themselves (job with its own dialog watch) - see RefactorJobs.cs
+            text = WatchesItself(name, args) ? t.Handler(args) : RunWatchingDialogs(name, () => t.Handler(args), args);
             Log.Info($"{name} done ({sw.ElapsedMilliseconds} ms)");
         }
         catch (Exception ex) { text = "Error: " + ErrorText(ex); isError = true; Log.Error($"{name}: {ex}"); }
@@ -1422,11 +1399,16 @@ public sealed partial class ToolRegistry
         if (name != "tc_lessons" && Environment.GetEnvironmentVariable("TCAGENT_LESSONS_RECALL") != "0")
         {
             var plain = text;
-            // after an error the STA may still be blocked (IDE dialog, hang) or the IDE gone: short timeout, then the last known solution
-            if (isError) text += Lessons.Recall(SolutionDir(2000) ?? lastSolutionDir, name, text) ?? "";
-            else if ((name is "tc_check" or "tc_build" or "tc_errors") && Lessons.HasCompileErrors(text))
-                text += Lessons.Recall(SolutionDir(), name, text) ?? "";
-            text += Lessons.Track(name, isError, plain) ?? "";
+            // never let the lessons lookup prevent the audit entry below
+            try
+            {
+                // after an error the STA may still be blocked (IDE dialog, hang) or the IDE gone: short timeout, then the last known solution
+                if (isError) text += Lessons.Recall(SolutionDir(2000) ?? lastSolutionDir, name, text) ?? "";
+                else if ((name is "tc_check" or "tc_build" or "tc_errors") && Lessons.HasCompileErrors(text))
+                    text += Lessons.Recall(SolutionDir(), name, text) ?? "";
+                text += Lessons.Track(name, isError, plain) ?? "";
+            }
+            catch (Exception ex) { Log.Error("Lessons: " + ex.Message); }
         }
         var callClass = Policy.ClassOf(name, args);
         if (callClass != ToolClass.Read || isError) policy.Audit(name, args, !isError, text, sw.ElapsedMilliseconds);
@@ -1441,9 +1423,10 @@ public sealed partial class ToolRegistry
     /// <summary>Runs a tool; if the IDE opens a modal dialog meanwhile, every automation interface call waits
     /// until it is closed. In that case return immediately with the dialog text instead of hanging for minutes
     /// (the call itself keeps running and completes as soon as the dialog is closed).</summary>
-    string RunWatchingDialogs(string name, Func<string> handler)
+    string RunWatchingDialogs(string name, Func<string> handler, JsonObject args = null)
     {
         if (name == "tc_dialogs") return handler();
+        var started = System.Diagnostics.Stopwatch.StartNew();
         var task = System.Threading.Tasks.Task.Run(handler);
         int seen = 0;
         while (!task.Wait(1000))
@@ -1452,7 +1435,14 @@ public sealed partial class ToolRegistry
             try { dialogs = IdeDialogs.Find(tc.AttachedPid); } catch { dialogs = new(); }
             seen = dialogs.Count > 0 ? seen + 1 : 0;
             if (seen < 3) continue;
-            task.ContinueWith(x => Log.Info($"{name} finished after dialog: " + (x.IsFaulted ? x.Exception?.InnerException?.Message : "ok\n" + (x.Result.Length > 2000 ? x.Result[..2000] + "..." : x.Result))));
+            task.ContinueWith(x =>
+            {
+                Log.Info($"{name} finished after dialog: " + (x.IsFaulted ? x.Exception?.InnerException?.Message : "ok\n" + (x.Result.Length > 2000 ? x.Result[..2000] + "..." : x.Result)));
+                // the call was reported (and audited) as error, but the change happened after all - audit the real outcome too
+                if (args != null && Policy.ClassOf(name, args) != ToolClass.Read)
+                    policy.Audit(name, args, !x.IsFaulted, x.IsFaulted ? "Error: " + ErrorText(x.Exception!) : x.Result, started.ElapsedMilliseconds,
+                                 "completed after an IDE dialog (the call itself returned an error)");
+            });
             throw new Exception("The IDE is showing a dialog and waiting for input - " + name + " will only complete afterwards:\n  " +
                                 string.Join("\n  ", dialogs) +
                                 "\nAsk the user to read and close the dialog (or tc_dialogs action=close, which corresponds to Cancel/X). " +
@@ -1478,6 +1468,9 @@ public sealed partial class ToolRegistry
                        "Restart the AI client: TcAgent Chat (close/reopen the chat window or restart Visual Studio), Claude Desktop (tray icon > Quit).";
         }
         if (string.IsNullOrWhiteSpace(msg)) msg = e.GetType().Name;
+        if (e is not IdeLostException && TwinCatSession.IsIdeLost(ex))
+            msg += " - the connection to the IDE was lost (TcXaeShell/Visual Studio crashed or was closed). Tell the user; when the IDE " +
+                   "is open again call tc_attach and check the last change - do not repeat changes blindly.";
         return msg;
     }
 

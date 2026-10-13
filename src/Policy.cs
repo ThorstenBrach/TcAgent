@@ -32,7 +32,7 @@ public sealed class Policy
         ["tc_twincat_version"] = ToolClass.ProjectWrite, ["tc_platform"] = ToolClass.ProjectWrite, ["tc_variant"] = ToolClass.ProjectWrite,
         ["tc_tccom"] = ToolClass.ProjectWrite, ["tc_scope_new"] = ToolClass.ProjectWrite, ["tc_scope"] = ToolClass.ProjectWrite,
         ["tc_hmi_page"] = ToolClass.ProjectWrite, ["tc_hmi_control"] = ToolClass.ProjectWrite, ["tc_hmi_symbol"] = ToolClass.ProjectWrite, ["tc_packages_change"] = ToolClass.RuntimeWrite,
-        ["tc_realtime"] = ToolClass.ProjectWrite, ["tc_sfc"] = ToolClass.ProjectWrite, ["tc_doc"] = ToolClass.ProjectWrite, ["tc_userdoc"] = ToolClass.ProjectWrite, ["tc_refactor"] = ToolClass.ProjectWrite, ["tc_coe"] = ToolClass.ProjectWrite, ["tc_route_add"] = ToolClass.RuntimeWrite,
+        ["tc_realtime"] = ToolClass.ProjectWrite, ["tc_sfc"] = ToolClass.ProjectWrite, ["tc_doc"] = ToolClass.ProjectWrite, ["tc_userdoc"] = ToolClass.ProjectWrite, ["tc_refactor"] = ToolClass.ProjectWrite, ["tc_lessons"] = ToolClass.ProjectWrite, ["tc_coe"] = ToolClass.ProjectWrite, ["tc_route_add"] = ToolClass.RuntimeWrite,
         ["tc_activate"] = ToolClass.RuntimeWrite, ["tc_plc_online"] = ToolClass.RuntimeWrite,
         ["ads_write"] = ToolClass.RuntimeWrite,
     };
@@ -69,16 +69,21 @@ public sealed class Policy
     public static ToolClass ClassOf(string tool) => Classes.TryGetValue(tool, out var c) ? c : ToolClass.Read;
 
     // read-only actions of otherwise changing tools (tc_task list, tc_realtime show, tc_coe list, tc_scope list ...)
-    static readonly HashSet<string> ReadActions = new(StringComparer.OrdinalIgnoreCase) { "list", "show", "info", "read", "runtimes", "controls", "xml", "outline", "memory", "pending", "analyze", "data", "templates", "template" };
+    static readonly HashSet<string> ReadActions = new(StringComparer.OrdinalIgnoreCase) { "list", "show", "info", "read", "runtimes", "controls", "xml", "outline", "memory", "pending", "analyze", "data", "templates", "template", "result", "search" };
 
     /// <summary>Class of a concrete call: read-only actions count as Read (no confirmation, allowed in ask/propose mode).</summary>
     public static ToolClass ClassOf(string tool, JsonObject args)
     {
         var cls = ClassOf(tool);
         if (cls == ToolClass.ProjectWrite && args?["action"] is JsonValue v && ReadActions.Contains(v.ToString())) return ToolClass.Read;
-        if (cls == ToolClass.ProjectWrite && args?["action"] == null && tool is "tc_userdoc" or "tc_refactor") return ToolClass.Read;   // default action: data / analyze
+        if (cls == ToolClass.ProjectWrite && args?["action"] == null && tool is "tc_userdoc" or "tc_refactor" or "tc_lessons") return ToolClass.Read;   // default action: data / analyze / search
+        // a static analysis run only reads - loading a settings file (.csa) changes the PLC project's settings
+        if (tool == "tc_static_analysis" && args?["settingsFile"] is JsonValue sf && sf.ToString().Trim().Length > 0) return ToolClass.ProjectWrite;
         return cls;
     }
+
+    /// <summary>File the audit entries of this process go to (TCAGENT_AUDIT or %LOCALAPPDATA%\TcAgent\audit.jsonl).</summary>
+    public string AuditPath => auditPath;
 
     public string Describe() =>
         $"Mode: {Mode} ({ModeText})\nAllowed target systems: {string.Join(", ", allowedTargets)}\nAudit log: {auditPath}";
@@ -112,21 +117,25 @@ public sealed class Policy
         }
     }
 
-    public void Audit(string tool, JsonObject args, bool ok, string resultOrError, long ms)
+    /// <summary>One line per changing call (and per failed call). note = e.g. "completed after an IDE dialog", "job ... finished".</summary>
+    public void Audit(string tool, JsonObject args, bool ok, string resultOrError, long ms, string note = null)
     {
         try
         {
-            var a = args.DeepClone().AsObject();
+            var a = (args ?? new JsonObject()).DeepClone().AsObject();
             foreach (var k in a.Select(p => p.Key).ToList())   // shorten long texts (code, XML), never log secrets
                 if (k.Contains("password", StringComparison.OrdinalIgnoreCase) || k.Contains("secret", StringComparison.OrdinalIgnoreCase)) a[k] = "***";
                 else if (a[k] is JsonValue v && v.ToString().Length > 300) a[k] = v.ToString()[..300] + "...";
             var line = new JsonObject
             {
-                ["time"] = DateTime.Now.ToString("o"), ["tool"] = tool, ["class"] = ClassOf(tool).ToString(),
+                ["time"] = DateTime.Now.ToString("o"), ["tool"] = tool, ["class"] = ClassOf(tool, args).ToString(),
                 ["ok"] = ok, ["ms"] = ms, ["args"] = a,
-                ["result"] = resultOrError.Length > 300 ? resultOrError[..300] + "..." : resultOrError
+                ["result"] = resultOrError == null ? "" : resultOrError.Length > 300 ? resultOrError[..300] + "..." : resultOrError,
+                ["pid"] = Environment.ProcessId, ["client"] = Program.ClientName
             };
-            File.AppendAllText(auditPath, line.ToJsonString(new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + Environment.NewLine);
+            if (note != null) line["note"] = note;
+            // shared append with retries: several TcAgent processes (chat, Claude, CLI) write the same audit file
+            SharedFile.Append(auditPath, line.ToJsonString(new JsonSerializerOptions { Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping }) + Environment.NewLine);
         }
         catch (Exception ex) { Log.Error("Audit: " + ex.Message); }
     }

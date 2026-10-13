@@ -14,6 +14,7 @@ exit code, JUnit XML and inline annotations.
 | `TcAgent.exe doc --solution X.sln --out doc/X.html` | program documentation as HTML (call hierarchy, diagrams, reference; with the explanations stored by the agent) | documentation as build artifact |
 | `TcAgent.exe archive --solution X.sln --out X.tszip` | archive of the whole solution | releases, support |
 | `TcAgent.exe test --solution X.sln` | builds, activates on the test target, starts the PLC, waits for TcUnit, collects the results | every push to `main`, nightly |
+| `TcAgent.exe feedback --open --markdown feedback.md` | Markdown report of the agents' `tc_feedback` entries (grouped by tool, ready for GitHub issues); `--summary` for counts, `--path` for another store; no IDE needed | weekly triage of a shared feedback folder |
 
 ```powershell
 TcAgent.exe check --solution .\MyMachine.sln --junit results\check.xml
