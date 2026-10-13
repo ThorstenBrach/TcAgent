@@ -66,6 +66,30 @@ public sealed class Policy
         Log.Info($"Policy: targets=[{string.Join(", ", allowedTargets)}] mode={Mode} audit={auditPath}");
     }
 
+    /// <summary>Command line only (TcAgent.exe hil --allow): targets a person allowed explicitly in the pipeline definition,
+    /// in addition to TCAGENT_ALLOW_TARGETS. Never used by the MCP server, so an agent cannot widen the whitelist.</summary>
+    public Policy(IEnumerable<string> extraTargets) : this()
+    {
+        var added = new List<string>();
+        foreach (var t in extraTargets ?? Enumerable.Empty<string>())
+        {
+            if (string.IsNullOrWhiteSpace(t)) continue;
+            if (t.Trim().Equals("local", StringComparison.OrdinalIgnoreCase))
+            {
+                allowedTargets.Add("127.0.0.1.1.1");
+                if (localNetId != null) allowedTargets.Add(localNetId);
+            }
+            else allowedTargets.Add(t.Trim());
+            added.Add(t.Trim());
+        }
+        if (added.Count > 0) Log.Info($"Policy: additionally allowed by the command line (--allow): {string.Join(", ", added)}");
+    }
+
+    /// <summary>true for the runtime of this PC: empty, "local", 127.0.0.1.1.1 or the own AmsNetId.</summary>
+    public bool IsLocal(string netId) =>
+        string.IsNullOrWhiteSpace(netId) || netId.Trim().Equals("local", StringComparison.OrdinalIgnoreCase) || netId.Trim() == "127.0.0.1.1.1" ||
+        (localNetId != null && netId.Trim().Equals(localNetId, StringComparison.OrdinalIgnoreCase));
+
     public static ToolClass ClassOf(string tool) => Classes.TryGetValue(tool, out var c) ? c : ToolClass.Read;
 
     // read-only actions of otherwise changing tools (tc_task list, tc_realtime show, tc_coe list, tc_scope list ...)

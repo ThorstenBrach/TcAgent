@@ -242,8 +242,11 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
 
 ## Pipeline
 
-- The same TcAgent.exe runs in CI without an AI: `TcAgent.exe check|build|test|analyze|library|archive|scope ...`
+- The same TcAgent.exe runs in CI without an AI: `TcAgent.exe check|build|test|sil|hil|analyze|library|archive|scope ...`
   with exit codes and JUnit XML (see docs/PIPELINE.md). Suggest it when the user wants automated checks.
+  `sil` = TcUnit on the runtime of the build PC, `hil` = on a remote test PLC that the pipeline must allow explicitly
+  (`--allow <AmsNetId>` or TCAGENT_ALLOW_TARGETS); both clean up (runtime back to Config mode). Library + tests: two PLC
+  projects in one solution, `sil --plc <Tests>`, then `library --plc <Lib>` - never remove test code from the library.
 
 ## Known limitations (`tc_version` shows the running version)
 
