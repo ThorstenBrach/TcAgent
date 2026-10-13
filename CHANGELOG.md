@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.20.4] – not released yet
+## [0.20.4] – 2026-10-13
 
 ### Added
 - `tc_task action=assign`: PLC task reference and program call (process image) - feedback from agents.
