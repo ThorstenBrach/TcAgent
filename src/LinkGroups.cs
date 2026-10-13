@@ -74,8 +74,8 @@ public sealed partial class ToolRegistry
     /// are expanded element-wise; otherwise the pair is linked as given. Notes (unlinked extra entries) go to <paramref name="notes"/>.</summary>
     List<LinkPair> ExpandLinkPair(string src, string dst, bool elementwise, StringBuilder notes)
     {
-        var s = TreeLinkNode(src);
-        var t = TreeLinkNode(dst);
+        var s = TreeLinkNode(src, elementwise);
+        var t = TreeLinkNode(dst, elementwise);
         // flat members ('<var>.<member>' siblings) are only searched when needed: path missing or the other side is a group
         if (elementwise && (s == null || s.Kids.Count == 0) && (s == null || t?.Kids.Count > 0)) s = FlatLinkNode(src) ?? s;
         if (elementwise && (t == null || t.Kids.Count == 0) && (t == null || s?.Kids.Count > 0)) t = FlatLinkNode(dst) ?? t;
@@ -108,12 +108,12 @@ public sealed partial class ToolRegistry
     }
 
     /// <summary>Tree item with its sub-items (tree children); null if the path does not exist.</summary>
-    LinkNode TreeLinkNode(string path)
+    LinkNode TreeLinkNode(string path, bool expand = true)
     {
         ITcSmTreeItem it;
         try { it = tc.Item(path); } catch { return null; }
         int budget = LinkNodeBudget;
-        var node = BuildLinkNode(it, it.Name, 0, ref budget);
+        var node = BuildLinkNode(it, it.Name, expand ? 0 : LinkMaxDepth, ref budget);   // elementwise=false: existence check only, no sub-items
         node.Path = path;          // keep the spelling the caller used for the top item
         return node;
     }

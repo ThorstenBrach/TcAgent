@@ -108,7 +108,7 @@ public sealed partial class ToolRegistry
             {
                 var raw = Xml(root);
                 o.AppendLine("\nNo values recognized - raw XML of the safety node (shortened):");
-                o.AppendLine(Shorten(raw, maxChars));
+                o.AppendLine(SafetyShorten(raw, maxChars));
             }
         }
         if (roots.Count == 0)
@@ -132,7 +132,7 @@ public sealed partial class ToolRegistry
         else o.AppendLine("No values recognized.");
         try { var kids = TwinCatSession.Children(it).Select(SafeName).ToList(); if (kids.Count > 0) o.AppendLine("Children: " + string.Join(", ", kids)); } catch { }
         o.AppendLine("\nXML (ProduceXml, shortened):");
-        o.AppendLine(xml.Length == 0 ? "(empty - ProduceXml not supported for this item)" : Shorten(xml, maxChars));
+        o.AppendLine(xml.Length == 0 ? "(empty - ProduceXml not supported for this item)" : SafetyShorten(xml, maxChars));
         return o.ToString();
     }
 
@@ -143,7 +143,7 @@ public sealed partial class ToolRegistry
         try { return (string)((dynamic)it).ProduceXml(false) ?? ""; } catch { return ""; }
     }
 
-    static string Shorten(string s, int max) => (s ?? "").Length <= max ? s : s[..max] + $"\n... (shortened, {s.Length} characters - maxChars)";
+    static string SafetyShorten(string s, int max) => (s ?? "").Length <= max ? s : s[..max] + $"\n... (shortened, {s.Length} characters - maxChars)";
 
     static void Classify(string path, string name, List<(string Key, string Val)> values, List<string> groups, List<string> aliases,
                          List<string> conns, List<string> crcs, List<string> parms)
@@ -289,7 +289,7 @@ public sealed partial class ToolRegistry
             if (nothing)
             {
                 o.AppendLine("  No values recognized - project file (shortened):");
-                try { o.AppendLine(Shorten(File.ReadAllText(proj), maxChars)); } catch (Exception ex) { o.AppendLine("  (not readable: " + ex.Message + ")"); }
+                try { o.AppendLine(SafetyShorten(File.ReadAllText(proj), maxChars)); } catch (Exception ex) { o.AppendLine("  (not readable: " + ex.Message + ")"); }
             }
         }
         return o.ToString();

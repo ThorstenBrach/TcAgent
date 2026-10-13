@@ -306,12 +306,13 @@ public sealed partial class ToolRegistry
     /// <summary>addData of a new step in the form of TwinCAT's own export.</summary>
     static XElement NewStepData(XNamespace ns, string name, bool initial, string comment, bool duplicate)
     {
-        var list = new XElement("attributes", new XElement("attribute", new XAttribute("guid", NameGuid), name));
-        if (!string.IsNullOrEmpty(comment)) list.Add(new XElement("attribute", new XAttribute("guid", CommentGuid), comment));
-        list.Add(new XElement("attribute", new XAttribute("guid", ExcludeGuid), "FALSE"),
-                 new XElement("attribute", new XAttribute("guid", SymbolGuid), "0"),
-                 new XElement("attribute", new XAttribute("guid", InitStepGuid), initial ? "TRUE" : "FALSE"),
-                 new XElement("attribute", new XAttribute("guid", DuplicationGuid), duplicate ? "TRUE" : "FALSE"));
+        // same namespace as the export (default PLCopen namespace) - an unqualified element would be written with xmlns=""
+        var list = new XElement(ns + "attributes", new XElement(ns + "attribute", new XAttribute("guid", NameGuid), name));
+        if (!string.IsNullOrEmpty(comment)) list.Add(new XElement(ns + "attribute", new XAttribute("guid", CommentGuid), comment));
+        list.Add(new XElement(ns + "attribute", new XAttribute("guid", ExcludeGuid), "FALSE"),
+                 new XElement(ns + "attribute", new XAttribute("guid", SymbolGuid), "0"),
+                 new XElement(ns + "attribute", new XAttribute("guid", InitStepGuid), initial ? "TRUE" : "FALSE"),
+                 new XElement(ns + "attribute", new XAttribute("guid", DuplicationGuid), duplicate ? "TRUE" : "FALSE"));
         return new XElement(ns + "addData",
                             new XElement(ns + "data", new XAttribute("name", "http://www.3s-software.com/plcopenxml/sfc/element"),
                                          new XAttribute("handleUnknown", "implementation"), list));
@@ -489,7 +490,7 @@ public sealed partial class ToolRegistry
                                           .Where(e => e.Name.LocalName == "variable").Select(e => (string)e.Attribute("name")).Where(n => n != null),
                                        StringComparer.OrdinalIgnoreCase);
         foreach (var f in flags.Elements())
-            if ((string)f.Attribute("Use") == "true" && (string)f.Attribute("Declare") != "true" && !vars.Contains("SFC" + f.Name.LocalName))
+            if ((string)f.Attribute("Use") == "true" && (string)f.Attribute("Declare") != "true" && !vars.Contains(FlagVar(f.Name.LocalName)))   // SFCErrorAnalyzation* already start with SFC
                 f.SetAttributeValue("Use", "false");
     }
 
