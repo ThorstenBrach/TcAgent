@@ -47,12 +47,14 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **HMI** | TwinCAT HMI (TE2000) pages and regions, controls with PLC bindings and button actions, symbol mapping, build – directly in the project files | `tc_hmi`, `tc_hmi_page`, `tc_hmi_control`, `tc_hmi_symbol` |
 | **Motion** | NC tasks and axes, link an axis to its drive | `tc_motion`, `tc_motion_add` |
 | **TwinSAFE** | Safety projects, groups, alias devices, connections, CRCs – read only, writing is intentionally not supported | `tc_safety` |
-| **Runtime** | Activate, login/start/stop, read/write variables via ADS – only on allowed targets | `tc_activate`, `tc_plc_online`, `ads_read`, `ads_write` |
+| **Runtime** | Activate, login/start/stop, read/write variables via ADS – changes only on allowed targets | `tc_activate`, `tc_plc_online`, `ads_read`, `ads_write` |
 | **Your rules** | Coding rules per project/person/company; "remember that I want X" becomes a rule | `tc_coding_rules`, `tc_coding_rules_add` |
 | **Your risk checks** | Extend the risk analysis with your own rules (regex, tested on the project first), tune or switch off the built-in ones, add checks the agent reviews by reading the code – per project/person/company | `tc_risk_rules` |
 | **Documentation** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 
 All 85 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+
+What you can do, explained step by step with example prompts: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
 ## In your CI pipeline
 
@@ -125,8 +127,8 @@ apply to **every** client:
 | Setting (MCP config `env`) | Effect |
 |---|---|
 | `TCAGENT_ALLOW_TARGETS` | AmsNetIds allowed for activation, online commands, ADS writes. Default `local` = this PC only |
-| `TCAGENT_MODE` | `agent` (default), `propose` (code changes only as a diff, nothing else), `ask` (read-only) |
-| `TCAGENT_CONFIRM` | `runtime` (default): you confirm every activation, PLC start/stop, ADS write – a Yes/No dialog in Visual Studio for the TcAgent Chat, the client's own question dialog elsewhere · `all`: also project changes · `off` |
+| `TCAGENT_MODE` | `agent` (default), `propose` (code changes only as a diff; reading, check and build still work, no other changes), `ask` (read-only) |
+| `TCAGENT_CONFIRM` | `runtime` (default): you confirm every activation, PLC start/stop, ADS write, runtime mode change, route and package change – a Yes/No dialog in Visual Studio for the TcAgent Chat, the client's own question dialog elsewhere · `all`: also project changes · `off` |
 | `TCAGENT_SOLUTION` | optional, part of the solution path to pin one Visual Studio instance. Not needed normally: the chat always uses its own IDE, a single open solution is found automatically, with several the user picks from a list |
 | `TCAGENT_AUDIT` | audit log of every changing call (default `%LOCALAPPDATA%\TcAgent\audit.jsonl`) |
 | `TCAGENT_RULES` | additional coding rules (files/folders, `;`-separated); `TCAGENT_RULES_GATE=0` disables the one-time gate |
@@ -167,7 +169,7 @@ shows the findings and saves it after your OK (`action=add`). Template: [docs/ri
 
 The agent looks things up instead of guessing (`tc_docs`, read-only): Beckhoff InfoSys is built in; add URLs, document
 folders and network shares per project (`<solution>\.tcagent\knowledge.md`, `.tcagent\docs\`) or personally
-(`%LOCALAPPDATA%\TcAgent\`). PDF, Word, HTML, Markdown and text are indexed; extracted text is cached.
+(`%LOCALAPPDATA%\TcAgent\`). PDF, Word, HTML, Markdown, text, XML, CSV, JSON and ST files are indexed; extracted text is cached.
 
 ## Feedback loop
 

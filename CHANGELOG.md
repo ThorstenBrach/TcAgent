@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 ## [0.22.3] – 2026-10-14
 
 ### Added
+- **User guide** – `docs/USER_GUIDE.md`: every feature explained by task, with example prompts, what the agent does,
+  options, limits and what needs your confirmation; CI pipeline, guardrails, configuration reference and FAQ.
 - **SIL / HIL test runs** – `TcAgent.exe sil` runs TcUnit on the runtime of the build PC (Run-mode check, PLC login/start
   fallback, optional Scope recording, clean-up that always runs: runtime to Config mode, target, I/O and autostart
   restored); `TcAgent.exe hil` does the same on a remote test PLC, only with explicit allowance (`TCAGENT_ALLOW_TARGETS`
@@ -188,8 +190,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.21.7...HEAD
-[0.21.7]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.21.7
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.22.3...HEAD
+[0.22.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.22.3
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0
