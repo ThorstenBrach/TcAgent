@@ -29,6 +29,7 @@ public sealed class Policy
         ["tc_runtime_startup"] = ToolClass.RuntimeWrite, ["tc_runtime_mode"] = ToolClass.RuntimeWrite, ["tc_io_scan_add"] = ToolClass.ProjectWrite, ["tc_motion_add"] = ToolClass.ProjectWrite, ["tc_motion"] = ToolClass.ProjectWrite,
         ["tc_new_solution"] = ToolClass.ProjectWrite, ["tc_plc_project_add"] = ToolClass.ProjectWrite, ["tc_import"] = ToolClass.ProjectWrite,
         ["tc_library"] = ToolClass.ProjectWrite, ["tc_library_save"] = ToolClass.ProjectWrite, ["tc_mapping_import"] = ToolClass.ProjectWrite,
+        ["tc_sbom"] = ToolClass.ProjectWrite, ["tc_library_lock"] = ToolClass.ProjectWrite,
         ["tc_twincat_version"] = ToolClass.ProjectWrite, ["tc_platform"] = ToolClass.ProjectWrite, ["tc_variant"] = ToolClass.ProjectWrite,
         ["tc_tccom"] = ToolClass.ProjectWrite, ["tc_scope_new"] = ToolClass.ProjectWrite, ["tc_scope"] = ToolClass.ProjectWrite,
         ["tc_hmi_page"] = ToolClass.ProjectWrite, ["tc_hmi_control"] = ToolClass.ProjectWrite, ["tc_hmi_symbol"] = ToolClass.ProjectWrite, ["tc_packages_change"] = ToolClass.RuntimeWrite,
@@ -103,6 +104,9 @@ public sealed class Policy
         if (cls == ToolClass.ProjectWrite && args?["action"] == null && tool is "tc_userdoc" or "tc_refactor" or "tc_motion" or "tc_lessons") return ToolClass.Read;   // default action: data / analyze / list / search
         // tc_risk_rules: only add/builtin/check write a file; show and test only read
         if (cls == ToolClass.ProjectWrite && tool == "tc_risk_rules" && !(args?["action"] is JsonValue ra && ra.ToString().ToLowerInvariant() is "add" or "builtin" or "check"))
+            return ToolClass.Read;
+        // tc_library_lock: only action=write writes the lock file; check (the default) only reads
+        if (cls == ToolClass.ProjectWrite && tool == "tc_library_lock" && !(args?["action"] is JsonValue la && la.ToString().Trim().ToLowerInvariant() == "write"))
             return ToolClass.Read;
         // tc_sfc comments/flags without values only list the step comments / SFC flags
         if (cls == ToolClass.ProjectWrite && tool == "tc_sfc" && args?["action"] is JsonValue sa && sa.ToString().ToLowerInvariant() is "comments" or "flags"

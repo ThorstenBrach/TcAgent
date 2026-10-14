@@ -5,6 +5,17 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+### Added
+- **SBOM** – `tc_sbom` and `TcAgent.exe sbom --solution <sln> [--out <file.cdx.json>] [--plc <names>]` write a CycloneDX 1.6
+  SBOM per PLC project (default `<solution>\sbom\<PLC project>.cdx.json`): the PLC project with its version and the git
+  commit/branch, one component per library reference with resolved version (`*` resolved like TwinCAT: newest installed),
+  vendor, placeholder, requested version, purl `pkg:generic/<vendor>/<name>@<version>` and the SHA-256 of the library file
+  from the library repository; dependencies. Missing data is marked (`not found`, `unresolved`, `unknown`).
+- **Library lock file** – `tc_library_lock` (action `check`/`write`) and `TcAgent.exe lock --solution <sln> [--plc <names>] [--check]`:
+  `<solution>\.tcagent\libraries.lock.json` with the resolved library versions per PLC project, sorted for clean Git diffs
+  (not rewritten when nothing changed); `--check` lists added/removed/changed libraries and exits 1 on differences,
+  2 without lock file - a pipeline gate against "a different library version on the build machine".
+
 ## [0.23.2] – 2026-10-14
 
 ### Added

@@ -553,6 +553,34 @@ Adds a library reference to a PLC.
 | `version` | string |  | Version or * (default) |
 | `vendor` | string |  | Vendor, e.g. Beckhoff Automation GmbH |
 
+### `tc_sbom`
+
+Software bill of materials (SBOM) of the PLC project(s) as CycloneDX 1.6 JSON – for security/compliance (e.g. Cyber Resilience Act) and as pipeline artifact. One file per PLC project, default `<solution>\sbom\<PLC project>.cdx.json`; returns a short summary with the file path.
+
+- `metadata.component`: the PLC project as `application`, version from the project information (`ProjectVersion` of the `.plcproj`, otherwise the XML description of the PLC project), properties `tcagent:plcPath`, `tcagent:git.commit` and `tcagent:git.branch` of the solution folder.
+- `components`: one `library` per library reference with resolved version, `supplier`/`publisher` = vendor (distributor), purl `pkg:generic/<vendor>/<name>@<version>` (URL-encoded; there is no official purl type for TwinCAT libraries) and `hashes` (SHA-256 of the `.library`/`.compiled-library` file when it is found in a library repository: the repositories of the IDE, `%ProgramData%\Beckhoff\TwinCAT\3.1\Components\Plc\Managed Libraries`, `C:\Program Files (x86)\Beckhoff\TwinCAT\3.1\...`, `%TWINCAT3DIR%\Components\Plc\Managed Libraries`). Properties: `tcagent:placeholder`, `tcagent:requestedVersion` (`*` or the version asked for), `tcagent:resolvedFrom`, `tcagent:license` (`unknown`).
+- `dependencies`: the PLC project depends on all its library references.
+- `*` references are resolved like TwinCAT does (newest version in the library repositories).
+- Missing data is marked, never left out: `tcagent:hash = not found`, `tcagent:resolvedVersion = unresolved`, `tcagent:vendor = unknown`, `tcagent:version = not found`, git `not available`.
+
+Pipeline: `TcAgent.exe sbom --solution X.sln [--out sbom\X.cdx.json] [--plc <names>]`.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `plcProjectPath` | string |  | PLC project, e.g. TIPC^MyPlc^MyPlc Project (empty = all PLC projects) |
+| `file` | string |  | Target file (default `<solution>\sbom\<PLC project>.cdx.json`; several PLC projects: `<name>.<PLC>.cdx.json`) |
+
+### `tc_library_lock`
+
+Library lock file `<solution>\.tcagent\libraries.lock.json`: the resolved library versions per PLC project (`name`, `vendor`, `placeholder`, `requested` = `*` or a fixed version, `resolved`), sorted so diffs in Git are clean. `action=check` (default, read only) compares the current resolution with the lock file and lists the differences – `+` added, `-` removed, `~` changed (version, requested version, vendor, library of a placeholder). `action=write` creates or updates it; if nothing changed the file is left untouched. With `plcProjectPath` only that project's entry is checked or replaced.
+
+Pipeline gate: `TcAgent.exe lock --solution X.sln --check` – exit 0 = equal, 1 = differences, 2 = no lock file.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string |  | `check` (default) or `write` |
+| `plcProjectPath` | string |  | PLC project (empty = all; with a project only its entry is checked/replaced) |
+
 ## Projects, export/import, libraries, analysis, mapping, routes, TcCOM
 
 ### `tc_new_solution`

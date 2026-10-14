@@ -1122,6 +1122,17 @@ and port 851; `netId` and `port` select others.
 `tc_library_save file=MyLib.library [install=true]` saves a PLC project as library and optionally installs it into the
 default repository – for example as a pipeline artifact.
 
+**SBOM and library lock** – *"Create an SBOM of the PLC project"*, *"Have any library versions changed since the lock
+file?"*
+
+- `tc_sbom` writes a CycloneDX 1.6 SBOM per PLC project (default `<solution>\sbom\<PLC project>.cdx.json`): every
+  library reference with resolved version, vendor, purl and the SHA-256 of the library file (when found in a
+  repository), the project version and the git commit. Missing data is marked, never left out.
+- `tc_library_lock` keeps the resolved library versions in `<solution>\.tcagent\libraries.lock.json` (in Git):
+  `action=check` (default) lists added, removed and changed libraries; `action=write` updates the file – the agent
+  only does that when you want to accept the current versions.
+- In the pipeline: `TcAgent.exe sbom` as build artifact, `TcAgent.exe lock --check` as gate – see [CI pipeline](#ci-pipeline).
+
 ### Build environment and variants
 
 - `tc_twincat_version` shows or selects the TwinCAT version (Remote Manager) the solution is built with, for example
@@ -1319,6 +1330,8 @@ GitHub runner with the label `twincat` and starts it at logon (not as a service 
 | `analyze --solution X.sln --sarif sa.sarif` | Static analysis (TE1200), SARIF for code scanning (4026.20+); `--settings <file.csa>` |
 | `library --solution X.sln --out MyLib.library` | Builds and saves the PLC project as library (`--plc`, `--install`, `--no-build`) |
 | `archive --solution X.sln --out X.tszip` | Archive of the whole solution |
+| `sbom --solution X.sln --out sbom/X.cdx.json` | SBOM (CycloneDX 1.6) per PLC project: libraries with version, vendor, purl, SHA-256, git commit (`--plc`) |
+| `lock --solution X.sln [--check]` | Writes `.tcagent\libraries.lock.json`; `--check` compares the resolved library versions with it (exit 1 on differences, 2 without lock file) |
 | `scope --solution X.sln --out signals.csv --seconds 30` | Records with the solution's Scope configuration and exports (PLC must be running) |
 | `doc --solution X.sln --out doc/X.html` | Program documentation as HTML, with the explanations stored by the agent |
 | `doc --solution X.sln --risks --fail-on high` | Static risk list; exit 1 on risks of that severity or higher |
@@ -1335,8 +1348,8 @@ Without arguments, `TcAgent.exe` is the MCP server.
 | Code | Meaning | Pipeline reaction |
 |---|---|---|
 | `0` | OK | green |
-| `1` | Compiler errors, failed tests, or risks at/above `--fail-on` | red |
-| `2` | Wrong call, or `sil`/`hil` refused because the target is not allowed | fix the pipeline definition |
+| `1` | Compiler errors, failed tests, risks at/above `--fail-on`, or library versions that differ from the lock file | red |
+| `2` | Wrong call, `sil`/`hil` refused because the target is not allowed, or no lock file for `lock --check` | fix the pipeline definition |
 | `3` | Infrastructure problem: IDE did not start, no route, activation failed, Run mode not reached, TcUnit timeout | retry |
 
 ### Example
@@ -1499,6 +1512,7 @@ agent and CI run gets the same rules and knowledge.
 | `knowledge\` | Documents for `tc_docs` – just drop them in (former name `docs\` still read) | you |
 | `lessons.md` | Project lessons learned | `tc_lessons add` (editable by hand) |
 | `doc-summaries.json` | Program documentation memory (explanations per object) | `tc_doc save/html` |
+| `libraries.lock.json` | Resolved library versions per PLC project (compared by `lock --check`) | `tc_library_lock action=write`, `TcAgent.exe lock` |
 | `doc-templates\` | Example manuals for `tc_userdoc` | you |
 | `backup\delete\` | Backups written by `tc_delete` (git-ignored via `backup\.gitignore`) | `tc_delete` |
 
@@ -1508,6 +1522,7 @@ Output next to it, outside `.tcagent`:
 |---|---|
 | `<solution>\doc\<PLC project>.html` | Default HTML page of `tc_doc action=html` and `TcAgent.exe doc` |
 | `<solution>\doc\user\` | Default folder for `tc_userdoc action=write` |
+| `<solution>\sbom\<PLC project>.cdx.json` | Default SBOM of `tc_sbom` and `TcAgent.exe sbom` |
 
 ### Personal and machine files (%LOCALAPPDATA%\TcAgent)
 
@@ -1608,7 +1623,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 85 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 87 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
@@ -1631,7 +1646,7 @@ All 85 tools and the section of this guide that covers them. Parameters: [TOOLS.
 | `tc_hmi`, `tc_hmi_page`, `tc_hmi_control`, `tc_hmi_symbol` | [HMI](#hmi) |
 | `tc_safety` | [TwinSAFE (read only)](#twinsafe-read-only) |
 | `tc_activate`, `tc_plc_online`, `tc_runtime_mode`, `tc_plc_state`, `ads_symbols`, `ads_read`, `ads_write` | [Runtime: activate, online, ADS](#runtime-activate-online-ads) |
-| `tc_new_solution`, `tc_plc_project_add`, `tc_export`, `tc_import`, `tc_library`, `tc_library_save`, `tc_twincat_version`, `tc_platform`, `tc_variant`, `tc_archive`, `tc_static_analysis`, `tc_packages`, `tc_packages_change` | [Projects, files, libraries and packages](#projects-files-libraries-and-packages) |
+| `tc_new_solution`, `tc_plc_project_add`, `tc_export`, `tc_import`, `tc_library`, `tc_library_save`, `tc_sbom`, `tc_library_lock`, `tc_twincat_version`, `tc_platform`, `tc_variant`, `tc_archive`, `tc_static_analysis`, `tc_packages`, `tc_packages_change` | [Projects, files, libraries and packages](#projects-files-libraries-and-packages) |
 | `tc_route_search`, `tc_route_add`, `tc_tccom` | [Network: routes and TcCOM](#network-routes-and-tccom) |
 | `tc_docs`, `tc_docs_add`, `tc_lessons` | [Knowledge: documentation and lessons learned](#knowledge-documentation-and-lessons-learned) |
 | `tc_dialogs` | [IDE dialogs](#ide-dialogs) |

@@ -39,6 +39,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Tests** | Evaluate TcUnit results | `tc_test_results` |
 | **I/O & system** | Scan EtherCAT and assign adapters, add masters, couplers and terminals offline, link variables in bulk (structs to PDO groups element by element), tasks and PLC task assignment, boot project, config/run mode, licenses (read) | `tc_io_scan`, `tc_io_add`, `tc_link`, `tc_task`, `tc_runtime_mode` |
 | **Projects & files** | New solutions and PLC projects, PLCopen/XTI export and import, libraries (references, placeholders, repositories, save as library), mapping export/import, archive, TwinCAT version, target platform, variants | `tc_new_solution`, `tc_plc_project_add`, `tc_export`, `tc_import`, `tc_library`, `tc_library_save` |
+| **Library supply chain** | SBOM of the PLC project as CycloneDX 1.6 (libraries with version, vendor, purl, SHA-256, git commit) and a library lock file whose check fails the pipeline when a library version changes | `tc_sbom`, `tc_library_lock` |
 | **Quality** | Static analysis (TE1200) with SARIF export | `tc_static_analysis` |
 | **Network** | ADS broadcast search, add routes, TcCOM module instances | `tc_route_search`, `tc_route_add`, `tc_tccom` |
 | **System** | Real-time cores and base time, task core assignment, CoE startup lists of EtherCAT devices, TwinCAT Package Manager (installed/available/outdated packages, install and upgrade with confirmation) | `tc_realtime`, `tc_coe`, `tc_packages`, `tc_packages_change` |
@@ -52,7 +53,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Your risk checks** | Extend the risk analysis with your own rules (regex, tested on the project first), tune or switch off the built-in ones, add checks the agent reviews by reading the code – per project/person/company | `tc_risk_rules` |
 | **Documentation** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 
-All 85 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 87 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 What you can do, explained step by step with example prompts: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 

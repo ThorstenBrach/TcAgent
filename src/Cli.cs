@@ -5,6 +5,8 @@
 //   TcAgent.exe test  --solution <sln>             build, activate on the test target, run TcUnit, collect the results
 //   TcAgent.exe sil   --solution <sln>             like test, on the runtime of this PC, with clean-up (CliTestRun.cs)
 //   TcAgent.exe hil   --solution <sln> --target <AmsNetId> --allow <AmsNetId>   like sil, on an explicitly allowed remote PLC
+//   TcAgent.exe sbom  --solution <sln> [--out <file.cdx.json>]   CycloneDX SBOM of the library references (CliSbom.cs)
+//   TcAgent.exe lock  --solution <sln> [--check]   library lock file .tcagent\libraries.lock.json / compare with it (CliSbom.cs)
 //   TcAgent.exe feedback [--open] [--markdown f]   report of the tc_feedback entries (Markdown for GitHub issues) - no IDE needed
 //   TcAgent.exe doctor [--solution <sln>]           is this machine/user ready for pipelines? (CliDoctor.cs)
 //   TcAgent.exe install --path <folder>             copy TcAgent to a fixed folder for pipelines, e.g. C:\Tools\TcAgent
@@ -25,13 +27,13 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock";
 
     sealed class Options
     {
         public string Command, Solution, Attach, Junit, Target, ProgId, Out, Sarif, Settings, ScopePath, FailOn;
         public int Seconds = 10;
-        public bool Install, Risks;
+        public bool Install, Risks, CheckLock;
         public readonly List<string> Plc = new();
         public readonly List<string> Allow = new();
         public bool KeepRunning;
@@ -104,6 +106,8 @@ public static partial class Cli
                 "archive" => Archive(o, tc),
                 "scope" => ScopeRecord(o, tc),
                 "doc" => Doc(o, tc),
+                "sbom" => Sbom(o, tc),
+                "lock" => Lock(o, tc),
                 "build" => Build(o, tc),
                 "test" => Test(o, tc, ownIde),
                 "sil" => TestRun(o, tc, ownIde, hil: false),
@@ -668,6 +672,7 @@ public static partial class Cli
                 case "--settings": o.Settings = Val(); break;
                 case "--install": o.Install = true; break;
                 case "--risks": o.Risks = true; break;
+                case "--check": o.CheckLock = true; break;
                 case "--fail-on": o.FailOn = Val().ToLowerInvariant(); break;
                 case "--scope": o.ScopePath = Val(); break;
                 case "--seconds": o.Seconds = int.Parse(Val()); break;
@@ -706,6 +711,7 @@ public static partial class Cli
         if (o.Command is "library" or "archive" or "scope" && o.Out == null) throw new Exception($"{o.Command} needs --out <file>");
         ValidateTestRunArgs(o);
         if (o.FailOn != null && o.FailOn is not ("high" or "medium" or "low")) throw new Exception("--fail-on: high, medium or low");
+        if (o.CheckLock && o.Command != "lock") throw new Exception("--check is an option of lock");
         return o;
     }
 
@@ -735,6 +741,15 @@ public static partial class Cli
       severity or higher.
       Uses the explanations the agent stored with tc_doc (<solution>\.tcagent\doc-summaries.json).
       Default output: <solution folder>\doc\<PLC project>.html
+
+  TcAgent.exe sbom --solution <sln> [--out <file.cdx.json>] [--plc <names>]
+      Software bill of materials (CycloneDX 1.6 JSON) per PLC project: every library reference with resolved version,
+      vendor, purl and the SHA-256 of the library file (when found in a library repository), project version, git
+      commit/branch. Missing data is marked, not left out. Default output: <solution folder>\sbom\<PLC project>.cdx.json
+
+  TcAgent.exe lock --solution <sln> [--plc <names>] [--check]
+      Writes the resolved library versions to <solution folder>\.tcagent\libraries.lock.json (commit it to Git).
+      --check compares the current resolution with the lock file: exit 0 = equal, 1 = differences (listed), 2 = no lock file.
 
   TcAgent.exe doctor [--solution <sln>] [--target <AmsNetId>] [--progid <ProgID>]
       Checks whether this machine and this user can run TcAgent pipelines: desktop session (not a service), Visual
@@ -785,11 +800,12 @@ Options
   --no-boot-project        test/sil/hil: do not create a boot project (test: PLC must start by itself)
   --disable-io / --keep-io test/sil/hil: disable all I/O devices (default: test/sil only in a Visual Studio
                            started by TcAgent, hil never)
-  --out <file>             library/archive/scope/doc: output file; sil/hil: Scope export (default scope-<sil|hil>.csv)
+  --out <file>             library/archive/scope/doc/sbom: output file; sil/hil: Scope export (default scope-<sil|hil>.csv)
   --sarif <file>           analyze: SARIF output
   --settings <file.csa>    analyze: static analysis settings to load first
   --install                library: also install into the library repository
   --risks                  doc: print the static risk list
+  --check                  lock: compare with .tcagent\libraries.lock.json instead of writing it
   --fail-on <severity>     doc: exit code 1 when there are risks of this severity or higher (high, medium, low)
   --scope <path>           scope, sil/hil: '<measurement project>/<scope>' (default: the only one); sil/hil record
                            during the test run when --scope or --out is given
@@ -797,7 +813,8 @@ Options
   --keep-dialogs           do not close dialogs of the IDE (default: closed like Cancel/X and logged - they block the IDE)
   --progid <id>            COM ProgID of the IDE, e.g. TcXaeShell.DTE.17.0 (default: VS 2022, then TcXaeShell)
 
-Exit codes: 0 OK, 1 compiler errors or failed tests, 2 wrong call or refused (test/sil/hil: target not allowed),
+Exit codes: 0 OK, 1 compiler errors, failed tests or lock differences, 2 wrong call, refused (test/sil/hil: target not
+            allowed) or no lock file (lock --check),
             3 infrastructure problem (IDE, route, activation, Run mode, timeout).
 Without arguments TcAgent.exe runs as MCP server for AI clients.";
 }

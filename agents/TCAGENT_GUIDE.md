@@ -260,6 +260,9 @@ treat them like project rules for that library.
   one method), struct fields, enum values and doc comments. Also works for third-party compiled libraries.
   The first fetch of a large library freezes VS for a few seconds; after that it is cached.
 - `tc_plc_library_add` on the `...^References` node adds a library.
+- Supply chain: `tc_sbom` writes a CycloneDX SBOM (libraries with version, vendor, purl, SHA-256, git commit);
+  `tc_library_lock` (default check) compares the resolved library versions with `.tcagent\libraries.lock.json` -
+  `action=write` only when the user wants to accept the current versions.
 
 ## Real-time cores, CoE startup list, packages
 
@@ -328,6 +331,8 @@ treat them like project rules for that library.
   `sil` = TcUnit on the runtime of the build PC, `hil` = on a remote test PLC that the pipeline must allow explicitly
   (`--allow <AmsNetId>` or TCAGENT_ALLOW_TARGETS); both clean up (runtime back to Config mode). Library + tests: two PLC
   projects in one solution, `sil --plc <Tests>`, then `library --plc <Lib>` - never remove test code from the library.
+- `TcAgent.exe sbom` (CycloneDX SBOM as build artifact) and `TcAgent.exe lock --check` (gate: exit 1 when library
+  versions differ from the committed `.tcagent\libraries.lock.json`, 2 without lock file).
 
 ## Known limitations (`tc_version` shows the running version)
 

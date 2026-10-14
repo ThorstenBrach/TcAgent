@@ -30,6 +30,12 @@ jobs:
         run: '& $env:TCAGENT doctor; exit $LASTEXITCODE'
       - name: Check all objects
         run: '& $env:TCAGENT check --solution $env:SOLUTION --junit results/check.xml'
+      # Optional: library versions as locked in .tcagent/libraries.lock.json (create it once with TcAgent.exe lock, commit it)
+      # - name: Library lock
+      #   run: '& $env:TCAGENT lock --solution $env:SOLUTION --check'
+      # Optional: SBOM (CycloneDX 1.6) of the PLC project(s) as artifact
+      # - name: SBOM
+      #   run: '& $env:TCAGENT sbom --solution $env:SOLUTION --out results/sbom.cdx.json'
       - name: Publish compiler results
         if: always()
         uses: actions/upload-artifact@v4

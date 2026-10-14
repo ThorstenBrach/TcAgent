@@ -14,6 +14,8 @@ exit code, JUnit XML and inline annotations.
 | `TcAgent.exe doc --solution X.sln --out doc/X.html` | program documentation as HTML (call hierarchy, diagrams, risks, reference; with the explanations stored by the agent) | documentation as build artifact |
 | `TcAgent.exe doc --solution X.sln --risks --fail-on high` | prints the static risk list (tc_doc action=risks, including the project's `.tcagent\risk-rules.md`); exit code 1 on risks of that severity or higher | code review gate with your own rules |
 | `TcAgent.exe archive --solution X.sln --out X.tszip` | archive of the whole solution | releases, support |
+| `TcAgent.exe sbom --solution X.sln --out sbom/X.cdx.json` | SBOM (CycloneDX 1.6 JSON) per PLC project: library references with resolved version, vendor, purl, SHA-256 of the library file, git commit | build artifact, releases (CRA / supply chain) |
+| `TcAgent.exe lock --solution X.sln --check` | compares the resolved library versions with the committed `.tcagent\libraries.lock.json`; exit 1 on differences, 2 without lock file (`lock` without `--check` writes it) | every push / pull request (gate) |
 | `TcAgent.exe test --solution X.sln` | builds, activates on the test target, starts the PLC, waits for TcUnit, collects the results | every push to `main`, nightly |
 | `TcAgent.exe sil --solution X.sln --plc Tests` | software in the loop: like `test` on the runtime of the build PC, checks Run mode, starts the PLC if needed, optional Scope recording, always cleans up | every push / pull request |
 | `TcAgent.exe hil --solution X.sln --target 5.1.2.3.1.1 --allow 5.1.2.3.1.1` | hardware in the loop: the same on a remote test PLC with real I/O – only with an explicit allowance | nightly, release candidates |
@@ -24,8 +26,8 @@ TcAgent.exe check --solution .\MyMachine.sln --junit results\check.xml
 TcAgent.exe test  --solution .\MyMachine.sln --junit results\tests.xml --timeout 900
 ```
 
-**Exit codes:** `0` OK · `1` compiler errors or failed tests · `2` wrong call, or `test`/`sil`/`hil` refused because the target is
-not allowed · `3` infrastructure problem (IDE could not be started, no route, activation failed, Run mode not reached,
+**Exit codes:** `0` OK · `1` compiler errors, failed tests or library versions that differ from the lock file · `2` wrong call,
+`test`/`sil`/`hil` refused because the target is not allowed, or no lock file for `lock --check` · `3` infrastructure problem (IDE could not be started, no route, activation failed, Run mode not reached,
 TcUnit did not finish in time). Pipelines can treat `3` as "retry" and `1` as "red"; `2` needs a fix in the pipeline definition.
 
 Without arguments `TcAgent.exe` is the MCP server as before; `TcAgent.exe help` lists all options.
@@ -125,6 +127,52 @@ Ready-made definitions: [library-github-actions.yml](pipeline/library-github-act
 Notes: increase the library version in the project information for every release – the candidate installed in the build
 stage has the same version and replaces the previous candidate on the build machine only. If the test project references a
 fixed library version instead of `*`, the build stage must install exactly that version.
+
+## SBOM and library lock
+
+**SBOM** – `TcAgent.exe sbom --solution X.sln [--out <file.cdx.json>] [--plc <names>]` writes a software bill of
+materials per PLC project in CycloneDX 1.6 JSON (default `<solution folder>\sbom\<PLC project>.cdx.json`; with several
+PLC projects and `--out` the PLC name is inserted: `X.<PLC>.cdx.json`):
+
+* the PLC project as `application` with its version from the project information and the git commit/branch of the
+  solution folder,
+* one `library` component per library reference: resolved version (`*` = newest installed, resolved like TwinCAT),
+  vendor as supplier/publisher, purl `pkg:generic/<vendor>/<name>@<version>`, SHA-256 of the library file when it is
+  found in a library repository, placeholder and requested version as properties,
+* `dependencies`: the PLC project depends on every library.
+
+What cannot be determined is marked (`tcagent:hash = not found`, `tcagent:resolvedVersion = unresolved`,
+`tcagent:license = unknown` ...), never left out. Publish the file as build artifact or attach it to a release; tools
+such as Dependency-Track read CycloneDX directly.
+
+**Library lock** – `TcAgent.exe lock --solution X.sln` writes `<solution folder>\.tcagent\libraries.lock.json` with the
+resolved library versions of every PLC project (sorted, so Git diffs show exactly what changed – if nothing changed the
+file is not rewritten). Commit it. In the pipeline `TcAgent.exe lock --solution X.sln --check` compares the resolution
+on the build machine with it:
+
+| Exit code | Meaning |
+|---|---|
+| `0` | same libraries and versions as locked |
+| `1` | differences, listed as `+` added, `-` removed, `~` changed (version, requested version, vendor) |
+| `2` | no lock file (or not readable) – create it with `TcAgent.exe lock` and commit it |
+
+This catches the classic "works on my PC": a `*` reference or placeholder resolves to a different library version
+on the build machine than on the developer's PC. If the change is intended, run `lock` again and commit the file.
+`--plc` restricts both to some PLC projects (only their entries are checked/replaced).
+
+```yaml
+# GitHub Actions: lock as gate in the check job, SBOM as artifact
+      - name: Library versions as locked
+        run: '& $env:TCAGENT lock --solution $env:SOLUTION --check'
+      - name: SBOM
+        run: '& $env:TCAGENT sbom --solution $env:SOLUTION --out sbom/plc.cdx.json'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: sbom
+          path: sbom/
+```
+
+Every command opens the solution once; on a busy runner combine the gate with the `check` job.
 
 ## Preparing the PLC project for TcUnit
 
