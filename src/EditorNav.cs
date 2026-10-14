@@ -113,13 +113,14 @@ public sealed partial class ToolRegistry
         {
             foreach (var x in items)
             {
-                if (depth <= 3 && dump.Count < 60) dump.Add(new string(' ', depth * 2) + Nm(x));
+                if (depth <= 1 && dump.Count < 120) dump.Add(new string(' ', depth * 2) + Nm(x));
                 int next = Is(x, segs[idx]) ? idx + 1 : idx;
                 if (next == segs.Length) return x;
                 if (next > idx || depth <= 3)
                 {
                     if (depth > 9) continue;
                     var kids = Kids(x);
+                    if (depth >= 2 && dump.Count < 120) dump.Add($"{new string(' ', depth * 2)}{Nm(x)} -> [{string.Join(", ", kids.Select(Nm).Take(12))}]");
                     if (next > bestIdx) { bestIdx = next; bestWhere = string.Join("^", segs.Take(next)); bestKids = kids.Select(Nm).Take(25).ToList(); }
                     var hit = Find(kids, next, depth + 1);
                     if (hit != null) return hit;
