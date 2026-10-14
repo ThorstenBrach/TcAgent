@@ -90,7 +90,14 @@ public sealed partial class ToolRegistry
                 var k = x.UIHierarchyItems;
                 if (k == null) return list;
                 if (!k.Expanded) { k.Expanded = true; expanded.Add(k); }
-                foreach (EnvDTE.UIHierarchyItem c in k) list.Add(c);
+                // nested hierarchies (TwinCAT project) fill their nodes only after the expansion was processed
+                for (int t = 0; t < 4; t++)
+                {
+                    list.Clear();
+                    foreach (EnvDTE.UIHierarchyItem c in k) list.Add(c);
+                    if (list.Count > 0) break;
+                    System.Threading.Thread.Sleep(150);
+                }
             }
             catch { }
             return list;
@@ -98,23 +105,60 @@ public sealed partial class ToolRegistry
         var sol = dte.ToolWindows.SolutionExplorer;
         var level = new List<EnvDTE.UIHierarchyItem>();
         foreach (EnvDTE.UIHierarchyItem x in sol.UIHierarchyItems) level.Add(x);
-        EnvDTE.UIHierarchyItem cur = null;
-        for (int depth = 0; depth < 4 && cur == null && level.Count > 0; depth++)
+        // the TwinCAT project node and the PLC node often have the same name: try every node named like segs[1]
+        // and keep the first one the rest of the path fits; remember how far we got for the error message
+        int bestDepth = -1; string bestWhere = null; List<string> bestKids = null;
+        EnvDTE.UIHierarchyItem Descend(EnvDTE.UIHierarchyItem start)
         {
-            cur = level.FirstOrDefault(x => Is(x, segs[1]));
-            if (cur == null) level = level.SelectMany(x => (IEnumerable<EnvDTE.UIHierarchyItem>)Kids(x)).ToList();
+            var c = start;
+            for (int i = 2; i < segs.Length; i++)
+            {
+                var kids = Kids(c);
+                var next = kids.FirstOrDefault(x => Is(x, segs[i]));
+                if (next == null)
+                {
+                    if (i > bestDepth)
+                    {
+                        bestDepth = i;
+                        bestWhere = string.Join("^", segs.Take(i));
+                        bestKids = kids.Select(x => { try { return x.Name; } catch { return "?"; } }).Take(25).ToList();
+                    }
+                    return null;
+                }
+                c = next;
+            }
+            return c;
         }
-        for (int i = 2; cur != null && i < segs.Length; i++)
+        EnvDTE.UIHierarchyItem cur = null;
+        for (int depth = 0; depth < 5 && cur == null && level.Count > 0; depth++)
         {
-            var seg = segs[i];
-            cur = Kids(cur).FirstOrDefault(x => Is(x, seg));
+            foreach (var cand in level.Where(x => Is(x, segs[1])).ToList())
+            {
+                cur = Descend(cand);
+                if (cur != null) break;
+            }
+            if (cur == null) level = level.SelectMany(x => (IEnumerable<EnvDTE.UIHierarchyItem>)Kids(x)).ToList();
         }
         var keep = new HashSet<EnvDTE.UIHierarchyItems>();
         try { for (var p = cur?.Collection?.Parent as EnvDTE.UIHierarchyItem; p != null; p = p.Collection?.Parent as EnvDTE.UIHierarchyItem) keep.Add(p.UIHierarchyItems); }
         catch { }
         foreach (var e in expanded)
             if (!keep.Contains(e)) try { e.Expanded = false; } catch { }
-        if (cur == null) return $"Not opened: {treePath} not found in the Solution Explorer.";
+        if (cur == null)
+        {
+            // fallback: open the object's file (.TcPOU/.TcDUT/.TcGVL) - the IDE opens the POU editor
+            var file = ObjectFile(treePath);
+            if (file != null)
+                try
+                {
+                    dte.ItemOperations.OpenFile(file);
+                    return $"Opened {Path.GetFileName(file)} (the file of {treePath}) - the node was not found in the Solution Explorer, " +
+                           "so for a method/action/property the POU itself is open" + (line > 0 ? "; cursor not placed" : "") + Diag();
+                }
+                catch (Exception ex) { return $"Not opened: {treePath} not found in the Solution Explorer and opening {file} failed: {ex.Message}" + Diag(); }
+            return $"Not opened: {treePath} not found in the Solution Explorer." + Diag();
+        }
+        string Diag() => bestWhere == null ? "" : $" [Solution Explorer: found '{bestWhere}', its children: {string.Join(", ", bestKids ?? new())}]";
         cur.Select(EnvDTE.vsUISelectionType.vsUISelectionTypeSelect);
         sol.DoDefaultAction();
         if (line <= 0) return $"Opened {treePath} in the IDE editor.";
@@ -132,6 +176,22 @@ public sealed partial class ToolRegistry
         }
         catch { }
         return $"Opened {treePath} in the IDE editor; cursor NOT placed on {part} line {line} (the TwinCAT editor offers no DTE text selection - needs TcAgentBridge).";
+    }
+
+    // file of a PLC object (FullPath VSProperty), for sub-objects (method, action ...) the file of the parent POU
+    string ObjectFile(string treePath)
+    {
+        for (var p = treePath; p.Contains('^'); p = p[..p.LastIndexOf('^')])
+        {
+            try
+            {
+                string xml = ((dynamic)tc.Item(p)).ProduceXml(false);
+                var m = System.Text.RegularExpressions.Regex.Match(xml, @"<Name>FullPath</Name>\s*<Value>([^<]+)</Value>");
+                if (m.Success && File.Exists(m.Groups[1].Value)) return m.Groups[1].Value;
+            }
+            catch { }
+        }
+        return null;
     }
 
     // Open a definition: find the declaration line in the declaration part (variable, or header line of the object)
