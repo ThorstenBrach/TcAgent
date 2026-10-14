@@ -208,6 +208,17 @@ public sealed class RiskConfig
         return BuiltinParams.TryGetValue(rule, out var ps) ? ps.First(p => p.Name == name).Default : 0;
     }
 
+    /// <summary>" [risk-rules.md: severity=medium, limit=200]" when the project/person changed the rule, else "".</summary>
+    public string BuiltinNote(string rule)
+    {
+        if (!Builtins.TryGetValue(rule, out var s)) return "";
+        var parts = new List<string>();
+        if (s.Off) parts.Add("off");
+        if (s.Severity != null) parts.Add("severity=" + s.Severity);
+        parts.AddRange(s.Params.Select(kv => $"{kv.Key}={kv.Value}"));
+        return parts.Count == 0 ? "" : $" [{Path.GetFileName(s.Source)}: {string.Join(", ", parts)}]";
+    }
+
     public bool IsOff(string rule) => Builtins.TryGetValue(rule, out var s) && s.Off;
 
     void BuildRule(Custom r, Dictionary<string, string> f, string where)

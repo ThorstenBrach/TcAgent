@@ -1,6 +1,6 @@
 <PackageManifest Version="2.0.0" xmlns="http://schemas.microsoft.com/developer/vsx-schema/2011">
   <Metadata>
-    <Identity Id="TcAgentBridge.86c8609c" Version="0.22.1" Language="en-US" Publisher="TcAgent" />
+    <Identity Id="TcAgentBridge.86c8609c" Version="0.22.2" Language="en-US" Publisher="TcAgent" />
     <DisplayName>TcAgent - TwinCAT 3 for AI coding agents</DisplayName>
     <Description xml:space="preserve">Lets AI coding agents (Claude, GitHub Copilot, Gemini, Codex) work in the TwinCAT 3 IDE: read and write PLC code, check and build, navigate, look up library APIs, configure I/O and tasks, control the runtime. Includes an in-IDE chat window and inline questions (Ctrl+Shift+Q).</Description>
     <MoreInfo>https://github.com/ThorstenBrach/TcAgent</MoreInfo>

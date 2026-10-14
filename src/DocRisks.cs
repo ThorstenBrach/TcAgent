@@ -122,7 +122,7 @@ public sealed partial class PlcDoc
         if (fired.Count > 0)
         {
             o.AppendLine("\nRules:");
-            foreach (var rule in RiskRules.Where(x => fired.Contains(x.Id))) o.AppendLine($"  {rule.Id} ({rule.Severity}): {rule.Detail}");
+            foreach (var rule in RiskRules.Where(x => fired.Contains(x.Id))) o.AppendLine($"  {rule.Id} ({rule.Severity}): {rule.Detail}{cfg.BuiltinNote(rule.Id)}");
             foreach (var rule in cfg.Customs.Values.Where(x => fired.Contains(x.Id)))
                 o.AppendLine($"  {rule.Id} ({rule.Severity}, own rule from {Path.GetFileName(rule.Source)}): {rule.Message}{(rule.Why != null ? " - " + rule.Why : "")}");
         }
@@ -156,7 +156,7 @@ public sealed partial class PlcDoc
         var cfg = RiskConfig ?? RiskConfig.Empty;
         o.Append("<details><summary>Rules</summary><ul>");
         foreach (var rule in RiskRules)
-            o.Append($"<li><code>{H(rule.Id)}</code> ({H(cfg.IsOff(rule.Id) ? "off" : cfg.Builtins.TryGetValue(rule.Id, out var bs) && bs.Severity != null ? bs.Severity : rule.Severity)}): {H(rule.Detail)}</li>");
+            o.Append($"<li><code>{H(rule.Id)}</code> ({H(cfg.IsOff(rule.Id) ? "off" : cfg.Builtins.TryGetValue(rule.Id, out var bs) && bs.Severity != null ? bs.Severity : rule.Severity)}): {H(rule.Detail)}{H(cfg.BuiltinNote(rule.Id))}</li>");
         foreach (var rule in cfg.Customs.Values.Where(x => !x.Off))
             o.Append($"<li><code>{H(rule.Id)}</code> ({H(rule.Severity)}, own rule): {H(rule.Message)}{(rule.Why != null ? " – " + H(rule.Why) : "")}</li>");
         o.Append("</ul></details>");

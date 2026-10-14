@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.22.1] – not released yet
+## [0.22.2] – not released yet
 
 ### Added
 - **SIL / HIL test runs** – `TcAgent.exe sil` runs TcUnit on the runtime of the build PC (Run-mode check, PLC login/start
