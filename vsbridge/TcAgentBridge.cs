@@ -25,7 +25,7 @@ namespace TcAgentBridge
     [Guid("86c8609c-4aac-4e7e-95e6-6b96179a3c4f")]
     public sealed class BridgePackage : AsyncPackage
     {
-        public const string BridgeVersion = "0.21.5";
+        public const string BridgeVersion = "0.21.6";
         internal static BridgePackage Instance;
         static readonly Guid ExportTypeGuid = new Guid("75161BEE-FB5F-434C-A3C6-86B7CEE2B8FC");
 
@@ -977,9 +977,29 @@ namespace TcAgentBridge
             var dte = Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE80.DTE2 ?? throw new Exception("DTE not available");
             var item = FindUiItem(dte, path.Split('^'), r);
             if (item == null) throw new Exception("Object not found in Solution Explorer: " + path);
+            // DoDefaultAction acts on the selection of the Solution Explorer - only when that window is active
+            string before = null;
+            try { before = dte.ActiveDocument?.FullName; } catch { }
+            try { dte.ToolWindows.SolutionExplorer.Parent.Activate(); } catch { }
             item.Select(EnvDTE.vsUISelectionType.vsUISelectionTypeSelect);
             dte.ToolWindows.SolutionExplorer.DoDefaultAction();
-            r["opened"] = true; r["via"] = "SolutionExplorer";
+            r["via"] = "SolutionExplorer";
+            string after = null;
+            try { after = dte.ActiveDocument?.FullName; } catch { }
+            var last = path.Split('^').Last();
+            if (!DocMatches(after, last))
+            {
+                // the node's object may be a project item that can be opened directly
+                try
+                {
+                    if (item.Object is EnvDTE.ProjectItem pi) { var w = pi.Open(EnvDTE.Constants.vsViewKindPrimary); w.Visible = true; w.Activate(); r["via"] = "ProjectItem"; }
+                }
+                catch (Exception ex) { r["projectItemError"] = ex.Message; }
+                try { after = dte.ActiveDocument?.FullName; } catch { }
+                if (!DocMatches(after, last))
+                    try { dte.ExecuteCommand("View.Open"); r["via"] = "View.Open"; } catch { }
+            }
+            r["opened"] = true;
             if (line > 0) foreach (var kv in Caret(path, part, line, column)) r[kv.Key] = kv.Value;
             return r;
         }
