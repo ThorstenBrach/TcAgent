@@ -1,6 +1,7 @@
 // Knowledge sources for the agent - read only.
 //   Web:     Beckhoff InfoSys is predefined; further URLs/domains in knowledge.md. Only pages of these domains are read.
-//   Folders: <Solution>\.tcagent\docs\ and %LOCALAPPDATA%\TcAgent\docs\ (just drop documents in),
+//   Folders: <Solution>\.tcagent\knowledge\ and %LOCALAPPDATA%\TcAgent\knowledge\ (just drop documents in; the former
+//            name docs\ is still read),
 //            plus any folders and network drives from knowledge.md (e.g. \\server\manuals).
 //   List:    <Solution>\.tcagent\knowledge.md, %LOCALAPPDATA%\TcAgent\knowledge.md, TCAGENT_KNOWLEDGE (';'-separated).
 //            One source per line ("- https://..." or "- \\server\share\folder"), the rest = comment.
@@ -47,8 +48,14 @@ public static class Knowledge
         var urls = new List<string> { InfoSys };
         var folders = new List<string>();
         var lists = new List<string>();
-        if (!string.IsNullOrEmpty(solutionDir)) folders.Add(Path.Combine(solutionDir, ".tcagent", "docs"));
-        folders.Add(Path.Combine(Root, "docs"));
+        // documents dropped into knowledge\ (same name as knowledge.md); docs\ is the former folder name and still read
+        if (!string.IsNullOrEmpty(solutionDir))
+        {
+            folders.Add(Path.Combine(solutionDir, ".tcagent", "knowledge"));
+            if (Directory.Exists(Path.Combine(solutionDir, ".tcagent", "docs"))) folders.Add(Path.Combine(solutionDir, ".tcagent", "docs"));
+        }
+        folders.Add(Path.Combine(Root, "knowledge"));
+        if (Directory.Exists(Path.Combine(Root, "docs"))) folders.Add(Path.Combine(Root, "docs"));
         var entries = new List<string>();
         foreach (var e in (Environment.GetEnvironmentVariable("TCAGENT_KNOWLEDGE") ?? "").Split(';')) entries.Add(e);
         foreach (var f in new[] { ListFile(null, "personal"), string.IsNullOrEmpty(solutionDir) ? null : ListFile(solutionDir, "project") })

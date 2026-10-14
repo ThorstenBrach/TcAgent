@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.22.5] – 2026-10-14
+## [0.22.6] – 2026-10-14
 
 ### Added
 - **User guide** – `docs/USER_GUIDE.md`: every feature explained by task, with example prompts, what the agent does,
@@ -43,6 +43,9 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - `tc_policy action=audit_check`: changing calls from the daily log that are missing in the audit log, with the likely reason.
 
 ### Changed
+- Uniform file names on every level (company, personal, project): `<topic>.md` plus an optional folder `<topic>\` for more
+  files – `coding-rules\` (formerly `rules\`, still read), `risk-rules\` now also personal, documents for `tc_docs` in
+  `knowledge\` (formerly `docs\`, still read).
 - VSIX: a rebuild with the same version number is copied too (all files compared, not only the size of `TcAgent.exe`).
 - After a deliberate IDE restart (IDE already running for a while) TcAgent reconnects on the next call.
 - `tc_editor_open`: search tolerant to equal node names and lazily loaded nodes; falls back to opening the object's file;
@@ -200,8 +203,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.22.5...HEAD
-[0.22.5]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.22.5
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.22.6...HEAD
+[0.22.6]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.22.6
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0

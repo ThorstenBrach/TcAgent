@@ -152,8 +152,8 @@ Put your conventions in Markdown – TcAgent shows them to every agent before it
 
 | File | Applies to |
 |---|---|
-| `<solution>\.tcagent\coding-rules.md` (and `.tcagent\rules\*.md`) | the project – shared via Git |
-| `%LOCALAPPDATA%\TcAgent\coding-rules.md` | you personally |
+| `<solution>\.tcagent\coding-rules.md` (and `coding-rules\*.md`) | the project – shared via Git |
+| `%LOCALAPPDATA%\TcAgent\coding-rules.md` (and `coding-rules\*.md`) | you personally |
 | `TCAGENT_RULES` | e.g. company rules on a network share |
 
 Say *"remember: step sequences always as CASE over an enum"* and the agent adds it as a rule (`tc_coding_rules_add`).
@@ -175,7 +175,7 @@ shows the findings and saves it after your OK (`action=add`). Template: [docs/ri
 ## Documentation and knowledge sources
 
 The agent looks things up instead of guessing (`tc_docs`, read-only): Beckhoff InfoSys is built in; add URLs, document
-folders and network shares per project (`<solution>\.tcagent\knowledge.md`, `.tcagent\docs\`) or personally
+folders and network shares per project (`<solution>\.tcagent\knowledge.md`, `.tcagent\knowledge\`) or personally
 (`%LOCALAPPDATA%\TcAgent\`). PDF, Word, HTML, Markdown, text, XML, CSV, JSON and ST files are indexed; extracted text is cached.
 
 ## Feedback loop

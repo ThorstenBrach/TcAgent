@@ -303,9 +303,8 @@ TcAgent reads Markdown files in this order and concatenates them. Later sources 
 | # | Source | Applies to |
 |---|---|---|
 | 1 | `TCAGENT_RULES` (files/folders, `;`-separated, for example on a network share) | company / department |
-| 2 | `%LOCALAPPDATA%\TcAgent\coding-rules.md` | you personally, every solution |
-| 3 | `<solution>\.tcagent\coding-rules.md` | this solution – shared via Git |
-| 4 | `<solution>\.tcagent\rules\*.md` | this solution, further files (for example one per topic) |
+| 2 | `%LOCALAPPDATA%\TcAgent\coding-rules.md` and `coding-rules\*.md` | you personally, every solution |
+| 3 | `<solution>\.tcagent\coding-rules.md` and `coding-rules\*.md` | this solution – shared via Git (the folder for further files, for example one per topic) |
 
 Overall precedence: your explicit instruction in the chat > project rules > personal rules > company standard. If a
 rule contradicts your request, the agent points it out briefly and follows you.
@@ -670,7 +669,7 @@ Risk rules work like coding rules – Markdown files, later files win:
 | Source | Applies to |
 |---|---|
 | `TCAGENT_RISK_RULES` (files/folders, `;`-separated) | company |
-| `%LOCALAPPDATA%\TcAgent\risk-rules.md` | you personally |
+| `%LOCALAPPDATA%\TcAgent\risk-rules.md` and `risk-rules\*.md` | you personally |
 | `<solution>\.tcagent\risk-rules.md` and `.tcagent\risk-rules\*.md` | the project, in Git |
 
 A file has three sections (template: [risk-rules.example.md](risk-rules.example.md)):
@@ -1187,8 +1186,8 @@ Example prompts:
 
 What the agent does:
 
-- `tc_docs action=search query=...` searches local documents (project `.tcagent\docs`, personal
-  `%LOCALAPPDATA%\TcAgent\docs`, registered folders and network drives) and pages already read, and – if a search service
+- `tc_docs action=search query=...` searches local documents (project `.tcagent\knowledge\`, personal
+  `%LOCALAPPDATA%\TcAgent\knowledge\`, registered folders and network drives) and pages already read, and – if a search service
   is configured (`TCAGENT_SEARCH`) – also InfoSys and enabled URLs. Without a search service the agent uses its client's
   web search (for example `site:infosys.beckhoff.com ...`) and then reads the page.
 - `tc_docs action=read url=...` reads a URL or file in an enabled source (`offset`, `max`, default 12000 characters).
@@ -1197,7 +1196,7 @@ What the agent does:
 
 Beckhoff InfoSys is built in; only pages of enabled domains are read. Sources are listed in
 `<solution>\.tcagent\knowledge.md` (project), `%LOCALAPPDATA%\TcAgent\knowledge.md` (personal) and `TCAGENT_KNOWLEDGE`.
-Documents can simply be dropped into `.tcagent\docs\`. PDF, Word, HTML, Markdown and text files are indexed (also XML,
+Documents can simply be dropped into `.tcagent\knowledge\` (the former name `docs\` is still read). PDF, Word, HTML, Markdown and text files are indexed (also XML,
 CSV, JSON and `.st`); extracted text is cached, so network drives stay fast and what has been read is available offline.
 
 The agent cites the source in its answer. Document content is treated as information, not as instructions.
@@ -1478,11 +1477,11 @@ agent and CI run gets the same rules and knowledge.
 | Path | Content | Written by |
 |---|---|---|
 | `coding-rules.md` | Project coding rules | you; `tc_coding_rules_add` (adds only) |
-| `rules\*.md` | Further coding-rule files | you |
+| `coding-rules\*.md` | Further coding-rule files (the former folder name `rules\` is still read) | you |
 | `risk-rules.md` | Project risk rules (built-in settings, own rules, checks) | you; `tc_risk_rules add/builtin/check` |
 | `risk-rules\*.md` | Further risk-rule files | you |
 | `knowledge.md` | Documentation sources (one URL or folder per line) | you; `tc_docs_add scope=project` |
-| `docs\` | Documents for `tc_docs` – just drop them in | you |
+| `knowledge\` | Documents for `tc_docs` – just drop them in (former name `docs\` still read) | you |
 | `lessons.md` | Project lessons learned | `tc_lessons add` (editable by hand) |
 | `doc-summaries.json` | Program documentation memory (explanations per object) | `tc_doc save/html` |
 | `doc-templates\` | Example manuals for `tc_userdoc` | you |
@@ -1500,7 +1499,8 @@ Output next to it, outside `.tcagent`:
 | Path | Content |
 |---|---|
 | `coding-rules.md`, `risk-rules.md`, `lessons.md`, `knowledge.md` | Personal rules, lessons and sources |
-| `docs\`, `doc-templates\` | Personal documents and example manuals |
+| `coding-rules\`, `risk-rules\` | Further personal rule files |
+| `knowledge\`, `doc-templates\` | Personal documents and example manuals |
 | `audit.jsonl` | Audit log |
 | `logs\tcagent-<date>.log` | Daily log of every tool call |
 | `chat-backends.json` | TcAgent Chat backends, `askHotkey`, `showOnStartup` |

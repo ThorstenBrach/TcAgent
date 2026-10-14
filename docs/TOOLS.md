@@ -65,7 +65,7 @@ Adds a rule to the coding rules ("remember ...", "from now on always ..."). The 
 ### `tc_risk_rules`
 
 Risk rules for the static risk analysis (`tc_doc action=risks`, section Risks of the HTML page, `TcAgent.exe doc --risks`) - Markdown
-files like the coding rules: `TCAGENT_RISK_RULES` (company, files/folders `;`-separated), `%LOCALAPPDATA%\TcAgent\risk-rules.md`
+files like the coding rules: `TCAGENT_RISK_RULES` (company, files/folders `;`-separated), `%LOCALAPPDATA%\TcAgent\risk-rules.md` and `risk-rules\*.md`
 (personal), `<solution>\.tcagent\risk-rules.md` and `.tcagent\risk-rules\*.md` (project, in Git). Later files win (same rule id or
 built-in setting). Format and examples: [risk-rules.example.md](risk-rules.example.md).
 

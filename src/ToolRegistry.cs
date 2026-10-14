@@ -113,7 +113,7 @@ public sealed partial class ToolRegistry
             a => RiskRulesTool(a));
 
         Add("tc_docs", "Look up documentation - read-only: Beckhoff InfoSys, other approved URLs, documents in the project folder " +
-                       ".tcagent\\docs or %LOCALAPPDATA%\\TcAgent\\docs and registered folders/network drives (PDF, Word, HTML, Markdown, text). " +
+                       ".tcagent\\knowledge or %LOCALAPPDATA%\\TcAgent\\knowledge and registered folders/network drives (PDF, Word, HTML, Markdown, text). " +
                        "action=search (query) searches local documents and pages already read; action=read (url or path) returns the text " +
                        "(long texts page by page via offset); action=sources shows the sources. For questions about terminals, parameters, error codes, " +
                        "TwinCAT functions, look it up here first instead of guessing, and cite the source.",

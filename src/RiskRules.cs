@@ -1,7 +1,7 @@
 // Risk rules: Markdown files that configure the static risk analysis (tc_doc action=risks, "Risks" section of the HTML page,
 // TcAgent.exe doc --risks) - the same principle as the coding rules:
 //   1. TCAGENT_RISK_RULES                       files/folders, ';'-separated (e.g. company rules on a network drive)
-//   2. %LOCALAPPDATA%\TcAgent\risk-rules.md     personal rules
+//   2. %LOCALAPPDATA%\TcAgent\risk-rules.md, risk-rules\*.md   personal rules
 //   3. <Solution>\.tcagent\risk-rules.md        project rules (versioned with Git)
 //   4. <Solution>\.tcagent\risk-rules\*.md      further project files
 // Later sources take precedence (same rule id or same built-in setting: the later one wins).
@@ -68,6 +68,7 @@ public sealed class RiskConfig
         }
         foreach (var p in (Environment.GetEnvironmentVariable("TCAGENT_RISK_RULES") ?? "").Split(';')) AddPath(p);
         AddPath(PersonalFile);
+        AddPath(Path.Combine(Path.GetDirectoryName(PersonalFile)!, "risk-rules"));
         if (!string.IsNullOrEmpty(solutionDir))
         {
             AddPath(Path.Combine(solutionDir, ".tcagent", "risk-rules.md"));
@@ -85,7 +86,7 @@ public sealed class RiskConfig
 
     public static string Where(string solutionDir) =>
         "Locations: " + (string.IsNullOrEmpty(solutionDir) ? "<solution folder>" : solutionDir) + "\\.tcagent\\risk-rules.md (project, in Git) " +
-        "and .tcagent\\risk-rules\\*.md, %LOCALAPPDATA%\\TcAgent\\risk-rules.md (personal), TCAGENT_RISK_RULES (files/folders, ';'-separated).";
+        "and .tcagent\\risk-rules\\*.md, %LOCALAPPDATA%\\TcAgent\\risk-rules.md and risk-rules\\*.md (personal), TCAGENT_RISK_RULES (files/folders, ';'-separated).";
 
     public static RiskConfig Load(string solutionDir)
     {

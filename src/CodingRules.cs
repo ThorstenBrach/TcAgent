@@ -1,8 +1,9 @@
 // Coding rules: Markdown files that TcAgent presents to the agent before it writes code for the first time.
-//   1. TCAGENT_RULES                         files/folders, ';'-separated (e.g. company rules on a network drive)
-//   2. %LOCALAPPDATA%\TcAgent\coding-rules.md  personal rules
-//   3. <Solution>\.tcagent\coding-rules.md      project rules (versioned with Git)
-//   4. <Solution>\.tcagent\rules\*.md           further project files
+// Same names on every level: coding-rules.md plus an optional folder coding-rules\ with further *.md files.
+//   1. TCAGENT_RULES                                      files/folders, ';'-separated (e.g. company rules on a network drive)
+//   2. %LOCALAPPDATA%\TcAgent\coding-rules.md, coding-rules\*.md   personal rules
+//   3. <Solution>\.tcagent\coding-rules.md, coding-rules\*.md       project rules (versioned with Git)
+//   (<Solution>\.tcagent\rules\*.md - the former name of the project folder - is still read)
 // Later sources appear further down and take precedence in case of conflicts.
 using System.Text;
 
@@ -21,11 +22,14 @@ public static class CodingRules
             else if (File.Exists(p)) list.Add(p);
         }
         foreach (var p in (Environment.GetEnvironmentVariable("TCAGENT_RULES") ?? "").Split(';')) AddPath(p);
-        AddPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "coding-rules.md"));
+        var personal = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent");
+        AddPath(Path.Combine(personal, "coding-rules.md"));
+        AddPath(Path.Combine(personal, "coding-rules"));
         if (!string.IsNullOrEmpty(solutionDir))
         {
             AddPath(Path.Combine(solutionDir, ".tcagent", "coding-rules.md"));
-            AddPath(Path.Combine(solutionDir, ".tcagent", "rules"));
+            AddPath(Path.Combine(solutionDir, ".tcagent", "coding-rules"));
+            AddPath(Path.Combine(solutionDir, ".tcagent", "rules"));          // former folder name
         }
         return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
@@ -91,6 +95,6 @@ public static class CodingRules
     }
 
     public static string Where(string solutionDir) =>
-        "Location: " + (string.IsNullOrEmpty(solutionDir) ? "<solution folder>" : solutionDir) + "\\.tcagent\\coding-rules.md (project, in Git), " +
-        "%LOCALAPPDATA%\\TcAgent\\coding-rules.md (personal) or TCAGENT_RULES (files/folders, ';'-separated).";
+        "Location: " + (string.IsNullOrEmpty(solutionDir) ? "<solution folder>" : solutionDir) + "\\.tcagent\\coding-rules.md and coding-rules\\*.md (project, in Git), " +
+        "%LOCALAPPDATA%\\TcAgent\\coding-rules.md and coding-rules\\*.md (personal) or TCAGENT_RULES (files/folders, ';'-separated).";
 }
