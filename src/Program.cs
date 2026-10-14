@@ -8,7 +8,7 @@ namespace TcAgent;
 
 public static class Program
 {
-    public const string ServerVersion = "0.22.4";
+    public const string ServerVersion = "0.22.5";
     public static string ClientName = "unknown";
 
     public static int Main(string[] args)
@@ -134,11 +134,25 @@ public static class Mcp
 
     public static void Send(JsonObject msg) { lock (writeLock) stdout.WriteLine(msg.ToJsonString()); }
 
+    /// <summary>Outcome of the last Elicit call: accept, decline, cancel, error, timeout or unsupported - and how long it took.
+    /// A client that cannot show the question (e.g. a CLI in non-interactive mode) answers at once with cancel/decline or an
+    /// error; callers must not take that for a decision of the user.</summary>
+    public static string LastElicitOutcome = "unsupported";
+    public static long LastElicitMs;
+
     /// <summary>Asks the user via the client (elicitation/create). null = not supported, declined or no answer.
     /// Works from the tool call itself and from a background job (the main loop then forwards the answer).</summary>
     public static JsonObject Elicit(string message, JsonObject schema, int timeoutMs = 300_000)
     {
+        LastElicitOutcome = "unsupported"; LastElicitMs = 0;
         if (!CanElicit) return null;
+        var started = System.Diagnostics.Stopwatch.StartNew();
+        try { return ElicitCore(message, schema, timeoutMs); }
+        finally { LastElicitMs = started.ElapsedMilliseconds; }
+    }
+
+    static JsonObject ElicitCore(string message, JsonObject schema, int timeoutMs)
+    {
         var id = "tcagent-elicit-" + Interlocked.Increment(ref nextId);
         waiting[id] = 0;
         try
@@ -158,15 +172,17 @@ public static class Mcp
             }
             if (answers.TryRemove(id, out var late)) return Evaluate(late);
             Log.Info("Elicitation without answer");
+            LastElicitOutcome = "timeout";
             return null;
         }
         finally { waiting.TryRemove(id, out _); answers.TryRemove(id, out _); }
 
         static JsonObject Evaluate(JsonObject m)
         {
-            if (m["error"] != null) { Log.Info("Elicitation declined: " + m["error"]?.ToJsonString()); return null; }
+            if (m["error"] != null) { Log.Info("Elicitation failed: " + m["error"]?.ToJsonString()); LastElicitOutcome = "error"; return null; }
             var r = m["result"] as JsonObject;
-            return r?["action"]?.ToString() == "accept" ? r["content"] as JsonObject : null;
+            LastElicitOutcome = r?["action"]?.ToString() ?? "error";
+            return LastElicitOutcome == "accept" ? r["content"] as JsonObject : null;
         }
     }
 }

@@ -1467,6 +1467,9 @@ public sealed partial class ToolRegistry
                 try { target = TargetOf(name, args); } catch { }
                 var what = Confirm.Describe(name, args, target);
                 var ok = Confirm.Ask(name, what, tc.AttachedPid);
+                if (ok == false && Confirm.LastNotShown)
+                    throw new OperationCanceledException("NOT executed: the confirmation could not be shown (the AI client cannot ask in this mode " +
+                        "and no TcAgentBridge dialog is reachable in the IDE). Ask the user in the chat; nothing was changed: " + what);
                 if (ok == false) throw new OperationCanceledException("Rejected by the user: " + what + " - do not retry without asking.");
                 if (ok == null) Log.Info("No confirmation possible (no channel) - " + what);
             }

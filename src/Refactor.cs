@@ -229,8 +229,10 @@ public sealed partial class ToolRegistry
                 job?.Progress(i, o.ToString(), $"change {i + 1} of {changes.Count}: {plan.Title}");
                 var choice = Confirm.Choose("TcAgent refactoring - " + plan.Title, question.ToString(), pid);
                 if (choice == null)
-                    return o + $"\nNo way to ask the user (no dialog in Visual Studio, client cannot ask). Nothing more was changed. " +
-                           "Show the proposals to the user in the chat and apply them only after the user agreed.";
+                    return o + $"\nNOT applied: the confirmation could not be shown - no TcAgentBridge dialog in the IDE " +
+                           (BridgeClient.Available(pid) ? "" : "(extension not reachable in this IDE; in the TwinCAT XAE Shell it needs vsbridge\\install-xaeshell.ps1) ") +
+                           "and the AI client cannot ask either. Nothing more was changed. Show the proposals to the user in the chat and " +
+                           "apply them only after the user agreed (e.g. with tc_plc_write, or again with tc_refactor once the dialog works).";
                 if (choice == "cancel") { o.AppendLine($"[{i + 1}] {plan.Title}: cancelled by the user - stopped, the remaining changes were not applied"); break; }
                 if (choice == "reject") { o.AppendLine($"[{i + 1}] {plan.Title}: REJECTED by the user"); rejected++; continue; }
                 if (choice == "all") all = true;

@@ -40,9 +40,13 @@ public static class Confirm
         };
     }
 
+    /// <summary>true after Ask returned false because the client could not show the question (not the user's "no").</summary>
+    public static bool LastNotShown;
+
     /// <summary>true = go ahead. null = nobody could be asked (no channel).</summary>
     public static bool? Ask(string tool, string what, int idePid)
     {
+        LastNotShown = false;
         bool fromChat = (Environment.GetEnvironmentVariable("TCAGENT_CLIENT") ?? "").StartsWith("chat:", StringComparison.OrdinalIgnoreCase)
                         || TwinCatSession.StartedFrom(idePid);
         if (fromChat && BridgeClient.Available(idePid))
@@ -68,7 +72,10 @@ public static class Confirm
                 ["required"] = new JsonArray("confirm")
             };
             var answer = Mcp.Elicit("TcAgent wants to execute: " + what, schema);
-            // a client that offers elicitation but gets no answer/decline -> no
+            // a client that offers elicitation but gets no answer/decline -> no (never run unconfirmed). If the question
+            // was evidently not on screen (immediate cancel/decline or an error), say so instead of "rejected by the user".
+            LastNotShown = answer == null && !(Mcp.LastElicitOutcome is "decline" or "cancel" && Mcp.LastElicitMs >= 1500)
+                           && Mcp.LastElicitOutcome != "timeout";
             return answer?["confirm"] is JsonValue c && c.ToString().Equals("true", StringComparison.OrdinalIgnoreCase);
         }
         return null;
@@ -110,7 +117,12 @@ public static class Confirm
                 ["required"] = new JsonArray("decision")
             };
             var answer = Mcp.Elicit(text, schema);
-            return answer?["decision"]?.ToString() ?? "cancel";
+            if (answer?["decision"]?.ToString() is { Length: > 0 } d) return d;
+            // decline/cancel only count as the user's answer if the question was really on screen: a client that cannot show
+            // it (CLI in non-interactive mode, e.g. the TcAgent Chat backend) answers at once or with an error
+            if (Mcp.LastElicitOutcome is "decline" or "cancel" && Mcp.LastElicitMs >= 1500) return "cancel";
+            Log.Info($"Choice via the client not shown ({Mcp.LastElicitOutcome} after {Mcp.LastElicitMs} ms)");
+            return null;
         }
         var choice = fromChat ? ViaBridge() ?? ViaClient() : ViaClient() ?? ViaBridge();
         return choice is "apply" or "all" or "reject" or "cancel" ? choice : choice == null ? null : "cancel";
