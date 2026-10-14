@@ -11,6 +11,8 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - **User guide** – `docs/USER_GUIDE.md`: every feature explained by task, with example prompts, what the agent does,
   options, limits and what needs your confirmation; CI pipeline, guardrails, configuration reference and FAQ; screenshots
   of the program documentation and animations of linking and risk rules from the test project.
+- README: overview graphic of the files on company, personal and project level (rules, risk rules, lessons, documentation
+  sources, manual templates, program memory, feedback); architecture graphic updated.
 - **SIL / HIL test runs** – `TcAgent.exe sil` runs TcUnit on the runtime of the build PC (Run-mode check, PLC login/start
   fallback, optional Scope recording, clean-up that always runs: runtime to Config mode, target, I/O and autostart
   restored); `TcAgent.exe hil` does the same on a remote test PLC, only with explicit allowance (`TCAGENT_ALLOW_TARGETS`

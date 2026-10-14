@@ -1,0 +1,94 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 738" width="1000" height="738" role="img" aria-label="Where TcAgent keeps rules, risk rules, lessons, documentation sources, templates, program memory and feedback">
+<style>text{font-family:"Segoe UI",system-ui,-apple-system,"DejaVu Sans",sans-serif}.t{font-size:15px;font-weight:700;fill:#0f172a}.s{font-size:12px;fill:#475569}.m{font-family:Consolas,"DejaVu Sans Mono",monospace;font-size:12.5px;fill:#334155}.tool{font-family:Consolas,"DejaVu Sans Mono",monospace;font-size:11.5px;fill:#6366f1}.h{font-size:14px;font-weight:700;fill:#0f172a}.hs{font-size:11.5px;fill:#475569}</style>
+<rect x="0" y="0" width="1000" height="738" rx="14" fill="#f8fafc"/>
+<rect x="24" y="18" width="952" height="56" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
+<text x="40" y="41" class="t">Agent guide (skill) – how the agent works with TcAgent</text>
+<text x="40" y="61" class="s">The same for every project. Installed into your AI client: SKILL.md (Claude skill), AGENTS.md, CLAUDE.md, GEMINI.md, copilot-instructions.md</text>
+<rect x="296" y="92" width="220" height="48" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+<text x="308" y="113" class="h">Company / team</text><text x="308" y="131" class="hs">variable → file or network share</text>
+<rect x="526" y="92" width="220" height="48" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+<text x="538" y="113" class="h">You</text><text x="538" y="131" class="hs">%LOCALAPPDATA%\TcAgent\</text>
+<rect x="756" y="92" width="220" height="48" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+<text x="768" y="113" class="h">Project</text><text x="768" y="131" class="hs">&lt;solution&gt;\.tcagent\  – in Git</text>
+<text x="28" y="113" class="h">What</text><text x="28" y="131" class="hs">read and written with</text>
+<rect x="24" y="150" width="262" height="66" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<text x="38" y="172" class="t">Coding rules</text>
+<text x="38" y="190" class="s">what your code must look like</text>
+<text x="38" y="207" class="tool">tc_coding_rules · _add</text>
+<rect x="296" y="150" width="220" height="66" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.55"/>
+<text x="308" y="188.0" class="m">TCAGENT_RULES</text>
+<rect x="526" y="150" width="220" height="66" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.55"/>
+<text x="538" y="188.0" class="m">coding-rules.md</text>
+<rect x="756" y="150" width="220" height="66" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.55"/>
+<text x="768" y="179.0" class="m">coding-rules.md</text>
+<text x="768" y="197.0" class="m">rules\*.md</text>
+<rect x="24" y="224" width="262" height="66" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<text x="38" y="246" class="t">Risk rules</text>
+<text x="38" y="264" class="s">what the risk analysis checks</text>
+<text x="38" y="281" class="tool">tc_risk_rules</text>
+<rect x="296" y="224" width="220" height="66" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.55"/>
+<text x="308" y="262.0" class="m">TCAGENT_RISK_RULES</text>
+<rect x="526" y="224" width="220" height="66" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.55"/>
+<text x="538" y="262.0" class="m">risk-rules.md</text>
+<rect x="756" y="224" width="220" height="66" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.55"/>
+<text x="768" y="253.0" class="m">risk-rules.md</text>
+<text x="768" y="271.0" class="m">risk-rules\*.md</text>
+<rect x="24" y="298" width="262" height="66" rx="8" fill="#ecfeff" stroke="#06b6d4" stroke-width="1.5"/>
+<text x="38" y="320" class="t">Lessons learned</text>
+<text x="38" y="338" class="s">hard-won solutions, recalled on errors</text>
+<text x="38" y="355" class="tool">tc_lessons</text>
+<rect x="296" y="298" width="220" height="66" rx="8" fill="#ffffff" stroke="#06b6d4" stroke-opacity="0.55"/>
+<text x="308" y="327.0" class="m">TCAGENT_LESSONS</text>
+<text x="308" y="345.0" class="m">(team file)</text>
+<rect x="526" y="298" width="220" height="66" rx="8" fill="#ffffff" stroke="#06b6d4" stroke-opacity="0.55"/>
+<text x="538" y="336.0" class="m">lessons.md</text>
+<rect x="756" y="298" width="220" height="66" rx="8" fill="#ffffff" stroke="#06b6d4" stroke-opacity="0.55"/>
+<text x="768" y="336.0" class="m">lessons.md</text>
+<rect x="24" y="372" width="262" height="66" rx="8" fill="#fefce8" stroke="#eab308" stroke-width="1.5"/>
+<text x="38" y="394" class="t">Documentation</text>
+<text x="38" y="412" class="s">manuals, data sheets, URLs</text>
+<text x="38" y="429" class="tool">tc_docs · _add</text>
+<rect x="296" y="372" width="220" height="66" rx="8" fill="#ffffff" stroke="#eab308" stroke-opacity="0.55"/>
+<text x="308" y="410.0" class="m">TCAGENT_KNOWLEDGE</text>
+<rect x="526" y="372" width="220" height="66" rx="8" fill="#ffffff" stroke="#eab308" stroke-opacity="0.55"/>
+<text x="538" y="401.0" class="m">knowledge.md</text>
+<text x="538" y="419.0" class="m">docs\</text>
+<rect x="756" y="372" width="220" height="66" rx="8" fill="#ffffff" stroke="#eab308" stroke-opacity="0.55"/>
+<text x="768" y="401.0" class="m">knowledge.md</text>
+<text x="768" y="419.0" class="m">docs\</text>
+<rect x="24" y="446" width="262" height="66" rx="8" fill="#fefce8" stroke="#eab308" stroke-width="1.5"/>
+<text x="38" y="468" class="t">Manual templates</text>
+<text x="38" y="486" class="s">your style for user manuals</text>
+<text x="38" y="503" class="tool">tc_userdoc</text>
+<rect x="296" y="446" width="220" height="66" rx="8" fill="#ffffff" stroke="#eab308" stroke-opacity="0.55"/>
+<text x="308" y="484.0" class="m">TCAGENT_DOC_TEMPLATES</text>
+<rect x="526" y="446" width="220" height="66" rx="8" fill="#ffffff" stroke="#eab308" stroke-opacity="0.55"/>
+<text x="538" y="484.0" class="m">doc-templates\</text>
+<rect x="756" y="446" width="220" height="66" rx="8" fill="#ffffff" stroke="#eab308" stroke-opacity="0.55"/>
+<text x="768" y="484.0" class="m">doc-templates\</text>
+<rect x="24" y="520" width="262" height="66" rx="8" fill="#f0fdf4" stroke="#22c55e" stroke-width="1.5"/>
+<text x="38" y="542" class="t">Program memory</text>
+<text x="38" y="560" class="s">explanations of your program</text>
+<text x="38" y="577" class="tool">tc_doc</text>
+<rect x="296" y="520" width="220" height="66" rx="8" fill="none" stroke="#cbd5e1" stroke-dasharray="4 4"/>
+<text x="406.0" y="558.0" class="s" text-anchor="middle">–</text>
+<rect x="526" y="520" width="220" height="66" rx="8" fill="none" stroke="#cbd5e1" stroke-dasharray="4 4"/>
+<text x="636.0" y="558.0" class="s" text-anchor="middle">–</text>
+<rect x="756" y="520" width="220" height="66" rx="8" fill="#ffffff" stroke="#22c55e" stroke-opacity="0.55"/>
+<text x="768" y="558.0" class="m">doc-summaries.json</text>
+<rect x="24" y="594" width="262" height="66" rx="8" fill="#fff7ed" stroke="#f97316" stroke-width="1.5"/>
+<text x="38" y="616" class="t">Feedback</text>
+<text x="38" y="634" class="s">problems reported by agents</text>
+<text x="38" y="651" class="tool">tc_feedback</text>
+<rect x="296" y="594" width="220" height="66" rx="8" fill="#ffffff" stroke="#f97316" stroke-opacity="0.55"/>
+<text x="308" y="623.0" class="m">TCAGENT_FEEDBACK</text>
+<text x="308" y="641.0" class="m">(team folder)</text>
+<rect x="526" y="594" width="220" height="66" rx="8" fill="#ffffff" stroke="#f97316" stroke-opacity="0.55"/>
+<text x="538" y="632.0" class="m">feedback\</text>
+<rect x="756" y="594" width="220" height="66" rx="8" fill="none" stroke="#cbd5e1" stroke-dasharray="4 4"/>
+<text x="866.0" y="632.0" class="s" text-anchor="middle">–</text>
+<defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker></defs>
+<line x1="316" y1="692" x2="956" y2="692" stroke="#6366f1" stroke-width="2" marker-end="url(#ar)"/>
+<text x="636.0" y="684" class="s" text-anchor="middle" style="fill:#4338ca;font-weight:600">Coding and risk rules: all files apply – on conflicts the later one wins</text>
+<text x="28" y="720" class="s">Plain Markdown / JSON files – readable and editable by hand. Rules are added only when you ask (dry run first); project files belong in Git.</text>
+</svg>
