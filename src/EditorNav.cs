@@ -64,6 +64,27 @@ public sealed partial class ToolRegistry
             }
         }
         else bridgeNote = "TcAgentBridge not active";
+        // DTE project model (works for the nested PLC project), then let the bridge put the cursor into the active editor
+        string viaItems = null;
+        try { viaItems = tc.Sta.Run(() => OpenViaProjectItems(treePath)); } catch (Exception ex) { Log.Info("open via ProjectItems: " + ex.Message); }
+        if (viaItems != null)
+        {
+            if (line <= 0) return $"Opened {treePath} in the IDE editor.";
+            if (BridgeClient.Available(pid))
+            {
+                var args = new JsonObject { ["path"] = treePath, ["part"] = part, ["line"] = line, ["column"] = Math.Max(1, column) };
+                JsonObject r = null;
+                for (int i = 0; i < 10; i++)
+                {
+                    System.Threading.Thread.Sleep(250);
+                    try { r = BridgeClient.Call(pid, "caret", args, 30000); } catch { }
+                    if (r != null && IsTrue(r["lineSet"])) break;
+                }
+                if (r != null && IsTrue(r["lineSet"])) return $"Opened {treePath} in the IDE editor, cursor on {part} line {line}.";
+                return $"Opened {treePath} in the IDE editor, but the cursor could not be placed{where}: {r?["lineError"]?.ToString() ?? "no answer from TcAgentBridge"}.";
+            }
+            return $"Opened {treePath} in the IDE editor; cursor not placed (needs TcAgentBridge).";
+        }
         // DTE fallback: select and open the node in the Solution Explorer; line only if the editor offers DTE text
         return tc.Sta.Run(() => OpenViaDte(treePath, part, line)) + $" ({bridgeNote})";
     }
@@ -185,6 +206,78 @@ public sealed partial class ToolRegistry
             catch { }
         }
         return null;
+    }
+
+    // The TwinCAT PLC project is a nested hierarchy whose nodes are not exposed through the Solution Explorer's
+    // UIHierarchy - but through the DTE project model: Solution > Project > ProjectItems (> SubProject) ...
+    // Finds the item of the tree path by the order of its segments (names with or without extension / type suffix)
+    // and opens it like a double-click. Returns null when nothing was found.
+    string OpenViaProjectItems(string treePath)
+    {
+        var dte = tc.RequireDte();
+        var segs = treePath.Split('^');
+        bool Is(string n, string seg)
+        {
+            n ??= "";
+            return string.Equals(n, seg, StringComparison.OrdinalIgnoreCase) || n.StartsWith(seg + " (", StringComparison.OrdinalIgnoreCase)
+                   || string.Equals(Path.GetFileNameWithoutExtension(n), seg, StringComparison.OrdinalIgnoreCase);
+        }
+        IEnumerable<(string Name, EnvDTE.ProjectItems Items, EnvDTE.ProjectItem Item)> Children(EnvDTE.ProjectItems items)
+        {
+            var list = new List<(string, EnvDTE.ProjectItems, EnvDTE.ProjectItem)>();
+            if (items == null) return list;
+            try
+            {
+                foreach (EnvDTE.ProjectItem pi in items)
+                {
+                    string n = ""; try { n = pi.Name; } catch { }
+                    EnvDTE.ProjectItems sub = null;
+                    try { sub = pi.SubProject?.ProjectItems; } catch { }
+                    try { sub ??= pi.ProjectItems; } catch { }
+                    list.Add((n, sub, pi));
+                }
+            }
+            catch { }
+            return list;
+        }
+        EnvDTE.ProjectItem Find(EnvDTE.ProjectItems items, int idx, int depth)
+        {
+            foreach (var (name, sub, item) in Children(items))
+            {
+                // the "<Plc> Project" level may not exist as an item in the project model - allow skipping it
+                int next = Is(name, segs[idx]) ? idx + 1
+                         : idx + 1 < segs.Length && segs[idx].EndsWith(" Project", StringComparison.OrdinalIgnoreCase) && Is(name, segs[idx + 1]) ? idx + 2
+                         : idx;
+                if (next == segs.Length) return item;
+                if ((next > idx || depth <= 3) && depth <= 12)
+                {
+                    var hit = Find(sub, next, depth + 1);
+                    if (hit != null) return hit;
+                }
+            }
+            return null;
+        }
+        EnvDTE.ProjectItem found = null;
+        foreach (EnvDTE.Project prj in dte.Solution.Projects)
+        {
+            string pn = ""; try { pn = prj.Name; } catch { }
+            int start = Is(pn, segs[1]) ? 2 : 1;
+            try { found = Find(prj.ProjectItems, start, 0); } catch { }
+            if (found != null) break;
+        }
+        if (found == null) return null;
+        try
+        {
+            var w = found.Open(EnvDTE.Constants.vsViewKindPrimary);
+            w.Visible = true;
+            w.Activate();
+        }
+        catch
+        {
+            found.ExpandView();
+            dte.ExecuteCommand("Project.Open");   // fallback: open the selected item
+        }
+        return "opened";
     }
 
     // Open a definition: find the declaration line in the declaration part (variable, or header line of the object)
