@@ -103,6 +103,10 @@ public sealed partial class ToolRegistry
             string n;
             try { n = x.Name ?? ""; } catch { return false; }
             if (string.Equals(n, seg, StringComparison.OrdinalIgnoreCase) || n.StartsWith(seg + " (", StringComparison.OrdinalIgnoreCase)) return true;
+                // POUs/DUTs/GVLs are listed with their file name ("FB_Axis.TcPOU")
+                var dot = n.LastIndexOf('.');
+                if (dot > 0 && n.Substring(dot).StartsWith(".Tc", StringComparison.OrdinalIgnoreCase)
+                    && string.Equals(n.Substring(0, dot), seg, StringComparison.OrdinalIgnoreCase)) return true;
                 // the PLC project node is called "<Plc>" in the Solution Explorer, "<Plc> Project" in the tree path
                 return seg.EndsWith(" Project", StringComparison.OrdinalIgnoreCase) && string.Equals(n, seg.Substring(0, seg.Length - 8), StringComparison.OrdinalIgnoreCase);
         }
