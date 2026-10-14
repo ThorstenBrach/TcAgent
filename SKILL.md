@@ -330,7 +330,7 @@ treat them like project rules for that library.
   `tc_goto_definition` resolves names in the scope of the object open in the editor; without an open editor it looks up
   POUs/DUTs/GVLs and their members in the project tree (local variables then need an open editor or `tc_plc_search`).
 - Changes in a currently open editor window can collide with tool changes.
-- Drive links/parameters (motion), TwinSAFE and SIL/HIL runs are not automated.
+- TwinSAFE is read only (no changes, no download); drive links are only verified as far as the project XML shows (motion).
 
 ## Feedback - mandatory
 
