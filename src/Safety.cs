@@ -65,8 +65,8 @@ public sealed partial class ToolRegistry
                 return tc.Sta.Run(() => SafetyShow(tc.Item(path), maxChars)) + note;
             case "list":
                 var tree = tc.Sta.Run(() => SafetyList(Math.Clamp(Int(a, "depth", 4), 1, 10), maxChars));
-                if (tree.Found) return tree.Text + note;
-                return tree.Text + SafetyFiles(SolutionDir(), maxChars) + note;
+                // the tree shows the structure; groups, alias devices and parameters live in the project files (*.sal, *.sds ...)
+                return tree.Text + (tree.Found ? "\nSafety project files on disk:\n" : "") + SafetyFiles(SolutionDir(), maxChars) + note;
             default:
                 throw new Exception("action: list, show or files (read only - writing TwinSAFE configuration is not supported)");
         }
@@ -104,7 +104,7 @@ public sealed partial class ToolRegistry
             try { top = TwinCatSession.Children(root).ToList(); } catch { top = new(); }
             if (top.Count == 0) o.AppendLine("  (no safety project)");
             foreach (var c in top) Walk(c, 1);
-            if (!anyValue)
+            if (!anyValue && top.Count == 0)
             {
                 var raw = Xml(root);
                 o.AppendLine("\nNo values recognized - raw XML of the safety node (shortened):");
