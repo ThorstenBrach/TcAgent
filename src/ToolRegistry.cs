@@ -925,7 +925,9 @@ public sealed partial class ToolRegistry
             for (int n = 0; n < lines.Length && hits < max; n++)
                 if (rx.IsMatch(lines[n])) { hits++; o.AppendLine($"{path}  [{label}:{n + 1}]  {lines[n].Trim()}"); }
         }
-        foreach (var it in tc.PlcObjects(root))
+        // the given object itself (e.g. a FB) and everything below it (methods, actions ...)
+        var items = root != null ? new[] { root }.Concat(tc.PlcObjects(root)) : tc.PlcObjects(null);
+        foreach (var it in items)
         {
             if (hits >= max) break;
             string path = null;

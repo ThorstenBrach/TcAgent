@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.22.2] – not released yet
+## [0.22.3] – 2026-10-14
 
 ### Added
 - **SIL / HIL test runs** – `TcAgent.exe sil` runs TcUnit on the runtime of the build PC (Run-mode check, PLC login/start
@@ -46,6 +46,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - Agent guide (SKILL.md, agents/TCAGENT_GUIDE.md): new section "Coding rules" - sources and precedence, why project
   rules live in the solution, applying and adding rules, difference to the guide and other knowledge sources; I/O linking
   order with task reference and the EtherCAT sync dialog; VS message boxes where only the title is visible.
+- `tc_plc_search` with `path` = one object (e.g. a FB) also searches that object itself, not only its methods/actions.
 - `tc_build`: the INFO messages "device … already exists in file …" (duplicate ESI device descriptions of the installation,
   100+ per build) are summed up in one line.
 - `tc_refactor apply` runs as a job: after `waitSeconds` (default 45) it returns "still waiting – k of n done" with a job id,
