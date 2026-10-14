@@ -5,11 +5,12 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.22.3] – 2026-10-14
+## [0.22.4] – 2026-10-14
 
 ### Added
 - **User guide** – `docs/USER_GUIDE.md`: every feature explained by task, with example prompts, what the agent does,
-  options, limits and what needs your confirmation; CI pipeline, guardrails, configuration reference and FAQ.
+  options, limits and what needs your confirmation; CI pipeline, guardrails, configuration reference and FAQ; screenshots
+  of the program documentation and animations of linking and risk rules from the test project.
 - **SIL / HIL test runs** – `TcAgent.exe sil` runs TcUnit on the runtime of the build PC (Run-mode check, PLC login/start
   fallback, optional Scope recording, clean-up that always runs: runtime to Config mode, target, I/O and autostart
   restored); `TcAgent.exe hil` does the same on a remote test PLC, only with explicit allowance (`TCAGENT_ALLOW_TARGETS`
@@ -48,6 +49,8 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - Agent guide (SKILL.md, agents/TCAGENT_GUIDE.md): new section "Coding rules" - sources and precedence, why project
   rules live in the solution, applying and adding rules, difference to the guide and other knowledge sources; I/O linking
   order with task reference and the EtherCAT sync dialog; VS message boxes where only the title is visible.
+- Program documentation: transition conditions with comparisons (`_pos >= _target`) broke the step chain diagram
+  (Mermaid read the HTML-escaped `>` as a statement end and drew stray states); conditions now use `≥ ≤ ≠ ＞ ＜`.
 - `tc_plc_search` with `path` = one object (e.g. a FB) also searches that object itself, not only its methods/actions.
 - `tc_build`: the INFO messages "device … already exists in file …" (duplicate ESI device descriptions of the installation,
   100+ per build) are summed up in one line.
@@ -190,8 +193,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.22.3...HEAD
-[0.22.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.22.3
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.22.4...HEAD
+[0.22.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.22.4
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0

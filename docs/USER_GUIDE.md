@@ -16,6 +16,8 @@ There are three ways to use TcAgent:
 | **Any MCP client** | Claude Desktop, Claude Code, GitHub Copilot (agent mode in Visual Studio 17.14+ or the CLI), Gemini CLI, Codex CLI | The same tools from the client you already use. |
 | **Command line (CLI)** | `TcAgent.exe check`, `test`, `sil`, `hil` and others on a build server | CI pipelines without an AI: exit codes, JUnit XML, annotations. |
 
+<p align="center"><a href="img/tcagent-demo.mp4"><img src="img/tcagent-demo.gif" width="760" alt="Video: from the device manual to the HMI page with one prompt"></a><br><sub>Click for the video. It is a generated visualization of the workflow; in practice TcAgent works exactly like this.</sub></p>
+
 Installation is covered in [INSTALLATION.md](INSTALLATION.md). This guide starts once TcAgent is installed and at
 least one AI client is signed in.
 
@@ -596,6 +598,16 @@ Default location `<solution>\doc\<PLC project>.html` (`file=...` for another). I
 Diagrams can be zoomed (buttons, Ctrl+mouse wheel, double click), moved and shown full screen. They use Mermaid, which
 needs internet access in the browser; the hierarchy tree works offline.
 
+<p align="center"><img src="img/guide/doc-overview.png" width="860" alt="Program documentation: overview with the explanation of the program and the task"><br><sub>The page of the test project: how the program works (written by the agent) and the tasks with cycle time and priority.</sub></p>
+
+<p align="center"><img src="img/guide/doc-callgraph.png" width="860" alt="Call graph of the test project"><br><sub>Call graph – task → MAIN → programs and function blocks; zoom with the buttons or Ctrl+mouse wheel.</sub></p>
+
+<p align="center"><img src="img/guide/doc-inheritance.png" width="860" alt="Inheritance hierarchy as diagram and tree"><br><sub>Inheritance hierarchy – diagram and tree, library base classes included, with the short description of each FB.</sub></p>
+
+<p align="center"><img src="img/guide/doc-chains.png" width="860" alt="SFC step chain FB_SfcTest drawn as diagram"><br><sub>Step chains – SFC and CASE state machines are drawn from the code; "Chain as text" shows the same chain in the tc_sfc format.</sub></p>
+
+<p align="center"><img src="img/guide/doc-reference.png" width="860" alt="Reference entry per object"><br><sub>Reference – one card per object: description, explanation, calls, libraries used, used by, code.</sub></p>
+
 ### Findings you may see
 
 Unused POUs, very long POUs, global coupling, and task problems: *"PLC project has no task reference – no process image
@@ -649,6 +661,8 @@ Rules only report what they can resolve; unknown identifiers (library constants,
 The findings are text based. The agent is told to verify each one in the code (`tc_plc_read`) before reporting or
 changing it. Counts and high risks also appear in the outline, and the full list in the **Risks** section of the HTML page.
 
+<p align="center"><img src="img/guide/doc-risks.png" width="860" alt="Risks section of the HTML page"><br><sub>The Risks section of the HTML page: severity, object (linked to its reference), line, rule and explanation.</sub></p>
+
 ### Your own risk rules: risk-rules.md
 
 Risk rules work like coding rules – Markdown files, later files win:
@@ -680,6 +694,8 @@ When you say *"check from now on that every MEMCPY uses SIZEOF"*, the agent:
 3. runs `tc_risk_rules action=test` on your project (nothing is saved) and shows you the findings,
 4. narrows the rule until the findings are right,
 5. saves it after your OK with `tc_risk_rules action=add` (dry run first; `scope=project` unless you mean "always").
+
+<p align="center"><img src="img/guide/risk-rule.gif" width="860" alt="Animation: a MEMCPY rule is tested on the project, checked and saved"><br><sub>A new rule in the test project: tested without saving, findings checked in the code, saved after your OK (tool output shortened).</sub></p>
 
 If a regex cannot decide it, the agent saves an agent check with `tc_risk_rules action=check text=...`. Built-in rules are
 tuned or switched off only on request: `tc_risk_rules action=builtin rule=long-code setting="limit=200"`.
@@ -782,6 +798,8 @@ expands the pair into single links, like "Change Multi Link" in the IDE: members
 reported with how it was matched (by name / by order). The agent runs `dryRun=true` first and shows you the pairs. If
 source elements remain unmatched, nothing is linked for that pair and the pairs found so far are listed for an explicit
 `pairs` call; extra target entries are reported as left unlinked. `elementwise=false` links exactly the given items.
+
+<p align="center"><img src="img/guide/link-struct.gif" width="860" alt="Animation: GVL_Gpib.ComIn/ComOut linked to the EL6001 element by element"><br><sub>GVL_Gpib.ComIn/ComOut to the EL6001 in one step: dry run with the pairs, your OK, 46 single links, build (tool output shortened).</sub></p>
 
 `tc_unlink source=... [target=...]` removes links of a variable (all, or only to one counterpart).
 

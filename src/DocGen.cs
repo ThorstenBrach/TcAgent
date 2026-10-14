@@ -866,9 +866,18 @@ public sealed partial class PlcDoc
         }
         if (!string.IsNullOrEmpty(start)) sd.AppendLine($"  [*] --> {S(start)}");
         foreach (var (f, t, c) in edges.Distinct())
-            sd.AppendLine($"  {S(f)} --> {S(t)}" + (string.IsNullOrWhiteSpace(c) ? "" : " : " + MLabel(c.Replace(";", ",")).Replace(":", " ")));
+            sd.AppendLine($"  {S(f)} --> {S(t)}" + (string.IsNullOrWhiteSpace(c) ? "" : " : " + StateLabel(c)));
         return sd.ToString();
     }
+
+    // Transition label of a state diagram. Mermaid reads the diagram source as HTML, so an entity like "&gt;" reaches its
+    // parser with a ';' - which ends a statement there ("_pos >= _target" became the stray states ":=" and "_target").
+    // Comparison operators and the other HTML-special characters are written as Unicode look-alikes instead.
+    static string StateLabel(string c) =>
+        Regex.Replace(c ?? "", @"\s+", " ").Trim()
+            .Replace(">=", "≥").Replace("<=", "≤").Replace("<>", "≠").Replace(">", "＞").Replace("<", "＜")
+            .Replace("&", "＆").Replace("\"", "'").Replace(";", ",").Replace(":", " ").Replace("|", "/")
+            .Replace("[", "(").Replace("]", ")").Replace("{", "(").Replace("}", ")").Replace("#", "＃");
 
     void TreeHtml(StringBuilder o, string key, HashSet<string> path, int depth, HashSet<string> done, bool instance = false)
     {
