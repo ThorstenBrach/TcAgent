@@ -149,6 +149,7 @@ public static partial class Cli
                                     : "Open the solution once interactively as this user and watch for questions (first start, licenses, " +
                                       "TwinSAFE/HMI projects, 'open in another instance'); is the solution already open in another IDE?");
                 }
+            }
             finally
             {
                 try { sta.Run(() => { tc.CloseIde(); return 0; }, 60_000); } catch { }
