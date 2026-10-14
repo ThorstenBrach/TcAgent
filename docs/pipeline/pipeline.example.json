@@ -1,0 +1,36 @@
+// TcAgent pipeline configuration - copy to .tcagent/pipeline.json in the root of your PLC repository.
+// TcAgent.exe ci runs the steps in order, each as its own TcAgent.exe call with a fresh IDE (docs/PIPELINE.md).
+// Comments (// and /* */) and trailing commas are allowed.
+{
+  "solution": "TwinCAT/MyMachine.sln",        // relative to the folder that contains .tcagent
+  "results": "results",                        // JUnit files, documentation, artifacts and ci-summary.md
+  "allowTargets": "local",                     // TCAGENT_ALLOW_TARGETS for the steps (optional)
+
+  "steps": [
+    // build machine ready? "openSolution": true also opens the solution once, hidden, like a pipeline does
+    { "run": "doctor" },
+
+    // "check all objects" - compiler errors, also in unused POUs (JUnit: results/02-check.xml)
+    { "run": "check", "warningsAsErrors": false },
+
+    { "run": "build" },
+
+    // static analysis (TE1200 license); relative output paths go into the results folder: results/sa.sarif
+    { "name": "static analysis", "run": "analyze", "plc": ["MyPlc"], "sarif": "sa.sarif", "continueOnError": true },
+
+    // program documentation (results/MyMachine.html) and the risk list; fails the pipeline on risks rated high
+    { "run": "doc", "risks": true, "failOn": "high" },
+
+    // TcUnit on the runtime of this PC (software in the loop), clean-up always runs
+    { "run": "sil", "target": "local", "plc": ["MyMachine_Tests"], "timeout": 900 },
+
+    // hardware in the loop on a test bench - only explicitly allowed targets; switched off until the bench is ready
+    { "run": "hil", "target": "5.80.201.232.1.1", "allow": "5.80.201.232.1.1", "timeout": 1200, "enabled": false },
+
+    { "run": "library", "plc": "MyLib", "out": "MyLib.library", "install": false },
+    { "run": "archive", "out": "MyMachine.tszip" },
+
+    // anything else: a name of your own, extra arguments verbatim
+    { "name": "rebuild with all checks", "run": "build", "rebuild": true, "args": ["--check-all"], "continueOnError": true }
+  ]
+}

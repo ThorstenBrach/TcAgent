@@ -1,0 +1,32 @@
+# TwinCAT pipeline with TcAgent: the steps are defined in the repository (.tcagent/pipeline.json), the pipeline only
+# calls "TcAgent.exe ci". Create the pipeline file with "TcAgent.exe ci --init" in the repository root
+# (format: docs/PIPELINE.md of TcAgent). The agent must run as a user, one job at a time per machine.
+trigger:
+  branches: { include: [main] }
+pr:
+  branches: { include: ['*'] }
+
+pool:
+  name: TwinCAT                                        # your self-hosted pool
+
+variables:
+  TCAGENT: C:\Tools\TcAgent\TcAgent.exe
+
+steps:
+  - checkout: self
+
+  - powershell: '& "$(TCAGENT)" ci; exit $LASTEXITCODE'
+    displayName: TcAgent pipeline (.tcagent/pipeline.json)
+
+  - task: PublishTestResults@2
+    condition: always()
+    inputs:
+      testResultsFormat: JUnit
+      testResultsFiles: 'results/*.xml'                # "results" in pipeline.json
+      testRunTitle: TwinCAT
+
+  - task: PublishPipelineArtifact@1
+    condition: always()
+    inputs:
+      targetPath: results
+      artifact: twincat-results

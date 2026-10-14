@@ -5,6 +5,16 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+### Added
+- **Pipeline configuration in the repository** – `.tcagent/pipeline.json` describes the steps of the TwinCAT pipeline
+  (`doctor`, `check`, `build`, `analyze`, `doc`, `test`/`sil`/`hil`, `library`, `archive` or any other TcAgent.exe
+  command; options as JSON keys, comments allowed) and `TcAgent.exe ci` runs them in order, each as its own TcAgent.exe
+  with a fresh IDE: live output with a header and a log group per step (GitHub Actions, Azure DevOps), stop at the first
+  failing step unless `continueOnError`, `"enabled": false`, default JUnit file per step in the results folder, summary
+  table on the console, in `results/ci-summary.md` and in the GitHub job summary. `--only`, `--from`, `--dry-run`,
+  `--config`; `--init` writes a starter file. New templates `docs/pipeline/github-actions-ci.yml`,
+  `azure-pipelines-ci.yml` and `pipeline.example.json`.
+
 ## [0.23.2] – 2026-10-14
 
 ### Added

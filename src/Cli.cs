@@ -8,6 +8,7 @@
 //   TcAgent.exe feedback [--open] [--markdown f]   report of the tc_feedback entries (Markdown for GitHub issues) - no IDE needed
 //   TcAgent.exe doctor [--solution <sln>]           is this machine/user ready for pipelines? (CliDoctor.cs)
 //   TcAgent.exe install --path <folder>             copy TcAgent to a fixed folder for pipelines, e.g. C:\Tools\TcAgent
+//   TcAgent.exe ci [--config <file>] [--dry-run]    run the steps of .tcagent\pipeline.json of the repository (CliCi.cs)
 //
 // Exit codes: 0 = OK, 1 = compiler errors / failed tests, 2 = wrong call, 3 = infrastructure problem (IDE, activation, timeout).
 // Without arguments TcAgent.exe is the MCP server as before.
@@ -25,7 +26,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "ci";
 
     sealed class Options
     {
@@ -39,6 +40,7 @@ public static partial class Cli
         public bool? DisableIo;
         public bool CloseDialogs = true;
         public int TimeoutSec = 1800, LoadTimeoutSec = 300;
+        public string Config, Only, From; public bool DryRun, Init;      // ci (CliCi.cs)
     }
 
     public static int Run(string[] args)
@@ -52,6 +54,7 @@ public static partial class Cli
         if (o.Command is "version") { Console.WriteLine($"TcAgent {Program.ServerVersion}"); return Ok; }
         if (o.Command is "install") return Install(o);          // CliDoctor.cs - no IDE needed
         if (o.Command is "doctor") { Program.ClientName = "cli:doctor"; return Doctor(o); }
+        if (o.Command is "ci") { Program.ClientName = "cli:ci"; return Ci(o); }   // CliCi.cs - every step is its own TcAgent.exe
 
         Program.ClientName = "cli:" + o.Command;
         var sta = new StaWorker();
@@ -688,11 +691,19 @@ public static partial class Cli
                 case "--keep-dialogs": o.CloseDialogs = false; break;
                 case "--allow": o.Allow.AddRange(Val().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)); break;
                 case "--keep-running": o.KeepRunning = true; break;
+                case "--config": o.Config = Val(); break;
+                case "--only": o.Only = Val(); break;
+                case "--from": o.From = Val(); break;
+                case "--dry-run": o.DryRun = true; break;
+                case "--init": o.Init = true; break;
                 default: throw new Exception("Unknown option " + a);
             }
         }
+        if (o.Command != "ci" && (o.Config != null || o.Only != null || o.From != null || o.DryRun || o.Init))
+            throw new Exception("--config, --only, --from, --dry-run and --init are only for ci");
         if (o.Command is "help" or "version") return o;
         if (o.Command is "install") return o;
+        if (o.Command is "ci") return o;                  // the steps are checked by ci itself (CliCi.cs)
         if (o.Command is "doctor")
         {
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception("Solution not found: " + o.Solution);
@@ -745,6 +756,13 @@ public static partial class Cli
       Copies this TcAgent including the interop of this TwinCAT installation to a fixed folder (e.g. C:\Tools\TcAgent)
       for pipelines - the VSIX installs per user and per version.
 
+  TcAgent.exe ci [--config <file>] [--only <steps>] [--from <n|step>] [--dry-run] [--init] [--solution <sln>]
+      Runs the pipeline of the repository: the steps of .tcagent\pipeline.json (searched upwards from the current
+      folder) in order, each as its own TcAgent.exe call with a fresh IDE, in the folder that contains .tcagent. Stops
+      at the first failing step (unless continueOnError), prints a summary and writes <results>\ci-summary.md (and the
+      GitHub job summary). --only/--from select steps by run or name (--from also by number), --dry-run prints the
+      command lines, --init writes a starter file, --solution overrides the file's solution. Format: docs/PIPELINE.md.
+
   TcAgent.exe feedback [--open] [--markdown <file.md>] [--summary] [--path <file|folder>]
       Report of the tc_feedback entries (TCAGENT_FEEDBACK or the default store), grouped by tool, as Markdown
       ready to paste into GitHub issues - to stdout or into the file. --open: only open entries; --summary: counts only.
@@ -796,6 +814,11 @@ Options
   --seconds <n>            scope: recording time (default 10)
   --keep-dialogs           do not close dialogs of the IDE (default: closed like Cancel/X and logged - they block the IDE)
   --progid <id>            COM ProgID of the IDE, e.g. TcXaeShell.DTE.17.0 (default: VS 2022, then TcXaeShell)
+  --config <file>          ci: pipeline file (default: .tcagent\pipeline.json in the current folder or above)
+  --only <a,b>             ci: run only these steps (run or name; also steps with ""enabled"": false)
+  --from <n|step>          ci: start at this step (number in the file, run or name)
+  --dry-run                ci: print the resolved command lines, run nothing
+  --init                   ci: write a starter .tcagent\pipeline.json (never overwrites)
 
 Exit codes: 0 OK, 1 compiler errors or failed tests, 2 wrong call or refused (test/sil/hil: target not allowed),
             3 infrastructure problem (IDE, route, activation, Run mode, timeout).

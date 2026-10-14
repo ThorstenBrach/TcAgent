@@ -1,0 +1,37 @@
+# TwinCAT pipeline with TcAgent: the steps are defined in the repository (.tcagent/pipeline.json), the workflow only
+# calls "TcAgent.exe ci". Copy to .github/workflows/twincat.yml of your PLC repository.
+# Create the pipeline file with "TcAgent.exe ci --init" in the repository root (format: docs/PIPELINE.md of TcAgent).
+# Runner: set up with setup-runner.ps1 (TcAgent in C:\Tools\TcAgent, label twincat, started at logon of a normal user).
+name: TwinCAT
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+env:
+  TCAGENT: C:\Tools\TcAgent\TcAgent.exe                # where TcAgent is installed on the runner
+
+defaults:
+  run:
+    shell: powershell
+
+# A self-hosted runner runs one job at a time - install only one runner per TwinCAT machine.
+
+jobs:
+  twincat:
+    runs-on: [self-hosted, windows, twincat]
+    steps:
+      - uses: actions/checkout@v4
+      - name: TcAgent pipeline (.tcagent/pipeline.json)
+        run: '& $env:TCAGENT ci; exit $LASTEXITCODE'     # each step in its own log group, summary on the run page
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: twincat-results
+          path: results/                                 # "results" in pipeline.json
+      # Optional: show the JUnit files as a check run (third-party action, review it before use)
+      # - uses: dorny/test-reporter@v1
+      #   if: always()
+      #   with: { name: TwinCAT, path: 'results/*.xml', reporter: java-junit }
