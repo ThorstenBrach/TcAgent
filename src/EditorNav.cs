@@ -54,7 +54,8 @@ public sealed partial class ToolRegistry
                 if (line <= 0) return $"Opened {treePath} in the IDE editor.";
                 return IsTrue(r["lineSet"])
                     ? $"Opened {treePath} in the IDE editor, cursor on {part} line {line}."
-                    : $"Opened {treePath} in the IDE editor, but the cursor could not be placed{where}: {r["lineError"]?.ToString() ?? "unknown reason"}.";
+                    : $"Opened {treePath} in the IDE editor, but the cursor could not be placed{where}: {r["lineError"]?.ToString() ?? "unknown reason"}." +
+                      (r["caretMembers"] != null ? $" [editor control members: {r["caretMembers"]}]" : "");
             }
             catch (Exception ex)
             {

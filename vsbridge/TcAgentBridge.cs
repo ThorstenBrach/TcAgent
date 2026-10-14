@@ -25,7 +25,7 @@ namespace TcAgentBridge
     [Guid("86c8609c-4aac-4e7e-95e6-6b96179a3c4f")]
     public sealed class BridgePackage : AsyncPackage
     {
-        public const string BridgeVersion = "0.21.6";
+        public const string BridgeVersion = "0.21.7";
         internal static BridgePackage Instance;
         static readonly Guid ExportTypeGuid = new Guid("75161BEE-FB5F-434C-A3C6-86B7CEE2B8FC");
 
@@ -1047,10 +1047,73 @@ namespace TcAgentBridge
                 if (now != vsLine && !r.ContainsKey("lineError")) r["lineError"] = $"caret is on VS line {now + 1} instead of {vsLine + 1}";
             }
             else r["lineSet"] = hr == 0;
+            // The TwinCAT text editor (SynEdit control of the part) may ignore IVsTextView.SetCaretPos: set it there directly
+            if (!(r.TryGetValue("lineSet", out var ok) && ok is bool b0 && b0) && target != null)
+            {
+                var how = SetCaretInControl(target, line, Math.Max(1, column));
+                if (how != null) { r["lineSet"] = true; r["via"] = how; r.Remove("lineError"); }
+                else r["caretMembers"] = string.Join(", ", target.GetType().GetMembers(System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance)
+                        .Select(m => m.Name).Where(n => System.Text.RegularExpressions.Regex.IsMatch(n, "Caret|Line|Select|Goto|Cursor", System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+                        .Distinct().Take(40));
+            }
             return r;
         }
 
         // Document moniker matches the object: "...\FB.TcPOU" (POU/DUT/GVL) or "...\FB.TcPOU@Method"
+        // Cursor in a TwinCAT editor control (line within its part, 1-based). Tries the usual members of SynEdit-like
+        // controls; returns how it worked or null.
+        static string SetCaretInControl(object ctl, int line, int column)
+        {
+            var t = ctl.GetType();
+            const System.Reflection.BindingFlags F = System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.Instance;
+            bool TryCall(string name, params object[] args)
+            {
+                foreach (var m in t.GetMethods(F).Where(x => x.Name == name && x.GetParameters().Length == args.Length))
+                {
+                    try
+                    {
+                        var ps = m.GetParameters();
+                        var conv = args.Select((v, i) => Convert.ChangeType(v, ps[i].ParameterType)).ToArray();
+                        m.Invoke(ctl, conv);
+                        return true;
+                    }
+                    catch { }
+                }
+                return false;
+            }
+            bool TrySet(string name, object v)
+            {
+                var pi = t.GetProperty(name, F);
+                if (pi == null || !pi.CanWrite) return false;
+                try { pi.SetValue(ctl, Convert.ChangeType(v, pi.PropertyType)); return true; } catch { return false; }
+            }
+            int? GetInt(string name) { try { var v = t.GetProperty(name, F)?.GetValue(ctl); return v == null ? (int?)null : Convert.ToInt32(v); } catch { return null; } }
+            // 1) line/column members (0- or 1-based - verified by reading back where possible)
+            foreach (var (name, zero) in new[] { ("GotoLine", false), ("GoToLine", false), ("SetCaretPosition", true), ("SetCaretPos", true), ("MoveCaret", true) })
+            {
+                if (TryCall(name, zero ? line - 1 : line, zero ? column - 1 : column) || TryCall(name, zero ? line - 1 : line))
+                {
+                    var now = GetInt("CaretLine") ?? GetInt("CurrentLine");
+                    if (now == null || now == line || now == line - 1) return name;
+                }
+            }
+            foreach (var name in new[] { "CaretLine", "CurrentLine", "CaretLineNumber" })
+                if (TrySet(name, line - 1) && (GetInt(name) == line - 1)) return name;
+            // 2) character offset of the line in the control's text (Select / SelectionStart)
+            string text = null;
+            try { text = t.GetProperty("Text", F)?.GetValue(ctl) as string; } catch { }
+            if (text != null)
+            {
+                int off = 0, l = 1;
+                while (l < line && off < text.Length) { var nl = text.IndexOf('\n', off); if (nl < 0) { off = text.Length; break; } off = nl + 1; l++; }
+                off = Math.Min(text.Length, off + column - 1);
+                if (TryCall("Select", off, 0)) return "Select(offset)";
+                if (TrySet("SelectionStart", off)) { TrySet("SelectionLength", 0); return "SelectionStart"; }
+                if (TrySet("CaretOffset", off) || TrySet("CaretPosition", off)) return "CaretOffset";
+            }
+            return null;
+        }
+
         static bool DocMatches(string doc, string name)
         {
             if (string.IsNullOrEmpty(doc) || string.IsNullOrEmpty(name)) return false;
