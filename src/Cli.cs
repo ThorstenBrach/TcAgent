@@ -74,9 +74,20 @@ public static partial class Cli
                 {
                     var sln = Path.GetFullPath(o.Solution);
                     Say($"Starting Visual Studio ({(o.Visible ? "visible" : "hidden")}) with {sln}");
-                    sta.Run(() => tc.Open(sln, o.Visible, o.ProgId), o.LoadTimeoutSec * 1000);
-                    ownIde = true;
-                    sta.Run(() => { tc.WaitForTwinCat(o.LoadTimeoutSec); return 0; }, (o.LoadTimeoutSec + 30) * 1000);
+                    using var load = new LoadGuard(o.CloseDialogs);
+                    try
+                    {
+                        sta.Run(() => tc.Open(sln, o.Visible, o.ProgId), o.LoadTimeoutSec * 1000);
+                        ownIde = true;
+                        sta.Run(() => { tc.WaitForTwinCat(o.LoadTimeoutSec); return 0; }, (o.LoadTimeoutSec + 30) * 1000);
+                    }
+                    catch (Exception ex)
+                    {
+                        var dlg = load.DialogText();
+                        var killed = ownIde ? new List<int>() : load.KillStarted();
+                        throw new Exception(Msg(ex) + (dlg != null ? " - IDE dialog(s) while loading: " + dlg : " - no IDE dialog was seen") +
+                                            (killed.Count > 0 ? $" - the hidden IDE (pid {string.Join(", ", killed)}) was ended" : ""));
+                    }
                     Say(tc.InstanceInfo);
                 }
                 sta.Run(() => { tc.RequireSysMan(); ShowAllMessages(tc); return 0; });
@@ -515,6 +526,72 @@ public static partial class Cli
         public List<IdeDialogs.Dialog> Snapshot() { lock (Seen) return Seen.ToList(); }
 
         public void Dispose() => timer?.Dispose();
+    }
+
+    /// <summary>Watches the IDE processes started by this command while the solution loads - before the process id is known.
+    /// A hidden Visual Studio that shows a dialog during Solution.Open would otherwise wait for ever (and the step only ends
+    /// with a timeout). Dialogs are reported with their text and - unless --keep-dialogs - closed like Cancel/X.</summary>
+    sealed class LoadGuard : IDisposable
+    {
+        readonly DateTime since = DateTime.Now.AddSeconds(-2);
+        readonly bool close;
+        readonly Timer timer;
+        readonly Dictionary<IntPtr, int> pending = new();
+        public readonly List<IdeDialogs.Dialog> Seen = new();
+        public readonly HashSet<int> Pids = new();
+
+        public LoadGuard(bool close) { this.close = close; timer = new Timer(_ => Tick(), null, 1000, 1000); }
+
+        static readonly string[] Names = { "devenv", "TcXaeShell", "TcXaeShell64" };
+
+        void Tick()
+        {
+            try
+            {
+                foreach (var n in Names)
+                    foreach (var p in Process.GetProcessesByName(n))
+                        using (p) { try { if (p.StartTime >= since) lock (Pids) Pids.Add(p.Id); } catch { } }
+                List<IdeDialogs.Dialog> now = new();
+                lock (Pids) foreach (var pid in Pids) { try { now.AddRange(IdeDialogs.Find(pid)); } catch { } }
+                lock (Seen)
+                {
+                    foreach (var h in pending.Keys.Where(h => now.All(d => d.Handle != h)).ToList()) pending.Remove(h);
+                    foreach (var d in now)
+                    {
+                        pending[d.Handle] = pending.TryGetValue(d.Handle, out var c) ? c + 1 : 1;
+                        if (pending[d.Handle] != 2) continue;
+                        Seen.Add(d);
+                        Say($"IDE DIALOG while loading {d} -> {(close ? "closed (Cancel/X)" : "left open (--keep-dialogs)")}");
+                        if (Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true")
+                            Console.WriteLine($"::warning title=TwinCAT dialog: {d.Title.Replace(":", " ")}::{d.Text}");
+                        if (close) IdeDialogs.Close(d);
+                    }
+                }
+            }
+            catch { }
+        }
+
+        /// <summary>Ends the IDE processes this command started (after a load timeout) - only those without a visible window.</summary>
+        public List<int> KillStarted()
+        {
+            var killed = new List<int>();
+            lock (Pids)
+                foreach (var pid in Pids)
+                    try
+                    {
+                        using var p = Process.GetProcessById(pid);
+                        if (p.MainWindowHandle != IntPtr.Zero && IsWindowVisible(p.MainWindowHandle)) continue;
+                        p.Kill(true); killed.Add(pid);
+                    }
+                    catch { }
+            return killed;
+        }
+
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr h);
+
+        public string DialogText() { lock (Seen) return Seen.Count == 0 ? null : string.Join("; ", Seen.Select(d => d.ToString())); }
+
+        public void Dispose() => timer.Dispose();
     }
 
     static bool LooksLikeError(IdeDialogs.Dialog d) =>

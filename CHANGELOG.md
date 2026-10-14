@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.23.0] – 2026-10-14
+## [0.23.1] – 2026-10-14
 
 ### Added
 - **Build server / runner** – `TcAgent.exe doctor [--solution <sln>]` checks whether a machine and user can run TcAgent
@@ -14,6 +14,10 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   copies TcAgent with its interop to a fixed path; `setup-runner.ps1` sets up a GitHub Actions self-hosted runner for
   TwinCAT (install, doctor, download + registration with label `twincat`, `.env` for the jobs, start at logon instead of a
   service). The pipeline templates start with `doctor`.
+- CLI (all commands with `--solution`, and `doctor`): dialogs of the hidden IDE are now watched already while the solution
+  loads - reported with their text and closed (Cancel) - and after a load timeout the hidden IDE started by the command is
+  ended instead of being left running. `doctor` also looks for TcUnit and licenses in the TwinCAT 4026 folders
+  (`%ProgramData%\Beckhoff\TwinCAT\3.1`).
 - **User guide** – `docs/USER_GUIDE.md`: every feature explained by task, with example prompts, what the agent does,
   options, limits and what needs your confirmation; CI pipeline, guardrails, configuration reference and FAQ; screenshots
   of the program documentation and animations of linking and risk rules from the test project.
@@ -213,8 +217,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.0...HEAD
-[0.23.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.23.0
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.1...HEAD
+[0.23.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.23.1
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0

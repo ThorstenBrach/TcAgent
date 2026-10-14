@@ -84,6 +84,8 @@ public static partial class Cli
 
         // ---- TcUnit (library repository of this TwinCAT installation)
         var libRoots = new[] { tcDir == null ? null : Path.Combine(tcDir, "Components", "Plc", "Managed Libraries"),
+                               ProgramData(@"Beckhoff\TwinCAT\3.1\Components\Plc\Managed Libraries"),      // TwinCAT 4026
+                               ProgramData(@"Beckhoff\TwinCAT\3.1\Repository"),
                                @"C:\Program Files (x86)\Beckhoff\TwinCAT\3.1\Components\Plc\Managed Libraries",
                                @"C:\TwinCAT\3.1\Components\Plc\Managed Libraries" }.Where(d => d != null && Directory.Exists(d)).Distinct().ToList();
         var tcunit = libRoots.SelectMany(d => SafeDirs(d, "TcUnit")).FirstOrDefault();
@@ -93,6 +95,7 @@ public static partial class Cli
 
         // ---- licenses: only a hint - the license state needs the runtime and is read by TwinCAT itself
         var licenseDirs = new[] { tcDir == null ? null : Path.Combine(tcDir, "Target", "License"),
+                                  ProgramData(@"Beckhoff\TwinCAT\3.1\License"), ProgramData(@"Beckhoff\TwinCAT\3.1\Target\License"),   // TwinCAT 4026
                                   @"C:\Program Files (x86)\Beckhoff\TwinCAT\3.1\Target\License", @"C:\TwinCAT\3.1\Target\License" }
             .Where(d => d != null && Directory.Exists(d)).Distinct().ToList();
         var licFiles = licenseDirs.SelectMany(d => SafeFiles(d, "*.tclrs")).ToList();
@@ -122,18 +125,30 @@ public static partial class Cli
             try
             {
                 var sln = Path.GetFullPath(o.Solution);
-                Console.WriteLine($"Opening {sln} hidden (as a pipeline does) ...");
-                sta.Run(() => tc.Open(sln, false, o.ProgId), o.LoadTimeoutSec * 1000);
-                sta.Run(() => { tc.WaitForTwinCat(o.LoadTimeoutSec); return 0; }, (o.LoadTimeoutSec + 30) * 1000);
-                var plcs = sta.Run(() => tc.PlcProjects().Select(p => p.Name).ToList());
-                Add(Level.Ok, "Solution", System.FormattableString.Invariant($"opened in {sw.Elapsed.TotalSeconds:0} s, PLC projects: {(plcs.Count == 0 ? "none" : string.Join(", ", plcs))}"));
-                if (plcs.Count == 0) Add(Level.Warn, "Solution", "no PLC project found");
-            }
-            catch (Exception ex)
-            {
-                Add(Level.Fail, "Solution", "could not open it: " + Msg(ex),
-                    "Start the IDE once interactively as this user (first-start settings), check licenses and dialogs; try --visible with check.");
-            }
+                Console.WriteLine($"Opening {sln} hidden (as a pipeline does, up to {o.LoadTimeoutSec} s) ...");
+                bool opened = false;
+                using var load = new LoadGuard(o.CloseDialogs);
+                try
+                {
+                    sta.Run(() => tc.Open(sln, false, o.ProgId), o.LoadTimeoutSec * 1000);
+                    opened = true;
+                    sta.Run(() => { tc.WaitForTwinCat(o.LoadTimeoutSec); return 0; }, (o.LoadTimeoutSec + 30) * 1000);
+                    var plcs = sta.Run(() => tc.PlcProjects().Select(p => p.Name).ToList());
+                    Add(Level.Ok, "Solution", System.FormattableString.Invariant($"opened in {sw.Elapsed.TotalSeconds:0} s, PLC projects: {(plcs.Count == 0 ? "none" : string.Join(", ", plcs))}"));
+                    if (plcs.Count == 0) Add(Level.Warn, "Solution", "no PLC project found");
+                    if (load.DialogText() is { } d) Add(Level.Warn, "Solution", "dialog(s) while loading (closed): " + d, "A pipeline closes them with Cancel - check whether the project still loads completely.");
+                }
+                catch (Exception ex)
+                {
+                    var dlg = load.DialogText();
+                    var killed = opened ? new List<int>() : load.KillStarted();
+                    Add(Level.Fail, "Solution", "could not open it: " + Msg(ex) +
+                        (dlg != null ? " - IDE dialog(s) while loading: " + dlg : " - no IDE dialog was seen") +
+                        (killed.Count > 0 ? $" - the hidden IDE (pid {string.Join(", ", killed)}) was ended" : ""),
+                        dlg != null ? "Answer this dialog once interactively (open the solution in the IDE as this user) or remove its cause."
+                                    : "Open the solution once interactively as this user and watch for questions (first start, licenses, " +
+                                      "TwinSAFE/HMI projects, 'open in another instance'); is the solution already open in another IDE?");
+                }
             finally
             {
                 try { sta.Run(() => { tc.CloseIde(); return 0; }, 60_000); } catch { }
@@ -156,6 +171,8 @@ public static partial class Cli
                           warns > 0 ? $"READY with {warns} warning(s) - check/build work; the warnings matter for test/sil." : "READY.");
         return fails > 0 ? Infra : Ok;
     }
+
+    static string ProgramData(string rel) => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), rel);
 
     static IEnumerable<string> SafeFiles(string dir, string pattern)
     {
