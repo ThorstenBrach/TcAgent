@@ -103,42 +103,33 @@ public sealed partial class ToolRegistry
             return list;
         }
         var sol = dte.ToolWindows.SolutionExplorer;
+        // Search by the ORDER of the path segments (TIPC^Plc^Plc Project^Folder^FB^Method): a node counts when its name
+        // is the next segment; nodes in between (Solution, TwinCAT project, "PLC") are allowed in the upper levels.
+        // Only nodes that matched a segment are expanded below level 3, so the search stays small.
+        var dump = new List<string>();
+        int bestIdx = 0; string bestWhere = null; List<string> bestKids = null;
+        string Nm(EnvDTE.UIHierarchyItem x) { try { return x.Name ?? ""; } catch { return "?"; } }
+        EnvDTE.UIHierarchyItem Find(List<EnvDTE.UIHierarchyItem> items, int idx, int depth)
+        {
+            foreach (var x in items)
+            {
+                if (depth <= 3 && dump.Count < 60) dump.Add(new string(' ', depth * 2) + Nm(x));
+                int next = Is(x, segs[idx]) ? idx + 1 : idx;
+                if (next == segs.Length) return x;
+                if (next > idx || depth <= 3)
+                {
+                    if (depth > 9) continue;
+                    var kids = Kids(x);
+                    if (next > bestIdx) { bestIdx = next; bestWhere = string.Join("^", segs.Take(next)); bestKids = kids.Select(Nm).Take(25).ToList(); }
+                    var hit = Find(kids, next, depth + 1);
+                    if (hit != null) return hit;
+                }
+            }
+            return null;
+        }
         var level = new List<EnvDTE.UIHierarchyItem>();
         foreach (EnvDTE.UIHierarchyItem x in sol.UIHierarchyItems) level.Add(x);
-        // the TwinCAT project node and the PLC node often have the same name: try every node named like segs[1]
-        // and keep the first one the rest of the path fits; remember how far we got for the error message
-        int bestDepth = -1; string bestWhere = null; List<string> bestKids = null;
-        EnvDTE.UIHierarchyItem Descend(EnvDTE.UIHierarchyItem start)
-        {
-            var c = start;
-            for (int i = 2; i < segs.Length; i++)
-            {
-                var kids = Kids(c);
-                var next = kids.FirstOrDefault(x => Is(x, segs[i]));
-                if (next == null)
-                {
-                    if (i > bestDepth)
-                    {
-                        bestDepth = i;
-                        bestWhere = string.Join("^", segs.Take(i));
-                        bestKids = kids.Select(x => { try { return x.Name; } catch { return "?"; } }).Take(25).ToList();
-                    }
-                    return null;
-                }
-                c = next;
-            }
-            return c;
-        }
-        EnvDTE.UIHierarchyItem cur = null;
-        for (int depth = 0; depth < 5 && cur == null && level.Count > 0; depth++)
-        {
-            foreach (var cand in level.Where(x => Is(x, segs[1])).ToList())
-            {
-                cur = Descend(cand);
-                if (cur != null) break;
-            }
-            if (cur == null) level = level.SelectMany(x => (IEnumerable<EnvDTE.UIHierarchyItem>)Kids(x)).ToList();
-        }
+        var cur = Find(level, 1, 0);
         var keep = new HashSet<EnvDTE.UIHierarchyItems>();
         try { for (var p = cur?.Collection?.Parent as EnvDTE.UIHierarchyItem; p != null; p = p.Collection?.Parent as EnvDTE.UIHierarchyItem) keep.Add(p.UIHierarchyItems); }
         catch { }
@@ -158,7 +149,8 @@ public sealed partial class ToolRegistry
                 catch (Exception ex) { return $"Not opened: {treePath} not found in the Solution Explorer and opening {file} failed: {ex.Message}" + Diag(); }
             return $"Not opened: {treePath} not found in the Solution Explorer." + Diag();
         }
-        string Diag() => bestWhere == null ? "" : $" [Solution Explorer: found '{bestWhere}', its children: {string.Join(", ", bestKids ?? new())}]";
+        string Diag() => (bestWhere == null ? "" : $" [Solution Explorer: matched up to '{bestWhere}', its children: {string.Join(", ", bestKids ?? new())}]") +
+                         $"\nSolution Explorer (upper levels):\n{string.Join("\n", dump)}";
         cur.Select(EnvDTE.vsUISelectionType.vsUISelectionTypeSelect);
         sol.DoDefaultAction();
         if (line <= 0) return $"Opened {treePath} in the IDE editor.";

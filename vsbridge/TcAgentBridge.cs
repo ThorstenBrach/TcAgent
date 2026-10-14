@@ -25,7 +25,7 @@ namespace TcAgentBridge
     [Guid("86c8609c-4aac-4e7e-95e6-6b96179a3c4f")]
     public sealed class BridgePackage : AsyncPackage
     {
-        public const string BridgeVersion = "0.21.1";
+        public const string BridgeVersion = "0.21.2";
         internal static BridgePackage Instance;
         static readonly Guid ExportTypeGuid = new Guid("75161BEE-FB5F-434C-A3C6-86B7CEE2B8FC");
 
@@ -1069,31 +1069,25 @@ namespace TcAgentBridge
                 catch { }
                 return list;
             }
-            // PLC node (e.g. "MyPlc") below Solution > TwinCAT project > PLC (breadth-first, depth <= 4)
+            // Search by the ORDER of the path segments: a node counts when its name is the next segment; nodes in between
+            // (Solution, TwinCAT project, "PLC") are allowed in the upper levels; below level 3 only matched nodes are expanded
+            EnvDTE.UIHierarchyItem Find(List<EnvDTE.UIHierarchyItem> items, int idx, int depth)
+            {
+                foreach (var x in items)
+                {
+                    int next = Is(x, segs[idx]) ? idx + 1 : idx;
+                    if (next == segs.Length) return x;
+                    if ((next > idx || depth <= 3) && depth <= 9)
+                    {
+                        var hit = Find(Kids(x), next, depth + 1);
+                        if (hit != null) return hit;
+                    }
+                }
+                return null;
+            }
             var level = new List<EnvDTE.UIHierarchyItem>();
             foreach (EnvDTE.UIHierarchyItem it in dte.ToolWindows.SolutionExplorer.UIHierarchyItems) level.Add(it);
-            // The TwinCAT project node and the PLC node often have the same name (e.g. "MyPlc" > PLC > "MyPlc"):
-            // try every node named like segs[1] (breadth-first, depth <= 5) and keep the first one the rest of the path fits
-            EnvDTE.UIHierarchyItem Descend(EnvDTE.UIHierarchyItem start)
-            {
-                var c = start;
-                for (int i = 2; c != null && i < segs.Length; i++)
-                {
-                    var seg = segs[i];
-                    c = Kids(c).FirstOrDefault(x => Is(x, seg));
-                }
-                return c;
-            }
-            EnvDTE.UIHierarchyItem cur = null;
-            for (int depth = 0; depth < 5 && cur == null && level.Count > 0; depth++)
-            {
-                foreach (var cand in level.Where(x => Is(x, segs[1])).ToList())
-                {
-                    cur = Descend(cand);
-                    if (cur != null) break;
-                }
-                if (cur == null) level = level.SelectMany(x => (IEnumerable<EnvDTE.UIHierarchyItem>)Kids(x)).ToList();
-            }
+            var cur = Find(level, 1, 0);
             // collapse nodes expanded for the search that are not on the way to the target
             var keep = new HashSet<EnvDTE.UIHierarchyItems>();
             try { for (var p = cur?.Collection?.Parent as EnvDTE.UIHierarchyItem; p != null; p = p.Collection?.Parent as EnvDTE.UIHierarchyItem) keep.Add(p.UIHierarchyItems); }
