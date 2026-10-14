@@ -86,7 +86,8 @@ public sealed partial class ToolRegistry
             return $"Opened {treePath} in the IDE editor; cursor not placed (needs TcAgentBridge).";
         }
         // DTE fallback: select and open the node in the Solution Explorer; line only if the editor offers DTE text
-        return tc.Sta.Run(() => OpenViaDte(treePath, part, line)) + $" ({bridgeNote})";
+        return tc.Sta.Run(() => OpenViaDte(treePath, part, line)) + $" ({bridgeNote})" +
+               (lastItemsDump != null ? "\nProject model (upper levels):\n" + lastItemsDump : "");
     }
 
     // Solution Explorer via DTE: find the PLC node (2nd segment) in the upper levels, then descend segment by segment.
@@ -212,8 +213,11 @@ public sealed partial class ToolRegistry
     // UIHierarchy - but through the DTE project model: Solution > Project > ProjectItems (> SubProject) ...
     // Finds the item of the tree path by the order of its segments (names with or without extension / type suffix)
     // and opens it like a double-click. Returns null when nothing was found.
+    string lastItemsDump;
+
     string OpenViaProjectItems(string treePath)
     {
+        lastItemsDump = null;
         var dte = tc.RequireDte();
         var segs = treePath.Split('^');
         bool Is(string n, string seg)
@@ -265,7 +269,28 @@ public sealed partial class ToolRegistry
             try { found = Find(prj.ProjectItems, start, 0); } catch { }
             if (found != null) break;
         }
-        if (found == null) return null;
+        if (found == null)
+        {
+            // diagnostics: the project model's upper levels (names only)
+            var d = new List<string>();
+            void Dump(EnvDTE.ProjectItems items, int depth)
+            {
+                foreach (var (name, sub, _) in Children(items))
+                {
+                    if (d.Count >= 80) return;
+                    d.Add(new string(' ', depth * 2) + name);
+                    if (depth < 4) Dump(sub, depth + 1);
+                }
+            }
+            foreach (EnvDTE.Project prj in dte.Solution.Projects)
+            {
+                string pn = ""; try { pn = prj.Name; } catch { }
+                d.Add(pn);
+                try { Dump(prj.ProjectItems, 1); } catch { }
+            }
+            lastItemsDump = string.Join("\n", d);
+            return null;
+        }
         try
         {
             var w = found.Open(EnvDTE.Constants.vsViewKindPrimary);
