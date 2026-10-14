@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.21.7] – not released yet
+## [0.21.8] – not released yet
 
 ### Added
 - **SIL / HIL test runs** – `TcAgent.exe sil` runs TcUnit on the runtime of the build PC (Run-mode check, PLC login/start
@@ -36,7 +36,8 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - VSIX: a rebuild with the same version number is copied too (all files compared, not only the size of `TcAgent.exe`).
 - After a deliberate IDE restart (IDE already running for a while) TcAgent reconnects on the next call.
 - `tc_editor_open`: search tolerant to equal node names and lazily loaded nodes; falls back to opening the object's file;
-  the error names the Solution Explorer nodes that were found.
+  the error names the Solution Explorer nodes that were found. The cursor is set in the TwinCAT text editor itself;
+  actions and transitions (no declaration part) get the cursor at their implementation line.
 - `tc_refactor apply` runs as a job: after `waitSeconds` (default 45) it returns "still waiting – k of n done" with a job id,
   `action=result` returns the report - for AI clients that reach the PC through a bridge with a call timeout.
 - `tc_realtime show`: available cores, cores left to Windows and the other real-time settings.

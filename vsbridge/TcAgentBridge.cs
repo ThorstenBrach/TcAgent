@@ -25,7 +25,7 @@ namespace TcAgentBridge
     [Guid("86c8609c-4aac-4e7e-95e6-6b96179a3c4f")]
     public sealed class BridgePackage : AsyncPackage
     {
-        public const string BridgeVersion = "0.21.7";
+        public const string BridgeVersion = "0.21.8";
         internal static BridgePackage Instance;
         static readonly Guid ExportTypeGuid = new Guid("75161BEE-FB5F-434C-A3C6-86B7CEE2B8FC");
 
@@ -1020,18 +1020,25 @@ namespace TcAgentBridge
             // In IVsTextView TwinCAT counts lines continuously across declaration + implementation
             var cds = SafeGet(dv, "EditorView") ?? SafeGet(SafeGet(EnvProp("Engine"), "Frame"), "ActiveView");
             int declLines = 0;
-            System.Windows.Forms.Control target = null;
+            bool hasDecl = false, hasImplView = false;
+            System.Windows.Forms.Control target = null, anySyn = null;
             foreach (var pn in new[] { "InterfaceEditorView", "ImplementationEditorView" })
             {
                 if (!(SafeGet(cds, pn) is System.Windows.Forms.Control ctl)) continue;
                 var syn = ctl.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0 ? ctl
                         : Descendants(ctl).FirstOrDefault(c => c.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0);
                 if (syn == null) continue;
+                anySyn = anySyn ?? syn;
+                if (pn == "ImplementationEditorView") hasImplView = true;
+                if (pn == "InterfaceEditorView") hasDecl = true;
                 if (pn == "InterfaceEditorView") declLines = (SafeGet(syn, "Text") as string ?? "").Replace("\r\n", "\n").Split('\n').Length;
                 if ((pn == "ImplementationEditorView") == impl) target = syn;
             }
             r["part"] = impl ? "implementation" : "declaration"; r["line"] = line;
-            if (impl && declLines == 0) { r["lineSet"] = false; r["lineError"] = "line count of the declaration part not available"; return r; }
+            // Actions/transitions have no declaration part: the implementation is the whole document (declLines stays 0)
+            if (impl && !hasDecl && !hasImplView && anySyn != null) target = anySyn;
+            if (impl && hasDecl && declLines == 0) { r["lineSet"] = false; r["lineError"] = "line count of the declaration part not available"; return r; }
+            if (impl && !hasDecl) r["declarationPart"] = "none";
             int vsLine = (impl ? declLines : 0) + line - 1;   // 0-based
             try { target?.Focus(); } catch { }
             int hr = -1;
