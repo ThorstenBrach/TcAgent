@@ -51,6 +51,18 @@ namespace TcAgentBridge
                 SaveState(state);
             }
             if (newVersion || !File.Exists(Exe)) Task.Run(() => Run(consent, log, notify));
+            else if (!StampCurrent())   // same version, rebuilt (developer builds): only copy the new files
+                Task.Run(() =>
+                {
+                    try { CopyApp(log); }
+                    catch (IOException ex)
+                    {
+                        log("Installer: " + ex);
+                        notify("TcAgent could not be updated because TcAgent.exe is still in use by an AI client (e.g. Claude Desktop). " +
+                               "Quit the AI clients, then click \"Set up clients\" in the TcAgent Chat window.");
+                    }
+                    catch (Exception ex) { log("Installer: " + ex); }
+                });
         }
 
         /// <summary>Copy, generate the interop and (with consent) set up the clients. Also via the button in the chat window.</summary>
@@ -88,14 +100,37 @@ namespace TcAgentBridge
 
         static void CopyApp(Action<string> log)
         {
-            if (File.Exists(Exe) && new FileInfo(Exe).Length == new FileInfo(Path.Combine(Source, "TcAgent.exe")).Length) return;
+            // TcAgent.exe is only the small app host (same size in every build): compare all files of the extension
+            // (size + time) so that a rebuild with the same version number is copied as well
+            var stamp = SourceStamp();
+            var stampFile = Path.Combine(AppDir, ".source-stamp");
+            if (File.Exists(Exe) && File.Exists(stampFile) && File.ReadAllText(stampFile) == stamp) return;
             foreach (var f in Directory.GetFiles(Source, "*", SearchOption.AllDirectories))
             {
                 var dst = Path.Combine(AppDir, f.Substring(Source.Length).TrimStart('\\'));
                 Directory.CreateDirectory(Path.GetDirectoryName(dst));
                 File.Copy(f, dst, true);
             }
+            try { File.WriteAllText(stampFile, stamp); } catch { }
             log("TcAgent copied to " + AppDir);
+        }
+
+        static bool StampCurrent()
+        {
+            try { var f = Path.Combine(AppDir, ".source-stamp"); return File.Exists(f) && File.ReadAllText(f) == SourceStamp(); }
+            catch { return true; }
+        }
+
+        static string SourceStamp()
+        {
+            var sb = new System.Text.StringBuilder();
+            foreach (var f in Directory.GetFiles(Source, "*", SearchOption.AllDirectories).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+            {
+                var fi = new FileInfo(f);
+                sb.Append(f.Substring(Source.Length)).Append('|').Append(fi.Length).Append('|').Append(fi.LastWriteTimeUtc.Ticks).Append('\n');
+            }
+            using (var sha = System.Security.Cryptography.SHA256.Create())
+                return BitConverter.ToString(sha.ComputeHash(System.Text.Encoding.UTF8.GetBytes(sb.ToString()))).Replace("-", "");
         }
 
         static void CleanupOldVersions(Action<string> log)

@@ -191,8 +191,25 @@ public sealed class TwinCatSession
         // Right after the IDE went away (crash, closed) do not reconnect on our own: queued calls would otherwise continue
         // in a freshly restarted IDE (and could crash it again). After a pause, or with tc_attach, it reconnects.
         if (DateTime.Now - lostAt < TimeSpan.FromSeconds(30))
+        {
+            // The user restarted the IDE on purpose (e.g. after an update) and it has been running for a while: reconnect.
+            // A freshly started IDE (crash + automatic restart) is still not used, so queued changes cannot continue there.
+            try
+            {
+                Attach(string.IsNullOrEmpty(lastSolution) ? null : lastSolution, 0);
+                var started = System.Diagnostics.Process.GetProcessById(AttachedPid).StartTime;
+                if (DateTime.Now - started > TimeSpan.FromSeconds(20) && started < lostAt)
+                {
+                    Log.Info("Reconnected to an IDE that was already running: " + InstanceInfo);
+                    lostAt = DateTime.MinValue;
+                    return;
+                }
+                Dte = null; SysMan = null; InstanceInfo = "not connected";
+            }
+            catch { Dte = null; SysMan = null; InstanceInfo = "not connected"; }
             throw new Exception("The connection to the IDE was lost just now (IDE crashed or closed). Tell the user and wait until the IDE " +
                                 "is open again, then call tc_attach - do not repeat changes blindly.");
+        }
         try
         {
             Attach(string.IsNullOrEmpty(lastSolution) ? null : lastSolution, 0);

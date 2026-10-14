@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.21.0] – not released yet
+## [0.21.1] – not released yet
 
 ### Added
 - **SIL / HIL test runs** – `TcAgent.exe sil` runs TcUnit on the runtime of the build PC (Run-mode check, PLC login/start
@@ -33,6 +33,10 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - `tc_policy action=audit_check`: changing calls from the daily log that are missing in the audit log, with the likely reason.
 
 ### Changed
+- VSIX: a rebuild with the same version number is copied too (all files compared, not only the size of `TcAgent.exe`).
+- After a deliberate IDE restart (IDE already running for a while) TcAgent reconnects on the next call.
+- `tc_editor_open`: search tolerant to equal node names and lazily loaded nodes; falls back to opening the object's file;
+  the error names the Solution Explorer nodes that were found.
 - `tc_refactor apply` runs as a job: after `waitSeconds` (default 45) it returns "still waiting – k of n done" with a job id,
   `action=result` returns the report - for AI clients that reach the PC through a bridge with a call timeout.
 - `tc_realtime show`: available cores, cores left to Windows and the other real-time settings.
@@ -172,8 +176,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.21.0...HEAD
-[0.21.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.21.0
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.21.1...HEAD
+[0.21.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.21.1
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0
