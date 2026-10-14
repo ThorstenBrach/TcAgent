@@ -15,6 +15,7 @@
 using System.Diagnostics;
 using Microsoft.Win32;
 using TwinCAT.Ads;
+using TCatSysManagerLib;
 
 namespace TcAgent;
 
@@ -136,6 +137,13 @@ public static partial class Cli
                     var plcs = sta.Run(() => tc.PlcProjects().Select(p => p.Name).ToList());
                     Add(Level.Ok, "Solution", System.FormattableString.Invariant($"opened in {sw.Elapsed.TotalSeconds:0} s, PLC projects: {(plcs.Count == 0 ? "none" : string.Join(", ", plcs))}"));
                     if (plcs.Count == 0) Add(Level.Warn, "Solution", "no PLC project found");
+                    // TcUnit as TwinCAT itself sees it (library repositories of this installation) - more reliable than folders
+                    var tcunitLib = sta.Run(() => FindInstalledLibrary(tc, "TcUnit"));
+                    if (tcunitLib != null)
+                    {
+                        f.RemoveAll(x => x.Area == "TcUnit");
+                        Add(Level.Ok, "TcUnit", tcunitLib + " (library repository, read through the opened solution)");
+                    }
                     if (load.DialogText() is { } d) Add(Level.Warn, "Solution", "dialog(s) while loading (closed): " + d, "A pipeline closes them with Cancel - check whether the project still loads completely.");
                 }
                 catch (Exception ex)
@@ -171,6 +179,32 @@ public static partial class Cli
         Console.WriteLine(fails > 0 ? $"NOT READY: {fails} problem(s), {warns} warning(s)." :
                           warns > 0 ? $"READY with {warns} warning(s) - check/build work; the warnings matter for test/sil." : "READY.");
         return fails > 0 ? Infra : Ok;
+    }
+
+    /// <summary>"Name, version (vendor)" of an installed library whose name contains the text, via the library manager of
+    /// the first PLC project (ScanLibraries = all repositories TwinCAT uses), or null.</summary>
+    static string FindInstalledLibrary(TwinCatSession tc, string name)
+    {
+        foreach (var plc in tc.PlcProjects())
+            foreach (var c in TwinCatSession.Children(plc))
+            {
+                if (c is not ITcPlcLibraryManager lm) continue;
+                try
+                {
+                    foreach (object r in (System.Collections.IEnumerable)((dynamic)lm).ScanLibraries())
+                    {
+                        string n = null, v = null, d = null;
+                        try { n = ((dynamic)r).Name?.ToString(); } catch { }
+                        if (n == null || n.IndexOf(name, StringComparison.OrdinalIgnoreCase) < 0) continue;
+                        try { v = ((dynamic)r).Version?.ToString(); } catch { }
+                        try { d = ((dynamic)r).Distributor?.ToString(); } catch { }
+                        return $"{n}, {v} ({d})";
+                    }
+                }
+                catch { }
+                return null;     // one library manager is enough - the repositories are the same for every project
+            }
+        return null;
     }
 
     static string ProgramData(string rel) => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), rel);
