@@ -577,7 +577,12 @@ public sealed class TwinCatSession
         o.Append(checkedInfo);
         o.AppendLine(System.FormattableString.Invariant($"Duration: {sw.Elapsed.TotalSeconds:0.0} s (build {tBuild:0.0} s") +
                      (checkAll ? System.FormattableString.Invariant($", check all objects {tCheck:0.0} s)") : ")"));
-        foreach (var e in compile) o.AppendLine(e.ToString());
+        // XAE lists duplicate device descriptions (ESI files of the installation) as INFO on every build - one line instead
+        static bool EsiDuplicate(ErrorEntry e) => e.Level == "INFO" && (e.Text ?? "").Contains("already exists in file");
+        int esiDup = compile.Count(EsiDuplicate);
+        foreach (var e in compile.Where(e => !EsiDuplicate(e))) o.AppendLine(e.ToString());
+        if (esiDup > 0)
+            o.AppendLine($"({esiDup} INFO messages 'device ... already exists in file ...' hidden - duplicate ESI device descriptions of the TwinCAT installation, not a project problem)");
         if (runtime.Count > 0)
             o.AppendLine($"({runtime.Count} runtime/TcUnit messages hidden - see tc_errors kind=runtime or tc_test_results)");
         return o.ToString();

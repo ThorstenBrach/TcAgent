@@ -38,6 +38,8 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - `tc_editor_open`: search tolerant to equal node names and lazily loaded nodes; falls back to opening the object's file;
   the error names the Solution Explorer nodes that were found. The cursor is set in the TwinCAT text editor itself;
   actions and transitions (no declaration part) get the cursor at their implementation line.
+- `tc_build`: the INFO messages "device … already exists in file …" (duplicate ESI device descriptions of the installation,
+  100+ per build) are summed up in one line.
 - `tc_refactor apply` runs as a job: after `waitSeconds` (default 45) it returns "still waiting – k of n done" with a job id,
   `action=result` returns the report - for AI clients that reach the PC through a bridge with a call timeout.
 - `tc_realtime show`: available cores, cores left to Windows and the other real-time settings.
