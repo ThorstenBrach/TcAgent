@@ -98,6 +98,7 @@ public sealed partial class PlcDoc
         foreach (var p in Pous.Values) { try { writes[p.Key] = Writes(p, code[p.Key]); } catch { writes[p.Key] = new(); } }
         MultiTask(writes, r);
         OutputWriters(writes, r);
+        ApplyRiskConfig(r);
         risks = r.OrderBy(x => x.Rank).ThenBy(x => x.Object, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Line).ToList();
         return risks;
     }
@@ -111,17 +112,28 @@ public sealed partial class PlcDoc
                                                     x.Rule.Equals(filter, StringComparison.OrdinalIgnoreCase))).ToList();
         var o = new StringBuilder($"Risks in {Project}: {RiskCounts(all)} (static, text based rules - verify each one in the code with tc_plc_read; " +
                                   "line = line in the implementation, (decl) = declaration)\n");
-        if (Pous.ContainsKey("CheckBounds")) o.AppendLine("Rule array-index is off: the project has an implicit CheckBounds function.");
+        if (Pous.ContainsKey("CheckBounds") && !(RiskConfig ?? RiskConfig.Empty).IsOff("array-index")) o.AppendLine("Rule array-index is off: the project has an implicit CheckBounds function.");
         if (list.Count == 0) o.AppendLine(all.Count == 0 ? "Nothing found." : "Nothing matches the filter.");
         foreach (var x in list.Take(Math.Max(1, max))) o.AppendLine(x.ToString());
         if (list.Count > max) o.AppendLine($"... {list.Count - max} more (max, minSeverity or filter=<object or rule>)");
         if (string.IsNullOrEmpty(minSeverity) && all.Any(x => x.Rank == 2)) o.AppendLine($"({all.Count(x => x.Rank == 2)} low risks not listed - minSeverity=low shows them)");
-        var fired = new HashSet<string>(list.Select(x => x.Rule));
+        var cfg = RiskConfig ?? RiskConfig.Empty;
+        var fired = new HashSet<string>(list.Select(x => x.Rule), StringComparer.OrdinalIgnoreCase);
         if (fired.Count > 0)
         {
             o.AppendLine("\nRules:");
             foreach (var rule in RiskRules.Where(x => fired.Contains(x.Id))) o.AppendLine($"  {rule.Id} ({rule.Severity}): {rule.Detail}");
+            foreach (var rule in cfg.Customs.Values.Where(x => fired.Contains(x.Id)))
+                o.AppendLine($"  {rule.Id} ({rule.Severity}, own rule from {Path.GetFileName(rule.Source)}): {rule.Message}{(rule.Why != null ? " - " + rule.Why : "")}");
         }
+        if (cfg.Checks.Count > 0)
+        {
+            o.AppendLine("\nChecks for the agent from the risk rules (not machine checked - verify each one by reading the code, report violations like findings):");
+            foreach (var (t, _) in cfg.Checks) o.AppendLine("  - " + t);
+        }
+        var off = RiskRules.Where(x => cfg.IsOff(x.Id)).Select(x => x.Id).ToList();
+        if (off.Count > 0) o.AppendLine($"\nSwitched off by the risk rules: {string.Join(", ", off)}");
+        if (cfg.Errors.Count > 0) o.AppendLine($"\nRisk rule files have {cfg.Errors.Count} errors (entries ignored) - tc_risk_rules shows them.");
         return o.ToString();
     }
 
@@ -131,7 +143,7 @@ public sealed partial class PlcDoc
         o.Append("<section id=\"risks\"><h2>Risks</h2>");
         o.Append($"<p>{H(RiskCounts(rk))} <span class=\"muted\">– static, text based rules on the ST code; check each one in the code. " +
                  "Line = line in the implementation, (decl) = declaration.</span></p>");
-        if (Pous.ContainsKey("CheckBounds")) o.Append("<p class=\"muted\">Rule array-index is off: the project has an implicit CheckBounds function.</p>");
+        if (Pous.ContainsKey("CheckBounds") && !(RiskConfig ?? RiskConfig.Empty).IsOff("array-index")) o.Append("<p class=\"muted\">Rule array-index is off: the project has an implicit CheckBounds function.</p>");
         if (rk.Count > 0)
         {
             o.Append("<table class=\"risks\"><tr><th>Severity</th><th>Object</th><th>Line</th><th>Rule</th><th>Explanation</th></tr>");
@@ -141,9 +153,20 @@ public sealed partial class PlcDoc
             o.Append("</table>");
             if (rk.Count > 1000) o.Append($"<p class=\"muted\">{rk.Count - 1000} more – tc_doc action=risks.</p>");
         }
+        var cfg = RiskConfig ?? RiskConfig.Empty;
         o.Append("<details><summary>Rules</summary><ul>");
-        foreach (var rule in RiskRules) o.Append($"<li><code>{H(rule.Id)}</code> ({H(rule.Severity)}): {H(rule.Detail)}</li>");
-        o.Append("</ul></details></section>");
+        foreach (var rule in RiskRules)
+            o.Append($"<li><code>{H(rule.Id)}</code> ({H(cfg.IsOff(rule.Id) ? "off" : cfg.Builtins.TryGetValue(rule.Id, out var bs) && bs.Severity != null ? bs.Severity : rule.Severity)}): {H(rule.Detail)}</li>");
+        foreach (var rule in cfg.Customs.Values.Where(x => !x.Off))
+            o.Append($"<li><code>{H(rule.Id)}</code> ({H(rule.Severity)}, own rule): {H(rule.Message)}{(rule.Why != null ? " – " + H(rule.Why) : "")}</li>");
+        o.Append("</ul></details>");
+        if (cfg.Checks.Count > 0)
+        {
+            o.Append("<details><summary>Additional checks (reviewed by reading the code)</summary><ul>");
+            foreach (var (t, _) in cfg.Checks) o.Append($"<li>{H(t)}</li>");
+            o.Append("</ul></details>");
+        }
+        o.Append("</section>");
     }
 
     // ================================================================== helpers
@@ -493,7 +516,7 @@ public sealed partial class PlcDoc
             if (CaseElse(masked) >= masked.Length)
                 AddRisk(r, "low", p.Key, line, "case-else", $"CASE {Trim(sel, 40)} has no ELSE - unexpected values are ignored silently");
             var numeric = LabelRx.Matches(masked).Cast<Match>().Count(l => Regex.IsMatch(l.Groups[1].Value, @"^-?\d"));
-            if (numeric >= 3)
+            if (numeric >= (RiskConfig ?? RiskConfig.Empty).Param("magic-number", "labels"))
                 AddRisk(r, "low", p.Key, line, "magic-number", $"CASE {Trim(sel, 40)} uses {numeric} numeric state labels - use an ENUM for the states");
         }
     }
@@ -501,7 +524,8 @@ public sealed partial class PlcDoc
     void Size(Pou p, string c, List<Risk> r)
     {
         var lines = c.Split('\n').Count(l => l.Trim().Length > 0);
-        var limit = p.Owner == null ? 300 : 150;
+        var cfg = RiskConfig ?? RiskConfig.Empty;
+        var limit = p.Owner == null ? cfg.Param("long-code", "limit") : cfg.Param("long-code", "memberLimit");
         if (lines > limit)
             AddRisk(r, lines > 2 * limit ? "medium" : "low", p.Key, 0, "long-code",
                     $"{lines} code lines (limit {limit}) - hard to review and test; split into methods/actions");
@@ -511,8 +535,9 @@ public sealed partial class PlcDoc
             if (t.Value.StartsWith("END_", StringComparison.OrdinalIgnoreCase)) depth = Math.Max(0, depth - 1);
             else if (++depth > max) { max = depth; at = t.Index; }
         }
-        if (max > 5)
-            AddRisk(r, max > 7 ? "medium" : "low", p.Key, LineAt(c, at), "deep-nesting", $"nesting depth {max} (IF/CASE/FOR/WHILE/REPEAT) - extract methods or use early RETURN");
+        int nestLow = cfg.Param("deep-nesting", "limit"), nestMedium = cfg.Param("deep-nesting", "mediumLimit");
+        if (max > nestLow)
+            AddRisk(r, max > nestMedium ? "medium" : "low", p.Key, LineAt(c, at), "deep-nesting", $"nesting depth {max} (IF/CASE/FOR/WHILE/REPEAT) - extract methods or use early RETURN");
     }
 
     void UnusedVars(Dictionary<string, string> code, List<Risk> r)

@@ -83,6 +83,35 @@ public sealed partial class ToolRegistry
                 return $"{res}\nFile: {file}";
             });
 
+        Add("tc_risk_rules", "Risk rules for the static risk analysis (tc_doc action=risks, HTML page, TcAgent.exe doc --risks) - Markdown files " +
+                             "like the coding rules (company TCAGENT_RISK_RULES, personal %LOCALAPPDATA%\\TcAgent\\risk-rules.md, project " +
+                             "<solution>\\.tcagent\\risk-rules.md, later wins). action=show (default): files, built-in rules with their settings, own rules, " +
+                             "agent checks and errors. action=test: run an own rule (find/require ...) on the project WITHOUT saving - always test " +
+                             "before add. action=add: save an own text rule (## Rule <id>). action=builtin: switch a built-in rule off, change its " +
+                             "severity or thresholds (rule + setting, e.g. 'off', 'severity=high', 'limit=200'). action=check: save a check the agent " +
+                             "verifies by reading the code (for things a regex cannot decide). Only add/change rules when the user asks; dryRun first.",
+            Schema(P("action", "string", "show (default), test, add, builtin or check"),
+                   P("id", "string", "add/test: rule id, letters/digits/-, e.g. no-memcpy-without-sizeof"),
+                   P("find", "string", "add/test: regular expression - every match is a finding (one per line), e.g. \\bMEMCPY\\s*\\("),
+                   P("require", "string", "add/test: regular expression that MUST occur in each selected object - finding if missing (instead of find)"),
+                   P("unless", "string", "add/test: regular expression - no finding if the line of the match also matches, e.g. SIZEOF"),
+                   P("unlessInObject", "string", "add/test: regular expression - object skipped if it matches anywhere in it"),
+                   P("in", "string", "add/test: impl (default), decl or both"),
+                   P("kinds", "string", "add/test: object kinds, e.g. 'FB, METHOD' (PROGRAM, FUNCTION_BLOCK/FB, FUNCTION, METHOD, PROPERTY, ACTION, TRANSITION, GVL, DUT, INTERFACE)"),
+                   P("objects", "string", "add/test: object names with * and ?, e.g. 'FB_Axis*, MAIN'"),
+                   P("comments", "string", "add/test: keep = match also in comments and strings (default: they are blanked, e.g. for a header comment check)"),
+                   P("severity", "string", "add/test: high, medium (default) or low"),
+                   P("message", "string", "add/test: text of the finding - what is wrong and what to do"),
+                   P("why", "string", "add: background / reason (optional)"),
+                   P("rule", "string", "builtin: id of a built-in rule, e.g. long-code, case-else"),
+                   P("setting", "string", "builtin: off | on | severity=high|medium|low | parameter=number (long-code: limit, memberLimit; deep-nesting: limit, mediumLimit; magic-number: labels), comma-separated"),
+                   P("text", "string", "check: the check as one sentence, e.g. 'Every MC_ function block instance: the Error output is evaluated.'"),
+                   P("scope", "string", "add/builtin/check: project (default, <solution>\\.tcagent\\risk-rules.md in Git) or personal"),
+                   P("max", "integer", "test: max. findings shown (default 50)"),
+                   P("plcProjectPath", "string", "test: PLC project (empty = the only one)"),
+                   P("dryRun", "boolean", "add/builtin/check: only show the entry")),
+            a => RiskRulesTool(a));
+
         Add("tc_docs", "Look up documentation - read-only: Beckhoff InfoSys, other approved URLs, documents in the project folder " +
                        ".tcagent\\docs or %LOCALAPPDATA%\\TcAgent\\docs and registered folders/network drives (PDF, Word, HTML, Markdown, text). " +
                        "action=search (query) searches local documents and pages already read; action=read (url or path) returns the text " +

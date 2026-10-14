@@ -62,6 +62,39 @@ Adds a rule to the coding rules ("remember ...", "from now on always ..."). The 
 | `section` | string |  | Heading, e.g. Names, Structure, Formatting (default: Additions) |
 | `dryRun` | boolean |  | Only show what would be added |
 
+### `tc_risk_rules`
+
+Risk rules for the static risk analysis (`tc_doc action=risks`, section Risks of the HTML page, `TcAgent.exe doc --risks`) - Markdown
+files like the coding rules: `TCAGENT_RISK_RULES` (company, files/folders `;`-separated), `%LOCALAPPDATA%\TcAgent\risk-rules.md`
+(personal), `<solution>\.tcagent\risk-rules.md` and `.tcagent\risk-rules\*.md` (project, in Git). Later files win (same rule id or
+built-in setting). Format and examples: [risk-rules.example.md](risk-rules.example.md).
+
+- `## Built-in rules` - `- <id>: off | on | severity=high|medium|low | <parameter>=<n>`; parameters: `long-code` limit (300), memberLimit (150);
+  `deep-nesting` limit (5), mediumLimit (7); `magic-number` labels (3).
+- `## Rule <id>` - own text rule: `find` (regex, every match is a finding, one per line) or `require` (regex that must occur in each
+  selected object, finding if missing); optional `unless` (regex on the line of the match), `unlessInObject` (regex, skips the object),
+  `in` (impl/decl/both), `kinds` (PROGRAM/PRG, FUNCTION_BLOCK/FB, FUNCTION, METHOD, PROPERTY, ACTION, TRANSITION, GVL, DUT, INTERFACE),
+  `objects` (names with `*`/`?`), `comments: keep` (match in comments and strings too - by default they are blanked), `severity`
+  (default medium), `message`, `why`, `enabled: false`. Regular expressions are case-insensitive, `^`/`$` per line, 2 s timeout.
+- `## Checks` - one sentence per bullet; not machine checked, returned with the results so the agent verifies them by reading the code.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string |  | `show` (default: files, all rules with settings, errors), `test` (run an own rule on the project without saving), `add` (save an own rule), `builtin` (tune a built-in rule), `check` (save an agent check) |
+| `id` | string |  | add/test: rule id (letters, digits, `-`, `_`) |
+| `find` / `require` | string |  | add/test: regular expression (exactly one of them) |
+| `unless`, `unlessInObject` | string |  | add/test: exceptions (regex) |
+| `in`, `kinds`, `objects`, `comments` | string |  | add/test: where the rule looks |
+| `severity`, `message`, `why` | string |  | add/test: severity (default medium) and text of the finding |
+| `rule`, `setting` | string |  | builtin: rule id and `off`, `on`, `severity=...`, `<parameter>=<n>` |
+| `text` | string |  | check: the check as one sentence |
+| `scope` | string |  | add/builtin/check: `project` (default) or `personal` |
+| `max` | integer |  | test: max. findings shown (default 50) |
+| `plcProjectPath` | string |  | test: PLC project (empty = the only one) |
+| `dryRun` | boolean |  | add/builtin/check: only show the entry |
+
+`show` and `test` only read; `add`, `builtin` and `check` write the rule file (an entry that does not parse is refused).
+
 ### `tc_docs`
 
 Looks up documentation, read-only: InfoSys, enabled URLs, document folders and network drives.
@@ -417,7 +450,9 @@ Tasks: the PLC task references (TcTTO items directly below the PLC project) with
 | `long-code` | low/medium | more than 300 code lines (POU) / 150 (method, action, property); more than twice: medium |
 | `deep-nesting` | low/medium | IF/CASE/FOR/WHILE/REPEAT nested deeper than 5 (low) / 7 (medium) |
 
-Pipeline: `TcAgent.exe doc --solution X.sln --risks [--fail-on high]` prints the list and returns exit code 1 when there are risks of that severity or higher.
+Own rules, thresholds, switched-off rules and agent checks: `risk-rules.md` files, see `tc_risk_rules`. The text output and the page list the own rules that fired and the agent checks.
+
+Pipeline: `TcAgent.exe doc --solution X.sln --risks [--fail-on high]` prints the list (with the risk-rules.md files of the solution) and returns exit code 1 when there are risks of that severity or higher; errors in the rule files are printed as `RISK RULES ERROR`.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

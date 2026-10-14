@@ -12,7 +12,7 @@ exit code, JUnit XML and inline annotations.
 | `TcAgent.exe library --solution X.sln --out MyLib.library` | builds and saves the PLC project as library | releases of your own libraries |
 | `TcAgent.exe scope --solution X.sln --out signals.csv --seconds 30` | records with the Scope configuration of the solution and exports the data (PLC must be running, e.g. after `test`) | HIL/SIL runs, signal evidence |
 | `TcAgent.exe doc --solution X.sln --out doc/X.html` | program documentation as HTML (call hierarchy, diagrams, risks, reference; with the explanations stored by the agent) | documentation as build artifact |
-| `TcAgent.exe doc --solution X.sln --risks --fail-on high` | prints the static risk list (tc_doc action=risks); exit code 1 on risks of that severity or higher | code review gate |
+| `TcAgent.exe doc --solution X.sln --risks --fail-on high` | prints the static risk list (tc_doc action=risks, including the project's `.tcagent\risk-rules.md`); exit code 1 on risks of that severity or higher | code review gate with your own rules |
 | `TcAgent.exe archive --solution X.sln --out X.tszip` | archive of the whole solution | releases, support |
 | `TcAgent.exe test --solution X.sln` | builds, activates on the test target, starts the PLC, waits for TcUnit, collects the results | every push to `main`, nightly |
 | `TcAgent.exe sil --solution X.sln --plc Tests` | software in the loop: like `test` on the runtime of the build PC, checks Run mode, starts the PLC if needed, optional Scope recording, always cleans up | every push / pull request |

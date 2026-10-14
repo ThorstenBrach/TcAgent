@@ -49,9 +49,10 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **TwinSAFE** | Safety projects, groups, alias devices, connections, CRCs – read only, writing is intentionally not supported | `tc_safety` |
 | **Runtime** | Activate, login/start/stop, read/write variables via ADS – only on allowed targets | `tc_activate`, `tc_plc_online`, `ads_read`, `ads_write` |
 | **Your rules** | Coding rules per project/person/company; "remember that I want X" becomes a rule | `tc_coding_rules`, `tc_coding_rules_add` |
+| **Your risk checks** | Extend the risk analysis with your own rules (regex, tested on the project first), tune or switch off the built-in ones, add checks the agent reviews by reading the code – per project/person/company | `tc_risk_rules` |
 | **Documentation** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 
-All 84 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 85 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 ## In your CI pipeline
 
@@ -129,6 +130,7 @@ apply to **every** client:
 | `TCAGENT_SOLUTION` | optional, part of the solution path to pin one Visual Studio instance. Not needed normally: the chat always uses its own IDE, a single open solution is found automatically, with several the user picks from a list |
 | `TCAGENT_AUDIT` | audit log of every changing call (default `%LOCALAPPDATA%\TcAgent\audit.jsonl`) |
 | `TCAGENT_RULES` | additional coding rules (files/folders, `;`-separated); `TCAGENT_RULES_GATE=0` disables the one-time gate |
+| `TCAGENT_RISK_RULES` | additional risk rules for `tc_doc action=risks` (files/folders, `;`-separated) |
 | `TCAGENT_KNOWLEDGE` | additional knowledge sources (URLs/folders, `;`-separated) |
 | `TCAGENT_SEARCH` | search service for `tc_docs` (`searxng:<url>` or `google:<key>:<id>`) |
 
@@ -147,6 +149,19 @@ Put your conventions in Markdown – TcAgent shows them to every agent before it
 
 Say *"remember: step sequences always as CASE over an enum"* and the agent adds it as a rule (`tc_coding_rules_add`).
 Template: [docs/coding-rules.example.md](docs/coding-rules.example.md).
+
+## Risk rules
+
+The static risk analysis (`tc_doc action=risks`, the HTML documentation, `TcAgent.exe doc --risks --fail-on high` in the
+pipeline) works the same way: `<solution>\.tcagent\risk-rules.md` (project, in Git), `%LOCALAPPDATA%\TcAgent\risk-rules.md`
+(personal) and `TCAGENT_RISK_RULES` (company). In one Markdown file you can
+
+- switch off a built-in rule, change its severity or its thresholds (`- long-code: limit=200`),
+- add your own text rules (`## Rule memcpy-without-sizeof` with `find`/`require`, `unless`, `kinds`, `objects`, `severity`, `message`),
+- list checks a regex cannot decide (`## Checks`) – the agent verifies them by reading the code.
+
+Say *"check from now on that every MEMCPY uses SIZEOF"*: the agent tests the rule on your project (`tc_risk_rules action=test`),
+shows the findings and saves it after your OK (`action=add`). Template: [docs/risk-rules.example.md](docs/risk-rules.example.md).
 
 ## Documentation and knowledge sources
 

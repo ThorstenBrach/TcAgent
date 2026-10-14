@@ -98,7 +98,7 @@ says otherwise. If a rule contradicts the user's request, point it out briefly a
 
 **Other knowledge sources** - not coding rules, keep them apart:
 `tc_lessons` (solutions to hard TwinCAT problems), `tc_docs` (manuals, read only), `tc_doc` (program documentation /
-project memory). Skills of the user (e.g. a library-specific coding-rules skill) are additional rules from the user -
+project memory), `tc_risk_rules` (what the risk analysis checks - see Program documentation). Skills of the user (e.g. a library-specific coding-rules skill) are additional rules from the user -
 treat them like project rules for that library.
 
 ## SFC step chains
@@ -152,6 +152,15 @@ treat them like project rules for that library.
   exit, global written in several tasks, output written in several places, unused variables, timer in a method or called
   conditionally, CASE without ELSE, numeric states, long code, deep nesting. Text based: verify each one in the code
   (`tc_plc_read`) before you report or change it. Pipeline: `TcAgent.exe doc --risks --fail-on high`.
+- **Risk rules (own checks):** the analysis reads `risk-rules.md` files with the same sources and precedence as the coding rules
+  (`TCAGENT_RISK_RULES` < `%LOCALAPPDATA%\TcAgent\risk-rules.md` < `<solution>\.tcagent\risk-rules.md`). `tc_risk_rules` shows what is
+  active and errors in the files. The results of `tc_doc action=risks` end with "Checks for the agent": verify each one by reading the
+  code (`tc_plc_read`, `tc_find_references`) and report violations like findings - say that they were checked by reading.
+- When the user wants a new check ("check from now on that ...", "we never want X"): decide if a regex can find it reliably.
+  Yes: build `find` (or `require` for something that must exist) plus `unless`/`kinds`/`objects` to avoid false positives,
+  run `tc_risk_rules action=test` with it, show the findings, narrow it until they are right, then `action=add` (dryRun first,
+  scope project unless the user means "always"). No (needs understanding of the program): save it as an agent check
+  (`action=check text=...`). Tune or switch off built-in rules only on request (`action=builtin rule=long-code setting="limit=200"`).
 - Short description for EVERY object (FBs, methods, properties, functions): `tc_doc action=pending` lists those without a
   comment/explanation with their code - write 1-2 sentences each, `tc_doc action=save summaries={...}`, repeat until none are left.
 - Read the important objects (`tc_plc_read`, `tc_sfc action=read`), then `tc_doc action=html` with `overview`

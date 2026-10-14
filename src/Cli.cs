@@ -217,6 +217,9 @@ public static partial class Cli
             d.Analyze();
             return d;
         }).ToList(), o.TimeoutSec * 1000);
+        var riskConfig = RiskConfig.Load(dir);
+        foreach (var d in docs) d.RiskConfig = riskConfig;
+        foreach (var e in riskConfig.Errors) Say("RISK RULES ERROR: " + e);
         foreach (var d in docs)
         {
             var file = o.Out == null ? Path.Combine(dir ?? ".", "doc", d.Project + ".html")

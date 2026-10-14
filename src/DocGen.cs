@@ -1072,13 +1072,18 @@ public sealed partial class ToolRegistry
                $"\nProject memory: {PlcDoc.Summaries.FileFor(dir)}";
     }
 
-    internal PlcDoc BuildDoc(string plcProjectPath) => tc.Sta.Run(() =>
+    internal PlcDoc BuildDoc(string plcProjectPath)
     {
-        var plc = PlcProject(plcProjectPath);
-        var d = PlcDoc.Collect(tc, plc, SfcForDoc);
-        d.Analyze();
+        var d = tc.Sta.Run(() =>
+        {
+            var plc = PlcProject(plcProjectPath);
+            var doc = PlcDoc.Collect(tc, plc, SfcForDoc);
+            doc.Analyze();
+            return doc;
+        }, 600_000);
+        d.RiskConfig = RiskConfig.Load(SolutionDir());     // risk-rules.md files (company, personal, project)
         return d;
-    }, 600_000);
+    }
 
     // SFC of one POU for the documentation: chain text and step-to-step edges
     internal static (string Text, List<(string, string, string)> Edges) SfcForDoc(ITcSmTreeItem plc, string pouPath)
