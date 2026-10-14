@@ -339,7 +339,7 @@ public static partial class Cli
                 case JsonValueKind.Null: break;
                 default:
                     var text = CiText(p.Value, $"{where} \"{p.Name}\"");
-                    if (CiOutputKeys.Contains(CiKebab(p.Name)) && !Path.IsPathRooted(text)) text = Path.Combine(cfg.Results, text);
+                    if (CiOutputKeys.Contains(CiKebab(p.Name)) && !Path.IsPathRooted(text) && !CiUnderResults(text, cfg.Results)) text = Path.Combine(cfg.Results, text);
                     s.Args.Add(option);
                     s.Args.Add(text);
                     break;
@@ -369,6 +369,15 @@ public static partial class Cli
     }
 
     /// <summary>camelCase -> kebab-case ("warningsAsErrors" -> "warnings-as-errors"); kebab-case stays.</summary>
+
+    // "results/x.html" with results folder "results" stays as it is (no results/results/x.html)
+    static bool CiUnderResults(string path, string results)
+    {
+        var a = path.Replace('/', '\\').TrimStart('.', '\\');
+        var b = results.Replace('/', '\\').Trim('\\').TrimStart('.', '\\');
+        return b.Length > 0 && a.StartsWith(b + "\\", StringComparison.OrdinalIgnoreCase);
+    }
+
     static string CiKebab(string key)
     {
         var sb = new StringBuilder();

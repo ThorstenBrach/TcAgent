@@ -59,7 +59,10 @@ public static class LibraryInventory
                         if (ComProp(r, "Folder") is { Length: > 0 } f) repos.Add(f);
                 }
                 catch { }
-                foreach (object r in (System.Collections.IEnumerable)((dynamic)lm).References)
+                System.Collections.IEnumerable libRefs;
+                try { libRefs = (System.Collections.IEnumerable)ComCall.Get(lm, "References"); }
+                catch { libRefs = Array.Empty<object>(); }       // older TwinCAT without References: report the PLC without libraries
+                foreach (object r in libRefs)
                 {
                     var x = Describe(plc.Name, r);
                     if (x.Version == null && x.Name != null)

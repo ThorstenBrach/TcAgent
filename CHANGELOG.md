@@ -5,6 +5,8 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.24.0] – 2026-10-15
+
 ### Added
 - **SBOM** – `tc_sbom` and `TcAgent.exe sbom --solution <sln> [--out <file.cdx.json>] [--plc <names>]` write a CycloneDX 1.6
   SBOM per PLC project (default `<solution>\sbom\<PLC project>.cdx.json`): the PLC project with its version and the git
@@ -23,6 +25,12 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   table on the console, in `results/ci-summary.md` and in the GitHub job summary. `--only`, `--from`, `--dry-run`,
   `--config`; `--init` writes a starter file. New templates `docs/pipeline/github-actions-ci.yml`,
   `azure-pipelines-ci.yml` and `pipeline.example.json`.
+
+### Fixed
+- `TcAgent.exe test`/`sil`/`hil` with a target outside `TCAGENT_ALLOW_TARGETS` now ends with exit code 2 (refused) instead of
+  3 (infrastructure) - the pipeline shows a configuration error, not a broken build machine.
+- `ci`: an output path that already starts with the results folder (`"out": "results/doc.html"`) is no longer doubled.
+- SBOM/lock: a TwinCAT version without readable library references reports the PLC project without libraries instead of stopping.
 
 ## [0.23.2] – 2026-10-14
 
@@ -237,7 +245,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.2...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.0...HEAD
+[0.24.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.2...v0.24.0
 [0.23.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.23.2
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
