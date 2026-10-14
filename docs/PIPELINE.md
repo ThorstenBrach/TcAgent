@@ -24,7 +24,7 @@ TcAgent.exe check --solution .\MyMachine.sln --junit results\check.xml
 TcAgent.exe test  --solution .\MyMachine.sln --junit results\tests.xml --timeout 900
 ```
 
-**Exit codes:** `0` OK · `1` compiler errors or failed tests · `2` wrong call, or `sil`/`hil` refused because the target is
+**Exit codes:** `0` OK · `1` compiler errors or failed tests · `2` wrong call, or `test`/`sil`/`hil` refused because the target is
 not allowed · `3` infrastructure problem (IDE could not be started, no route, activation failed, Run mode not reached,
 TcUnit did not finish in time). Pipelines can treat `3` as "retry" and `1` as "red"; `2` needs a fix in the pipeline definition.
 
@@ -232,7 +232,7 @@ unless you save). Use `--no-boot-project` if your PLC is started differently.
 | Symptom | Cause / remedy |
 |---|---|
 | exit 3 "Could not open the TwinCAT solution" | Visual Studio/XAE not installed for this user, or the agent runs without a desktop session. Try `--visible` interactively. |
-| exit 3 "target system … is not allowed" | the target is not in `TCAGENT_ALLOW_TARGETS` – set it in the pipeline's environment. |
+| exit 2 "REFUSED: target system … is not allowed" | the target is not in `TCAGENT_ALLOW_TARGETS` – set it in the pipeline's environment. |
 | exit 2 "REFUSED: … not allowed" (sil/hil) | the target is neither in `TCAGENT_ALLOW_TARGETS` nor passed with `--allow` (hil), or `TCAGENT_MODE` is `ask`/`propose`. |
 | exit 3 "… answers the broadcast search but not via ADS" | the ADS route from the build machine to the test PLC is missing – add it once (TwinCAT router "Add Route…"). |
 | exit 3 "No TwinCAT runtime answers on this PC" | XAR not installed / system service stopped, or the usermode runtime is not started (`--target <its NetId>`). |

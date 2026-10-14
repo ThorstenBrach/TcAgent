@@ -325,7 +325,7 @@ public static partial class Cli
             return (string)sm.GetTargetNetId();
         });
         try { policy.Check("tc_activate", () => target); }
-        catch (Exception ex) { return InfraError(o, "target", ex.Message + " (pass --target or set TCAGENT_ALLOW_TARGETS for the CI machine)"); }
+        catch (Exception ex) { return Refused(o, "target", ex.Message + " (pass --target or set TCAGENT_ALLOW_TARGETS for the CI machine)"); }   // like sil/hil: exit 2
         Say("Test target: " + target);
 
         // 2) disable I/O devices (no hardware on the CI machine) - by default only in a Visual Studio started by TcAgent
@@ -797,7 +797,7 @@ Options
   --keep-dialogs           do not close dialogs of the IDE (default: closed like Cancel/X and logged - they block the IDE)
   --progid <id>            COM ProgID of the IDE, e.g. TcXaeShell.DTE.17.0 (default: VS 2022, then TcXaeShell)
 
-Exit codes: 0 OK, 1 compiler errors or failed tests, 2 wrong call or refused (sil/hil: target not allowed),
+Exit codes: 0 OK, 1 compiler errors or failed tests, 2 wrong call or refused (test/sil/hil: target not allowed),
             3 infrastructure problem (IDE, route, activation, Run mode, timeout).
 Without arguments TcAgent.exe runs as MCP server for AI clients.";
 }
