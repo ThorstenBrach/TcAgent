@@ -28,11 +28,8 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
 3. **Read before writing:** `tc_plc_read` on the object. Follow existing header comments, naming conventions and
    project rules (e.g. the project's coding-rules skills).
    **Coding rules:** before first writing/creating code, call `tc_coding_rules` once and align all changes
-   with them (names, comments, structure). Without that call TcAgent rejects the first write once and
-   returns the rules. On conflicts: user instruction > project rules > personal rules > company standard.
-   If the user says "remember ...", "from now on always ..." or repeatedly corrects the same thing: phrase the rule briefly and
-   generally, tell the user, and add it with `tc_coding_rules_add` (scope project = for the team, personal = just for them;
-   if unsure, ask briefly). It then applies to all future sessions and agents.
+   with them (names, comments, structure). Without that call TcAgent rejects the first write once and returns the
+   rules. Details - where rules come from, precedence, adding rules - in the section "Coding rules" below.
 4. **Change:** `tc_plc_write` (always send the COMPLETE declaration or implementation part) or
    `tc_plc_create` (kind: function_block, function, program, method, property, dut_struct, dut_enum, gvl,
    interface, folder ...; for methods `parentPath` is the FB).
@@ -50,6 +47,56 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
 7. **Tests:** `tc_test_results` returns the result of the last TcUnit run (suites, tests, failures with names).
    TcUnit output appears in the IDE as "errors" in the error list - these are runtime messages, not
    compiler errors; `tc_errors kind=compile|runtime` separates them.
+
+## Coding rules (what the code must follow) vs. this guide (how to work with TcAgent)
+
+Two different things - do not mix them up:
+
+- **This guide / the skill `twincat-tcagent`** describes how to work with the TcAgent tools (order of calls,
+  confirmations, limits). It is the same for every solution and does not depend on the open project.
+- **Coding rules** describe what the PLC code itself must look like (names, comments, structure, formatting).
+  They are Markdown files that TcAgent reads and returns with `tc_coding_rules`. `tc_refactor` and `tc_sfc` (step comments) follow them too.
+
+**Sources** - TcAgent reads them in this order and concatenates them; later sources appear further down and
+**take precedence** on conflicts:
+
+| # | Source | Scope | Typical content |
+|---|--------|-------|-----------------|
+| 1 | `TCAGENT_RULES` (environment variable, files/folders separated by `;`, e.g. on a network drive) | company / department | company standard |
+| 2 | `%LOCALAPPDATA%\TcAgent\coding-rules.md` | this user, **every** solution | personal style, e.g. "`///` comments above the variable, in English" |
+| 3 | `<Solution folder>\.tcagent\coding-rules.md` | this solution, versioned in Git | project / customer conventions for the whole team and the pipeline |
+| 4 | `<Solution folder>\.tcagent\rules\*.md` | this solution | further rule files (e.g. one per topic) |
+
+Why project rules live in the solution folder: they travel with the project (Git), every team member, agent and CI run
+gets the same rules without local setup, and different projects (customer A, own library) can have different
+conventions. Rules that should apply everywhere belong in the personal file or in `TCAGENT_RULES`, not in a project.
+
+**Precedence overall:** explicit instruction of the user in the chat > project rules (3, 4) > personal rules (2) >
+company standard (1). Existing code of the object you change: follow its header comment and naming style unless a rule
+says otherwise. If a rule contradicts the user's request, point it out briefly and follow the user.
+
+**Applying the rules**
+- Call `tc_coding_rules` once per session before the first `tc_plc_write`, `tc_plc_create` or `tc_refactor action=apply`;
+  TcAgent rejects the first of these calls without it once and returns the rules.
+- Apply them to everything you write: new variables, comments, method names, generated tests - also in code you only
+  extend. Do not reformat untouched code just to make it conform; offer `tc_refactor` for that (the user confirms).
+- No rules found ("No coding guidelines defined"): use common TwinCAT conventions and the style of the existing
+  code, and ask the user before introducing a convention of your own.
+
+**Adding rules** (`tc_coding_rules_add rule="..." scope=project|personal section=...`)
+- When the user says "remember ...", "from now on always ...", "this is how I want it" or corrects the same thing twice.
+- Phrase it as ONE general, unambiguous sentence with an example if needed
+  (e.g. `Internal variables start with _ (e.g. _nState).`), not as a note about the current object.
+- `scope=personal` = only this user, all solutions; `scope=project` (default) = this solution, for the team (Git).
+  If it is unclear whether the user means "always" or "in this project", ask briefly.
+- `dryRun=true` shows the entry first; tell the user in one sentence what you added and to which file.
+  Existing rules are never changed or removed by TcAgent - the user edits the file for that.
+- Never put passwords, customer secrets or temporary task notes into rule files.
+
+**Other knowledge sources** - not coding rules, keep them apart:
+`tc_lessons` (solutions to hard TwinCAT problems), `tc_docs` (manuals, read only), `tc_doc` (program documentation /
+project memory). Skills of the user (e.g. a library-specific coding-rules skill) are additional rules from the user -
+treat them like project rules for that library.
 
 ## SFC step chains
 
@@ -164,9 +211,14 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
   Product names without revision usually work; otherwise include the revision (`EL6001-0000-0020`). Then `tc_tree` for the paths.
 - `tc_xml_get` reads the XML description of a tree item (terminals, tasks, parameters). To change it,
   write this format back with `tc_xml_set` - only the parts to change.
-- **Link:** declare PLC variables with `AT %I*` (input) or `AT %Q*` (output), then `tc_build`
+- **Link:** declare PLC variables with `AT %I*` (input) or `AT %Q*` (output), make sure a task calls the program
+  (`tc_task action=list`; if the PLC has no task reference: `tc_task action=assign` - with the user's OK), then `tc_build`
   (a real build - only then does the process image exist), get paths with `tc_io_vars` (terminal and
-  `TIPC^<Plc>^<Plc> Instance`), then all links in ONE `tc_link pairs=...` ('<path> => <path>' per line).
+  `TIPC^<Plc>^<Plc> Instance`), then all links in ONE `tc_link pairs=...` ('<path> => <path>' per line), then `tc_build`
+  again and `tc_save`.
+- **First build with a fresh process image:** if nothing is linked to the EtherCAT master yet, XAE shows a dialog
+  "... needs at least one sync variable". Ask the user to confirm it with OK - the PLC process image is created anyway -
+  link the I/O, build again: the dialog does not come back.
 - `tc_link source target` links variables, e.g.
   `TIPC^MyPlc^MyPlc Instance^PlcTask Inputs^MAIN.bIn` with `TIID^Device 1 (EtherCAT)^Term 2 (EL1008)^Channel 1^Input`.
   Determine paths with `tc_tree` first.
@@ -256,6 +308,8 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
 
 - While the IDE shows a modal dialog, every Automation Interface call waits. Tools then return the dialog text -
   tell the user what it says; `tc_dialogs` lists open dialogs, `tc_dialogs action=close` only cancels (never Yes/OK).
+  For Visual Studio message boxes TcAgent may only see the title ('Microsoft Visual Studio'): then ask the user what the
+  dialog says and to close it - do not close it yourself, and do not retry the tool while it is open.
 - Runtime actions (activate, PLC start/stop, ADS write, runtime mode, routes) may need the user's confirmation
   (`TCAGENT_CONFIRM`). A declined confirmation is final - do not retry or work around it.
 

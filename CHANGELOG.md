@@ -38,6 +38,9 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - `tc_editor_open`: search tolerant to equal node names and lazily loaded nodes; falls back to opening the object's file;
   the error names the Solution Explorer nodes that were found. The cursor is set in the TwinCAT text editor itself;
   actions and transitions (no declaration part) get the cursor at their implementation line.
+- Agent guide (SKILL.md, agents/TCAGENT_GUIDE.md): new section "Coding rules" - sources and precedence, why project
+  rules live in the solution, applying and adding rules, difference to the guide and other knowledge sources; I/O linking
+  order with task reference and the EtherCAT sync dialog; VS message boxes where only the title is visible.
 - `tc_build`: the INFO messages "device … already exists in file …" (duplicate ESI device descriptions of the installation,
   100+ per build) are summed up in one line.
 - `tc_refactor apply` runs as a job: after `waitSeconds` (default 45) it returns "still waiting – k of n done" with a job id,
