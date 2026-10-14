@@ -67,6 +67,14 @@ TcAgent.exe check --solution MyMachine.sln --junit results\check.xml
 TcAgent.exe test  --solution MyMachine.sln --junit results\tests.xml
 ```
 
+Or describe the pipeline once in the repository (`.tcagent\pipeline.json`: doctor, check, build, doc, sil, ...) and let
+every CI system – and your PC – run it with one command:
+
+```powershell
+TcAgent.exe ci --init     # starter file with the solution found in the repository
+TcAgent.exe ci            # runs the steps, each with a fresh IDE; summary in results\ci-summary.md
+```
+
 Ready-made definitions for GitHub Actions, Azure DevOps, Jenkins and GitLab: [docs/PIPELINE.md](docs/PIPELINE.md).
 A GitHub runner on your PC, a VM or a Beckhoff IPC is set up with one script (`setup-runner.ps1`); `TcAgent.exe doctor`
 tells you whether a machine is ready and what is missing.

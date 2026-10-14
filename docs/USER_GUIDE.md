@@ -1339,9 +1339,17 @@ GitHub runner with the label `twincat` and starts it at logon (not as a service 
 | `sil --solution X.sln --plc Tests` | Software in the loop on the runtime of the build PC, with clean-up |
 | `hil --solution X.sln --target <NetId> --allow <NetId>` | Hardware in the loop on a remote test PLC – only with explicit allowance |
 | `feedback --open --markdown feedback.md` | Markdown report of `tc_feedback` entries; no IDE needed |
+| `ci [--only check,doc] [--dry-run]` | Runs the pipeline of the repository from `.tcagent\pipeline.json` (`--init` creates it) |
 | `help` | Lists all options |
 
 Without arguments, `TcAgent.exe` is the MCP server.
+
+**The pipeline in the repository.** Put the steps into `.tcagent\pipeline.json` (start with `TcAgent.exe ci --init`) and
+the CI definition only calls `TcAgent.exe ci`: it runs the steps in order (`doctor`, `check`, `build`, `doc`, `sil`, ...;
+options as JSON keys, e.g. `"failOn": "high"`), each with a fresh IDE, stops at the first failing step, groups the log per
+step and writes a summary to `results\ci-summary.md` and the GitHub job summary. The same file works on every CI system
+and on your PC (`TcAgent.exe ci --only check`). Format and options:
+[PIPELINE.md](PIPELINE.md#pipeline-configuration-in-the-repository-tcagentpipelinejson-and-tcagentexe-ci).
 
 ### Exit codes
 
@@ -1515,6 +1523,7 @@ agent and CI run gets the same rules and knowledge.
 | `libraries.lock.json` | Resolved library versions per PLC project (compared by `lock --check`) | `tc_library_lock action=write`, `TcAgent.exe lock` |
 | `doc-templates\` | Example manuals for `tc_userdoc` | you |
 | `backup\delete\` | Backups written by `tc_delete` (git-ignored via `backup\.gitignore`) | `tc_delete` |
+| `pipeline.json` | Pipeline steps for `TcAgent.exe ci` – usually in the `.tcagent` folder of the repository root (`ci` searches upwards); paths in it are relative to the folder that contains `.tcagent` | you; `TcAgent.exe ci --init` |
 
 Output next to it, outside `.tcagent`:
 

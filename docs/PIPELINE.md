@@ -19,6 +19,7 @@ exit code, JUnit XML and inline annotations.
 | `TcAgent.exe test --solution X.sln` | builds, activates on the test target, starts the PLC, waits for TcUnit, collects the results | every push to `main`, nightly |
 | `TcAgent.exe sil --solution X.sln --plc Tests` | software in the loop: like `test` on the runtime of the build PC, checks Run mode, starts the PLC if needed, optional Scope recording, always cleans up | every push / pull request |
 | `TcAgent.exe hil --solution X.sln --target 5.1.2.3.1.1 --allow 5.1.2.3.1.1` | hardware in the loop: the same on a remote test PLC with real I/O – only with an explicit allowance | nightly, release candidates |
+| `TcAgent.exe ci` | runs the pipeline defined in the repository (`.tcagent/pipeline.json`): the steps above in order, each with a fresh IDE, with a summary – see [below](#pipeline-configuration-in-the-repository-tcagentpipelinejson-and-tcagentexe-ci) | every push / pull request – one line in the CI definition |
 | `TcAgent.exe feedback --open --markdown feedback.md` | Markdown report of the agents' `tc_feedback` entries (grouped by tool, ready for GitHub issues); `--summary` for counts, `--path` for another store; no IDE needed | weekly triage of a shared feedback folder |
 
 ```powershell
@@ -31,6 +32,102 @@ TcAgent.exe test  --solution .\MyMachine.sln --junit results\tests.xml --timeout
 TcUnit did not finish in time). Pipelines can treat `3` as "retry" and `1` as "red"; `2` needs a fix in the pipeline definition.
 
 Without arguments `TcAgent.exe` is the MCP server as before; `TcAgent.exe help` lists all options.
+
+## Pipeline configuration in the repository: `.tcagent/pipeline.json` and `TcAgent.exe ci`
+
+Instead of spelling out every TcAgent call in the YAML of each CI system, the PLC repository can describe its pipeline
+itself – the same file for GitHub Actions, Azure DevOps, Jenkins, GitLab and a developer's PC:
+
+```powershell
+TcAgent.exe ci --init        # writes .tcagent\pipeline.json with the *.sln found below the current folder
+TcAgent.exe ci --dry-run     # shows the resolved command lines
+TcAgent.exe ci               # runs the steps
+```
+
+The CI definition shrinks to one call (`& $env:TCAGENT ci; exit $LASTEXITCODE`) plus uploading `results/` – see
+[github-actions-ci.yml](pipeline/github-actions-ci.yml) and [azure-pipelines-ci.yml](pipeline/azure-pipelines-ci.yml).
+
+**The file.** `ci` looks for `.tcagent/pipeline.json` in the current folder and its parents (or takes `--config <file>`).
+The folder that contains `.tcagent` is the *repository root*: all relative paths are relative to it, and the steps run
+there. Comments (`//`, `/* */`) and trailing commas are allowed. Full example:
+[pipeline.example.json](pipeline/pipeline.example.json).
+
+```jsonc
+{
+  "solution": "TwinCAT/MyMachine.sln",        // relative to the repository root
+  "results": "results",                        // JUnit, documentation, artifacts, ci-summary.md (default "results")
+  "allowTargets": "local",                     // TCAGENT_ALLOW_TARGETS for the steps (optional; otherwise inherited)
+  "steps": [
+    { "run": "doctor" },
+    { "run": "check", "warningsAsErrors": false },
+    { "run": "build" },
+    { "run": "analyze", "plc": ["MyPlc"], "sarif": "sa.sarif", "continueOnError": true },
+    { "run": "doc", "risks": true, "failOn": "high" },
+    { "run": "sil", "target": "local", "plc": ["MyMachine_Tests"], "timeout": 900 },
+    { "run": "hil", "target": "5.80.201.232.1.1", "allow": "5.80.201.232.1.1", "enabled": false },
+    { "run": "library", "plc": "MyLib", "out": "MyLib.library", "install": false },
+    { "run": "archive", "out": "MyMachine.tszip" },
+    { "name": "rebuild with all checks", "run": "build", "rebuild": true, "args": ["--check-all"] }
+  ]
+}
+```
+
+| Key | Meaning |
+|---|---|
+| `solution` | the `.sln`, relative to the repository root. Needed by every step that opens a solution. `ci --solution <sln>` overrides it. |
+| `results` | folder for the results (default `results`), created if missing |
+| `allowTargets` | sets `TCAGENT_ALLOW_TARGETS` for the steps (string or list); without it the variable of the CI agent applies |
+| `steps` | the steps, run in this order |
+
+**A step** is `{ "run": "<command>", ...options }` – any `TcAgent.exe` command (`check`, `build`, `analyze`, `doc`,
+`test`, `sil`, `hil`, `library`, `archive`, `scope`, `doctor`, `feedback`, and commands added later); a plain string
+`"check"` is short for `{ "run": "check" }`. The options are the command line options of the command:
+
+| In the step | On the command line |
+|---|---|
+| `"warningsAsErrors": true` / `false` | `--warnings-as-errors` / nothing (camelCase becomes kebab-case; `"fail-on"` works as well) |
+| `"timeout": 900`, `"target": "local"` | `--timeout 900`, `--target local` |
+| `"plc": ["A", "B"]` | `--plc A,B` |
+| `"args": ["--check-all"]` | appended verbatim |
+| `"name": "..."` | name in the log and the summary; `--only`/`--from` accept it |
+| `"continueOnError": true` | a failure does not stop the pipeline – the following steps run, the failure still counts for the exit code |
+| `"enabled": false` | step is skipped (e.g. `hil` until the test bench is ready); `--only <step>` runs it anyway |
+| `"openSolution": true` | `doctor` only: also opens the solution once (`doctor --solution`) |
+
+Added automatically:
+
+* `--solution <solution>` for every command that opens a solution (not for `doctor` – unless `"openSolution": true` –,
+  `feedback`, `install`). A step with its own `"solution"` (or `"attach"`) keeps it; `"solution": false` adds none.
+* `--junit <results>/<nn>-<run>.xml` for `check`, `build`, `analyze`, `test`, `sil`, `hil` (`nn` = position in the file,
+  e.g. `results/02-check.xml`), unless the step sets `"junit"`.
+* `doc` without `"out"`: `--out <results>/<solution name>.html`.
+* Relative `junit`, `out`, `sarif` and `markdown` paths are placed in the results folder (`"sarif": "sa.sarif"` →
+  `results/sa.sarif`); absolute paths stay as they are.
+
+**Running.** `ci` itself never opens the IDE: every step is a child process of the same `TcAgent.exe` – the commands run
+exactly as on the command line, every step gets a fresh IDE, and one step cannot leave the next one a half-changed IDE.
+Their output appears in the log as it comes, each step under a header `== [2/6] check ==`; on GitHub Actions each step is
+a collapsible log group (`::group::`), on Azure DevOps as well (`##[group]`). After each step a line
+`-- [2/6] check: OK (exit 0, 41.2 s)`.
+
+* The first failing step stops the pipeline (unless `continueOnError`); the remaining steps are listed as "not run".
+* **Exit code** of `ci`: 0 if all steps passed, otherwise the most significant exit code of the failed steps –
+  `2` (wrong call / refused: the definition must be fixed) before `1` (compiler errors, failed tests, risk gate) before
+  `3` (infrastructure – a retry may help). Other exit codes (crash) count as `3`. A broken `pipeline.json` is exit `2`
+  before anything runs.
+* **Summary** at the end: table of step, exit code, duration and result on the console, as Markdown in
+  `<results>/ci-summary.md`, and – on GitHub Actions – in the job summary of the run (`GITHUB_STEP_SUMMARY`).
+
+| Option | |
+|---|---|
+| `--config <file>` | another pipeline file; the repository root is the folder containing its `.tcagent` folder, otherwise its own folder |
+| `--only <a,b>` | only these steps (by `run` or `name`), e.g. `--only check,doc`; also runs steps with `"enabled": false` |
+| `--from <n\|step>` | start at step *n* (position in the file) or at the first step with that `run`/`name` – e.g. after fixing a test |
+| `--dry-run` | print the resolved command lines (and skipped steps), run nothing |
+| `--init` | write a starter `.tcagent/pipeline.json` (doctor, check, build, doc with risks, test with `"enabled": false`); finds the `*.sln` up to 3 levels below the current folder; never overwrites an existing file |
+| `--solution <sln>` | use this solution instead of the file's `solution` |
+
+Locally the same file is the quickest check before a push: `TcAgent.exe ci --only check,doc`.
 
 ## What `test` does
 
@@ -255,6 +352,9 @@ Ready-to-copy definitions in [docs/pipeline/](pipeline/):
 |---|---|
 | GitHub Actions (self-hosted runner) | [github-actions.yml](pipeline/github-actions.yml) – copy to `.github/workflows/` |
 | Azure DevOps (self-hosted agent) | [azure-pipelines.yml](pipeline/azure-pipelines.yml) |
+| GitHub Actions, steps in `.tcagent/pipeline.json` (`TcAgent.exe ci`) | [github-actions-ci.yml](pipeline/github-actions-ci.yml) – copy to `.github/workflows/` |
+| Azure DevOps, steps in `.tcagent/pipeline.json` (`TcAgent.exe ci`) | [azure-pipelines-ci.yml](pipeline/azure-pipelines-ci.yml) |
+| The pipeline file itself (all keys, with comments) | [pipeline.example.json](pipeline/pipeline.example.json) – copy to `.tcagent/pipeline.json` |
 | Jenkins | [Jenkinsfile](pipeline/Jenkinsfile) |
 | GitLab CI (Windows shell runner) | [gitlab-ci.yml](pipeline/gitlab-ci.yml) – copy to `.gitlab-ci.yml` |
 | Library + tests, `check -> build -> sil -> library` (GitHub Actions) | [library-github-actions.yml](pipeline/library-github-actions.yml) |
