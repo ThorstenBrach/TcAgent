@@ -8,7 +8,7 @@ namespace TcAgent;
 
 public static class Program
 {
-    public const string ServerVersion = "0.22.6";
+    public const string ServerVersion = "0.22.7";
     public static string ClientName = "unknown";
 
     public static int Main(string[] args)

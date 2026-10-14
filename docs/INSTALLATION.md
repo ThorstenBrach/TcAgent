@@ -36,7 +36,10 @@ The remaining sections describe the **manual / developer setup** from source.
 
 The TwinCAT XAE Shell works as well (TcAgent attaches to `TcXaeShell.DTE`). The VS extension (step 3, chat window and inline
 question) is built for the shell with `vsbridge\install-xaeshell.ps1` (close the shell first; asks for administrator rights) -
-the VSIX itself only installs into Visual Studio 2022.
+the VSIX itself only installs into Visual Studio 2022. The server (`TcAgent.exe`) for the shell comes from that VSIX: after an
+update install the VSIX of the same version (double-click) and run `install-xaeshell.ps1`; on its next start the shell copies
+the new server from the VSIX and registers it (the chat window shows "TcAgent server x ≠ extension y" in orange until then -
+"Set up clients" does it at once, then "New chat").
 
 Optional, for the Scope and HMI tools: **TE1300 Scope View** (`tc_scope`) and **TE2000 HMI Engineering** (`tc_hmi*`).
 

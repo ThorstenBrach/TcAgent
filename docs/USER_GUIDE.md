@@ -123,7 +123,12 @@ To check that the extension is running, ask *"Is the TcAgent bridge running?"* â
 (diagnostics, writes `probe.txt`) and `lm_call` (advanced read-only diagnostics). You will rarely need these.
 
 **TwinCAT XAE Shell:** TcAgent controls the shell like Visual Studio. For the chat window and the inline question in the
-shell, run `vsbridge\install-xaeshell.ps1` once (shell closed, asks for administrator rights).
+shell, run `vsbridge\install-xaeshell.ps1` once (shell closed, asks for administrator rights). After an update install the VSIX
+of the same version too - the shell takes the new `TcAgent.exe` from it.
+
+The chat window shows the TcAgent version at the top right. If it says *"TcAgent server x â‰  extension y"* in orange, the chat
+still starts the old server: click **Set up clients**, then **New chat**. The backend you chose last (Claude, Copilot,
+Gemini, Codex) is selected again the next time.
 
 ### How the agent works
 

@@ -24,8 +24,64 @@ namespace TcAgentBridge
         static readonly string StateFile = Path.Combine(Local, "setup-state.json");
         static readonly string SetupLog = Path.Combine(Local, "setup.log");
 
-        /// <summary>Source folder "tcagent" in the installed extension; not present for a developer installation via install.ps1.</summary>
-        static string Source => Path.Combine(Path.GetDirectoryName(typeof(Installer).Assembly.Location) ?? "", "tcagent");
+        /// <summary>Source folder "tcagent" with TcAgent.exe: in the installed extension itself (VSIX in Visual Studio 2022) or -
+        /// for the TwinCAT XAE Shell, whose bridge is installed without the server by install-xaeshell.ps1 - in the VSIX of the
+        /// same version that is installed in Visual Studio 2022 (%LOCALAPPDATA%\Microsoft\VisualStudio\17.0_*\Extensions\*).
+        /// So a double-click on the VSIX also updates the server for the XAE Shell. Empty for a developer installation.</summary>
+        static string Source
+        {
+            get
+            {
+                if (source != null) return source;
+                var s = FindSource();
+                // cache only a hit: a VSIX installed in VS 2022 while the XAE Shell is running is still found later
+                if (File.Exists(Path.Combine(s, "TcAgent.exe"))) source = s;
+                return s;
+            }
+        }
+        static string source;
+
+        static string FindSource()
+        {
+            var own = Path.Combine(Path.GetDirectoryName(typeof(Installer).Assembly.Location) ?? "", "tcagent");
+            if (File.Exists(Path.Combine(own, "TcAgent.exe"))) return own;
+            try
+            {
+                var vs = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Microsoft", "VisualStudio");
+                if (!Directory.Exists(vs)) return own;
+                foreach (var inst in Directory.GetDirectories(vs, "17.0_*"))
+                {
+                    var ext = Path.Combine(inst, "Extensions");
+                    if (!Directory.Exists(ext)) continue;
+                    foreach (var d in Directory.GetDirectories(ext))
+                    {
+                        var exe = Path.Combine(d, "tcagent", "TcAgent.exe");
+                        var manifest = Path.Combine(d, "extension.vsixmanifest");
+                        if (!File.Exists(exe) || !File.Exists(manifest)) continue;
+                        var m = File.ReadAllText(manifest);
+                        if (m.IndexOf("TcAgentBridge", StringComparison.OrdinalIgnoreCase) >= 0 &&
+                            m.IndexOf("Version=\"" + BridgePackage.BridgeVersion + "\"", StringComparison.Ordinal) >= 0)
+                            return Path.Combine(d, "tcagent");
+                    }
+                }
+            }
+            catch { }
+            return own;
+        }
+
+        /// <summary>Version of the TcAgent.exe the chat and the AI clients start (from mcp-claude.json, folder app\&lt;version&gt;),
+        /// null if not set up.</summary>
+        public static string RegisteredServerVersion()
+        {
+            try
+            {
+                var f = Path.Combine(Local, "mcp-claude.json");
+                if (!File.Exists(f)) return null;
+                var m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(f), @"app[\\/]+([0-9][0-9.]*[0-9])[\\/]+TcAgent\.exe", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                return m.Success ? m.Groups[1].Value : null;
+            }
+            catch { return null; }
+        }
 
         public static string AppDir => Path.Combine(Local, "app", BridgePackage.BridgeVersion);
         public static string Exe => Path.Combine(AppDir, "TcAgent.exe");

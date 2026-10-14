@@ -60,6 +60,9 @@ namespace TcAgentBridge
             DockPanel.SetDock(clear, Dock.Right);
             top.Children.Add(clear);
             if (Installer.IsVsixInstall) { DockPanel.SetDock(setup, Dock.Right); top.Children.Add(setup); }
+            DockPanel.SetDock(versionLabel, Dock.Right);
+            top.Children.Add(versionLabel);
+            UpdateVersionLabel();
             var left = new WrapPanel();
             left.Children.Add(backendBox); left.Children.Add(contextBox); left.Children.Add(buildBox);
             top.Children.Add(left);

@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.22.6] – 2026-10-14
+## [0.22.7] – 2026-10-14
 
 ### Added
 - **User guide** – `docs/USER_GUIDE.md`: every feature explained by task, with example prompts, what the agent does,
@@ -43,6 +43,10 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - `tc_policy action=audit_check`: changing calls from the daily log that are missing in the audit log, with the likely reason.
 
 ### Changed
+- TcAgent Chat: shows the TcAgent version at the top right - in orange "server x ≠ extension y" when the chat still starts an
+  older TcAgent.exe; the backend chosen last (Claude, Copilot, Gemini, Codex) is selected again on the next start.
+- TwinCAT XAE Shell: the bridge takes the server (`TcAgent.exe`) from the VSIX of the same version installed in Visual Studio
+  2022 and registers it - before, the shell's chat kept running the old server until Visual Studio 2022 was started.
 - Uniform file names on every level (company, personal, project): `<topic>.md` plus an optional folder `<topic>\` for more
   files – `coding-rules\` (formerly `rules\`, still read), `risk-rules\` now also personal, documents for `tc_docs` in
   `knowledge\` (formerly `docs\`, still read).
@@ -203,8 +207,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.22.6...HEAD
-[0.22.6]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.22.6
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.22.7...HEAD
+[0.22.7]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.22.7
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0

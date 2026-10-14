@@ -56,6 +56,79 @@ namespace TcAgentBridge
                                              ToolTip = "Register TcAgent in Claude, Copilot, Gemini and Codex (setup-clients.ps1)" };
         readonly Button clear = new Button { Content = "New chat", Padding = new Thickness(8, 2, 8, 2), ToolTip = "Clear history - next request starts without previous conversation" };
         readonly TextBlock status = new TextBlock { Margin = new Thickness(0, 4, 0, 0), Opacity = 0.75 };
+        readonly TextBlock versionLabel = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 8, 0), FontSize = 11, Opacity = 0.7 };
+
+        // TcAgent version in the top bar: the server the chat starts (mcp-claude.json) and the extension; a mismatch is
+        // shown in orange - the chat then still talks to the old TcAgent.exe until "Set up clients" / a VS 2022 start
+        internal void UpdateVersionLabel()
+        {
+            if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(UpdateVersionLabel)); return; }
+            var ext = BridgePackage.BridgeVersion;
+            var srv = Installer.RegisteredServerVersion();
+            if (srv == null)
+            {
+                versionLabel.Text = "TcAgent " + ext + " (server not set up)";
+                versionLabel.ToolTip = "No TcAgent server registered for the chat yet - click \"Set up clients\" (or start Visual Studio 2022 once after installing the VSIX).";
+                versionLabel.ClearValue(TextBlock.ForegroundProperty); versionLabel.Opacity = 0.9;
+            }
+            else if (srv == ext)
+            {
+                versionLabel.Text = "TcAgent " + ext;
+                versionLabel.ToolTip = "TcAgent server and extension " + ext;
+                versionLabel.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey); versionLabel.Opacity = 0.7;
+            }
+            else
+            {
+                versionLabel.Text = "TcAgent server " + srv + " \u2260 extension " + ext;
+                versionLabel.ToolTip = "The chat still starts TcAgent " + srv + ". Click \"Set up clients\" (or start Visual Studio 2022 once after installing the VSIX), then \"New chat\".";
+                versionLabel.Foreground = new SolidColorBrush(System.Windows.Media.Color.FromRgb(0xE0, 0x7B, 0x00)); versionLabel.Opacity = 1;
+            }
+        }
+
+        // the backend chosen last is the default next time (chat-backends.json "default")
+        void SaveDefaultBackend(string key)
+        {
+            if (string.IsNullOrEmpty(key)) return;
+            try
+            {
+                var ser = new JavaScriptSerializer();
+                // no file yet: setup-clients.ps1 writes the full template later - do not create a partial one before it
+                if (!File.Exists(SettingsFile)) return;
+                var js = ser.Deserialize<Dictionary<string, object>>(File.ReadAllText(SettingsFile));
+                if (js.TryGetValue("default", out var d) && d as string == key) return;
+                js["default"] = key;
+                Directory.CreateDirectory(Dir);
+                File.WriteAllText(SettingsFile, Indent(ser.Serialize(js)), new UTF8Encoding(false));
+            }
+            catch (Exception ex) { status.Text = "Could not remember the backend: " + ex.Message; }
+        }
+
+        // JavaScriptSerializer writes one line - keep chat-backends.json readable for manual editing
+        static string Indent(string json)
+        {
+            var sb = new StringBuilder(); int depth = 0; bool str = false, esc = false;
+            for (int i = 0; i < json.Length; i++)
+            {
+                var ch = json[i];
+                if (str)
+                {
+                    // inside a string: copy verbatim, track escapes (a string may end with an escaped backslash: "C:\\")
+                    sb.Append(ch);
+                    if (esc) esc = false; else if (ch == '\\') esc = true; else if (ch == '"') str = false;
+                    continue;
+                }
+                if (ch == '"') { str = true; sb.Append(ch); continue; }
+                switch (ch)
+                {
+                    case '{': case '[': sb.Append(ch).Append('\n').Append(' ', ++depth * 2); break;
+                    case '}': case ']': sb.Append('\n').Append(' ', --depth * 2).Append(ch); break;
+                    case ',': sb.Append(ch).Append('\n').Append(' ', depth * 2); break;
+                    case ':': sb.Append(": "); break;
+                    default: sb.Append(ch); break;
+                }
+            }
+            return sb.ToString();
+        }
 
         readonly List<Backend> backends = new List<Backend>();
         readonly List<KeyValuePair<string, string>> history = new List<KeyValuePair<string, string>>();
@@ -68,6 +141,7 @@ namespace TcAgentBridge
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(() => Notice(msg))); return; }
             SystemLine("[TcAgent] " + msg);
+            UpdateVersionLabel();      // e.g. after the automatic setup at startup ("TcAgent x registered")
         }
 
         internal void FocusInput()
@@ -99,12 +173,12 @@ namespace TcAgentBridge
             setup.Click += (s, e) =>
             {
                 status.Text = "Setting up AI clients ...";
-                System.Threading.Tasks.Task.Run(() => Installer.Run(true, _ => { }, m => BridgePackage.Instance?.Notify(m)));
+                System.Threading.Tasks.Task.Run(() => { Installer.Run(true, _ => { }, m => BridgePackage.Instance?.Notify(m)); UpdateVersionLabel(); });
             };
-            clear.Click += (s, e) => { history.Clear(); msgs.Children.Clear(); cur = null; KillSession(); status.Text = "New conversation."; WarmUp(); };
+            clear.Click += (s, e) => { history.Clear(); msgs.Children.Clear(); cur = null; KillSession(); UpdateVersionLabel(); status.Text = "New conversation."; WarmUp(); };
             // Pre-start the Claude session as soon as the window becomes visible or the backend changes
             IsVisibleChanged += (s, e) => { if (IsVisible) WarmUp(); };
-            backendBox.SelectionChanged += (s, e) => { if (IsVisible && !busy) WarmUp(); };
+            backendBox.SelectionChanged += (s, e) => { SaveDefaultBackend(Current?.Key); if (IsVisible && !busy) WarmUp(); };
             Dispatcher.ShutdownStarted += (s, e) => KillSession();
             input.PreviewKeyDown += (s, e) =>
             {

@@ -46,6 +46,7 @@ function Invoke-Install {
     if (Test-Path $flag) { (Get-Item $flag).LastWriteTime = Get-Date } else { New-Item -ItemType File $flag | Out-Null }
     Write-Host "Configuration refresh requested ($flag)"
     Write-Host "Done. Start the XAE Shell: View > Other Windows > TcAgent Chat (or Ctrl+Shift+Q in the code editor)." -ForegroundColor Green
+    Write-Host "The server (TcAgent.exe) is taken from the VSIX of the same version installed in Visual Studio 2022 - double-click bin\TcAgent-<version>.vsix if not done yet."
 }
 
 # second stage (administrator): only copy + register
