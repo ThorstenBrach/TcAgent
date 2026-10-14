@@ -25,7 +25,7 @@ namespace TcAgentBridge
     [Guid("86c8609c-4aac-4e7e-95e6-6b96179a3c4f")]
     public sealed class BridgePackage : AsyncPackage
     {
-        public const string BridgeVersion = "0.21.3";
+        public const string BridgeVersion = "0.21.4";
         internal static BridgePackage Instance;
         static readonly Guid ExportTypeGuid = new Guid("75161BEE-FB5F-434C-A3C6-86B7CEE2B8FC");
 
@@ -1054,7 +1054,9 @@ namespace TcAgentBridge
             {
                 string n;
                 try { n = it.Name ?? ""; } catch { return false; }
-                return string.Equals(n, seg, StringComparison.OrdinalIgnoreCase) || n.StartsWith(seg + " (", StringComparison.OrdinalIgnoreCase);
+                if (string.Equals(n, seg, StringComparison.OrdinalIgnoreCase) || n.StartsWith(seg + " (", StringComparison.OrdinalIgnoreCase)) return true;
+                // the PLC project node is called "<Plc>" in the Solution Explorer, "<Plc> Project" in the tree path
+                return seg.EndsWith(" Project", StringComparison.OrdinalIgnoreCase) && string.Equals(n, seg.Substring(0, seg.Length - 8), StringComparison.OrdinalIgnoreCase);
             }
             List<EnvDTE.UIHierarchyItem> Kids(EnvDTE.UIHierarchyItem it)
             {
@@ -1075,12 +1077,19 @@ namespace TcAgentBridge
             {
                 foreach (var x in items)
                 {
-                    int next = Is(x, segs[idx]) ? idx + 1 : idx;
-                    if (next == segs.Length) return x;
-                    if ((next > idx || depth <= 3) && depth <= 9)
+                    bool match = Is(x, segs[idx]);
+                    if (match && idx + 1 == segs.Length) return x;
+                    if ((!match && depth > 3) || depth > 9) continue;
+                    var kids = Kids(x);
+                    if (match)
                     {
-                        var hit = Find(Kids(x), next, depth + 1);
+                        var hit = Find(kids, idx + 1, depth + 1);
                         if (hit != null) return hit;
+                    }
+                    if (depth <= 3)
+                    {
+                        var hit2 = Find(kids, idx, depth + 1);
+                        if (hit2 != null) return hit2;
                     }
                 }
                 return null;

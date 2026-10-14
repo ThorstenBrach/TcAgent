@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.21.3] – not released yet
+## [0.21.4] – not released yet
 
 ### Added
 - **SIL / HIL test runs** – `TcAgent.exe sil` runs TcUnit on the runtime of the build PC (Run-mode check, PLC login/start
@@ -176,8 +176,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.21.3...HEAD
-[0.21.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.21.3
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.21.4...HEAD
+[0.21.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.21.4
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0

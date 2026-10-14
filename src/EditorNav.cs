@@ -102,7 +102,9 @@ public sealed partial class ToolRegistry
         {
             string n;
             try { n = x.Name ?? ""; } catch { return false; }
-            return string.Equals(n, seg, StringComparison.OrdinalIgnoreCase) || n.StartsWith(seg + " (", StringComparison.OrdinalIgnoreCase);
+            if (string.Equals(n, seg, StringComparison.OrdinalIgnoreCase) || n.StartsWith(seg + " (", StringComparison.OrdinalIgnoreCase)) return true;
+                // the PLC project node is called "<Plc>" in the Solution Explorer, "<Plc> Project" in the tree path
+                return seg.EndsWith(" Project", StringComparison.OrdinalIgnoreCase) && string.Equals(n, seg.Substring(0, seg.Length - 8), StringComparison.OrdinalIgnoreCase);
         }
         List<EnvDTE.UIHierarchyItem> Kids(EnvDTE.UIHierarchyItem x)
         {
@@ -131,20 +133,28 @@ public sealed partial class ToolRegistry
         var dump = new List<string>();
         int bestIdx = 0; string bestWhere = null; List<string> bestKids = null;
         string Nm(EnvDTE.UIHierarchyItem x) { try { return x.Name ?? ""; } catch { return "?"; } }
+        // a node may match the next segment (then the path continues below it) or - in the upper levels - be a node
+        // in between (Solution, TwinCAT project, "PLC"); both are tried, because names repeat ("MyPlc" > PLC > "MyPlc")
         EnvDTE.UIHierarchyItem Find(List<EnvDTE.UIHierarchyItem> items, int idx, int depth)
         {
             foreach (var x in items)
             {
                 if (depth <= 1 && dump.Count < 120) dump.Add(new string(' ', depth * 2) + Nm(x));
-                int next = Is(x, segs[idx]) ? idx + 1 : idx;
-                if (next == segs.Length) return x;
-                if (next > idx || depth <= 3)
+                bool match = Is(x, segs[idx]);
+                if (match && idx + 1 == segs.Length) return x;
+                if (!match && depth > 3) continue;
+                if (depth > 9) continue;
+                var kids = Kids(x);
+                if (depth >= 2 && dump.Count < 120) dump.Add($"{new string(' ', depth * 2)}{Nm(x)} -> [{string.Join(", ", kids.Select(Nm).Take(12))}]");
+                if (match)
                 {
-                    if (depth > 9) continue;
-                    var kids = Kids(x);
-                    if (depth >= 2 && dump.Count < 120) dump.Add($"{new string(' ', depth * 2)}{Nm(x)} -> [{string.Join(", ", kids.Select(Nm).Take(12))}]");
-                    if (next > bestIdx) { bestIdx = next; bestWhere = string.Join("^", segs.Take(next)); bestKids = kids.Select(Nm).Take(25).ToList(); }
-                    var hit = Find(kids, next, depth + 1);
+                    if (idx + 1 > bestIdx) { bestIdx = idx + 1; bestWhere = string.Join("^", segs.Take(idx + 1)); bestKids = kids.Select(Nm).Take(25).ToList(); }
+                    var hit = Find(kids, idx + 1, depth + 1);
+                    if (hit != null) return hit;
+                }
+                if (depth <= 3)
+                {
+                    var hit = Find(kids, idx, depth + 1);
                     if (hit != null) return hit;
                 }
             }
