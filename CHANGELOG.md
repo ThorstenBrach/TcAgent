@@ -5,7 +5,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.22.0] – not released yet
+## [0.22.1] – not released yet
 
 ### Added
 - **SIL / HIL test runs** – `TcAgent.exe sil` runs TcUnit on the runtime of the build PC (Run-mode check, PLC login/start
@@ -15,7 +15,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   solution: docs and ready-made pipelines (`docs/pipeline/library-*.yml`).
 - **Risk rules** – `risk-rules.md` files configure the risk analysis like the coding rules (company `TCAGENT_RISK_RULES`, personal
   `%LOCALAPPDATA%\TcAgent\risk-rules.md`, project `<solution>\.tcagent\risk-rules.md`; later wins): switch off built-in rules or change
-  their severity and thresholds, own text rules (`find`/`require` regex with `unless`, `kinds`, `objects`, `in`, `comments`), and checks
+  their severity and thresholds, own text rules (`find`/`require` regex with `unless` (checked on the whole statement), `kinds`, `objects`, `in`, `comments`), and checks
   the agent verifies by reading the code. New tool `tc_risk_rules` (`show`, `test` on the project without saving, `add`, `builtin`,
   `check`); template `docs/risk-rules.example.md`; used by `tc_doc action=risks`, the HTML page and `TcAgent.exe doc --risks`.
 - **Risk analysis** – `tc_doc action=risks`: static analysis of the ST code with 13 documented rules (division without

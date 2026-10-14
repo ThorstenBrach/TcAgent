@@ -369,7 +369,15 @@ public sealed partial class PlcDoc
                 {
                     var line = lineOf(m.Index);
                     if (!seen.Add(line)) continue;                                   // one finding per line
-                    if (rule.Unless != null && line - 1 < lines.Length && rule.Unless.IsMatch(lines[line - 1])) continue;
+                    // unless: the line of the match and the whole statement (to the next ';') - calls often span several lines
+                    if (rule.Unless != null)
+                    {
+                        var stmtStart = text.LastIndexOf('\n', Math.Max(0, m.Index - 1)) + 1;
+                        var semi = text.IndexOf(';', m.Index);
+                        var lineEnd = text.IndexOf('\n', m.Index);
+                        var stmtEnd = Math.Max(semi < 0 ? text.Length : semi + 1, lineEnd < 0 ? text.Length : lineEnd);
+                        if (rule.Unless.IsMatch(text[stmtStart..stmtEnd])) continue;
+                    }
                     AddRisk(r, rule.Severity, p.Key, line, rule.Id, rule.Message, part);
                 }
             }

@@ -94,7 +94,7 @@ public sealed partial class ToolRegistry
                    P("id", "string", "add/test: rule id, letters/digits/-, e.g. no-memcpy-without-sizeof"),
                    P("find", "string", "add/test: regular expression - every match is a finding (one per line), e.g. \\bMEMCPY\\s*\\("),
                    P("require", "string", "add/test: regular expression that MUST occur in each selected object - finding if missing (instead of find)"),
-                   P("unless", "string", "add/test: regular expression - no finding if the line of the match also matches, e.g. SIZEOF"),
+                   P("unless", "string", "add/test: regular expression - no finding if the statement of the match (its line up to the next ';') also matches, e.g. SIZEOF"),
                    P("unlessInObject", "string", "add/test: regular expression - object skipped if it matches anywhere in it"),
                    P("in", "string", "add/test: impl (default), decl or both"),
                    P("kinds", "string", "add/test: object kinds, e.g. 'FB, METHOD' (PROGRAM, FUNCTION_BLOCK/FB, FUNCTION, METHOD, PROPERTY, ACTION, TRANSITION, GVL, DUT, INTERFACE)"),

@@ -45,18 +45,14 @@
 - require: `\A(?:.*\n){0,3}\s*(///|//|\(\*)`
 - message: No header comment in the first lines of the declaration - describe purpose, inputs/outputs and error behaviour.
 
-## Rule wait-loop
-- severity: high
-- find: `\bWHILE\b[^;]*\bDO\b`
-- kinds: METHOD, FUNCTION
-- message: WHILE in a method/function - waiting for a signal inside one call blocks the task; use a state machine over several cycles.
-
 ## Checks
 
-<!-- Checks the AI agent verifies by reading the code (things a regular expression cannot decide). They appear with the
+<!-- Checks the AI agent verifies by reading the code (things a regular expression cannot decide - e.g. a WHILE that
+     waits for a signal looks the same as a bounded loop over a string). They appear with the
      results of tc_doc action=risks and in the HTML page; the agent reports violations like findings. One sentence each. -->
 
 - Every MC_ function block instance (MC_Power, MC_MoveAbsolute ...): the Error output is evaluated and the ErrorID is logged or passed on.
 - Every state machine has a defined error state, and every state can reach it.
 - Outputs that move hardware are reset when the PLC goes to error or stop (no output stays TRUE after an error).
 - Timeouts exist for every wait on an external signal (sensor, drive, communication).
+- No WHILE/REPEAT loop waits for a signal inside one call (bounded loops over strings or arrays are fine) - waiting belongs in a state machine over several cycles.

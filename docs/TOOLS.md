@@ -72,7 +72,7 @@ built-in setting). Format and examples: [risk-rules.example.md](risk-rules.examp
 - `## Built-in rules` - `- <id>: off | on | severity=high|medium|low | <parameter>=<n>`; parameters: `long-code` limit (300), memberLimit (150);
   `deep-nesting` limit (5), mediumLimit (7); `magic-number` labels (3).
 - `## Rule <id>` - own text rule: `find` (regex, every match is a finding, one per line) or `require` (regex that must occur in each
-  selected object, finding if missing); optional `unless` (regex on the line of the match), `unlessInObject` (regex, skips the object),
+  selected object, finding if missing); optional `unless` (regex on the statement of the match - from its line to the next `;`, so multi-line calls count), `unlessInObject` (regex, skips the object),
   `in` (impl/decl/both), `kinds` (PROGRAM/PRG, FUNCTION_BLOCK/FB, FUNCTION, METHOD, PROPERTY, ACTION, TRANSITION, GVL, DUT, INTERFACE),
   `objects` (names with `*`/`?`), `comments: keep` (match in comments and strings too - by default they are blanked), `severity`
   (default medium), `message`, `why`, `enabled: false`. Regular expressions are case-insensitive, `^`/`$` per line, 2 s timeout.
