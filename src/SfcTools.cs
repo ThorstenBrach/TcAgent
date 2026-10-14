@@ -86,13 +86,15 @@ public sealed partial class ToolRegistry
     string SfcRenumber(SfcCtx c, JsonObject a)
     {
         var original = new XDocument(c.Doc);
-        var order = (Str(a, "order") ?? "main").ToLowerInvariant();
+        var order = (Str(a, "order") ?? "chain").ToLowerInvariant();   // default: reading order of action=read
         if (order is not ("main" or "chain")) throw new Exception("order: main (main sequence first, then the branches) or chain (order of action=read)");
         var all = SfcStepOrder(c.Sfc, order, out var orderNote);
         if (all.Count == 0) throw new Exception("the chart has no steps");
         var sel = SelectSteps(all, Str(a, "steps"));
         if (sel.Count == 0) throw new Exception("steps: no step selected");
-        int start = Int(a, "start", 10), inc = Int(a, "step", 10), digits = Int(a, "digits", 3);
+        // default start: the number of the first selected step (N000 stays N000), otherwise 10
+        var firstNo = Regex.Match(sel[0], @"(\d+)$");
+        int start = Int(a, "start", firstNo.Success && int.TryParse(firstNo.Groups[1].Value, out var fn) ? fn : 10), inc = Int(a, "step", 10), digits = Int(a, "digits", 3);
         if (start < 0 || inc < 1 || digits < 1 || digits > 9) throw new Exception("start >= 0, step >= 1, digits 1..9");
         var prefix = Str(a, "prefix");
         if (string.IsNullOrEmpty(prefix))

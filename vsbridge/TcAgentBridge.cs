@@ -1072,16 +1072,27 @@ namespace TcAgentBridge
             // PLC node (e.g. "MyPlc") below Solution > TwinCAT project > PLC (breadth-first, depth <= 4)
             var level = new List<EnvDTE.UIHierarchyItem>();
             foreach (EnvDTE.UIHierarchyItem it in dte.ToolWindows.SolutionExplorer.UIHierarchyItems) level.Add(it);
-            EnvDTE.UIHierarchyItem cur = null;
-            for (int depth = 0; depth < 4 && cur == null && level.Count > 0; depth++)
+            // The TwinCAT project node and the PLC node often have the same name (e.g. "MyPlc" > PLC > "MyPlc"):
+            // try every node named like segs[1] (breadth-first, depth <= 5) and keep the first one the rest of the path fits
+            EnvDTE.UIHierarchyItem Descend(EnvDTE.UIHierarchyItem start)
             {
-                cur = level.FirstOrDefault(x => Is(x, segs[1]));
-                if (cur == null) level = level.SelectMany(x => (IEnumerable<EnvDTE.UIHierarchyItem>)Kids(x)).ToList();
+                var c = start;
+                for (int i = 2; c != null && i < segs.Length; i++)
+                {
+                    var seg = segs[i];
+                    c = Kids(c).FirstOrDefault(x => Is(x, seg));
+                }
+                return c;
             }
-            for (int i = 2; cur != null && i < segs.Length; i++)
+            EnvDTE.UIHierarchyItem cur = null;
+            for (int depth = 0; depth < 5 && cur == null && level.Count > 0; depth++)
             {
-                var seg = segs[i];
-                cur = Kids(cur).FirstOrDefault(x => Is(x, seg));
+                foreach (var cand in level.Where(x => Is(x, segs[1])).ToList())
+                {
+                    cur = Descend(cand);
+                    if (cur != null) break;
+                }
+                if (cur == null) level = level.SelectMany(x => (IEnumerable<EnvDTE.UIHierarchyItem>)Kids(x)).ToList();
             }
             // collapse nodes expanded for the search that are not on the way to the target
             var keep = new HashSet<EnvDTE.UIHierarchyItems>();

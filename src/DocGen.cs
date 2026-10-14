@@ -1028,7 +1028,7 @@ public sealed partial class ToolRegistry
                       "Explanations are kept in <solution>\\.tcagent\\doc-summaries.json and reused. For a user manual of FBs use tc_userdoc.",
             Schema(Req(P("action", "string", "outline, pending, save, html, memory or risks")),
                    P("max", "integer", "pending: objects per call (default 15); risks: max. entries (default 200)"),
-                   P("minSeverity", "string", "risks: high, medium or low (default low = all)"),
+                   P("minSeverity", "string", "risks: high, medium or low (default medium = high and medium)"),
                    P("filter", "string", "risks: only this object (part of the name) or this rule id, e.g. div-zero"),
                    P("maxChars", "integer", "pending: max. code characters per object (default 2500)"),
                    P("plcProjectPath", "string", "PLC project, e.g. TIPC^MyPlc^MyPlc Project (empty = the only one)"),

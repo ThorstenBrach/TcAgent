@@ -333,11 +333,11 @@ JUMP Init
 | `force` | boolean |  | write: also when embedded step actions would lose their step; renumber: also when code outside the POU references renamed steps; comments: also when they do not look like the language the guidelines require (only after asking the user) |
 | `duplicate` | string |  | write: `new` (default) = new steps get "Duplicate on copy", `all` = also existing steps, `none` = TwinCAT default |
 | `prefix` | string |  | renumber: name prefix (default: the existing prefix, e.g. `N`) |
-| `start` | integer |  | renumber: first number (default 10) |
+| `start` | integer |  | renumber: first number (default: number of the first selected step, e.g. N000 -> 0; otherwise 10) |
 | `step` | integer |  | renumber: increment (default 10) |
 | `digits` | integer |  | renumber: minimum digits, zero-padded (default 3 → `N010`) |
 | `steps` | string |  | renumber: only these steps – comma-separated (`N020,N030`) or a range in the chosen order (`N020..N070`); default all |
-| `order` | string |  | renumber: `main` (default: main sequence first, then the branches in order) or `chain` (order of action=read) |
+| `order` | string |  | renumber: `chain` (default: order of action=read) or `main` (main sequence first, then the branches in order) |
 | `renameActions` | boolean |  | renumber: rename embedded step actions `_a<old>_active` → `_a<new>_active` (default true) |
 | `comments` | object |  | comments: `{"N010": "Wait for part present", ...}` – empty text removes a comment |
 | `flags` | object |  | flags: `{"SFCInit": true, "SFCReset": false, ...}` |

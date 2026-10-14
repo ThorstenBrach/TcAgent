@@ -106,7 +106,7 @@ public sealed partial class PlcDoc
     public string RisksText(string minSeverity, int max, string filter)
     {
         var all = Risks();
-        var min = string.IsNullOrEmpty(minSeverity) ? 2 : Math.Min(2, SeverityRank(minSeverity));
+        var min = string.IsNullOrEmpty(minSeverity) ? 1 : Math.Min(2, SeverityRank(minSeverity));   // default: high + medium, low only on request
         var list = all.Where(x => x.Rank <= min && (string.IsNullOrEmpty(filter) || x.Object.Contains(filter, StringComparison.OrdinalIgnoreCase) ||
                                                     x.Rule.Equals(filter, StringComparison.OrdinalIgnoreCase))).ToList();
         var o = new StringBuilder($"Risks in {Project}: {RiskCounts(all)} (static, text based rules - verify each one in the code with tc_plc_read; " +
@@ -115,6 +115,7 @@ public sealed partial class PlcDoc
         if (list.Count == 0) o.AppendLine(all.Count == 0 ? "Nothing found." : "Nothing matches the filter.");
         foreach (var x in list.Take(Math.Max(1, max))) o.AppendLine(x.ToString());
         if (list.Count > max) o.AppendLine($"... {list.Count - max} more (max, minSeverity or filter=<object or rule>)");
+        if (string.IsNullOrEmpty(minSeverity) && all.Any(x => x.Rank == 2)) o.AppendLine($"({all.Count(x => x.Rank == 2)} low risks not listed - minSeverity=low shows them)");
         var fired = new HashSet<string>(list.Select(x => x.Rule));
         if (fired.Count > 0)
         {
