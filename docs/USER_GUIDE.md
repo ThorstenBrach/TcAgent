@@ -1300,10 +1300,20 @@ The same `TcAgent.exe` runs **without an AI** on a build server. It opens the so
 through the Automation Interface and reports with exit code, JUnit XML and inline annotations (GitHub Actions and Azure
 DevOps are detected automatically). Full details: [PIPELINE.md](PIPELINE.md).
 
+### Setting up a runner
+
+On your PC, a VM or a Beckhoff IPC that becomes the build server: install the VSIX, start Visual Studio 2022 once, then run
+`setup-runner.ps1 -RepoUrl https://github.com/<owner>/<repo> -Token <registration token> -Solution <your.sln> -Start` as
+the user the runner should run as. It installs TcAgent to `C:\Tools\TcAgent`, runs `TcAgent.exe doctor`, registers the
+GitHub runner with the label `twincat` and starts it at logon (not as a service – Visual Studio needs a desktop). Details:
+[PIPELINE.md](PIPELINE.md#setting-up-a-github-runner-in-four-steps).
+
 ### Commands
 
 | Command | What it does |
 |---|---|
+| `doctor [--solution X.sln]` | Is this machine/user ready for pipelines? Session, IDE, interop, runtime, TcUnit – with a hint per problem |
+| `install --path C:\Tools\TcAgent` | Copies TcAgent with its interop to a fixed folder for the workflows |
 | `check --solution X.sln` | "Check all objects" of every PLC project, no code generated |
 | `build --solution X.sln` | Builds the solution (`--rebuild`, `--check-all`) |
 | `analyze --solution X.sln --sarif sa.sarif` | Static analysis (TE1200), SARIF for code scanning (4026.20+); `--settings <file.csa>` |

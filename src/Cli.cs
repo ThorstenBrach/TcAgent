@@ -6,6 +6,8 @@
 //   TcAgent.exe sil   --solution <sln>             like test, on the runtime of this PC, with clean-up (CliTestRun.cs)
 //   TcAgent.exe hil   --solution <sln> --target <AmsNetId> --allow <AmsNetId>   like sil, on an explicitly allowed remote PLC
 //   TcAgent.exe feedback [--open] [--markdown f]   report of the tc_feedback entries (Markdown for GitHub issues) - no IDE needed
+//   TcAgent.exe doctor [--solution <sln>]           is this machine/user ready for pipelines? (CliDoctor.cs)
+//   TcAgent.exe install --path <folder>             copy TcAgent to a fixed folder for pipelines, e.g. C:\Tools\TcAgent
 //
 // Exit codes: 0 = OK, 1 = compiler errors / failed tests, 2 = wrong call, 3 = infrastructure problem (IDE, activation, timeout).
 // Without arguments TcAgent.exe is the MCP server as before.
@@ -23,7 +25,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install";
 
     sealed class Options
     {
@@ -48,6 +50,8 @@ public static partial class Cli
         catch (Exception ex) { Console.Error.WriteLine("Error: " + ex.Message); Console.Error.WriteLine("TcAgent.exe help shows the usage."); return Usage; }
         if (o.Command is "help") { Console.WriteLine(Help); return Ok; }
         if (o.Command is "version") { Console.WriteLine($"TcAgent {Program.ServerVersion}"); return Ok; }
+        if (o.Command is "install") return Install(o);          // CliDoctor.cs - no IDE needed
+        if (o.Command is "doctor") { Program.ClientName = "cli:doctor"; return Doctor(o); }
 
         Program.ClientName = "cli:" + o.Command;
         var sta = new StaWorker();
@@ -582,7 +586,7 @@ public static partial class Cli
                 case "--solution": case "-s": o.Solution = Val(); break;
                 case "--attach": o.Attach = i + 1 < args.Length && !args[i + 1].StartsWith("--") ? args[++i] : ""; break;
                 case "--junit": case "-o": o.Junit = Val(); break;
-                case "--out": o.Out = Val(); break;
+                case "--out": case "--path": o.Out = Val(); break;
                 case "--sarif": o.Sarif = Val(); break;
                 case "--settings": o.Settings = Val(); break;
                 case "--install": o.Install = true; break;
@@ -611,6 +615,12 @@ public static partial class Cli
             }
         }
         if (o.Command is "help" or "version") return o;
+        if (o.Command is "install") return o;
+        if (o.Command is "doctor")
+        {
+            if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception("Solution not found: " + o.Solution);
+            return o;
+        }
         if (o.Solution == null && o.Attach == null) throw new Exception("--solution <path to .sln> (or --attach) is required");
         if (o.Solution != null && o.Attach != null) throw new Exception("use either --solution or --attach");
         if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception("Solution not found: " + o.Solution);
@@ -648,6 +658,15 @@ public static partial class Cli
       severity or higher.
       Uses the explanations the agent stored with tc_doc (<solution>\.tcagent\doc-summaries.json).
       Default output: <solution folder>\doc\<PLC project>.html
+
+  TcAgent.exe doctor [--solution <sln>] [--target <AmsNetId>] [--progid <ProgID>]
+      Checks whether this machine and this user can run TcAgent pipelines: desktop session (not a service), Visual
+      Studio / XAE Shell, TwinCAT XAE, interop, runtime via ADS, TcUnit, git - with a hint for every problem. With
+      --solution it opens the solution hidden like a pipeline and closes it again. Exit 0 = ready, 3 = not ready.
+
+  TcAgent.exe install --path <folder>
+      Copies this TcAgent including the interop of this TwinCAT installation to a fixed folder (e.g. C:\Tools\TcAgent)
+      for pipelines - the VSIX installs per user and per version.
 
   TcAgent.exe feedback [--open] [--markdown <file.md>] [--summary] [--path <file|folder>]
       Report of the tc_feedback entries (TCAGENT_FEEDBACK or the default store), grouped by tool, as Markdown

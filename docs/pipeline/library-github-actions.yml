@@ -30,6 +30,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Runner ready? (session, IDE, interop, runtime)
+        run: '& $env:TCAGENT doctor; exit $LASTEXITCODE'
       - name: Check all objects (both PLC projects)
         run: '& $env:TCAGENT check --solution $env:SOLUTION --junit results/check.xml; exit $LASTEXITCODE'
 

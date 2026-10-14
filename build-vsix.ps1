@@ -24,7 +24,7 @@ dotnet publish "$here\TcAgent.csproj" -c Release -r win-x64 --self-contained tru
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed - see build-vsix.log" }
 Get-ChildItem "$stage\tcagent" -Filter 'Interop.*.dll' | Remove-Item -Force
 Get-ChildItem "$stage\tcagent" -Filter '*.pdb' | Remove-Item -Force
-Copy-Item "$here\setup-clients.ps1", "$here\SKILL.md", "$here\THIRD-PARTY-NOTICES.md", "$here\LICENSE" "$stage\tcagent\"
+Copy-Item "$here\setup-clients.ps1", "$here\setup-runner.ps1", "$here\SKILL.md", "$here\THIRD-PARTY-NOTICES.md", "$here\LICENSE" "$stage\tcagent\"
 # never ship Visual Studio automation assemblies (Microsoft license) - TcAgent loads them from the user's VS
 Get-ChildItem "$stage\tcagent" -Include 'envdte*.dll','Microsoft.VisualStudio.Interop.dll' -Recurse | Remove-Item -Force
 New-Item -ItemType Directory -Force "$stage\tcagent\agents" | Out-Null

@@ -67,6 +67,8 @@ TcAgent.exe test  --solution MyMachine.sln --junit results\tests.xml
 ```
 
 Ready-made definitions for GitHub Actions, Azure DevOps, Jenkins and GitLab: [docs/PIPELINE.md](docs/PIPELINE.md).
+A GitHub runner on your PC, a VM or a Beckhoff IPC is set up with one script (`setup-runner.ps1`); `TcAgent.exe doctor`
+tells you whether a machine is ready and what is missing.
 
 ## Install
 
@@ -210,6 +212,7 @@ vsbridge/               TcAgentBridge (VS 2022 extension, .NET Framework): chat 
 agents/TCAGENT_GUIDE.md agent guide (source for AGENTS.md / GEMINI.md / CLAUDE.md / copilot-instructions.md)
 SKILL.md                the same guide as a Claude skill
 setup-clients.ps1       registers TcAgent in all AI clients (run automatically by the VSIX)
+setup-runner.ps1        sets up a GitHub Actions self-hosted runner for TwinCAT pipelines
 build.ps1, build-vsix.ps1, test.ps1
 docs/                   installation, tool reference, CI pipelines (docs/pipeline/), images
 ```

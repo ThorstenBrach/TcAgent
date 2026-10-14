@@ -147,6 +147,55 @@ TcAgent drives the real TwinCAT engineering, so the build agent is a Windows mac
 * TcAgent from source: `build.ps1` produces `bin\publish\TcAgent.exe` (including the interop generated from the local
   TwinCAT installation). Copy that folder to the machine, or build there.
 
+### Setting up a GitHub runner in four steps
+
+1. **Install TcAgent** on the machine: the VSIX (double-click), then start Visual Studio 2022 once as the runner user – it
+   copies TcAgent and generates the interop for this TwinCAT installation.
+2. **Registration token:** GitHub > repository > Settings > Actions > Runners > *New self-hosted runner* (valid for 1 hour).
+3. **As the runner user** (not as SYSTEM, not as a service), in the TcAgent folder:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\setup-runner.ps1 -RepoUrl https://github.com/<owner>/<repo> -Token <token> `
+       -Solution D:\Projects\MyMachine\MyMachine.sln -Start
+   ```
+
+   It copies TcAgent to `C:\Tools\TcAgent` (`TcAgent.exe install`), checks the machine (`TcAgent.exe doctor`, with
+   `-Solution` also an end-to-end open of the solution), downloads and registers the runner (labels `self-hosted, Windows,
+   X64, twincat`), writes `C:\actions-runner\.env` (`TCAGENT`, `TCAGENT_ALLOW_TARGETS`) and creates a scheduled task that
+   starts the runner at logon of this user. Options: `-RunnerDir`, `-TcAgentPath`, `-Name`, `-Labels`, `-AllowTargets`,
+   `-Force` (set up even if doctor reports problems), `-Uninstall`.
+4. **Dedicated build machine / VM / IPC:** enable automatic logon for that user (Sysinternals *Autologon*), so the runner
+   comes back after a reboot. Lock the screen if needed – the session stays usable.
+
+Then copy [github-actions.yml](pipeline/github-actions.yml) to `.github/workflows/` of the PLC repository. Its first step
+`TcAgent.exe doctor` stops a job at once with a clear message if the runner is not ready.
+
+### Checking a machine: `TcAgent.exe doctor`
+
+```
+TcAgent.exe doctor [--solution <sln>] [--target <AmsNetId>] [--progid <ProgID>]
+```
+
+| Check | FAIL / WARN when |
+|---|---|
+| Session | FAIL: runs in session 0 / as SYSTEM (service without desktop) |
+| IDE | FAIL: neither `VisualStudio.DTE.17.0` nor the XAE Shell is registered |
+| TwinCAT XAE | FAIL: `TCatSysManager.tlb` not found |
+| Interop | FAIL: `Interop.TCatSysManagerLib.dll` neither next to TcAgent.exe nor in `%LOCALAPPDATA%\TcAgent\lib` |
+| Runtime | WARN: no TwinCAT system service answers via ADS (needed for `test`/`sil`) |
+| TcUnit | WARN: not in the library repository |
+| git, temp folder | WARN: git missing · FAIL: temp folder not writable |
+| Solution (`--solution`) | FAIL: the solution cannot be opened hidden like in a pipeline |
+
+Licenses are only listed (TE1030 for TcAgent, the runtime licenses of the project for `test`/`sil`). Exit code 0 = ready,
+3 = not ready.
+
+### A fixed path: `TcAgent.exe install --path <folder>`
+
+The VSIX installs TcAgent per user and per version (`%LOCALAPPDATA%\TcAgent\app\<version>`). `install` copies the running
+TcAgent including the interop to a fixed folder – the workflows use `C:\Tools\TcAgent\TcAgent.exe`. Run it again after an
+update (`setup-runner.ps1` does it as well).
+
 One TwinCAT runtime can only run one configuration – run test jobs on a machine **one at a time**
 (GitHub: one runner per machine, Azure: one agent, Jenkins: one executor).
 

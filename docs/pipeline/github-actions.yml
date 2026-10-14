@@ -1,5 +1,7 @@
 # TwinCAT check + TcUnit tests with TcAgent on a self-hosted Windows runner.
-# Copy to .github/workflows/twincat.yml in your PLC repository and adjust SOLUTION and TCAGENT.
+# Copy to .github/workflows/twincat.yml in your PLC repository and adjust SOLUTION.
+# Runner: set up with setup-runner.ps1 from the TcAgent repository (installs TcAgent to C:\Tools\TcAgent, registers the runner
+# with the label twincat and starts it at logon of a normal user).
 # The runner needs Visual Studio 2022/XAE with TwinCAT 3.1, the runtime for tests, and must run as a user (see docs/PIPELINE.md).
 name: TwinCAT
 
@@ -10,7 +12,7 @@ on:
 
 env:
   SOLUTION: MyMachine.sln                              # path of the solution in the repository
-  TCAGENT: C:\Tools\TcAgent\TcAgent.exe                # where TcAgent is installed on the runner
+  TCAGENT: C:\Tools\TcAgent\TcAgent.exe                # where TcAgent is installed on the runner (setup-runner.ps1 / TcAgent.exe install)
   TCAGENT_ALLOW_TARGETS: local                         # only this PC may be activated
 
 defaults:
@@ -24,6 +26,8 @@ jobs:
     runs-on: [self-hosted, windows, twincat]
     steps:
       - uses: actions/checkout@v4
+      - name: Runner ready? (session, IDE, interop, runtime)
+        run: '& $env:TCAGENT doctor; exit $LASTEXITCODE'
       - name: Check all objects
         run: '& $env:TCAGENT check --solution $env:SOLUTION --junit results/check.xml'
       - name: Publish compiler results

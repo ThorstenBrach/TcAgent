@@ -9,6 +9,9 @@ pipeline {
         TCAGENT_ALLOW_TARGETS = 'local'
     }
     stages {
+        stage('Agent ready') {
+            steps { bat '"%TCAGENT%" doctor' }
+        }
         stage('Check') {
             steps { bat '"%TCAGENT%" check --solution "%SOLUTION%" --junit results\\check.xml' }
         }

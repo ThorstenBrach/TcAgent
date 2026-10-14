@@ -5,9 +5,15 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.22.7] – 2026-10-14
+## [0.23.0] – 2026-10-14
 
 ### Added
+- **Build server / runner** – `TcAgent.exe doctor [--solution <sln>]` checks whether a machine and user can run TcAgent
+  pipelines (desktop session instead of a service, Visual Studio / XAE Shell, TwinCAT XAE, interop, runtime via ADS, TcUnit,
+  git; with `--solution` an end-to-end open of the solution) and says what to fix; `TcAgent.exe install --path <folder>`
+  copies TcAgent with its interop to a fixed path; `setup-runner.ps1` sets up a GitHub Actions self-hosted runner for
+  TwinCAT (install, doctor, download + registration with label `twincat`, `.env` for the jobs, start at logon instead of a
+  service). The pipeline templates start with `doctor`.
 - **User guide** – `docs/USER_GUIDE.md`: every feature explained by task, with example prompts, what the agent does,
   options, limits and what needs your confirmation; CI pipeline, guardrails, configuration reference and FAQ; screenshots
   of the program documentation and animations of linking and risk rules from the test project.
@@ -207,8 +213,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.22.7...HEAD
-[0.22.7]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.22.7
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.0...HEAD
+[0.23.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.23.0
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0

@@ -16,6 +16,8 @@ variables:
 steps:
   - checkout: self
 
+  - powershell: '& "$(TCAGENT)" doctor; exit $LASTEXITCODE'
+    displayName: Agent ready?
   - powershell: '& "$(TCAGENT)" check --solution "$(SOLUTION)" --junit "$(Build.ArtifactStagingDirectory)\check.xml"'
     displayName: Check all objects
 

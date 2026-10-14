@@ -11,6 +11,7 @@ check:
   stage: check
   tags: [twincat]
   script:
+    - '& $env:TCAGENT doctor; if ($LASTEXITCODE) { exit $LASTEXITCODE }'
     - '& $env:TCAGENT check --solution $env:SOLUTION --junit results/check.xml; exit $LASTEXITCODE'
   artifacts:
     when: always
