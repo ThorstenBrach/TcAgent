@@ -143,7 +143,11 @@ public sealed partial class ToolRegistry
         try { return (string)((dynamic)it).ProduceXml(false) ?? ""; } catch { return ""; }
     }
 
-    static string SafetyShorten(string s, int max) => (s ?? "").Length <= max ? s : s[..max] + $"\n... (shortened, {s.Length} characters - maxChars)";
+    static string SafetyShorten(string s, int max)
+    {
+        s = Regex.Replace(s ?? "", @"<TreeImageData\w*>[^<]*</TreeImageData\w*>", "");   // icon bitmaps (hex) are noise
+        return s.Length <= max ? s : s[..max] + $"\n... (shortened, {s.Length} characters - maxChars)";
+    }
 
     static void Classify(string path, string name, List<(string Key, string Val)> values, List<string> groups, List<string> aliases,
                          List<string> conns, List<string> crcs, List<string> parms)
