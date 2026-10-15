@@ -256,6 +256,36 @@ public static partial class Cli
             var f = Path.Combine(d.FullName, CiFolder, CiFile);
             if (File.Exists(f)) return f;
         }
+        // not above: one pipeline file up to two levels below (e.g. TwinCAT\.tcagent\pipeline.json while the workflow runs in the root)
+        var below = new List<string>();
+        void Walk(string d, int level)
+        {
+            if (level > 2 || below.Count > 1) return;
+            string[] subs;
+            try { subs = Directory.GetDirectories(d); } catch { return; }
+            foreach (var sub in subs)
+            {
+                var n = Path.GetFileName(sub);
+                if (n.Equals(CiFolder, StringComparison.OrdinalIgnoreCase))
+                {
+                    if (level > 0 && File.Exists(Path.Combine(sub, CiFile))) below.Add(Path.Combine(sub, CiFile));
+                    continue;
+                }
+                if (n.StartsWith(".") || n is "bin" or "obj" or "_Boot" or "node_modules" or "results" or "Packages") continue;
+                Walk(sub, level + 1);
+            }
+        }
+        Walk(dir, 0);
+        if (below.Count == 1) return below[0];
+        if (below.Count > 1) throw new Exception($"several pipeline files below {dir} - pass --config <file>");
+        return null;
+    }
+
+    /// <summary>The Git repository root (folder with .git) of the directory or one of its parents, or null.</summary>
+    static string CiGitRoot(string dir)
+    {
+        for (var d = new DirectoryInfo(dir); d != null; d = d.Parent)
+            if (Directory.Exists(Path.Combine(d.FullName, ".git")) || File.Exists(Path.Combine(d.FullName, ".git"))) return d.FullName;
         return null;
     }
 
@@ -495,6 +525,13 @@ public static partial class Cli
     static int CiInit(Options o)
     {
         var cwd = Directory.GetCurrentDirectory();
+        // the workflow runs "ci" in the repository root - the file belongs there, also when --init is run in a subfolder
+        var git = CiGitRoot(cwd);
+        if (o.Config == null && git != null && !git.Equals(cwd, StringComparison.OrdinalIgnoreCase))
+        {
+            Console.WriteLine($"Git repository root: {git} - the pipeline file goes there (the workflow runs TcAgent.exe ci in the root).");
+            cwd = git;
+        }
         var file = Path.GetFullPath(o.Config ?? Path.Combine(cwd, CiFolder, CiFile));
         if (File.Exists(file))
         {

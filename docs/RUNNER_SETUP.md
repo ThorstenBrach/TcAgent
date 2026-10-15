@@ -167,7 +167,8 @@ list.
 
 **Do not click into the runner window.** In a console window a click starts *Select* mode (the title shows
 *Auswählen*/*Select*) and Windows pauses the program as soon as it writes – the job seems to hang. Press **Esc** to
-continue. To be safe: right-click the title bar → *Properties* → switch off *QuickEdit Mode*.
+continue. The window started by `setup-runner.ps1` (`run-tcagent.ps1`) has QuickEdit switched off, so a click cannot pause
+it; a window started with `run.cmd` directly still can.
 
 ## Step 6 – Run it like in operation
 
@@ -175,7 +176,8 @@ continue. To be safe: right-click the title bar → *Properties* → switch off 
 runs as a normal user. Test that once:
 
 1. Close the runner window.
-2. Log off and on again (this also tests the autostart) – or double-click `C:\actions-runner\run.cmd`.
+2. Log off and on again (this also tests the autostart) – or right-click `C:\actions-runner\run-tcagent.ps1` →
+   *Run with PowerShell*.
 3. GitHub → Actions → TwinCAT → **Run workflow**. It must be green as well.
 
 ## Dedicated build server (VM or Beckhoff IPC)
@@ -209,13 +211,13 @@ The template is a start; add steps as needed (all in [PIPELINE.md](PIPELINE.md))
 
 | Symptom | Cause / remedy |
 |---|---|
-| `Error: Solution not found: X.sln` | file name differs from the folder name (e.g. folder `MyMachine_2`, solution `MyMachine2.sln`) – `dir *.sln` |
+| `Error: Solution not found: X.sln` | file name differs from the folder name (e.g. folder `MyMachine_2`, solution `MyMachine2.sln`) – the message lists the `.sln` files in that folder |
 | `Der Operator "<" ist für zukünftige Versionen reserviert` | `<TOKEN>` typed literally – paste the token itself |
 | `git rm`: *staged content different from both the file and the HEAD* | nothing committed yet – add `-f` (only removes from the selection) |
 | thousands of files in `git status` | HMI NuGet packages (`Packages/`) or generated files – use the `.gitignore` template; patterns need `**/` to match in subfolders |
 | runner registration fails | token older than one hour or already used – reload the GitHub page |
 | run stays *Queued* | runner not started, or the workflow's `runs-on` labels do not match (`[self-hosted, windows, twincat]`) |
-| job seems to hang, runner window title shows *Select*/*Auswählen* | a click into the console window paused it – press Esc, switch off QuickEdit |
+| job seems to hang, runner window title shows *Select*/*Auswählen* | a click into the console window paused it – press Esc; start the runner with `run-tcagent.ps1` (QuickEdit off) |
 | `doctor` FAIL Session | the runner runs as a service or under SYSTEM – uninstall the service, use `setup-runner.ps1` |
 | `doctor` FAIL Interop | Visual Studio 2022 was not started once after installing the VSIX as this user |
 | step stops after 300 s with "IDE DIALOG …" | a dialog in the hidden IDE – open the solution once normally and answer it |

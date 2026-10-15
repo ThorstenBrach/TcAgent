@@ -167,6 +167,23 @@ public static partial class Cli
         return ReportCompile(o, "analyze", string.Join(", ", names), compile, sw.Elapsed.TotalSeconds);
     }
 
+    /// <summary>"Solution not found" with the .sln files that exist in that folder (typical: folder MyMachine_2, file MyMachine2.sln).</summary>
+    static string SolutionNotFound(string path)
+    {
+        var msg = "Solution not found: " + path;
+        try
+        {
+            var dir = Path.GetDirectoryName(Path.GetFullPath(path));
+            if (dir != null && Directory.Exists(dir))
+            {
+                var slns = Directory.GetFiles(dir, "*.sln").Select(Path.GetFileName).Take(5).ToList();
+                if (slns.Count > 0) msg += " - in that folder: " + string.Join(", ", slns);
+            }
+        }
+        catch { }
+        return msg;
+    }
+
     /// <summary>Saves the PLC project as .library (artifact), optionally installs it.</summary>
     static int SaveLibrary(Options o, TwinCatSession tc)
     {
@@ -711,12 +728,12 @@ public static partial class Cli
         if (o.Command is "ci") return o;                  // the steps are checked by ci itself (CliCi.cs)
         if (o.Command is "doctor")
         {
-            if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception("Solution not found: " + o.Solution);
+            if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
             return o;
         }
         if (o.Solution == null && o.Attach == null) throw new Exception("--solution <path to .sln> (or --attach) is required");
         if (o.Solution != null && o.Attach != null) throw new Exception("use either --solution or --attach");
-        if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception("Solution not found: " + o.Solution);
+        if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
         if (o.TimeoutSec < 10) throw new Exception("--timeout is in seconds (min. 10)");
         if (o.Seconds < 1) throw new Exception("--seconds must be at least 1");
         if (o.Command is "library" or "archive" or "scope" && o.Out == null) throw new Exception($"{o.Command} needs --out <file>");

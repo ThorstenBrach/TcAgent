@@ -39,7 +39,7 @@ Instead of spelling out every TcAgent call in the YAML of each CI system, the PL
 itself – the same file for GitHub Actions, Azure DevOps, Jenkins, GitLab and a developer's PC:
 
 ```powershell
-TcAgent.exe ci --init        # writes .tcagent\pipeline.json with the *.sln found below the current folder
+TcAgent.exe ci --init        # writes .tcagent\pipeline.json in the Git repository root with the *.sln found below it
 TcAgent.exe ci --dry-run     # shows the resolved command lines
 TcAgent.exe ci               # runs the steps
 ```
@@ -47,7 +47,8 @@ TcAgent.exe ci               # runs the steps
 The CI definition shrinks to one call (`& $env:TCAGENT ci; exit $LASTEXITCODE`) plus uploading `results/` – see
 [github-actions-ci.yml](pipeline/github-actions-ci.yml) and [azure-pipelines-ci.yml](pipeline/azure-pipelines-ci.yml).
 
-**The file.** `ci` looks for `.tcagent/pipeline.json` in the current folder and its parents (or takes `--config <file>`).
+**The file.** `ci` looks for `.tcagent/pipeline.json` in the current folder and its parents, then up to two levels below
+(e.g. `TwinCAT\.tcagent\pipeline.json` when the workflow runs in the repository root), or takes `--config <file>`.
 The folder that contains `.tcagent` is the *repository root*: all relative paths are relative to it, and the steps run
 there. Comments (`//`, `/* */`) and trailing commas are allowed. Full example:
 [pipeline.example.json](pipeline/pipeline.example.json).
@@ -124,7 +125,7 @@ a collapsible log group (`::group::`), on Azure DevOps as well (`##[group]`). Af
 | `--only <a,b>` | only these steps (by `run` or `name`), e.g. `--only check,doc`; also runs steps with `"enabled": false` |
 | `--from <n\|step>` | start at step *n* (position in the file) or at the first step with that `run`/`name` – e.g. after fixing a test |
 | `--dry-run` | print the resolved command lines (and skipped steps), run nothing |
-| `--init` | write a starter `.tcagent/pipeline.json` (doctor, check, build, doc with risks, test with `"enabled": false`); finds the `*.sln` up to 3 levels below the current folder; never overwrites an existing file |
+| `--init` | write a starter `.tcagent/pipeline.json` (doctor, check, build, doc with risks, test with `"enabled": false`); writes into the Git repository root (the folder the workflow runs in) when called in a subfolder, finds the `*.sln` up to 3 levels below it; never overwrites an existing file |
 | `--solution <sln>` | use this solution instead of the file's `solution` |
 
 Locally the same file is the quickest check before a push: `TcAgent.exe ci --only check,doc`.

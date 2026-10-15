@@ -5,6 +5,16 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.24.1] – 2026-10-15
+
+### Fixed
+- `ci --init` in a subfolder (e.g. next to the solution in `TwinCAT\`) writes the pipeline file into the Git repository
+  root, where the workflow runs `TcAgent.exe ci`; `ci` also finds a single `.tcagent\pipeline.json` up to two levels below
+  the current folder.
+- "Solution not found" lists the `.sln` files that exist in that folder (folder `X_2`, file `X2.sln`).
+- Runner: `setup-runner.ps1` starts the runner through `run-tcagent.ps1` with QuickEdit switched off - a click into the
+  runner window no longer pauses a job (scheduled task, Startup fallback and `-Start`).
+
 ## [0.24.0] – 2026-10-15
 
 ### Added
@@ -248,7 +258,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.0...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.1...HEAD
+[0.24.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.2...v0.24.0
 [0.23.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.23.2
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4

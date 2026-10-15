@@ -11,7 +11,8 @@
 #   3. downloads the latest GitHub runner (win-x64) to <RunnerDir> and registers it with the labels self-hosted, Windows,
 #      X64, twincat (+ -Labels)
 #   4. writes <RunnerDir>\.env with TCAGENT and TCAGENT_ALLOW_TARGETS - every job sees them as environment variables
-#   5. creates a scheduled task that starts run.cmd at logon of this user (interactive, not as a service)
+#   5. creates a scheduled task that starts the runner at logon of this user (interactive, not as a service; run-tcagent.ps1
+#      starts run.cmd with QuickEdit switched off, so a click into the window cannot pause a job)
 #   6. -Start: starts the runner now in its own window
 #
 # Afterwards: on a dedicated build machine enable automatic logon for this user (Sysinternals Autologon or netplwiz),
@@ -125,9 +126,32 @@ $lines += "TCAGENT_ALLOW_TARGETS=$AllowTargets"
 Set-Content -Path $envFile -Value $lines -Encoding ASCII
 Get-Content $envFile | ForEach-Object { Write-Host "  $_" }
 
+# ---------------------------------------------------------------- start script without QuickEdit
+# A click into a console window with QuickEdit starts "Select" mode and Windows pauses the program at its next output -
+# the job seems to hang. run-tcagent.ps1 switches QuickEdit off for the runner's window and then starts run.cmd.
+$startScript = Join-Path $RunnerDir 'run-tcagent.ps1'
+Set-Content -Path $startScript -Encoding ASCII -Value @'
+# Starts the GitHub Actions runner with QuickEdit switched off (written by TcAgent setup-runner.ps1)
+try {
+    Add-Type -Namespace TcAgent -Name Console -MemberDefinition @"
+[DllImport("kernel32.dll")] public static extern IntPtr GetStdHandle(int handle);
+[DllImport("kernel32.dll")] public static extern bool GetConsoleMode(IntPtr handle, out uint mode);
+[DllImport("kernel32.dll")] public static extern bool SetConsoleMode(IntPtr handle, uint mode);
+"@
+    $h = [TcAgent.Console]::GetStdHandle(-10)
+    $mode = [uint32]0
+    if ([TcAgent.Console]::GetConsoleMode($h, [ref]$mode)) {
+        [void][TcAgent.Console]::SetConsoleMode($h, [uint32](($mode -band 0xFFFFFFBF) -bor 0x80))   # QuickEdit off (0x40), extended flags (0x80)
+    }
+} catch { }
+$host.UI.RawUI.WindowTitle = 'GitHub Actions Runner (TcAgent) - do not click into this window'
+& (Join-Path $PSScriptRoot 'run.cmd')
+'@
+$startArgs = "-NoProfile -ExecutionPolicy Bypass -File `"$startScript`""
+
 # ---------------------------------------------------------------- 5. autostart at logon (interactive, not a service)
 Step "Autostart at logon of $($me.Name)"
-$action = New-ScheduledTaskAction -Execute 'cmd.exe' -Argument "/c `"$RunnerDir\run.cmd`"" -WorkingDirectory $RunnerDir
+$action = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument $startArgs -WorkingDirectory $RunnerDir
 $trigger = New-ScheduledTaskTrigger -AtLogOn -User $me.Name
 $principal = New-ScheduledTaskPrincipal -UserId $me.Name -LogonType Interactive -RunLevel Limited
 $settings = New-ScheduledTaskSettingsSet -ExecutionTimeLimit ([TimeSpan]::Zero) -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1) -AllowStartIfOnBatteries
@@ -137,17 +161,17 @@ try {
 } catch {
     # a logon trigger usually needs an elevated PowerShell - fall back to the user's Startup folder (no admin needed)
     $startup = Join-Path ([Environment]::GetFolderPath('Startup')) 'TcAgent-runner.cmd'
-    Set-Content -Path $startup -Value "@start `"GitHub Actions Runner`" /D `"$RunnerDir`" cmd.exe /c `"$RunnerDir\run.cmd`"" -Encoding ASCII
+    Set-Content -Path $startup -Value "@start `"GitHub Actions Runner`" /D `"$RunnerDir`" powershell.exe $startArgs" -Encoding ASCII
     Write-Host "Scheduled task not created ($($_.Exception.Message)) - using $startup instead (run elevated for the scheduled task)." -ForegroundColor Yellow
 }
 
 if ($Start) {
     Step "Starting the runner"
-    Start-Process cmd.exe -ArgumentList "/c `"$RunnerDir\run.cmd`"" -WorkingDirectory $RunnerDir
+    Start-Process powershell.exe -ArgumentList $startArgs -WorkingDirectory $RunnerDir
 }
 
 Write-Host ""
 Write-Host "Done. Runner '$Name' with labels: self-hosted, Windows, X64, $Labels" -ForegroundColor Green
 Write-Host "Workflows: runs-on: [self-hosted, windows, twincat] and call `$env:TCAGENT (see docs/pipeline/github-actions.yml)."
 Write-Host "Dedicated build machine: enable automatic logon for $($me.Name) (Sysinternals Autologon), so the runner survives a reboot."
-if (-not $Start) { Write-Host "Start it now: $RunnerDir\run.cmd  (or log off and on again)" }
+if (-not $Start) { Write-Host "Start it now: $RunnerDir\run-tcagent.ps1 (right-click > Run with PowerShell) or log off and on again" }
