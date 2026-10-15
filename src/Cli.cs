@@ -59,6 +59,14 @@ public static partial class Cli
         if (o.Command is "ci") { Program.ClientName = "cli:ci"; return Ci(o); }   // CliCi.cs - every step is its own TcAgent.exe
 
         Program.ClientName = "cli:" + o.Command;
+
+        // an explicit --target that is not allowed: refuse before the IDE is started (the same check runs again later)
+        if (o.Command is "test" or "sil" or "hil" && !string.IsNullOrWhiteSpace(o.Target) && !o.Target.Trim().Equals("local", StringComparison.OrdinalIgnoreCase))
+        {
+            try { new Policy(o.Command == "hil" ? o.Allow : Enumerable.Empty<string>()).Check("tc_activate", () => o.Target.Trim()); }
+            catch (Exception ex) { return Refused(o, "target", ex.Message + " (pass --target or set TCAGENT_ALLOW_TARGETS for the CI machine)"); }
+        }
+
         var sta = new StaWorker();
         var tc = new TwinCatSession(sta);
         bool ownIde = false;

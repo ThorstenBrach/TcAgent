@@ -5,6 +5,12 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.24.3] – 2026-10-15
+
+### Changed
+- `test`/`sil`/`hil` with an explicit `--target` that is not allowed are refused (exit 2) **before** Visual Studio is
+  started - the check took a full solution load before.
+
 ## [0.24.2] – 2026-10-15
 
 ### Fixed
@@ -265,7 +271,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.2...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.3...HEAD
+[0.24.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.2...v0.24.3
 [0.24.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.2...v0.24.0
