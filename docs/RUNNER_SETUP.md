@@ -75,19 +75,11 @@ pull request whose workflow runs on your PC. GitHub: *New repository* → name �
    cd /d D:\Projects\MyMachine
    git init -b main
    git add .
-   git status --short | find /c /v ""
+   git status --short
    ```
 
-   The last line counts the files. Expect the PLC sources (`.TcPOU`, `.TcGVL`, `.TcDUT`, `.plcproj`, `.tsproj`, `.sln`),
-   HMI/Scope projects referenced by the solution and the files under `.tcagent` – a few hundred at most. **Thousands** mean
-   that packages or generated files slipped through: add the folder to `.gitignore`, then
-
-   ```
-   git rm -r -q --cached -f .
-   git add .
-   ```
-
-   (`--cached` only removes files from the selection, nothing is deleted on disk.)
+   Check the list before committing: the PLC sources (`.TcPOU`, `.TcGVL`, `.TcDUT`, `.plcproj`, `.tsproj`, `.sln`),
+   HMI/Scope projects referenced by the solution and the files under `.tcagent`.
 
    Keep every project that the solution references (HMI, Scope, Safety) – the runner works on a fresh checkout, and a
    missing project makes the solution load with errors.
@@ -214,8 +206,6 @@ The template is a start; add steps as needed (all in [PIPELINE.md](PIPELINE.md))
 |---|---|
 | `Error: Solution not found: X.sln` | file name differs from the folder name (e.g. folder `MyMachine_2`, solution `MyMachine2.sln`) – the message lists the `.sln` files in that folder |
 | `Der Operator "<" ist für zukünftige Versionen reserviert` | `<TOKEN>` typed literally – paste the token itself |
-| `git rm`: *staged content different from both the file and the HEAD* | nothing committed yet – add `-f` (only removes from the selection) |
-| thousands of files in `git status` | HMI NuGet packages (`Packages/`) or generated files – use the `.gitignore` template; patterns need `**/` to match in subfolders |
 | runner registration fails | token older than one hour or already used – reload the GitHub page |
 | run stays *Queued* | runner not started, or the workflow's `runs-on` labels do not match (`[self-hosted, windows, twincat]`) |
 | job seems to hang, runner window title shows *Select*/*Auswählen* | a click into the console window paused it – press Esc; start the runner with `run-tcagent.ps1` (QuickEdit off) |
