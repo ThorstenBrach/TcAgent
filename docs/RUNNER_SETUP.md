@@ -2,7 +2,7 @@
 
 This guide sets up a **self-hosted GitHub Actions runner** that checks, builds and documents a TwinCAT 3 project on every
 push – on your own PC first, later on a VM or a Beckhoff IPC used as build server. It follows the first real setup
-(TwinCAT 3.1.4026, Visual Studio 2022, GitHub runner 2.338): about 30 minutes, the first pipeline run takes 5–15 minutes.
+(TwinCAT 3.1.4026, Visual Studio 2022, GitHub runner 2.338).
 
 Other CI systems (Azure DevOps, Jenkins, GitLab) and all commands are described in [PIPELINE.md](PIPELINE.md).
 
@@ -35,8 +35,8 @@ TcAgent version):
 ```
 
 `doctor` checks the desktop session, Visual Studio/XAE, the TwinCAT interop, the local runtime, licenses, git and the temp
-folder, and with `--solution` it opens the solution **hidden, exactly as the pipeline will** (the first time this takes
-1–2 minutes). The end must be `READY.`:
+folder, and with `--solution` it opens the solution **hidden, exactly as the pipeline will** – how long that takes depends on the
+project and the machine; `doctor` shows it. The end must be `READY.`:
 
 ```
 OK    Session      desktop session 1
@@ -46,14 +46,14 @@ OK    Interop      C:\Users\...\AppData\Local\TcAgent\lib\Interop.TCatSysManager
 OK    Runtime      127.0.0.1.1.1: Config
 INFO  Licenses     1 license file(s) in C:\ProgramData\Beckhoff\TwinCAT\3.1\License
 OK    git          C:\Program Files\Git\cmd\git.exe
-OK    Solution     opened in 80 s, PLC projects: MyMachine
+OK    Solution     opened in … s, PLC projects: MyMachine
 OK    TcUnit       TcUnit, 1.3.2 (library repository, read through the opened solution)
 
 READY.
 ```
 
 Every `FAIL` line says what to do. If opening hangs, a dialog in the hidden IDE is waiting (first start, license,
-update notice): `doctor` stops it after 300 s and names the dialog – open the solution once normally in Visual Studio and
+update notice): `doctor` stops it after the load timeout and names the dialog – open the solution once normally in Visual Studio and
 answer it.
 
 ## Step 2 – Put the project into a Git repository
@@ -160,8 +160,9 @@ Running job: check
 ```
 
 and picks up the waiting run. Follow it in GitHub under **Actions → TwinCAT → the run → check**: every step with its log
-and duration. Each TcAgent step opens the solution in its own hidden Visual Studio (about 1–2 minutes each), so the
-template job (doctor, check, build, documentation) takes **5–10 minutes**. At the end: green check mark, the compiler
+and duration. Each TcAgent step opens the solution in its own hidden Visual Studio, so the job takes
+roughly as many times the opening time of the solution as it has steps, plus the check and build itself – the step
+durations of the first run show what to expect on your machine. At the end: green check mark, the compiler
 results as test report, and the artifact `twincat-results` with the JUnit files and the HTML documentation with the risk
 list.
 
@@ -220,7 +221,7 @@ The template is a start; add steps as needed (all in [PIPELINE.md](PIPELINE.md))
 | job seems to hang, runner window title shows *Select*/*Auswählen* | a click into the console window paused it – press Esc; start the runner with `run-tcagent.ps1` (QuickEdit off) |
 | `doctor` FAIL Session | the runner runs as a service or under SYSTEM – uninstall the service, use `setup-runner.ps1` |
 | `doctor` FAIL Interop | Visual Studio 2022 was not started once after installing the VSIX as this user |
-| step stops after 300 s with "IDE DIALOG …" | a dialog in the hidden IDE – open the solution once normally and answer it |
+| step stops after the load timeout with "IDE DIALOG …" | a dialog in the hidden IDE – open the solution once normally and answer it |
 | doctor shows an old TcAgent version | `setup-runner.ps1` and `install` take the newest version in `%LOCALAPPDATA%\TcAgent\app` – start Visual Studio once after a VSIX update |
 
 Remove the runner: `.\setup-runner.ps1 -Uninstall -Token XY12...` with a removal token (token from *Settings → Actions → Runners →
