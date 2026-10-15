@@ -7,28 +7,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [0.24.3] – 2026-10-15
 
-### Changed
-- `test`/`sil`/`hil` with an explicit `--target` that is not allowed are refused (exit 2) **before** Visual Studio is
-  started - the check took a full solution load before.
-
-## [0.24.2] – 2026-10-15
-
-### Fixed
-- `doctor` without `--solution`: TcUnit not found in the usual library folders is a hint (INFO), no longer a warning - on
-  TwinCAT 4026 it was a false alarm (the `ci` template's first step reported "READY with 1 warning"); `--solution` checks
-  it through TwinCAT and still warns when it is really missing.
-
-## [0.24.1] – 2026-10-15
-
-### Fixed
-- `ci --init` in a subfolder (e.g. next to the solution in `TwinCAT\`) writes the pipeline file into the Git repository
-  root, where the workflow runs `TcAgent.exe ci`; `ci` also finds a single `.tcagent\pipeline.json` up to two levels below
-  the current folder.
-- "Solution not found" lists the `.sln` files that exist in that folder (folder `X_2`, file `X2.sln`).
-- Runner: `setup-runner.ps1` starts the runner through `run-tcagent.ps1` with QuickEdit switched off - a click into the
-  runner window no longer pauses a job (scheduled task, Startup fallback and `-Start`).
-
-## [0.24.0] – 2026-10-15
+Build server and pipeline release: tested end to end with a self-hosted GitHub Actions runner on a developer PC.
 
 ### Added
 - **SBOM** – `tc_sbom` and `TcAgent.exe sbom --solution <sln> [--out <file.cdx.json>] [--plc <names>]` write a CycloneDX 1.6
@@ -52,13 +31,27 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   (doctor, Git repository, token, `setup-runner.ps1`, first run, operation, build server, troubleshooting), tested on a
   developer PC; `.gitignore` template for TwinCAT projects `docs/pipeline/twincat.gitignore` (`**/` patterns, HMI packages).
 
+### Changed
+- `test`/`sil`/`hil` with an explicit `--target` that is not allowed are refused (exit 2) **before** Visual Studio is
+  started - the check took a full solution load before.
+- `doctor --solution` asks TwinCAT's library manager whether TcUnit is installed (independent of the repository folder).
+
 ### Fixed
 - `TcAgent.exe test`/`sil`/`hil` with a target outside `TCAGENT_ALLOW_TARGETS` now ends with exit code 2 (refused) instead of
   3 (infrastructure) - the pipeline shows a configuration error, not a broken build machine.
 - `ci`: an output path that already starts with the results folder (`"out": "results/doc.html"`) is no longer doubled.
 - SBOM/lock: a TwinCAT version without readable library references reports the PLC project without libraries instead of stopping.
+- `ci --init` in a subfolder (e.g. next to the solution in `TwinCAT\`) writes the pipeline file into the Git repository
+  root, where the workflow runs `TcAgent.exe ci`; `ci` also finds a single `.tcagent\pipeline.json` up to two levels below
+  the current folder.
+- "Solution not found" lists the `.sln` files that exist in that folder (folder `X_2`, file `X2.sln`).
+- Runner: `setup-runner.ps1` starts the runner through `run-tcagent.ps1` with QuickEdit switched off - a click into the
+  runner window no longer pauses a job (scheduled task, Startup fallback and `-Start`).
+- `doctor` without `--solution`: TcUnit not found in the usual library folders is a hint (INFO), no longer a warning - on
+  TwinCAT 4026 it was a false alarm (the `ci` template's first step reported "READY with 1 warning"); `--solution` checks
+  it through TwinCAT and still warns when it is really missing.
 
-## [0.23.2] – 2026-10-14
+## [0.23.1] – 2026-10-14
 
 ### Added
 - **Build server / runner** – `TcAgent.exe doctor [--solution <sln>]` checks whether a machine and user can run TcAgent
@@ -70,8 +63,7 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - CLI (all commands with `--solution`, and `doctor`): dialogs of the hidden IDE are now watched already while the solution
   loads - reported with their text and closed (Cancel) - and after a load timeout the hidden IDE started by the command is
   ended instead of being left running. `doctor` also looks for TcUnit and licenses in the TwinCAT 4026 folders
-  (`%ProgramData%\Beckhoff\TwinCAT\3.1`); with `--solution` it asks TwinCAT's library manager whether TcUnit is installed
-  (independent of the repository folder).
+  (`%ProgramData%\Beckhoff\TwinCAT\3.1`).
 - **User guide** – `docs/USER_GUIDE.md`: every feature explained by task, with example prompts, what the agent does,
   options, limits and what needs your confirmation; CI pipeline, guardrails, configuration reference and FAQ; screenshots
   of the program documentation and animations of linking and risk rules from the test project.
@@ -272,11 +264,8 @@ coding rules, documentation sources, agent feedback, the TcAgent Chat window and
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
 [Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.3...HEAD
-[0.24.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.2...v0.24.3
-[0.24.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.1...v0.24.2
-[0.24.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.0...v0.24.1
-[0.24.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.2...v0.24.0
-[0.23.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.23.2
+[0.24.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.1...v0.24.3
+[0.23.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.23.1
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4
 [0.18.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.13.0...v0.18.0
 [0.13.0]: https://github.com/ThorstenBrach/TcAgent/releases/tag/v0.13.0
