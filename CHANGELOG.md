@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.24.2] – 2026-10-15
+
+### Fixed
+- `doctor` without `--solution`: TcUnit not found in the usual library folders is a hint (INFO), no longer a warning - on
+  TwinCAT 4026 it was a false alarm (the `ci` template's first step reported "READY with 1 warning"); `--solution` checks
+  it through TwinCAT and still warns when it is really missing.
+
 ## [0.24.1] – 2026-10-15
 
 ### Fixed
@@ -258,7 +265,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.1...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.2...HEAD
+[0.24.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.1...v0.24.2
 [0.24.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.0...v0.24.1
 [0.24.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.2...v0.24.0
 [0.23.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.23.2

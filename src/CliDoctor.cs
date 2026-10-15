@@ -90,8 +90,12 @@ public static partial class Cli
                                @"C:\Program Files (x86)\Beckhoff\TwinCAT\3.1\Components\Plc\Managed Libraries",
                                @"C:\TwinCAT\3.1\Components\Plc\Managed Libraries" }.Where(d => d != null && Directory.Exists(d)).Distinct().ToList();
         var tcunit = libRoots.SelectMany(d => SafeDirs(d, "TcUnit")).FirstOrDefault();
-        if (tcunit == null) Add(Level.Warn, "TcUnit", "TcUnit library not found in the library repository",
-                                "Needed for test/sil: install TcUnit (TwinCAT Package Manager or tcunit.org) into the library repository.");
+        // folders only: TwinCAT 4026 can keep libraries in other repositories - the reliable check is through the opened
+        // solution (--solution, below). Without it a miss is only a hint, not a warning (it was a false alarm on 4026).
+        if (tcunit == null) Add(o.Solution != null ? Level.Warn : Level.Info, "TcUnit", "TcUnit not found in the usual library folders",
+                                o.Solution != null
+                                    ? "Needed for test/sil: install TcUnit (TwinCAT Package Manager or tcunit.org) into the library repository."
+                                    : "Needed for test/sil only. doctor --solution <sln> checks it reliably through TwinCAT.");
         else Add(Level.Ok, "TcUnit", tcunit);
 
         // ---- licenses: only a hint - the license state needs the runtime and is read by TwinCAT itself
