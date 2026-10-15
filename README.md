@@ -77,7 +77,7 @@ TcAgent.exe ci            # runs the steps, each with a fresh IDE; summary in re
 
 Ready-made definitions for GitHub Actions, Azure DevOps, Jenkins and GitLab: [docs/PIPELINE.md](docs/PIPELINE.md).
 A GitHub runner on your PC, a VM or a Beckhoff IPC is set up with one script (`setup-runner.ps1`); `TcAgent.exe doctor`
-tells you whether a machine is ready and what is missing.
+tells you whether a machine is ready and what is missing – step by step in [docs/RUNNER_SETUP.md](docs/RUNNER_SETUP.md).
 
 ## Install
 

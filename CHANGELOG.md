@@ -25,6 +25,9 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   table on the console, in `results/ci-summary.md` and in the GitHub job summary. `--only`, `--from`, `--dry-run`,
   `--config`; `--init` writes a starter file. New templates `docs/pipeline/github-actions-ci.yml`,
   `azure-pipelines-ci.yml` and `pipeline.example.json`.
+- **Runner guide** – `docs/RUNNER_SETUP.md`: your own TwinCAT build server with a GitHub Actions runner step by step
+  (doctor, Git repository, token, `setup-runner.ps1`, first run, operation, build server, troubleshooting), tested on a
+  developer PC; `.gitignore` template for TwinCAT projects `docs/pipeline/twincat.gitignore` (`**/` patterns, HMI packages).
 
 ### Fixed
 - `TcAgent.exe test`/`sil`/`hil` with a target outside `TCAGENT_ALLOW_TARGETS` now ends with exit code 2 (refused) instead of

@@ -1,0 +1,35 @@
+# .gitignore for a TwinCAT 3 project with a TcAgent pipeline - copy to the root of the repository as .gitignore.
+# Patterns with "**/" match in every subfolder (the solution is often in a subfolder such as TwinCAT\).
+
+# Visual Studio / TwinCAT build and IDE output
+.vs/
+**/_Boot/
+**/_CompileInfo/
+**/_Libraries/
+*.~u
+*.tpy
+*.suo
+*.user
+*.bak
+*.orig
+*.compileinfo
+*.tmc.bak
+*.tsproj.bak
+**/LineIDs.dbg
+**/LineIDs.dbg.bak
+
+# licenses are bound to a machine
+*.tclrs
+
+# TwinCAT HMI: NuGet packages are restored by Visual Studio, build output
+**/Packages/
+**/bin/
+**/obj/
+
+# TcAgent: backups stay local; coding rules, risk rules, lessons, doc-summaries.json, libraries.lock.json are versioned
+**/.tcagent/backup/
+
+# generated output (the pipeline publishes it as artifact)
+**/doc/*.html
+**/results/
+**/sbom/

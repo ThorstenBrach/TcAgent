@@ -294,6 +294,9 @@ TcAgent drives the real TwinCAT engineering, so the build agent is a Windows mac
 
 ### Setting up a GitHub runner in four steps
 
+Step-by-step guide with the expected output of every step, the repository preparation and troubleshooting:
+[RUNNER_SETUP.md](RUNNER_SETUP.md).
+
 1. **Install TcAgent** on the machine: the VSIX (double-click), then start Visual Studio 2022 once as the runner user – it
    copies TcAgent and generates the interop for this TwinCAT installation.
 2. **Registration token:** GitHub > repository > Settings > Actions > Runners > *New self-hosted runner* (valid for 1 hour).
