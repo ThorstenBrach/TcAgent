@@ -11,6 +11,7 @@
 //   TcAgent.exe doctor [--solution <sln>]           is this machine/user ready for pipelines? (CliDoctor.cs)
 //   TcAgent.exe install --path <folder>             copy TcAgent to a fixed folder for pipelines, e.g. C:\Tools\TcAgent
 //   TcAgent.exe ci [--config <file>] [--dry-run]    run the steps of .tcagent\pipeline.json of the repository (CliCi.cs)
+//   TcAgent.exe st export|check|import --solution <sln>   PLC code as plain-text .st files and back - no IDE (CliPlainText.cs)
 //
 // Exit codes: 0 = OK, 1 = compiler errors / failed tests, 2 = wrong call, 3 = infrastructure problem (IDE, activation, timeout).
 // Without arguments TcAgent.exe is the MCP server as before.
@@ -28,7 +29,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st";
 
     sealed class Options
     {
@@ -42,7 +43,8 @@ public static partial class Cli
         public bool? DisableIo;
         public bool CloseDialogs = true;
         public int TimeoutSec = 1800, LoadTimeoutSec = 300;
-        public string Config, Only, From; public bool DryRun, Init;      // ci (CliCi.cs)
+        public string Config, Only, From; public bool DryRun, Init;      // ci (CliCi.cs); From/DryRun also st import
+        public string Sub; public bool Clean, Force;                      // st export|check|import (CliPlainText.cs)
     }
 
     public static int Run(string[] args)
@@ -57,6 +59,7 @@ public static partial class Cli
         if (o.Command is "install") return Install(o);          // CliDoctor.cs - no IDE needed
         if (o.Command is "doctor") { Program.ClientName = "cli:doctor"; return Doctor(o); }
         if (o.Command is "ci") { Program.ClientName = "cli:ci"; return Ci(o); }   // CliCi.cs - every step is its own TcAgent.exe
+        if (o.Command is "st") { Program.ClientName = "cli:st"; return PlainTextCli(o); }   // CliPlainText.cs - project files only, no IDE
 
         Program.ClientName = "cli:" + o.Command;
 
@@ -726,12 +729,19 @@ public static partial class Cli
                 case "--from": o.From = Val(); break;
                 case "--dry-run": o.DryRun = true; break;
                 case "--init": o.Init = true; break;
-                default: throw new Exception("Unknown option " + a);
+                case "--clean": o.Clean = true; break;
+                case "--force": o.Force = true; break;
+                default:
+                    // st: the sub-command (export, check, import) is the first argument that is not an option
+                    if (o.Command == "st" && o.Sub == null && !a.StartsWith("-")) { o.Sub = a.ToLowerInvariant(); break; }
+                    throw new Exception("Unknown option " + a);
             }
         }
-        if (o.Command != "ci" && (o.Config != null || o.Only != null || o.From != null || o.DryRun || o.Init))
-            throw new Exception("--config, --only, --from, --dry-run and --init are only for ci");
+        if (o.Command != "ci" && (o.Config != null || o.Only != null || o.Init || (o.Command != "st" && (o.From != null || o.DryRun))))
+            throw new Exception("--config, --only, --from, --dry-run and --init are only for ci (--from and --dry-run also for st import)");
+        if ((o.Clean || o.Force) && o.Command != "st") throw new Exception("--clean and --force are only for st");
         if (o.Command is "help" or "version") return o;
+        if (o.Command is "st") { ValidateSt(o); return o; }
         if (o.Command is "install") return o;
         if (o.Command is "ci") return o;                  // the steps are checked by ci itself (CliCi.cs)
         if (o.Command is "doctor")
@@ -803,6 +813,16 @@ public static partial class Cli
       GitHub job summary). --only/--from select steps by run or name (--from also by number), --dry-run prints the
       command lines, --init writes a starter file, --solution overrides the file's solution. Format: docs/PIPELINE.md.
 
+  TcAgent.exe st export --solution <sln> [--plc <names>] [--out <folder>] [--clean]
+  TcAgent.exe st check  --solution <sln> [--plc <names>] [--out <folder>]
+  TcAgent.exe st import --solution <sln> [--plc <names>] [--from <folder>] [--dry-run] [--force]
+      PLC code as plain-text ST files (one .st per POU/GVL/DUT/interface, methods/properties/actions inside) and back -
+      works on the project files, no IDE. Default folder: <solution folder>\st\<PLC project>\<folder>\<name>.st.
+      export writes only changed files (--clean also removes .st files without object). check: exit 1 if the text folder
+      differs from the project (CI gate). import changes the existing objects (Ids kept), creates new methods/properties/
+      actions/objects, never deletes; --dry-run lists the changes. Refused (exit 2) while the solution is open in an IDE.
+      Graphical implementations (SFC, LD, FBD, CFC) stay as they are. Format: docs/PLAINTEXT.md.
+
   TcAgent.exe feedback [--open] [--markdown <file.md>] [--summary] [--path <file|folder>]
       Report of the tc_feedback entries (TCAGENT_FEEDBACK or the default store), grouped by tool, as Markdown
       ready to paste into GitHub issues - to stdout or into the file. --open: only open entries; --summary: counts only.
@@ -843,7 +863,8 @@ Options
   --no-boot-project        test/sil/hil: do not create a boot project (test: PLC must start by itself)
   --disable-io / --keep-io test/sil/hil: disable all I/O devices (default: test/sil only in a Visual Studio
                            started by TcAgent, hil never)
-  --out <file>             library/archive/scope/doc/sbom: output file; sil/hil: Scope export (default scope-<sil|hil>.csv)
+  --out <file>             library/archive/scope/doc/sbom: output file; sil/hil: Scope export (default scope-<sil|hil>.csv);
+                           st export/check: text folder (default <solution folder>\st)
   --sarif <file>           analyze: SARIF output
   --settings <file.csa>    analyze: static analysis settings to load first
   --install                library: also install into the library repository
@@ -857,12 +878,14 @@ Options
   --progid <id>            COM ProgID of the IDE, e.g. TcXaeShell.DTE.17.0 (default: VS 2022, then TcXaeShell)
   --config <file>          ci: pipeline file (default: .tcagent\pipeline.json in the current folder or above)
   --only <a,b>             ci: run only these steps (run or name; also steps with ""enabled"": false)
-  --from <n|step>          ci: start at this step (number in the file, run or name)
-  --dry-run                ci: print the resolved command lines, run nothing
+  --from <n|step>          ci: start at this step (number in the file, run or name); st import: text folder
+  --dry-run                ci: print the resolved command lines, run nothing; st import: list the changes, write nothing
+  --clean                  st export: remove .st files whose object no longer exists
+  --force                  st import: write even if it cannot be checked whether the solution is open in an IDE
   --init                   ci: write a starter .tcagent\pipeline.json (never overwrites)
 
-Exit codes: 0 OK, 1 compiler errors, failed tests or lock differences, 2 wrong call, refused (test/sil/hil: target not
-            allowed) or no lock file (lock --check),
+Exit codes: 0 OK, 1 compiler errors, failed tests, lock or st check differences, st import errors, 2 wrong call, refused
+            (test/sil/hil: target not allowed; st import: solution open in an IDE) or no lock file (lock --check),
             3 infrastructure problem (IDE, route, activation, Run mode, timeout).
 Without arguments TcAgent.exe runs as MCP server for AI clients.";
 }

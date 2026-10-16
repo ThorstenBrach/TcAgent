@@ -29,7 +29,7 @@ public sealed class Policy
         ["tc_runtime_startup"] = ToolClass.RuntimeWrite, ["tc_runtime_mode"] = ToolClass.RuntimeWrite, ["tc_io_scan_add"] = ToolClass.ProjectWrite, ["tc_motion_add"] = ToolClass.ProjectWrite, ["tc_motion"] = ToolClass.ProjectWrite,
         ["tc_new_solution"] = ToolClass.ProjectWrite, ["tc_plc_project_add"] = ToolClass.ProjectWrite, ["tc_import"] = ToolClass.ProjectWrite,
         ["tc_library"] = ToolClass.ProjectWrite, ["tc_library_save"] = ToolClass.ProjectWrite, ["tc_mapping_import"] = ToolClass.ProjectWrite,
-        ["tc_sbom"] = ToolClass.ProjectWrite, ["tc_library_lock"] = ToolClass.ProjectWrite,
+        ["tc_sbom"] = ToolClass.ProjectWrite, ["tc_library_lock"] = ToolClass.ProjectWrite, ["tc_plaintext"] = ToolClass.ProjectWrite,
         ["tc_twincat_version"] = ToolClass.ProjectWrite, ["tc_platform"] = ToolClass.ProjectWrite, ["tc_variant"] = ToolClass.ProjectWrite,
         ["tc_tccom"] = ToolClass.ProjectWrite, ["tc_scope_new"] = ToolClass.ProjectWrite, ["tc_scope"] = ToolClass.ProjectWrite,
         ["tc_hmi_page"] = ToolClass.ProjectWrite, ["tc_hmi_control"] = ToolClass.ProjectWrite, ["tc_hmi_symbol"] = ToolClass.ProjectWrite, ["tc_packages_change"] = ToolClass.RuntimeWrite,
@@ -111,6 +111,11 @@ public sealed class Policy
         // tc_sfc comments/flags without values only list the step comments / SFC flags
         if (cls == ToolClass.ProjectWrite && tool == "tc_sfc" && args?["action"] is JsonValue sa && sa.ToString().ToLowerInvariant() is "comments" or "flags"
             && args["comments"] == null && args["flags"] == null) return ToolClass.Read;
+        // tc_plaintext: export/check only write the text folder (like tc_export); an import with dryRun only plans
+        if (cls == ToolClass.ProjectWrite && tool == "tc_plaintext" &&
+            !(args?["action"] is JsonValue pa && pa.ToString().Trim().ToLowerInvariant() == "import" &&
+              !(args["dryRun"] is JsonValue pd && pd.ToString().Equals("true", StringComparison.OrdinalIgnoreCase))))
+            return ToolClass.Read;
         // a static analysis run only reads - loading a settings file (.csa) changes the PLC project's settings
         if (tool == "tc_static_analysis" && args?["settingsFile"] is JsonValue sf && sf.ToString().Trim().Length > 0) return ToolClass.ProjectWrite;
         return cls;
@@ -143,7 +148,7 @@ public sealed class Policy
             args.Any(kv => kv.Value is JsonValue jv && System.Text.RegularExpressions.Regex.IsMatch(jv.ToString(), @"(?:^|\n|=>)\s*TISC(?:\^|\s*$)",
                                                                                                     System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline)))
             throw new UnauthorizedAccessException($"{tool} blocked: the TwinSAFE configuration (TISC) is read only in TcAgent - change, verify and download it in the TwinSAFE editor.");
-        if (cls != ToolClass.Read && Mode == AgentMode.Propose && tool is not ("tc_plc_write" or "tc_plc_create"))
+        if (cls != ToolClass.Read && Mode == AgentMode.Propose && tool is not ("tc_plc_write" or "tc_plc_create" or "tc_plaintext"))   // these only return a proposal (DryRun)
             throw new UnauthorizedAccessException($"{tool} blocked: TcAgent is running in mode 'propose' - changes only as a proposal via tc_plc_write/tc_plc_create (diff).");
         if (cls == ToolClass.RuntimeWrite)
         {
