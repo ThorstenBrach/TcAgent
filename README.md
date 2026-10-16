@@ -28,6 +28,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 |---|---|---|
 | **Your context** | The agent knows the object, line and selection you are working on – ask "what does *this* do?" | `tc_editor_context` |
 | **PLC code** | Read, change (optionally as a diff to approve), create POUs, methods, properties, DUTs, GVLs; implement interfaces in one step | `tc_plc_read`, `tc_plc_write`, `tc_plc_create` |
+| **Plain-text ST** | The whole PLC code as `.st` files (one per POU, methods/properties/actions inside) for reviews, Git diffs and bulk edits – and back into the project, Ids kept, nothing deleted; also as CI gate | `tc_plaintext` |
 | **SFC step chains** | Read and write sequential function charts as text – steps, actions, transitions, alternative and parallel branches, jumps; renumber steps, step comments, SFC flags | `tc_sfc` |
 | **Lessons learned** | The agent remembers hard-won solutions – what the problem was, why, and how it was solved – and recalls them by itself when the same error comes up again (project, personal or team file) | `tc_lessons` |
 | **Program documentation** | Explains the project: call hierarchy, call graph, inheritance hierarchy, class diagram, step chains (SFC and CASE), a short description for every FB, method and function (from comments or derived from the code), findings – one HTML page with zoomable diagrams, explanations kept as project memory; task overview with cycle times and a static risk analysis | `tc_doc` |
@@ -53,7 +54,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Your risk checks** | Extend the risk analysis with your own rules (regex, tested on the project first), tune or switch off the built-in ones, add checks the agent reviews by reading the code – per project/person/company | `tc_risk_rules` |
 | **Documentation** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 
-All 87 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 88 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 What you can do, explained step by step with example prompts: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
@@ -74,6 +75,9 @@ every CI system – and your PC – run it with one command:
 TcAgent.exe ci --init     # starter file with the solution found in the repository
 TcAgent.exe ci            # runs the steps, each with a fresh IDE; summary in results\ci-summary.md
 ```
+
+`TcAgent.exe st export|check|import` keeps a plain-text copy of the PLC code (`.st` files) next to the project –
+readable diffs in pull requests, `st check` as gate; no IDE needed: [docs/PLAINTEXT.md](docs/PLAINTEXT.md).
 
 Ready-made definitions for GitHub Actions, Azure DevOps, Jenkins and GitLab: [docs/PIPELINE.md](docs/PIPELINE.md).
 A GitHub runner on your PC, a VM or a Beckhoff IPC is set up with one script (`setup-runner.ps1`); `TcAgent.exe doctor`

@@ -16,6 +16,7 @@ exit code, JUnit XML and inline annotations.
 | `TcAgent.exe archive --solution X.sln --out X.tszip` | archive of the whole solution | releases, support |
 | `TcAgent.exe sbom --solution X.sln --out sbom/X.cdx.json` | SBOM (CycloneDX 1.6 JSON) per PLC project: library references with resolved version, vendor, purl, SHA-256 of the library file, git commit | build artifact, releases (CRA / supply chain) |
 | `TcAgent.exe lock --solution X.sln --check` | compares the resolved library versions with the committed `.tcagent\libraries.lock.json`; exit 1 on differences, 2 without lock file (`lock` without `--check` writes it) | every push / pull request (gate) |
+| `TcAgent.exe st check --solution X.sln` | compares the committed plain-text copy of the PLC code (`st\<PLC project>\...\<name>.st`) with the project; exit 1 when it is out of date. `st export` writes it; no IDE needed – see [below](#plain-text-st-files) | every push / pull request (gate) |
 | `TcAgent.exe test --solution X.sln` | builds, activates on the test target, starts the PLC, waits for TcUnit, collects the results | every push to `main`, nightly |
 | `TcAgent.exe sil --solution X.sln --plc Tests` | software in the loop: like `test` on the runtime of the build PC, checks Run mode, starts the PLC if needed, optional Scope recording, always cleans up | every push / pull request |
 | `TcAgent.exe hil --solution X.sln --target 5.1.2.3.1.1 --allow 5.1.2.3.1.1` | hardware in the loop: the same on a remote test PLC with real I/O – only with an explicit allowance | nightly, release candidates |
@@ -27,7 +28,7 @@ TcAgent.exe check --solution .\MyMachine.sln --junit results\check.xml
 TcAgent.exe test  --solution .\MyMachine.sln --junit results\tests.xml --timeout 900
 ```
 
-**Exit codes:** `0` OK · `1` compiler errors, failed tests or library versions that differ from the lock file · `2` wrong call,
+**Exit codes:** `0` OK · `1` compiler errors, failed tests, library versions that differ from the lock file or an out-of-date `st` folder · `2` wrong call,
 `test`/`sil`/`hil` refused because the target is not allowed, or no lock file for `lock --check` · `3` infrastructure problem (IDE could not be started, no route, activation failed, Run mode not reached,
 TcUnit did not finish in time). Pipelines can treat `3` as "retry" and `1` as "red"; `2` needs a fix in the pipeline definition.
 
@@ -271,6 +272,32 @@ on the build machine than on the developer's PC. If the change is intended, run 
 ```
 
 Every command opens the solution once; on a busy runner combine the gate with the `check` job.
+
+## Plain-text ST files
+
+`TcAgent.exe st export --solution X.sln` writes the PLC code as plain Structured Text: one `.st` file per POU, GVL, DUT
+and interface in `<solution folder>\st\<PLC project>\<folder>\<name>.st`, methods, properties and actions inside the POU
+file ([format](PLAINTEXT.md)). It reads the project files directly – no IDE, a few seconds even for large projects.
+
+* **Reviews:** commit the `st` folder with the project. Pull requests then show the code change as readable ST next
+  to the `.TcPOU` XML, and the text is what reviewers and AI review tools read.
+* **Gate:** `TcAgent.exe st check --solution X.sln` fails (exit 1) when the `st` folder no longer matches the project –
+  someone changed the project without `st export`. It lists `missing`, `differs` and `not in the project` files and
+  ignores line-end differences (Git `core.autocrlf`).
+* **Export as artifact:** `st export --out <folder>` (only changed files are written; `--clean` removes files of deleted
+  objects).
+* `st import` takes edited `.st` files back into the project (never on a build server while an IDE has the solution
+  open – it is refused with exit 2).
+
+```json
+{ "run": "st", "args": ["check"] }      // .tcagent/pipeline.json: no IDE, runs in seconds - put it first
+```
+
+```yaml
+# GitHub Actions
+      - name: ST text folder up to date
+        run: '& $env:TCAGENT st check --solution $env:SOLUTION'
+```
 
 ## Preparing the PLC project for TcUnit
 

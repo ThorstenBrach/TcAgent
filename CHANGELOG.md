@@ -5,6 +5,23 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.25.0] – 2026-10-16
+
+### Added
+- **Plain-text ST files** – `TcAgent.exe st export|check|import --solution <sln>` and the tool `tc_plaintext`: the PLC code
+  as one `.st` file per POU, GVL, DUT and interface (`<solution>\st\<PLC project>\<folder>\<name>.st`), methods,
+  properties (`GET`/`SET`) and actions inside the POU file with `END_METHOD`/`END_PROPERTY`/`END_ACTION` markers –
+  TwinCAT's declaration and implementation text unchanged. Works on the project files, no IDE.
+  - `st export` writes only changed files (`--clean` removes files of deleted objects); `st check` exits 1 when the text
+    folder differs from the project – a CI gate for a committed text mirror with readable diffs.
+  - `st import` takes edited files back into the existing project: changed declarations/implementations replaced with
+    Ids, order and unchanged XML byte-identical (LineIds of changed blocks removed), new methods/properties/actions/
+    accessors and new `.TcPOU`/`.TcIO`/`.TcGVL`/`.TcDUT` files (with `.plcproj` entries) created, nothing deleted;
+    renames/moves refused; `--dry-run`; refused (exit 2) while an IDE has the solution open. Through `tc_plaintext` the
+    import writes through the connected IDE instead.
+  - A `// @implementation` line separates declaration and implementation where the split is ambiguous; graphical bodies
+    (SFC, LD, FBD, CFC) appear as `// @implementation SFC - ...` and stay untouched. Format: `docs/PLAINTEXT.md`.
+
 ## [0.24.3] – 2026-10-15
 
 Build server and pipeline release: tested end to end with a self-hosted GitHub Actions runner on a developer PC.
@@ -263,7 +280,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.3...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.25.0...HEAD
+[0.25.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.3...v0.25.0
 [0.24.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.1...v0.24.3
 [0.23.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.23.1
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4

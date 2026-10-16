@@ -281,6 +281,12 @@ treat them like project rules for that library.
 ## Projects, files and analysis
 
 - New solution / PLC project: `tc_new_solution`, `tc_plc_project_add`. Export/import PLCopen XML or XTI: `tc_export`, `tc_import`.
+- Plain-text ST (`tc_plaintext`): `action=export` writes the PLC code as `.st` files (`<solution>\st\<PLC>\<folder>\<name>.st`,
+  methods/properties/actions inside the POU file) - use it when the user wants the code as text (review, Git, bulk edit);
+  `action=check` lists differences; `action=import dryRun=true` first, then `action=import` takes edited files back into the
+  existing project (writes through the IDE when it is open there - then `tc_save`, `tc_check`). Keep `// @implementation`
+  lines; graphical bodies (`// @implementation SFC ...`) are not touched; it never deletes, renames or moves objects.
+  For single changes `tc_plc_write` stays the normal way.
 - Libraries: `tc_library` (references, placeholders, repositories, install), `tc_library_save` (save a PLC project as library).
 - `tc_static_analysis` (TE1200) shows errors/warnings, optionally as SARIF. `tc_mapping_export`/`tc_mapping_import` for I/O mappings,
   `tc_archive` for a .tszip, `tc_twincat_version` and `tc_platform` for the build environment, `tc_variant` for project variants.
@@ -336,6 +342,8 @@ treat them like project rules for that library.
   projects in one solution, `sil --plc <Tests>`, then `library --plc <Lib>` - never remove test code from the library.
 - `TcAgent.exe sbom` (CycloneDX SBOM as build artifact) and `TcAgent.exe lock --check` (gate: exit 1 when library
   versions differ from the committed `.tcagent\libraries.lock.json`, 2 without lock file).
+- `TcAgent.exe st check` (gate: exit 1 when the committed `st` folder of plain-text ST files is out of date; no IDE),
+  `st export` / `st import` (refused while an IDE has the solution open).
 
 ## Known limitations (`tc_version` shows the running version)
 

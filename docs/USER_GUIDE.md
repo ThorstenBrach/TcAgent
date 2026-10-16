@@ -28,6 +28,7 @@ least one AI client is signed in.
 - [Getting started](#getting-started)
 - [Understanding code](#understanding-code)
 - [Writing and changing code](#writing-and-changing-code)
+- [Plain-text ST files](#plain-text-st-files)
 - [Coding rules](#coding-rules)
 - [Library APIs](#library-apis)
 - [SFC step chains](#sfc-step-chains)
@@ -293,6 +294,41 @@ back into its original folder.
 - `tc_plc_write` refuses text for graphical bodies (FBD, LD, CFC). SFC chains go through `tc_sfc`.
 - Changes in an editor window you currently have open can collide with tool changes. Avoid typing in the same object
   while the agent writes it.
+
+---
+
+## Plain-text ST files
+
+**Good for:** reading and reviewing the whole PLC code as text, diffs in Git, bulk edits in any editor, a committed text
+mirror of the project that the pipeline keeps up to date.
+
+### Example prompts
+
+- *"Export the PLC code as ST files."*
+- *"I changed st\MyPlc\Axis\FB_Axis.st – take it into the project, show me what changes first."*
+- *"Is the st folder still up to date?"*
+
+### What the agent does
+
+`tc_plaintext action=export` writes one `.st` file per POU, GVL, DUT and interface to `<solution folder>\st\<PLC
+project>\<folder>\<name>.st` – TwinCAT's declaration and implementation text with `END_FUNCTION_BLOCK`, methods as
+`METHOD … END_METHOD`, properties as `PROPERTY … GET … END_GET SET … END_SET END_PROPERTY`, actions as
+`ACTION A_Reset: … END_ACTION`. `action=check` lists files that differ from the project. `action=import dryRun=true`
+shows what an import would change; `action=import` takes the files back into the existing project: changed parts are
+replaced (Ids kept), new methods, properties, actions and new files are created, **nothing is deleted**. When the
+solution is open in the connected IDE the import writes through the IDE (then `tc_save` and `tc_check`).
+
+Without an agent: `TcAgent.exe st export|check|import --solution X.sln` – works on the project files, no IDE; `st import`
+is refused while the solution is open in an IDE.
+
+### Details worth knowing
+
+- A line `// @implementation` separates declaration and implementation where it is not obvious (e.g. a comment after
+  the last `END_VAR`) – keep it when you edit.
+- SFC, LD, FBD and CFC bodies are not text: the file shows `// @implementation SFC - not plain text, kept as it is in
+  the project`, the body stays untouched (ST actions of an SFC chart are normal `ACTION` blocks).
+- Renaming or moving objects through the files is refused; delete objects in TwinCAT (`tc_delete`).
+- Format, rules and exit codes: [PLAINTEXT.md](PLAINTEXT.md).
 
 ---
 
@@ -1334,6 +1370,7 @@ GitHub runner with the label `twincat` and starts it at logon (not as a service 
 | `lock --solution X.sln [--check]` | Writes `.tcagent\libraries.lock.json`; `--check` compares the resolved library versions with it (exit 1 on differences, 2 without lock file) |
 | `scope --solution X.sln --out signals.csv --seconds 30` | Records with the solution's Scope configuration and exports (PLC must be running) |
 | `doc --solution X.sln --out doc/X.html` | Program documentation as HTML, with the explanations stored by the agent |
+| `st export\|check\|import --solution X.sln` | PLC code as plain-text `.st` files and back – no IDE; `st check` exits 1 when the committed text folder is out of date ([PLAINTEXT.md](PLAINTEXT.md)) |
 | `doc --solution X.sln --risks --fail-on high` | Static risk list; exit 1 on risks of that severity or higher |
 | `test --solution X.sln` | Builds, activates on the test target, starts the PLC, waits for TcUnit, collects results |
 | `sil --solution X.sln --plc Tests` | Software in the loop on the runtime of the build PC, with clean-up |
@@ -1632,7 +1669,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 87 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 88 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
@@ -1642,6 +1679,7 @@ All 87 tools and the section of this guide that covers them. Parameters: [TOOLS.
 | `tc_plc_write`, `tc_plc_create`, `tc_check`, `tc_build`, `tc_errors`, `tc_save`, `tc_delete` | [Writing and changing code](#writing-and-changing-code) |
 | `tc_coding_rules`, `tc_coding_rules_add` | [Coding rules](#coding-rules) |
 | `tc_lib_signatures`, `tc_plc_references`, `tc_plc_library_add` | [Library APIs](#library-apis) |
+| `tc_plaintext` | [Plain-text ST files](#plain-text-st-files) |
 | `tc_sfc` | [SFC step chains](#sfc-step-chains) |
 | `tc_refactor` | [Refactoring names and comments](#refactoring-names-and-comments) |
 | `tc_test_results` | [Tests with TcUnit](#tests-with-tcunit) |
