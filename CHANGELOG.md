@@ -5,6 +5,18 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.25.1] – 2026-10-16
+
+### Fixed
+- **`st import` / `tc_plaintext import`: a method added before `END_FUNCTION_BLOCK`** was written as text into the
+  implementation of the function block. Import now also accepts the IEC 61131-3 3rd edition layout – methods,
+  properties and actions inside `FUNCTION_BLOCK … END_FUNCTION_BLOCK` (also `PROGRAM`, `FUNCTION`, `INTERFACE`): the first
+  sub-block header ends the POU body, trailing blank lines of the body are no change; both layouts import identically.
+- Safety net: a file whose declaration or implementation would still contain a block line (`METHOD`, `END_METHOD`,
+  `END_FUNCTION_BLOCK`, `GET` …) is refused with file and line instead of being written.
+- `st check` also fails for objects whose text cannot be read back exactly (e.g. a POU damaged by 0.25.0); importing
+  the exported text repairs such a POU (the method text becomes a real method).
+
 ## [0.25.0] – 2026-10-16
 
 ### Added
@@ -280,7 +292,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.25.0...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.25.1...HEAD
+[0.25.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.3...v0.25.0
 [0.24.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.1...v0.24.3
 [0.23.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.23.1

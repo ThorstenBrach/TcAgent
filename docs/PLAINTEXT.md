@@ -75,6 +75,31 @@ END_ACTION
 The interface's `END_INTERFACE` follows the interface declaration (like `END_FUNCTION_BLOCK` follows the POU body), so
 every block of a file is closed by its own marker.
 
+**Import also accepts the IEC 61131-3 3rd edition layout** – methods, properties and actions *inside* the POU, before
+`END_FUNCTION_BLOCK` / `END_PROGRAM` / `END_FUNCTION` (or `END_INTERFACE`):
+
+```
+FUNCTION_BLOCK FB_Axis
+VAR
+END_VAR
+_trig(CLK := Execute);
+
+METHOD M_Start : BOOL
+M_Start := TRUE;
+END_METHOD
+END_FUNCTION_BLOCK
+```
+
+The first `METHOD`, `PROPERTY` or `ACTION` header in column 1 ends the POU body; comment and attribute lines directly
+above it (`//`, `(*`, `{attribute ...}`) belong to the method, so separate the POU code from the first sub-block with a
+blank line. Blank lines at the end of the POU code do not count as a change. Both layouts import identically; export
+always writes the layout shown above (sub-blocks after the `END_` marker).
+
+**Safety net:** after splitting, no declaration or implementation may contain a block line (`METHOD …`, `PROPERTY …`,
+`ACTION …:`, `GET`, `SET`, `END_METHOD`, `END_PROPERTY`, `END_ACTION`, `END_GET`, `END_SET`, `END_FUNCTION_BLOCK`,
+`END_PROGRAM`, `END_FUNCTION`, `END_INTERFACE` – also indented). Such a file is refused with its line number, e.g. a
+`METHOD` without its `END_METHOD`, or an indented method inside the POU code.
+
 ### Declaration and implementation
 
 On import the body of a POU, method, `GET` or `SET` is split into declaration and implementation:
@@ -132,8 +157,9 @@ inside a POU and other XML (ObjectProperties …) are not exported and stay as t
   `.TcPOU` already exists on disk without being in the `.plcproj`.
 * Files are only written when their content changes; BOM and line ends of the project files are kept.
 * Building a new project from `.st` files is not supported – import works on an existing PLC project.
-* Code lines that start in column 1 with an `END_` marker of the format (`END_METHOD`, `END_FUNCTION_BLOCK`, `GET` …,
-  e.g. inside a block comment) cannot be represented; the export warns ("cannot be read back") for such objects.
+* Code lines that start with a block keyword of the format (`END_METHOD`, `END_FUNCTION_BLOCK`, `METHOD <name>`, `GET`
+  …, e.g. inside a block comment) cannot be represented: the export warns ("cannot be read back" / "does not reproduce
+  the project exactly") and `st check` lists the object as `cannot be represented exactly`.
 
 ### The IDE must not have the solution open
 
@@ -162,6 +188,7 @@ Commit the `st` folder together with the project: pull requests then show readab
 `st check` fails the pipeline when someone changed the project without running `st export`. In
 `.tcagent/pipeline.json`: `{ "run": "st", "args": ["check"] }`. See [PIPELINE.md](PIPELINE.md#plain-text-st-files).
 
-Exit codes: `0` OK · `1` `check`: differences (listed as `missing`, `differs`, `not in the project`); `import`: errors,
+Exit codes: `0` OK · `1` `check`: differences (listed as `missing`, `differs`, `not in the project`,
+`cannot be represented exactly`); `import`: errors,
 nothing written · `2` wrong call, no matching PLC project, or `import` refused because the solution is open in an IDE ·
 `3` the project files cannot be read.
