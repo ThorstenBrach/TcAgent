@@ -817,9 +817,10 @@ public static partial class Cli
   TcAgent.exe st check  --solution <sln> [--plc <names>] [--out <folder>]
   TcAgent.exe st import --solution <sln> [--plc <names>] [--from <folder>] [--dry-run] [--force]
       PLC code as plain-text ST files (one .st per POU/GVL/DUT/interface, methods/properties/actions inside) and back -
-      works on the project files, no IDE. Default folder: <solution folder>\st\<PLC project>\<folder>\<name>.st.
-      export writes only changed files (--clean also removes .st files without object). check: exit 1 if the text folder
-      differs from the project (CI gate). import changes the existing objects (Ids kept), creates new methods/properties/
+      works on the project files, no IDE. Default folder: <solution folder>\st\<PLC project>\<folder>\<name>.st, plus
+      <PLC project>\references.json with the library references of the .plcproj (export/check only, import ignores it).
+      export writes only changed files (--clean also removes .st files without object, never references.json). check:
+      exit 1 if the text folder (.st files and references.json) differs from the project (CI gate). import changes the existing objects (Ids kept), creates new methods/properties/
       actions/objects, never deletes; --dry-run lists the changes. Refused (exit 2) while the solution is open in an IDE.
       Graphical implementations (SFC, LD, FBD, CFC) stay as they are. Format: docs/PLAINTEXT.md.
 
@@ -880,7 +881,7 @@ Options
   --only <a,b>             ci: run only these steps (run or name; also steps with ""enabled"": false)
   --from <n|step>          ci: start at this step (number in the file, run or name); st import: text folder
   --dry-run                ci: print the resolved command lines, run nothing; st import: list the changes, write nothing
-  --clean                  st export: remove .st files whose object no longer exists
+  --clean                  st export: remove .st files whose object no longer exists (references.json is kept)
   --force                  st import: write even if it cannot be checked whether the solution is open in an IDE
   --init                   ci: write a starter .tcagent\pipeline.json (never overwrites)
 

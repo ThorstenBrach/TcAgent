@@ -7,7 +7,7 @@ gate that keeps a committed text mirror of the project up to date.
 
 ```powershell
 TcAgent.exe st export --solution MyMachine.sln              # project -> st\<PLC project>\...\<name>.st
-TcAgent.exe st check  --solution MyMachine.sln              # exit 1 if the .st files differ from the project
+TcAgent.exe st check  --solution MyMachine.sln              # exit 1 if the .st files or references.json differ
 TcAgent.exe st import --solution MyMachine.sln --dry-run    # what would change in the project
 TcAgent.exe st import --solution MyMachine.sln              # .st files -> existing project
 ```
@@ -20,14 +20,60 @@ a large project takes seconds. Tasks (`.TcTTO`) and other files are not exported
 ## Folder layout
 
 ```
+<folder>\<PLC project>\references.json                         library references of the PLC project
 <folder>\<PLC project>\<folder in the PLC project>\<name>.st
 ```
+
+For example `st\M2XLibrary\references.json` next to `st\M2XLibrary\Core\...`.
 
 `<folder>` is `--out` (export/check) or `--from` (import), default `<solution folder>\st`. `<PLC project>` is the name of
 the `.plcproj` file without extension. The folders below it are the folders of the PLC project
 (`<Compile Include="Gpib\GpibSerialFB.TcPOU">` → `st\MyPlc\Gpib\GpibSerialFB.st`). The `.plcproj` files are found by
 searching the solution folder (without `bin`, `obj`, `_Boot`, `_Libraries`, `.git`, `.vs`); `--plc` selects PLC projects
 by `.plcproj` name or PLC project name, also with ` Project` (`--plc MyPlc` or `--plc "MyPlc Project"`).
+
+## references.json
+
+`export` writes the library references of each PLC project to `<folder>\<PLC project>\references.json`, in the format
+of the [SRCI repository](https://github.com/ThorstenBrach/SRCI) (`RobotLibrary\references.json`): UTF-8 without BOM,
+CRLF, 2 blanks indentation, no line end after the closing `]`.
+
+```json
+[
+  {
+    "Name": "RobotLibrarySysDep",
+    "Version": "*",
+    "DistributorName": "Thorsten Brach",
+    "Namespace": null
+  },
+  {
+    "Name": "Tc3_IotBase",
+    "Version": "*",
+    "DistributorName": "Beckhoff Automation GmbH",
+    "Namespace": "IotBase"
+  }
+]
+```
+
+Source is the `.plcproj`:
+
+| `.plcproj` | references.json |
+|---|---|
+| `<PlaceholderReference Include="Standard">` with `<DefaultResolution>Tc2_Standard, 3.4.5.0 (Beckhoff Automation GmbH)</DefaultResolution>` | `Name` `Tc2_Standard`, `Version` `3.4.5.0`, `DistributorName` `Beckhoff Automation GmbH` – from the default resolution, not from `Include` |
+| `<LibraryReference Include="Tc3_IotBase,newest,Beckhoff Automation GmbH">` | `Name`, `Version`, `DistributorName` from `Include`; `newest` becomes `*` |
+| `<Namespace>` | `null` when it equals the name, otherwise the namespace |
+| `<Parameters>` of a placeholder (e.g. TcUnit's `GVL_PARAM_TCUNIT`) | not taken over |
+
+The entries are sorted by name (ordinal, case-insensitive), so that Git diffs stay small. The versions are the ones
+the project asks for (`*` = newest installed), not the resolved ones – for the resolved versions see `TcAgent.exe lock`
+and `TcAgent.exe sbom`. A placeholder whose `DefaultResolution` is not `Name, Version (Distributor)` is left out with a
+warning.
+
+* `export` writes the file only when its content changes (counted with the `.st` files in "file(s) written" /
+  "unchanged"); `--clean` never removes it – only `.st` files.
+* `check` compares it like a `.st` file, line ends ignored: `missing: <PLC project>\references.json` or
+  `differs: …` → exit 1.
+* `import` ignores it: references are not written back into the project (no warning).
 
 ## File format
 
@@ -128,7 +174,7 @@ inside a POU and other XML (ObjectProperties …) are not exported and stay as t
 
 ### Line ends, trailing newlines, encoding
 
-* `.st` files are UTF-8 without BOM, CRLF line ends. Non-ASCII characters (umlauts …) stay as they are. Import accepts
+* `.st` files (and `references.json`) are UTF-8 without BOM, CRLF line ends. Non-ASCII characters (umlauts …) stay as they are. Import accepts
   LF line ends too (e.g. Git with `core.autocrlf`); `st check` compares independent of line ends.
 * TwinCAT declarations usually end with a line end, implementations usually not. In the file the `END_` marker is always
   on its own line. On import a block counts as **unchanged** when its text equals what the export writes for it – then
@@ -187,6 +233,8 @@ TcAgent.exe st check --solution MyMachine.sln     # exit 1: the committed st\ fo
 Commit the `st` folder together with the project: pull requests then show readable ST diffs next to the XML, and
 `st check` fails the pipeline when someone changed the project without running `st export`. In
 `.tcagent/pipeline.json`: `{ "run": "st", "args": ["check"] }`. See [PIPELINE.md](PIPELINE.md#plain-text-st-files).
+
+`st check` covers `references.json` too: a changed library reference without `st export` fails the gate.
 
 Exit codes: `0` OK · `1` `check`: differences (listed as `missing`, `differs`, `not in the project`,
 `cannot be represented exactly`); `import`: errors,

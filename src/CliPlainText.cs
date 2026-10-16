@@ -5,7 +5,8 @@
 //   TcAgent.exe st check  --solution <sln> [--plc <names>] [--out <folder>]             exit 1 if the .st files differ from the project
 //   TcAgent.exe st import --solution <sln> [--plc <names>] [--from <folder>] [--dry-run] [--force]   .st files -> existing project
 //
-// Default folder: <solution folder>\st. Format: docs/PLAINTEXT.md.
+// Default folder: <solution folder>\st. export/check also write/compare <folder>\<PLC project>\references.json (library
+// references of the .plcproj); import ignores it. Format: docs/PLAINTEXT.md.
 //
 // SPDX-License-Identifier: MIT
 namespace TcAgent;
@@ -60,7 +61,7 @@ public static partial class Cli
         if (o.Sub == "check")
         {
             if (rep.Differences.Count == 0) { Say($"{tag} OK: the text folder matches the project ({rep.Objects} object(s)) - {folder}"); return Ok; }
-            var msg = $"{rep.Differences.Count} difference(s) between {folder} and the project - run TcAgent.exe st export and commit the .st files";
+            var msg = $"{rep.Differences.Count} difference(s) between {folder} and the project - run TcAgent.exe st export and commit the .st files and references.json";
             if (Environment.GetEnvironmentVariable("GITHUB_ACTIONS") == "true") Console.WriteLine($"::error title=TcAgent st check::{msg}");
             else if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TF_BUILD"))) Console.WriteLine($"##vso[task.logissue type=error]TcAgent st check: {msg}");
             Say($"{tag} FAILED: {msg}");

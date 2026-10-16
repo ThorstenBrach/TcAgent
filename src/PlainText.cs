@@ -3,6 +3,8 @@
 // Works on the project files only (.plcproj, .TcPOU, .TcGVL, .TcDUT, .TcIO) - no IDE, fast, CI friendly.
 // One .st file per object: <out>\<PLC project>\<folder as in the plcproj>\<Name>.st with TwinCAT's own declaration and
 // implementation text plus END_ markers; methods, properties and actions inside the POU file. Format: docs/PLAINTEXT.md.
+// Next to the code folders: <out>\<PLC project>\references.json with the library references of the .plcproj (export/check
+// only - the import ignores it).
 //
 // The XML is read and changed on the string level (never re-serialized): only the CDATA of changed declarations and
 // implementations is replaced, new methods/properties/actions/accessors are inserted, the LineIds of changed blocks are
@@ -788,6 +790,15 @@ public static class PlainText
         public string Path, Dir, Stem, Name, Text;
         public bool Bom;
         public readonly List<PlcObj> Objects = new();
+        public readonly List<LibraryRef> References = new();
+        /// <summary>Problems with the library references (e.g. a placeholder without DefaultResolution) - export warnings.</summary>
+        public readonly List<string> ReferenceIssues = new();
+    }
+
+    /// <summary>A library reference of the .plcproj as written to references.json (Namespace null = same as Name).</summary>
+    public sealed class LibraryRef
+    {
+        public string Name, Version, DistributorName, Namespace;
     }
 
     static readonly string[] CodeExtensions = { ".tcpou", ".tcgvl", ".tcdut", ".tcio" };
@@ -852,6 +863,13 @@ public static class PlainText
             if (ig.Name != "ItemGroup") continue;
             foreach (var c in ig.Children)
             {
+                if (c.Name is "PlaceholderReference" or "LibraryReference")
+                {
+                    var r = ParseLibraryRef(p.Text, c, out var issue);
+                    if (r != null) p.References.Add(r);
+                    if (issue != null) p.ReferenceIssues.Add(issue);
+                    continue;
+                }
                 if (c.Name != "Compile") continue;
                 var inc = (c.Attr("Include") ?? "").Replace('/', '\\');
                 var ext = System.IO.Path.GetExtension(inc);
@@ -865,8 +883,103 @@ public static class PlainText
             }
         }
         if (string.IsNullOrEmpty(p.Name)) p.Name = p.Stem;
+        // sorted by name (ordinal, case-insensitive; stable) so that Git diffs of references.json stay small
+        var sorted = p.References.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Name, StringComparer.Ordinal).ToList();
+        p.References.Clear();
+        p.References.AddRange(sorted);
         return p;
     }
+
+    // ------------------------------------------------------------------ library references (references.json)
+    public const string ReferencesFile = "references.json";
+
+    /// <summary>"Tc2_Standard, * (Beckhoff Automation GmbH)" - name, version and distributor of a DefaultResolution.</summary>
+    static readonly Regex ResolutionRx = new(@"^\s*(?<name>[^,]+?)\s*,\s*(?<version>[^\s(]+)\s*\((?<dist>.*)\)\s*$", RegexOptions.CultureInvariant);
+
+    /// <summary>"newest" (LibraryReference) and an empty version mean "newest installed" - written as "*".</summary>
+    static string NormVersion(string v) =>
+        string.IsNullOrWhiteSpace(v) || v.Trim().Equals("newest", StringComparison.OrdinalIgnoreCase) ? "*" : v.Trim();
+
+    /// <summary>One &lt;PlaceholderReference&gt; or &lt;LibraryReference&gt; of the .plcproj; parameters (e.g. GVL_PARAM_TCUNIT)
+    /// are not taken over. null (with issue) when the entry cannot be read.</summary>
+    static LibraryRef ParseLibraryRef(string text, Tag c, out string issue)
+    {
+        issue = null;
+        var include = (c.Attr("Include") ?? "").Trim();
+        string name, version, dist;
+        if (c.Name == "PlaceholderReference")
+        {
+            var res = c.Child("DefaultResolution") is { } d ? ElementText(text, d).Trim() : "";
+            var m = ResolutionRx.Match(res);
+            if (!m.Success)
+            {
+                issue = $"placeholder {include}: DefaultResolution '{res}' is not 'Name, Version (Distributor)' - not in {ReferencesFile}";
+                return null;
+            }
+            (name, version, dist) = (m.Groups["name"].Value.Trim(), m.Groups["version"].Value, m.Groups["dist"].Value.Trim());
+        }
+        else
+        {
+            var parts = include.Split(',');
+            if (parts.Length != 3 || parts[0].Trim().Length == 0)
+            {
+                issue = $"library reference '{include}' is not 'Name,Version,Distributor' - not in {ReferencesFile}";
+                return null;
+            }
+            (name, version, dist) = (parts[0].Trim(), parts[1], parts[2].Trim());
+        }
+        var ns = c.Child("Namespace") is { } n ? ElementText(text, n).Trim() : "";
+        return new LibraryRef
+        {
+            Name = name, Version = NormVersion(version), DistributorName = dist.Length > 0 ? dist : null,
+            Namespace = ns.Length == 0 || ns == name ? null : ns
+        };
+    }
+
+    static string JsonString(string v)
+    {
+        if (v == null) return "null";
+        var sb = new StringBuilder("\"");
+        foreach (var ch in v)
+        {
+            switch (ch)
+            {
+                case '"': sb.Append("\\\""); break;
+                case '\\': sb.Append("\\\\"); break;
+                case '\n': sb.Append("\\n"); break;
+                case '\r': sb.Append("\\r"); break;
+                case '\t': sb.Append("\\t"); break;
+                default:
+                    if (ch < ' ') sb.Append("\\u").Append(((int)ch).ToString("x4", System.Globalization.CultureInfo.InvariantCulture));
+                    else sb.Append(ch);
+                    break;
+            }
+        }
+        return sb.Append('"').ToString();
+    }
+
+    /// <summary>references.json in the format of the SRCI repository: an array of {Name, Version, DistributorName, Namespace},
+    /// 2 blanks indentation, lines joined with "\n" (written with CRLF), no line end after the closing bracket.</summary>
+    public static string ReferencesJson(IEnumerable<LibraryRef> refs)
+    {
+        var list = refs.ToList();
+        if (list.Count == 0) return "[]";
+        var sb = new StringBuilder("[\n");
+        for (int i = 0; i < list.Count; i++)
+        {
+            var r = list[i];
+            sb.Append("  {\n")
+              .Append("    \"Name\": ").Append(JsonString(r.Name)).Append(",\n")
+              .Append("    \"Version\": ").Append(JsonString(r.Version)).Append(",\n")
+              .Append("    \"DistributorName\": ").Append(JsonString(r.DistributorName)).Append(",\n")
+              .Append("    \"Namespace\": ").Append(JsonString(r.Namespace)).Append('\n')
+              .Append(i < list.Count - 1 ? "  },\n" : "  }\n");
+        }
+        return sb.Append(']').ToString();
+    }
+
+    /// <summary>The library references of a .plcproj file (sorted by name) - for tests and tools.</summary>
+    public static List<LibraryRef> ReadReferences(string plcproj) => ReadPlcProj(plcproj).References;
 
     /// <summary>--plc: plcproj file name or PLC project name, also with " Project" (the name of the nested project in the tree).</summary>
     static bool PlcMatches(PlcProj p, IReadOnlyCollection<string> filters)
@@ -1060,6 +1173,7 @@ public static class PlainText
                 }
                 else rep.Unchanged++;
             }
+            ExportReferences(p, outDir, check, rep);
             foreach (var f in StFiles(root))
             {
                 if (expected.Contains(Path.GetFullPath(f))) continue;
@@ -1070,6 +1184,36 @@ public static class PlainText
             }
         }
         return rep;
+    }
+
+    /// <summary>&lt;out&gt;\&lt;PLC project&gt;\references.json: written only when the content changes (counted like a .st file);
+    /// check compares it with line ends ignored. --clean never removes it (it only removes .st files).</summary>
+    static void ExportReferences(PlcProj p, string outDir, bool check, Report rep)
+    {
+        foreach (var issue in p.ReferenceIssues) rep.Warnings.Add($"{p.Stem}: {issue}");
+        var rel = Path.Combine(p.Stem, ReferencesFile);
+        var target = Path.Combine(outDir, rel);
+        var text = ReferencesJson(p.References);
+        var data = new UTF8Encoding(false).GetBytes(text.Replace("\n", "\r\n"));
+        var old = File.Exists(target) ? File.ReadAllBytes(target) : null;
+        if (check)
+        {
+            if (old == null) rep.Differences.Add("missing: " + rel);
+            else
+            {
+                bool same;
+                // line ends ignored, also a final line end added by an editor or Git
+                try { same = N(StrictUtf8.GetString(old).TrimStart('\uFEFF')).TrimEnd('\n') == text; } catch (DecoderFallbackException) { same = false; }
+                if (!same) rep.Differences.Add("differs: " + rel);
+            }
+        }
+        else if (old == null || !old.AsSpan().SequenceEqual(data))
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
+            File.WriteAllBytes(target, data);
+            rep.Written++;
+        }
+        else rep.Unchanged++;
     }
 
     static int[] VersionKey(string v)

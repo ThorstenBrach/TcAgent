@@ -21,9 +21,11 @@ public sealed partial class ToolRegistry
     {
         Add("tc_plaintext", "PLC code as plain-text ST files (like a CODESYS/Plaincat text export) - for reviews, diffs, Git and bulk edits. " +
                             "One .st file per POU/GVL/DUT/interface in <folder>\\<PLC project>\\<folder in the project>\\<name>.st, methods, " +
-                            "properties (GET/SET) and actions inside the POU file, each closed by END_METHOD/END_PROPERTY/END_ACTION. " +
-                            "action=export writes the files (only changed ones; clean=true removes .st files without object); action=check " +
-                            "lists the differences between the folder and the project; action=import takes changed .st files back into the " +
+                            "properties (GET/SET) and actions inside the POU file, each closed by END_METHOD/END_PROPERTY/END_ACTION; " +
+                            "<folder>\\<PLC project>\\references.json lists the library references of the .plcproj (Name, Version, " +
+                            "DistributorName, Namespace). action=export writes the files (only changed ones; clean=true removes .st files " +
+                            "without object, never references.json); action=check lists the differences between the folder and the project " +
+                            "(.st files and references.json); action=import (ignores references.json) takes changed .st files back into the " +
                             "EXISTING project: changed declarations/implementations are replaced (Ids kept), new methods/properties/actions and " +
                             "new .st files are created, nothing is deleted. A '// @implementation' line separates declaration and implementation " +
                             "where it is not clear (keep it); '// @implementation SFC - ...' marks a graphical body that stays as it is. " +

@@ -27,3 +27,5 @@ anonymized entries as an issue – they show where tools or descriptions need im
   `TcAgentBridge.pkgdef`) carry the same version number.
 * No Beckhoff binaries and no generated interop assemblies in the repository.
 * Test against a project without connected hardware.
+* Unit tests for the file logic (no TwinCAT needed): `dotnet test tests\TcAgent.Tests`. The test project links the
+  sources it tests from `src/` (the server project itself needs the TwinCAT interop).

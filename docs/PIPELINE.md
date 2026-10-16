@@ -16,7 +16,7 @@ exit code, JUnit XML and inline annotations.
 | `TcAgent.exe archive --solution X.sln --out X.tszip` | archive of the whole solution | releases, support |
 | `TcAgent.exe sbom --solution X.sln --out sbom/X.cdx.json` | SBOM (CycloneDX 1.6 JSON) per PLC project: library references with resolved version, vendor, purl, SHA-256 of the library file, git commit | build artifact, releases (CRA / supply chain) |
 | `TcAgent.exe lock --solution X.sln --check` | compares the resolved library versions with the committed `.tcagent\libraries.lock.json`; exit 1 on differences, 2 without lock file (`lock` without `--check` writes it) | every push / pull request (gate) |
-| `TcAgent.exe st check --solution X.sln` | compares the committed plain-text copy of the PLC code (`st\<PLC project>\...\<name>.st`) with the project; exit 1 when it is out of date. `st export` writes it; no IDE needed – see [below](#plain-text-st-files) | every push / pull request (gate) |
+| `TcAgent.exe st check --solution X.sln` | compares the committed plain-text copy of the PLC code (`st\<PLC project>\...\<name>.st`) and the library references (`st\<PLC project>\references.json`) with the project; exit 1 when it is out of date. `st export` writes it; no IDE needed – see [below](#plain-text-st-files) | every push / pull request (gate) |
 | `TcAgent.exe test --solution X.sln` | builds, activates on the test target, starts the PLC, waits for TcUnit, collects the results | every push to `main`, nightly |
 | `TcAgent.exe sil --solution X.sln --plc Tests` | software in the loop: like `test` on the runtime of the build PC, checks Run mode, starts the PLC if needed, optional Scope recording, always cleans up | every push / pull request |
 | `TcAgent.exe hil --solution X.sln --target 5.1.2.3.1.1 --allow 5.1.2.3.1.1` | hardware in the loop: the same on a remote test PLC with real I/O – only with an explicit allowance | nightly, release candidates |
@@ -277,15 +277,18 @@ Every command opens the solution once; on a busy runner combine the gate with th
 
 `TcAgent.exe st export --solution X.sln` writes the PLC code as plain Structured Text: one `.st` file per POU, GVL, DUT
 and interface in `<solution folder>\st\<PLC project>\<folder>\<name>.st`, methods, properties and actions inside the POU
-file ([format](PLAINTEXT.md)). It reads the project files directly – no IDE, a few seconds even for large projects.
+file ([format](PLAINTEXT.md)), plus `st\<PLC project>\references.json` with the library references of the PLC project
+([format](PLAINTEXT.md#referencesjson)). It reads the project files directly – no IDE, a few seconds even for large
+projects.
 
 * **Reviews:** commit the `st` folder with the project. Pull requests then show the code change as readable ST next
   to the `.TcPOU` XML, and the text is what reviewers and AI review tools read.
 * **Gate:** `TcAgent.exe st check --solution X.sln` fails (exit 1) when the `st` folder no longer matches the project –
-  someone changed the project without `st export`. It lists `missing`, `differs` and `not in the project` files and
-  ignores line-end differences (Git `core.autocrlf`).
-* **Export as artifact:** `st export --out <folder>` (only changed files are written; `--clean` removes files of deleted
-  objects).
+  someone changed the project without `st export`. It covers `references.json` too, so an added, removed or changed
+  library reference fails the gate as well. It lists `missing`, `differs` and `not in the project` files and ignores
+  line-end differences (Git `core.autocrlf`).
+* **Export as artifact:** `st export --out <folder>` (only changed files are written; `--clean` removes `.st` files of
+  deleted objects, never `references.json`).
 * `st import` takes edited `.st` files back into the project (never on a build server while an IDE has the solution
   open – it is refused with exit 2).
 

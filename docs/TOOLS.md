@@ -638,7 +638,7 @@ Imports from files: kind=plcopen (PLCopen XML into a PLC project), kind=item (.x
 
 ### `tc_plaintext`
 
-PLC code as plain-text ST files and back (format: [PLAINTEXT.md](PLAINTEXT.md)). One `.st` file per POU/GVL/DUT/interface in `<folder>\<PLC project>\<folder in the project>\<name>.st`; methods, properties (`GET`/`SET`) and actions inside the POU file, each closed by `END_METHOD`/`END_PROPERTY`/`END_ACTION`. `action=export` writes the files (only changed ones), `action=check` lists the differences between the folder and the project, `action=import` takes the files back into the **existing** project: changed declarations/implementations are replaced (Ids kept), new methods/properties/actions and new `.st` files are created, nothing is deleted. A `// @implementation` line separates declaration and implementation where the split is not clear; `// @implementation SFC - ...` marks a graphical body that stays as it is. Works on the project files; when the solution is open in the connected IDE, import writes through the IDE (like `tc_plc_write`/`tc_plc_create`/`tc_import kind=pou_files`) – then `tc_save` and `tc_check`. Refused when the solution is open in another IDE. export/check count as read tools; import with `dryRun` too.
+PLC code as plain-text ST files and back (format: [PLAINTEXT.md](PLAINTEXT.md)). One `.st` file per POU/GVL/DUT/interface in `<folder>\<PLC project>\<folder in the project>\<name>.st`; methods, properties (`GET`/`SET`) and actions inside the POU file, each closed by `END_METHOD`/`END_PROPERTY`/`END_ACTION`; `<folder>\<PLC project>\references.json` lists the library references of the `.plcproj` (`Name`, `Version`, `DistributorName`, `Namespace` – format in [PLAINTEXT.md](PLAINTEXT.md#referencesjson)). `action=export` writes the files (only changed ones; `clean` never removes `references.json`), `action=check` lists the differences between the folder and the project (`.st` files and `references.json`), `action=import` ignores `references.json` and takes the `.st` files back into the **existing** project: changed declarations/implementations are replaced (Ids kept), new methods/properties/actions and new `.st` files are created, nothing is deleted. A `// @implementation` line separates declaration and implementation where the split is not clear; `// @implementation SFC - ...` marks a graphical body that stays as it is. Works on the project files; when the solution is open in the connected IDE, import writes through the IDE (like `tc_plc_write`/`tc_plc_create`/`tc_import kind=pou_files`) – then `tc_save` and `tc_check`. Refused when the solution is open in another IDE. export/check count as read tools; import with `dryRun` too.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -646,7 +646,7 @@ PLC code as plain-text ST files and back (format: [PLAINTEXT.md](PLAINTEXT.md)).
 | `solution` | string |  | Path of the .sln (default: the solution of the connected IDE) |
 | `plc` | string |  | Only these PLC projects, comma-separated (plcproj name or PLC project name; default: all) |
 | `folder` | string |  | Text folder (default: `<solution folder>\st`) |
-| `clean` | boolean |  | export: also remove .st files whose object no longer exists |
+| `clean` | boolean |  | export: also remove .st files whose object no longer exists (references.json is kept) |
 | `dryRun` | boolean |  | import: only list the changes, write nothing |
 
 ### `tc_library`

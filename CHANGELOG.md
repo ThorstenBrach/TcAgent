@@ -5,6 +5,19 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.26.0] – 2026-10-16
+
+### Added
+- **references.json** – `TcAgent.exe st export|check` and `tc_plaintext` also write/compare
+  `<folder>\<PLC project>\references.json` with the library references of each PLC project, in the format of the SRCI
+  repository (`Name`, `Version`, `DistributorName`, `Namespace`; UTF-8 without BOM, CRLF, 2 blanks indentation).
+  Placeholders from `<DefaultResolution>`, library references from `Include` (`newest` → `*`); `Namespace` is `null`
+  when it equals the name; placeholder parameters are left out; sorted by name for stable Git diffs. Written only when
+  it changes and counted in the report; `st check` reports `missing`/`differs` (line ends ignored) and exits 1; `--clean`
+  never removes it; `st import` ignores it. Format: `docs/PLAINTEXT.md`.
+- **Unit tests** – `tests\TcAgent.Tests` (xUnit, .NET 8, no TwinCAT needed): `dotnet test tests\TcAgent.Tests`. First
+  tests: references.json (parsing, format, sorting, unchanged file not rewritten, check missing/differs, clean, import).
+
 ## [0.25.1] – 2026-10-16
 
 ### Fixed
@@ -292,7 +305,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.25.1...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.26.0...HEAD
+[0.26.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.25.1...v0.26.0
 [0.25.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.3...v0.25.0
 [0.24.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.1...v0.24.3
