@@ -1046,6 +1046,7 @@ public static class PlainText
                 string text;
                 try { text = ReadText(f).Text; }
                 catch (DecoderFallbackException) { rep.Errors.Add($"{rel}: not UTF-8 - save the file as UTF-8"); continue; }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { rep.Errors.Add($"{rel}: {ex.Message}"); continue; }
                 var key = (relDir.ToLowerInvariant(), name.ToLowerInvariant());
                 try
                 {
