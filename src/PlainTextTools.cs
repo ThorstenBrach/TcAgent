@@ -79,7 +79,7 @@ public sealed partial class ToolRegistry
         if (!inAttached)
         {
             var others = tc.Sta.Run(() => tc.ListInstances().Where(i => !string.IsNullOrEmpty(i.Solution) &&
-                                                                       string.Equals(i.Solution, sln, StringComparison.OrdinalIgnoreCase))
+                                                                       SamePath(i.Solution, sln))
                                                            .Select(i => i.Pid).ToList(), 60_000);
             if (others.Count > 0)
                 throw new Exception($"NOT imported: the solution is open in another IDE (pid {string.Join(", ", others)}) - connect to it with tc_attach first.");
@@ -196,5 +196,11 @@ public sealed partial class ToolRegistry
             item = next ?? (ITcSmTreeItem)((dynamic)item).CreateChild(seg, 601, "", null);
         }
         return item;
+    }
+
+    static bool SamePath(string a, string b)
+    {
+        try { return string.Equals(Path.GetFullPath(a), Path.GetFullPath(b), StringComparison.OrdinalIgnoreCase); }
+        catch { return string.Equals(a, b, StringComparison.OrdinalIgnoreCase); }
     }
 }
