@@ -858,6 +858,8 @@ public static class PlainText
         var proj = ParseXml(p.Text).Child("Project") ?? throw new PlainTextException(path + ": no <Project>");
         foreach (var pg in proj.Children)
             if (pg.Name == "PropertyGroup" && p.Name == null && pg.Child("Name") is { } n) p.Name = ElementText(p.Text, n).Trim();
+        var placeholders = new Dictionary<string, LibraryRef>(StringComparer.OrdinalIgnoreCase);   // placeholder -> its entry
+        var resolutions = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);       // <PlaceholderResolution>
         foreach (var ig in proj.Children)
         {
             if (ig.Name != "ItemGroup") continue;
@@ -867,7 +869,13 @@ public static class PlainText
                 {
                     var r = ParseLibraryRef(p.Text, c, out var issue);
                     if (r != null) p.References.Add(r);
+                    if (r != null && c.Name == "PlaceholderReference") placeholders[(c.Attr("Include") ?? "").Trim()] = r;
                     if (issue != null) p.ReferenceIssues.Add(issue);
+                    continue;
+                }
+                if (c.Name == "PlaceholderResolution")
+                {
+                    if (c.Child("Resolution") is { } res) resolutions[(c.Attr("Include") ?? "").Trim()] = ElementText(p.Text, res).Trim();
                     continue;
                 }
                 if (c.Name != "Compile") continue;
@@ -883,6 +891,22 @@ public static class PlainText
             }
         }
         if (string.IsNullOrEmpty(p.Name)) p.Name = p.Stem;
+        // <PlaceholderResolution> (Properties of the placeholder in the library manager) overrides the default resolution:
+        // that is the library TwinCAT really uses for this project
+        foreach (var (inc, resText) in resolutions)
+        {
+            if (!placeholders.TryGetValue(inc, out var r)) continue;
+            var m = ResolutionRx.Match(resText);
+            if (!m.Success) { p.ReferenceIssues.Add($"placeholder {inc}: Resolution '{resText}' is not 'Name, Version (Distributor)' - default resolution used"); continue; }
+            var oldName = r.Name;
+            r.Name = m.Groups["name"].Value.Trim();
+            r.Version = NormVersion(m.Groups["version"].Value);
+            var dist = m.Groups["dist"].Value.Trim();
+            r.DistributorName = dist.Length > 0 ? dist : null;
+            var ns = r.Namespace ?? oldName;                       // null meant "same as the (old) name"
+            r.Namespace = ns == r.Name ? null : ns;
+        }
+
         // sorted by name (ordinal, case-insensitive; stable) so that Git diffs of references.json stay small
         var sorted = p.References.OrderBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ThenBy(x => x.Name, StringComparer.Ordinal).ToList();
         p.References.Clear();

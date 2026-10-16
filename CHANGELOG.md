@@ -5,6 +5,12 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.26.1] – 2026-10-16
+
+### Fixed
+- `references.json`: a project-specific placeholder resolution (`<PlaceholderResolution>`, placeholder properties in the
+  library manager) overrides the default resolution - name, version and distributor of the library TwinCAT really uses.
+
 ## [0.26.0] – 2026-10-16
 
 ### Added
@@ -305,7 +311,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.26.0...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.26.1...HEAD
+[0.26.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.26.0...v0.26.1
 [0.26.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.25.1...v0.26.0
 [0.25.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.25.0...v0.25.1
 [0.25.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.3...v0.25.0

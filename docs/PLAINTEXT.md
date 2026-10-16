@@ -60,6 +60,7 @@ Source is the `.plcproj`:
 | `.plcproj` | references.json |
 |---|---|
 | `<PlaceholderReference Include="Standard">` with `<DefaultResolution>Tc2_Standard, 3.4.5.0 (Beckhoff Automation GmbH)</DefaultResolution>` | `Name` `Tc2_Standard`, `Version` `3.4.5.0`, `DistributorName` `Beckhoff Automation GmbH` – from the default resolution, not from `Include` |
+| `<PlaceholderResolution Include="Standard">` with `<Resolution>Tc2_Standard, 3.4.7.0 (…)</Resolution>` (placeholder properties in the library manager) | overrides the default resolution of that placeholder – the library TwinCAT really uses; an unreadable resolution is a warning and the default stays |
 | `<LibraryReference Include="Tc3_IotBase,newest,Beckhoff Automation GmbH">` | `Name`, `Version`, `DistributorName` from `Include`; `newest` becomes `*` |
 | `<Namespace>` | `null` when it equals the name, otherwise the namespace |
 | `<Parameters>` of a placeholder (e.g. TcUnit's `GVL_PARAM_TCUNIT`) | not taken over |

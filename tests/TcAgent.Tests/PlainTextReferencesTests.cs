@@ -210,4 +210,40 @@ public sealed class PlainTextReferencesTests : IDisposable
         Assert.Contains(rep.Warnings, w => w.Contains("aDep") && w.Contains("references.json"));
         Assert.DoesNotContain("\"aDep\"", File.ReadAllText(Json));
     }
+
+    [Fact]
+    public void PlaceholderResolution_overrides_the_default_resolution()
+    {
+        // project-specific resolution of a placeholder (library manager > placeholder > properties): that library is used
+        var text = PlcProj.Replace("</Project>",
+            "  <ItemGroup>\n" +
+            "    <PlaceholderResolution Include=\"Tc2_System\">\n" +
+            "      <Resolution>Tc2_System, 3.10.2.0 (Beckhoff Automation GmbH)</Resolution>\n" +
+            "    </PlaceholderResolution>\n" +
+            "    <PlaceholderResolution Include=\"Standard\">\n" +
+            "      <Resolution>Tc2_StandardNew, 3.5.0.0 (Other Vendor)</Resolution>\n" +
+            "    </PlaceholderResolution>\n" +
+            "    <PlaceholderResolution Include=\"aDep\">\n" +
+            "      <Resolution>garbage</Resolution>\n" +
+            "    </PlaceholderResolution>\n" +
+            "  </ItemGroup>\n" +
+            "</Project>");
+        Assert.NotEqual(PlcProj, text);
+        var refs = PlainText.ReadReferences(WritePlcProj(text));
+
+        var sys = refs.Single(r => r.Name == "Tc2_System");
+        Assert.Equal("3.10.2.0", sys.Version);
+        Assert.Null(sys.Namespace);
+
+        var std = refs.Single(r => r.Name == "Tc2_StandardNew");            // redirected placeholder: new library
+        Assert.Equal("3.5.0.0", std.Version);
+        Assert.Equal("Other Vendor", std.DistributorName);
+        Assert.Equal("Tc2_Standard", std.Namespace);                         // namespace stays the one of the project
+        Assert.DoesNotContain(refs, r => r.Name == "Tc2_Standard");
+
+        Assert.Equal("1.2.3.4", refs.Single(r => r.Name == "aDep").Version); // unreadable resolution: default kept
+
+        var rep = PlainText.Export(Sln, null, Out, check: false, clean: false);
+        Assert.Contains(rep.Warnings, w => w.Contains("aDep") && w.Contains("Resolution"));
+    }
 }
