@@ -79,7 +79,9 @@ warning.
 ## File format
 
 The text is TwinCAT's own declaration and implementation text, unchanged, plus `END_` markers on their own line
-(column 1). Sub-objects follow in the order of the project file, separated by one blank line.
+(column 1). Methods, properties and actions are written **inside** the POU, before its `END_` marker (IEC 61131-3 3rd
+edition layout), in the order of the project file: a blank line after the POU body, before every sub-block and before
+the closing `END_` marker.
 
 ```
 // comments and attributes before the header belong to the declaration
@@ -88,8 +90,8 @@ VAR_INPUT
   Execute : BOOL;
 END_VAR
 _trig(CLK := Execute);                   <- implementation of the POU
-END_FUNCTION_BLOCK                       <- END_PROGRAM / END_FUNCTION / END_FUNCTION_BLOCK
 
+/// comments directly above a header belong to that method/property/action
 METHOD PUBLIC M_Start : BOOL
 VAR_INPUT
   Speed : LREAL;
@@ -111,36 +113,26 @@ END_PROPERTY
 ACTION A_Reset:
 _speed := 0;
 END_ACTION
+
+END_FUNCTION_BLOCK                       <- END_PROGRAM / END_FUNCTION / END_FUNCTION_BLOCK
 ```
 
 | Object | Content of the `.st` file |
 |---|---|
-| POU (program, function block, function) | declaration, implementation, `END_PROGRAM`/`END_FUNCTION_BLOCK`/`END_FUNCTION`, then `METHOD … END_METHOD`, `PROPERTY … GET … END_GET SET … END_SET END_PROPERTY`, `ACTION <name>: … END_ACTION` |
-| Interface (`.TcIO`) | declaration, `END_INTERFACE`, then the methods and properties with declarations only (`PROPERTY P : INT` / `GET` / `END_GET` / `END_PROPERTY`) |
+| POU (program, function block, function) | declaration, implementation, then `METHOD … END_METHOD`, `PROPERTY … GET … END_GET SET … END_SET END_PROPERTY`, `ACTION <name>: … END_ACTION`, then `END_PROGRAM`/`END_FUNCTION_BLOCK`/`END_FUNCTION`. Without sub-objects the `END_` marker follows the body directly |
+| Interface (`.TcIO`) | declaration, the methods and properties with declarations only (`PROPERTY P : INT` / `GET` / `END_GET` / `END_PROPERTY`), then `END_INTERFACE` |
 | GVL, DUT | the declaration only (`VAR_GLOBAL … END_VAR`, `TYPE … END_TYPE` are complete) |
 
-The interface's `END_INTERFACE` follows the interface declaration (like `END_FUNCTION_BLOCK` follows the POU body), so
-every block of a file is closed by its own marker.
+**How the import finds the end of the POU body:** the first `METHOD <name>`, `PROPERTY <name>` or `ACTION <name>:` line
+in column 1 ends it. Comment and attribute lines directly above that header (`//`, `(*`, `{attribute ...}`, no blank line
+in between) belong to the sub-block – so keep a blank line between the POU code and the first sub-block, as the export
+does. Blank lines at the end of the POU code do not count as a change.
 
-**Import also accepts the IEC 61131-3 3rd edition layout** – methods, properties and actions *inside* the POU, before
-`END_FUNCTION_BLOCK` / `END_PROGRAM` / `END_FUNCTION` (or `END_INTERFACE`):
-
-```
-FUNCTION_BLOCK FB_Axis
-VAR
-END_VAR
-_trig(CLK := Execute);
-
-METHOD M_Start : BOOL
-M_Start := TRUE;
-END_METHOD
-END_FUNCTION_BLOCK
-```
-
-The first `METHOD`, `PROPERTY` or `ACTION` header in column 1 ends the POU body; comment and attribute lines directly
-above it (`//`, `(*`, `{attribute ...}`) belong to the method, so separate the POU code from the first sub-block with a
-blank line. Blank lines at the end of the POU code do not count as a change. Both layouts import identically; export
-always writes the layout shown above (sub-blocks after the `END_` marker).
+**The older layout is still accepted:** `END_FUNCTION_BLOCK` (`END_PROGRAM`, `END_FUNCTION`, `END_INTERFACE`) right after
+the body, the sub-blocks after it. Both layouts import identically, also mixed. Text folders written by earlier builds
+therefore import unchanged, but `st check` reports their POUs with sub-objects as `differs` until the next `st export`
+rewrites them (once). The export itself uses the older layout only for a POU that the inside layout cannot reproduce exactly
+(e.g. a method declaration with a blank line between its doc comment and its `METHOD` line).
 
 **Safety net:** after splitting, no declaration or implementation may contain a block line (`METHOD …`, `PROPERTY …`,
 `ACTION …:`, `GET`, `SET`, `END_METHOD`, `END_PROPERTY`, `END_ACTION`, `END_GET`, `END_SET`, `END_FUNCTION_BLOCK`,

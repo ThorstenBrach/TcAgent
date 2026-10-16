@@ -5,53 +5,37 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.26.1] – 2026-10-16
-
-### Fixed
-- `references.json`: a project-specific placeholder resolution (`<PlaceholderResolution>`, placeholder properties in the
-  library manager) overrides the default resolution - name, version and distributor of the library TwinCAT really uses.
-
-## [0.26.0] – 2026-10-16
-
-### Added
-- **references.json** – `TcAgent.exe st export|check` and `tc_plaintext` also write/compare
-  `<folder>\<PLC project>\references.json` with the library references of each PLC project, in the format of the SRCI
-  repository (`Name`, `Version`, `DistributorName`, `Namespace`; UTF-8 without BOM, CRLF, 2 blanks indentation).
-  Placeholders from `<DefaultResolution>`, library references from `Include` (`newest` → `*`); `Namespace` is `null`
-  when it equals the name; placeholder parameters are left out; sorted by name for stable Git diffs. Written only when
-  it changes and counted in the report; `st check` reports `missing`/`differs` (line ends ignored) and exits 1; `--clean`
-  never removes it; `st import` ignores it. Format: `docs/PLAINTEXT.md`.
-- **Unit tests** – `tests\TcAgent.Tests` (xUnit, .NET 8, no TwinCAT needed): `dotnet test tests\TcAgent.Tests`. First
-  tests: references.json (parsing, format, sorting, unchanged file not rewritten, check missing/differs, clean, import).
-
-## [0.25.1] – 2026-10-16
-
-### Fixed
-- **`st import` / `tc_plaintext import`: a method added before `END_FUNCTION_BLOCK`** was written as text into the
-  implementation of the function block. Import now also accepts the IEC 61131-3 3rd edition layout – methods,
-  properties and actions inside `FUNCTION_BLOCK … END_FUNCTION_BLOCK` (also `PROGRAM`, `FUNCTION`, `INTERFACE`): the first
-  sub-block header ends the POU body, trailing blank lines of the body are no change; both layouts import identically.
-- Safety net: a file whose declaration or implementation would still contain a block line (`METHOD`, `END_METHOD`,
-  `END_FUNCTION_BLOCK`, `GET` …) is refused with file and line instead of being written.
-- `st check` also fails for objects whose text cannot be read back exactly (e.g. a POU damaged by 0.25.0); importing
-  the exported text repairs such a POU (the method text becomes a real method).
-
-## [0.25.0] – 2026-10-16
+## [0.26.2] – 2026-10-17
 
 ### Added
 - **Plain-text ST files** – `TcAgent.exe st export|check|import --solution <sln>` and the tool `tc_plaintext`: the PLC code
-  as one `.st` file per POU, GVL, DUT and interface (`<solution>\st\<PLC project>\<folder>\<name>.st`), methods,
-  properties (`GET`/`SET`) and actions inside the POU file with `END_METHOD`/`END_PROPERTY`/`END_ACTION` markers –
-  TwinCAT's declaration and implementation text unchanged. Works on the project files, no IDE.
+  as one `.st` file per POU, GVL, DUT and interface (`<solution>\st\<PLC project>\<folder>\<name>.st`) – TwinCAT's
+  declaration and implementation text unchanged, methods (`METHOD … END_METHOD`), properties (`PROPERTY … GET … END_GET
+  SET … END_SET END_PROPERTY`) and actions (`ACTION <name>: … END_ACTION`) inside the POU before `END_FUNCTION_BLOCK` /
+  `END_PROGRAM` / `END_FUNCTION` / `END_INTERFACE` (IEC 61131-3 3rd edition layout). Works on the project files, no IDE.
   - `st export` writes only changed files (`--clean` removes files of deleted objects); `st check` exits 1 when the text
-    folder differs from the project – a CI gate for a committed text mirror with readable diffs.
+    folder differs from the project – a CI gate for a committed text mirror with readable diffs. Every exported file is
+    read back first; an object the text cannot reproduce exactly is reported (warning, `st check`: difference).
   - `st import` takes edited files back into the existing project: changed declarations/implementations replaced with
     Ids, order and unchanged XML byte-identical (LineIds of changed blocks removed), new methods/properties/actions/
     accessors and new `.TcPOU`/`.TcIO`/`.TcGVL`/`.TcDUT` files (with `.plcproj` entries) created, nothing deleted;
-    renames/moves refused; `--dry-run`; refused (exit 2) while an IDE has the solution open. Through `tc_plaintext` the
-    import writes through the connected IDE instead.
+    renames/moves refused, a file with a block line inside a declaration or implementation (e.g. a `METHOD` without
+    `END_METHOD`) refused with its line; `--dry-run`; refused (exit 2) while an IDE has the solution open. Through
+    `tc_plaintext` the import writes through the connected IDE instead (then `tc_save`, `tc_check`).
+  - Import accepts both layouts: sub-objects inside the POU (the export format) or after its `END_` marker (the format
+    of the first internal builds). A re-export rewrites such existing text folders once; until then `st check` reports
+    their POUs with sub-objects as `differs`.
   - A `// @implementation` line separates declaration and implementation where the split is ambiguous; graphical bodies
     (SFC, LD, FBD, CFC) appear as `// @implementation SFC - ...` and stay untouched. Format: `docs/PLAINTEXT.md`.
+- **references.json** – `st export|check` and `tc_plaintext` also write/compare `<folder>\<PLC project>\references.json`
+  with the library references of each PLC project, in the format of the SRCI repository (`Name`, `Version`,
+  `DistributorName`, `Namespace`; UTF-8 without BOM, CRLF, 2 blanks indentation). Placeholders from
+  `<DefaultResolution>`, overridden by a project-specific `<PlaceholderResolution>` (the library TwinCAT really uses);
+  library references from `Include` (`newest` → `*`); `Namespace` is `null` when it equals the name; placeholder
+  parameters are left out; sorted by name for stable Git diffs. Written only when it changes; `st check` reports
+  `missing`/`differs` (line ends ignored); `--clean` never removes it; `st import` ignores it.
+- **Unit tests** – `tests\TcAgent.Tests` (xUnit, .NET 8, no TwinCAT needed): `dotnet test tests\TcAgent.Tests` –
+  references.json and the `.st` layout (export format, round trip without changes, old layout still imported).
 
 ## [0.24.3] – 2026-10-15
 
@@ -311,11 +295,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.26.1...HEAD
-[0.26.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.26.0...v0.26.1
-[0.26.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.25.1...v0.26.0
-[0.25.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.25.0...v0.25.1
-[0.25.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.3...v0.25.0
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.26.2...HEAD
+[0.26.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.3...v0.26.2
 [0.24.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.1...v0.24.3
 [0.23.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.23.1
 [0.20.4]: https://github.com/ThorstenBrach/TcAgent/compare/v0.18.0...v0.20.4

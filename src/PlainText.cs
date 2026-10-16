@@ -335,13 +335,19 @@ public static class PlainText
     static string RenderAction(Block b) =>
         b.ImplLang != null && b.ImplLang != "ST" ? NonStMarker(b.ImplLang) + "\n" : E(N(b.Impl ?? ""));
 
-    static string RenderFile(Block obj)
+    /// <summary>The .st text of an object. inside=true (the export format): methods, properties and actions inside the POU /
+    /// interface, before its END_ marker (IEC 61131-3 3rd edition), each preceded by a blank line, and a blank line before
+    /// the END_ marker. inside=false: the END_ marker right after the body, the sub-blocks after it (0.25 format, used by the
+    /// export only for an object the inside layout cannot reproduce exactly). Without sub-blocks both are the same.</summary>
+    static string RenderFile(Block obj, bool inside)
     {
         if (obj.Kind is "GVL" or "DUT") return E(N(obj.Decl ?? ""));
         bool itf = obj.Kind == "ITF";
+        var end = itf ? "END_INTERFACE" : "END_" + PouKeyword(obj.Decl);
+        bool after = !inside || obj.Subs.Count == 0;
         var sb = new StringBuilder();
-        if (itf) sb.Append(E(N(obj.Decl ?? ""))).Append("END_INTERFACE\n");
-        else sb.Append(RenderBody(obj)).Append("END_").Append(PouKeyword(obj.Decl)).Append('\n');
+        sb.Append(itf ? E(N(obj.Decl ?? "")) : RenderBody(obj));
+        if (after) sb.Append(end).Append('\n');
         foreach (var s in obj.Subs)
         {
             sb.Append('\n');
@@ -355,6 +361,7 @@ public static class PlainText
                 sb.Append("END_PROPERTY\n");
             }
         }
+        if (!after) sb.Append('\n').Append(end).Append('\n');
         return sb.ToString();
     }
 
@@ -1163,8 +1170,15 @@ public static class PlainText
                 {
                     var (xml, _) = ReadText(o.FullPath);
                     obj = ObjectFromXml(xml);
-                    text = RenderFile(obj);
+                    text = RenderFile(obj, true);
                     issues = SelfCheck(xml, obj, text);
+                    if (issues.Count > 0 && obj.Subs.Count > 0)
+                    {
+                        // e.g. a sub-block declaration with a blank line before its METHOD line: the 0.25 layout keeps it exact
+                        var alt = RenderFile(obj, false);
+                        var altIssues = SelfCheck(xml, obj, alt);
+                        if (altIssues.Count == 0) { text = alt; issues = altIssues; }
+                    }
                 }
                 catch (Exception ex) when (ex is PlainTextException or DecoderFallbackException or IOException)
                 { rep.Warnings.Add($"{o.Include}: {ex.Message}"); continue; }

@@ -311,9 +311,10 @@ mirror of the project that the pipeline keeps up to date.
 ### What the agent does
 
 `tc_plaintext action=export` writes one `.st` file per POU, GVL, DUT and interface to `<solution folder>\st\<PLC
-project>\<folder>\<name>.st` – TwinCAT's declaration and implementation text with `END_FUNCTION_BLOCK`, methods as
-`METHOD … END_METHOD`, properties as `PROPERTY … GET … END_GET SET … END_SET END_PROPERTY`, actions as
-`ACTION A_Reset: … END_ACTION`. `action=check` lists files that differ from the project. `action=import dryRun=true`
+project>\<folder>\<name>.st` – TwinCAT's declaration and implementation text; methods as `METHOD … END_METHOD`,
+properties as `PROPERTY … GET … END_GET SET … END_SET END_PROPERTY` and actions as `ACTION A_Reset: … END_ACTION`
+inside `FUNCTION_BLOCK … END_FUNCTION_BLOCK` (IEC 61131-3 3rd edition; files with the sub-objects after
+`END_FUNCTION_BLOCK` are imported as well). `action=check` lists files that differ from the project. `action=import dryRun=true`
 shows what an import would change; `action=import` takes the files back into the existing project: changed parts are
 replaced (Ids kept), new methods, properties, actions and new files are created, **nothing is deleted**. When the
 solution is open in the connected IDE the import writes through the IDE (then `tc_save` and `tc_check`).

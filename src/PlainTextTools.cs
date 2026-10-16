@@ -21,7 +21,7 @@ public sealed partial class ToolRegistry
     {
         Add("tc_plaintext", "PLC code as plain-text ST files (like a CODESYS/Plaincat text export) - for reviews, diffs, Git and bulk edits. " +
                             "One .st file per POU/GVL/DUT/interface in <folder>\\<PLC project>\\<folder in the project>\\<name>.st, methods, " +
-                            "properties (GET/SET) and actions inside the POU file, each closed by END_METHOD/END_PROPERTY/END_ACTION; " +
+                            "properties (GET/SET) and actions inside the POU before END_FUNCTION_BLOCK, each closed by END_METHOD/END_PROPERTY/END_ACTION; " +
                             "<folder>\\<PLC project>\\references.json lists the library references of the .plcproj (Name, Version, " +
                             "DistributorName, Namespace). action=export writes the files (only changed ones; clean=true removes .st files " +
                             "without object, never references.json); action=check lists the differences between the folder and the project " +
