@@ -279,7 +279,8 @@ treat them like project rules for that library.
 
 - New solution / PLC project: `tc_new_solution`, `tc_plc_project_add`. Export/import PLCopen XML or XTI: `tc_export`, `tc_import`.
 - Plain-text ST (`tc_plaintext`): `action=export` writes the PLC code as `.st` files (`<solution>\st\<PLC>\<folder>\<name>.st`,
-  methods/properties/actions inside the POU before END_FUNCTION_BLOCK) - use it when the user wants the code as text (review, Git, bulk edit);
+  methods/properties/actions inside the POU before END_FUNCTION_BLOCK; plus `<PLC>\references.json` with the library
+  references) - use it when the user wants the code as text (review, Git, bulk edit);
   `action=check` lists differences; `action=import dryRun=true` first, then `action=import` takes edited files back into the
   existing project (writes through the IDE when it is open there - then `tc_save`, `tc_check`). Keep `// @implementation`
   lines; graphical bodies (`// @implementation SFC ...`) are not touched; it never deletes, renames or moves objects.

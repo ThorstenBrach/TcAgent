@@ -77,7 +77,8 @@ TcAgent.exe ci            # runs the steps, each with a fresh IDE; summary in re
 ```
 
 `TcAgent.exe st export|check|import` keeps a plain-text copy of the PLC code (`.st` files) next to the project –
-readable diffs in pull requests, `st check` as gate; no IDE needed: [docs/PLAINTEXT.md](docs/PLAINTEXT.md).
+readable diffs in pull requests, `st check` as gate, `references.json` with the library references of each PLC project;
+no IDE needed: [docs/PLAINTEXT.md](docs/PLAINTEXT.md).
 
 Ready-made definitions for GitHub Actions, Azure DevOps, Jenkins and GitLab: [docs/PIPELINE.md](docs/PIPELINE.md).
 A GitHub runner on your PC, a VM or a Beckhoff IPC is set up with one script (`setup-runner.ps1`); `TcAgent.exe doctor`
@@ -213,6 +214,9 @@ powershell -ExecutionPolicy Bypass -File .\vsbridge\install.ps1
 
 # or the installable package bin\TcAgent-<version>.vsix
 powershell -ExecutionPolicy Bypass -File .\build-vsix.ps1
+
+# unit tests (no TwinCAT needed)
+dotnet test tests\TcAgent.Tests
 ```
 
 Requirements: Windows 10/11, Visual Studio 2022 with TwinCAT 3.1 XAE (tested with 4026), TE1030 license, .NET 8 SDK.
@@ -227,6 +231,7 @@ SKILL.md                the same guide as a Claude skill
 setup-clients.ps1       registers TcAgent in all AI clients (run automatically by the VSIX)
 setup-runner.ps1        sets up a GitHub Actions self-hosted runner for TwinCAT pipelines
 build.ps1, build-vsix.ps1, test.ps1
+tests/TcAgent.Tests/     unit tests of the file logic (xUnit, no TwinCAT): dotnet test tests\TcAgent.Tests
 docs/                   installation, tool reference, CI pipelines (docs/pipeline/), images
 ```
 
