@@ -276,7 +276,7 @@ Every command opens the solution once; on a busy runner combine the gate with th
 ## Plain-text ST files
 
 `TcAgent.exe st export --solution X.sln` writes the PLC code as plain Structured Text: one `.st` file per POU, GVL, DUT
-and interface in `<solution folder>\st\<PLC project>\<folder>\<name>.st`, methods, properties and actions inside the POU
+and interface in `<solution folder>\st\<PLC project>\<folder>\<name>.st`, methods, properties and actions in the POU
 file ([format](PLAINTEXT.md)), plus `st\<PLC project>\references.json` with the library references of the PLC project
 ([format](PLAINTEXT.md#referencesjson)). It reads the project files directly – no IDE, a few seconds even for large
 projects.

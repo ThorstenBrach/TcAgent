@@ -5,6 +5,17 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+### Changed
+- **Format of the plain-text ST files** (`st export|check|import`, `tc_plaintext`): every block is its declaration, an empty
+  line, the implementation indented by two blanks, an empty line and the `END_` line; the POU ends with its own
+  `END_FUNCTION_BLOCK` / `END_PROGRAM` / `END_FUNCTION`, methods, properties and actions follow after it; properties and
+  interfaces have no `END_PROPERTY` / `END_INTERFACE`; GVLs and DUTs are followed by two empty lines; whitespace at the
+  ends of the texts is not written. The import tells declaration and implementation apart by the indentation (no
+  `// @implementation` lines any more); whitespace at the ends of a text or of its lines does not count as a change.
+  Text folders of earlier builds are rewritten by the next `st export`; their import is refused (methods before the
+  `END_` line, code not indented). Round trip without changes for all checked objects. Tests: `PlainTextRepositoryTests`
+  (objects of a real library with their reference text files), `PlainTextLayoutTests` rewritten.
+
 ## [0.26.2] – 2026-10-17
 
 ### Added

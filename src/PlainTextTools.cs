@@ -19,16 +19,17 @@ public sealed partial class ToolRegistry
 {
     void RegisterPlainText()
     {
-        Add("tc_plaintext", "PLC code as plain-text ST files (like a CODESYS/Plaincat text export) - for reviews, diffs, Git and bulk edits. " +
-                            "One .st file per POU/GVL/DUT/interface in <folder>\\<PLC project>\\<folder in the project>\\<name>.st, methods, " +
-                            "properties (GET/SET) and actions inside the POU before END_FUNCTION_BLOCK, each closed by END_METHOD/END_PROPERTY/END_ACTION; " +
+        Add("tc_plaintext", "PLC code as plain-text ST files - for reviews, diffs, Git and bulk edits. " +
+                            "One .st file per POU/GVL/DUT/interface in <folder>\\<PLC project>\\<folder in the project>\\<name>.st: declaration, " +
+                            "implementation indented by two blanks, END_FUNCTION_BLOCK, then the methods (END_METHOD), properties (GET ... END_GET, " +
+                            "SET ... END_SET) and actions (END_ACTION); " +
                             "<folder>\\<PLC project>\\references.json lists the library references of the .plcproj (Name, Version, " +
                             "DistributorName, Namespace). action=export writes the files (only changed ones; clean=true removes .st files " +
                             "without object, never references.json); action=check lists the differences between the folder and the project " +
                             "(.st files and references.json); action=import (ignores references.json) takes changed .st files back into the " +
                             "EXISTING project: changed declarations/implementations are replaced (Ids kept), new methods/properties/actions and " +
-                            "new .st files are created, nothing is deleted. A '// @implementation' line separates declaration and implementation " +
-                            "where it is not clear (keep it); '// @implementation SFC - ...' marks a graphical body that stays as it is. " +
+                            "new .st files are created, nothing is deleted. Keep implementations indented by two blanks (that separates them from " +
+                            "the declaration); '// @implementation SFC - ...' marks a graphical body that stays as it is. " +
                             "Use import with dryRun=true first. When the solution is open in the connected IDE the import writes through the IDE " +
                             "(then tc_save and tc_check); export/check read the files on disk - call tc_save first if there are unsaved changes.",
             Schema(Req(P("action", "string", "export, check or import")),

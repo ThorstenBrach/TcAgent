@@ -2,7 +2,8 @@
 //
 // Works on the project files only (.plcproj, .TcPOU, .TcGVL, .TcDUT, .TcIO) - no IDE, fast, CI friendly.
 // One .st file per object: <out>\<PLC project>\<folder as in the plcproj>\<Name>.st with TwinCAT's own declaration and
-// implementation text plus END_ markers; methods, properties and actions inside the POU file. Format: docs/PLAINTEXT.md.
+// implementation text (implementation indented by two blanks) plus END_ markers; methods, properties and actions
+// after the END_ line of the POU. Format: docs/PLAINTEXT.md.
 // Next to the code folders: <out>\<PLC project>\references.json with the library references of the .plcproj (export/check
 // only - the import ignores it).
 //
@@ -38,6 +39,9 @@ public static class PlainText
         foreach (var l in lines) sb.Append(l).Append('\n');
         return sb.ToString();
     }
+
+    /// <summary>Text without whitespace at its ends and at the ends of its lines (what the .st file keeps of it).</summary>
+    static string Canon(string t) => string.Join("\n", N(t ?? "").Trim().Split('\n').Select(l => l.TrimEnd()));
 
     static string Cdata(string t) => "<![CDATA[" + t.Replace("]]>", "]]]]><![CDATA[>") + "]]>";
 
@@ -298,71 +302,63 @@ public static class PlainText
 
     static string NonStMarker(string lang) => "// @implementation " + lang + " - not plain text, kept as it is in the project";
 
-    // ------------------------------------------------------------------ declaration / implementation split
-    /// <summary>Splits a block body (POU, METHOD, GET, SET) into declaration and implementation: at an explicit
-    /// "// @implementation" line, otherwise after the last END_VAR line, otherwise after the header line (GET/SET: all
-    /// implementation). Lang != null: the separator names a graphical language (implementation not in the text).</summary>
-    static (string D, string I, string Lang) Split(string body, string kind)
-    {
-        var lines = Lines(body);
-        for (int k = 0; k < lines.Count; k++)
-        {
-            var m = SepRx.Match(lines[k]);
-            if (m.Success) return (Join(lines.Take(k)), Join(lines.Skip(k + 1)), m.Groups[1].Success ? m.Groups[1].Value : null);
-        }
-        int last = -1;
-        for (int k = 0; k < lines.Count; k++)
-            if (EndVarRx.IsMatch(lines[k])) last = k;
-        if (last >= 0) return (Join(lines.Take(last + 1)), Join(lines.Skip(last + 1)), null);
-        if (kind is "GET" or "SET") return ("", body, null);
-        var hrx = kind == "POU" ? PouHeaderRx : MethodHeaderRx;
-        for (int k = 0; k < lines.Count; k++)
-            if (hrx.IsMatch(lines[k])) return (Join(lines.Take(k + 1)), Join(lines.Skip(k + 1)), null);
-        return (body, "", null);
-    }
-
     // ------------------------------------------------------------------ export: object -> .st text (LF here, written with CRLF)
-    static string RenderBody(Block b)
+    // Layout of a file (docs/PLAINTEXT.md): every block is written as
+    //   [head line]  declaration (whitespace at both ends removed)  empty line
+    //   [implementation (whitespace at both ends removed, every line indented by two blanks)  empty line]
+    //   END_ line  empty line
+    // The POU ends with its END_ line right after its own body, the methods/properties/actions follow in the order of the
+    // project file. Properties and interfaces have no END_PROPERTY / END_INTERFACE: their declaration is followed by two
+    // empty lines. GVL, DUT: the declaration and two empty lines.
+    const string Indent = "  ";
+
+    static List<string> DeclLines(string d) => N(d ?? "").Trim().Split('\n').ToList();
+
+    /// <summary>null = the block has no implementation part (interface method, property); empty list = empty implementation.</summary>
+    static List<string> ImplLines(Block b)
     {
-        var d = E(N(b.Decl ?? ""));
-        if (b.ImplLang != null && b.ImplLang != "ST") return d + NonStMarker(b.ImplLang) + "\n";
-        var i = E(N(b.Impl ?? ""));
-        var (d2, i2, lang) = Split(d + i, b.Kind);
-        if (lang == null && d2 == d && i2 == i) return d + i;
-        return d + "// @implementation\n" + i;
+        if (b.ImplLang == null) return null;
+        if (b.ImplLang != "ST") return new List<string> { Indent + NonStMarker(b.ImplLang) };
+        var t = N(b.Impl ?? "").Trim();
+        return t.Length == 0 ? new List<string>() : t.Split('\n').Select(l => Indent + l).ToList();
     }
 
-    static string RenderAction(Block b) =>
-        b.ImplLang != null && b.ImplLang != "ST" ? NonStMarker(b.ImplLang) + "\n" : E(N(b.Impl ?? ""));
-
-    /// <summary>The .st text of an object. inside=true (the export format): methods, properties and actions inside the POU /
-    /// interface, before its END_ marker (IEC 61131-3 3rd edition), each preceded by a blank line, and a blank line before
-    /// the END_ marker. inside=false: the END_ marker right after the body, the sub-blocks after it (0.25 format, used by the
-    /// export only for an object the inside layout cannot reproduce exactly). Without sub-blocks both are the same.</summary>
-    static string RenderFile(Block obj, bool inside)
+    static void AddBlock(List<string> o, string head, string decl, Block b, string end, bool hasDecl = true)
     {
-        if (obj.Kind is "GVL" or "DUT") return E(N(obj.Decl ?? ""));
+        if (head != null) o.Add(head);
+        if (hasDecl) o.AddRange(DeclLines(decl));
+        o.Add("");
+        var impl = ImplLines(b);
+        if (impl != null) { o.AddRange(impl); o.Add(""); }
+        o.Add(end);
+        o.Add("");
+    }
+
+    static string RenderText(Block obj)
+    {
+        var o = new List<string>();
         bool itf = obj.Kind == "ITF";
-        var end = itf ? "END_INTERFACE" : "END_" + PouKeyword(obj.Decl);
-        bool after = !inside || obj.Subs.Count == 0;
-        var sb = new StringBuilder();
-        sb.Append(itf ? E(N(obj.Decl ?? "")) : RenderBody(obj));
-        if (after) sb.Append(end).Append('\n');
-        foreach (var s in obj.Subs)
+        if (obj.Kind is "GVL" or "DUT" || itf)
         {
-            sb.Append('\n');
-            if (s.Kind == "METHOD") sb.Append(itf ? E(N(s.Decl ?? "")) : RenderBody(s)).Append("END_METHOD\n");
-            else if (s.Kind == "ACTION") sb.Append("ACTION ").Append(s.Name).Append(":\n").Append(RenderAction(s)).Append("END_ACTION\n");
-            else
-            {
-                sb.Append(E(N(s.Decl ?? "")));
-                foreach (var a in s.Subs)
-                    sb.Append(a.Kind).Append('\n').Append(itf ? E(N(a.Decl ?? "")) : RenderBody(a)).Append("END_").Append(a.Kind).Append('\n');
-                sb.Append("END_PROPERTY\n");
-            }
+            o.AddRange(DeclLines(obj.Decl));
+            o.Add("");
+            o.Add("");
         }
-        if (!after) sb.Append('\n').Append(end).Append('\n');
-        return sb.ToString();
+        else AddBlock(o, null, obj.Decl, obj, "END_" + PouKeyword(obj.Decl));
+        if (obj.Kind is "POU" or "ITF")
+            foreach (var s in obj.Subs)
+            {
+                if (s.Kind == "METHOD") AddBlock(o, null, s.Decl, s, "END_METHOD");
+                else if (s.Kind == "ACTION") AddBlock(o, "ACTION " + s.Name + ":", null, s, "END_ACTION", hasDecl: false);
+                else
+                {
+                    o.AddRange(DeclLines(s.Decl));
+                    o.Add("");
+                    o.Add("");
+                    foreach (var a in s.Subs) AddBlock(o, a.Kind, a.Decl, a, "END_" + a.Kind);
+                }
+            }
+        return string.Concat(o.Select(l => l + "\n"));
     }
 
     static int CountNonSt(Block b) => (b.ImplLang != null && b.ImplLang != "ST" ? 1 : 0) + b.Subs.Sum(CountNonSt);
@@ -372,9 +368,6 @@ public static class PlainText
     {
         public string Kind, Name, D, I, Lang;
         public int Line;
-        /// <summary>Main block written before its sub-blocks (methods inside FUNCTION_BLOCK..END_FUNCTION_BLOCK): trailing
-        /// blank lines are not compared.</summary>
-        public bool TrimTail;
         public readonly List<PBlock> Accessors = new();
         public PBlock(string kind, string name, int line) { Kind = kind; Name = name; Line = line; }
     }
@@ -382,6 +375,7 @@ public static class PlainText
     // a sub-block header in column 1 (strict, so that variables named method/action/get/set do not match)
     static readonly Regex SubStartRx = new(@"^(?:(?:METHOD|PROPERTY)\s+[A-Za-z_]|ACTION\s+[A-Za-z_]\w*\s*:?\s*$)", IC);
     static readonly Regex CommentLineRx = new(@"^\s*(?://|\(\*|\{)", RegexOptions.CultureInvariant);
+    static readonly Regex OldEndRx = new(@"^END_(PROPERTY|INTERFACE)\s*$", IC);
     // safety net: block keywords that must never end up inside a declaration or implementation text
     static readonly Regex NetRx = new(@"^\s*(?:(METHOD|PROPERTY)\s+[A-Za-z_]|ACTION\s+[A-Za-z_]\w*\s*:?\s*$|(?:GET|SET)\s*$|END_(?:METHOD|PROPERTY|ACTION|FUNCTION_BLOCK|PROGRAM|FUNCTION|INTERFACE|GET|SET)\b)", IC);
 
@@ -395,7 +389,7 @@ public static class PlainText
             var m = NetRx.Match(lines[k]);
             if (!m.Success) continue;
             if (allowed != null && !used && m.Groups[1].Success && m.Groups[1].Value.ToUpperInvariant() == allowed) { used = true; continue; }
-            throw new PlainTextException($"line {start + k + 1}: '{lines[k].Trim()}' inside a block - every METHOD, PROPERTY and ACTION needs its own END_METHOD / END_PROPERTY / END_ACTION line (column 1)");
+            throw new PlainTextException($"line {start + k + 1}: '{lines[k].Trim()}' inside a block - every METHOD and ACTION needs its own END_METHOD / END_ACTION line, every GET/SET its END_GET / END_SET (column 1)");
         }
     }
 
@@ -404,6 +398,60 @@ public static class PlainText
         int n = lines.Count;
         while (n > 0 && string.IsNullOrWhiteSpace(lines[n - 1])) n--;
         return lines.GetRange(0, n);
+    }
+
+    static List<string> StripBlank(List<string> lines)
+    {
+        int a = 0;
+        while (a < lines.Count && string.IsNullOrWhiteSpace(lines[a])) a++;
+        return StripBlankTail(lines.GetRange(a, lines.Count - a));
+    }
+
+    static bool IsIndented(string l) => l.StartsWith(Indent, StringComparison.Ordinal) || l.StartsWith('\t');
+
+    static string Dedent(string l) =>
+        l.StartsWith(Indent, StringComparison.Ordinal) ? l[Indent.Length..] : l.StartsWith('\t') ? l[1..] : l.TrimStart(' ');
+
+    /// <summary>Splits the lines of a block (between its head and its END_ line) into declaration and implementation.
+    /// The implementation is the indented part at the end (lines indented by two blanks, empty lines in between); the
+    /// declaration ends with its last END_VAR line, or with its header line (METHOD/FUNCTION_BLOCK...), or is empty
+    /// (GET/SET/ACTION) - lines between declaration and implementation may only be comments or empty.
+    /// Lang != null: the implementation is the marker of a graphical body.</summary>
+    static (string D, string I, string Lang) SplitBlock(List<string> region, int firstLine, string kind)
+    {
+        int anchor = -1;
+        for (int k = 0; k < region.Count; k++)
+            if (EndVarRx.IsMatch(region[k])) anchor = k;
+        if (anchor < 0 && kind is "POU" or "METHOD")
+        {
+            var hrx = kind == "POU" ? PouHeaderRx : MethodHeaderRx;
+            anchor = region.FindIndex(l => hrx.IsMatch(l));
+            if (anchor < 0) anchor = region.Count - 1;
+        }
+        // implementation: the indented / empty lines at the end
+        int s = region.Count;
+        while (s > anchor + 1 && (string.IsNullOrWhiteSpace(region[s - 1]) || IsIndented(region[s - 1]))) s--;
+        // the declaration ends at its last non-empty line before that; between anchor and s only comments are allowed
+        for (int k = anchor + 1; k < s; k++)
+            if (!string.IsNullOrWhiteSpace(region[k]) && !CommentLineRx.IsMatch(region[k]))
+                throw new PlainTextException($"line {firstLine + k + 1}: '{region[k].Trim()}' after the declaration is not indented - " +
+                                             "the implementation must be indented by two blanks and separated from the declaration by an empty line");
+        var decl = StripBlank(region.GetRange(0, s));
+        var impl = StripBlank(region.GetRange(s, region.Count - s)).Select(Dedent).ToList();
+        if (impl.Count == 1)
+        {
+            var m = SepRx.Match(impl[0]);
+            if (m.Success && m.Groups[1].Success) return (Join(decl), "", m.Groups[1].Value);
+        }
+        return (Join(decl), Join(impl), null);
+    }
+
+    /// <summary>Start of the block whose header is at line h: comment/attribute lines directly above belong to it.</summary>
+    static int BlockStart(List<string> lines, int h, int min)
+    {
+        int start = h;
+        while (start > min && CommentLineRx.IsMatch(lines[start - 1])) start--;
+        return start;
     }
 
     static (PBlock Main, List<PBlock> Subs) ParseSt(string text, string kind)
@@ -415,114 +463,113 @@ public static class PlainText
         if (kind is "GVL" or "DUT")
         {
             CheckSegment(lines, 0, null);
-            main.D = t;
+            main.D = Join(StripBlank(lines));
             return (main, subs);
         }
         bool itf = kind == "ITF";
-        var missingEnd = "line 1: " + (itf ? "END_INTERFACE" : "END_FUNCTION_BLOCK / END_PROGRAM / END_FUNCTION") + " (own line, column 1) is missing";
-        int e = lines.FindIndex(l => MainEndRx.IsMatch(l));
-        if (e < 0) throw new PlainTextException(missingEnd);
-        // IEC 61131-3 3rd edition layout: methods/properties/actions before END_FUNCTION_BLOCK. The first sub-block header
-        // ends the body; comment/attribute lines directly above it belong to the sub-block, blank lines to neither.
-        int h = lines.FindIndex(0, e, l => SubStartRx.IsMatch(l));
-        List<string> bodyLines;
-        bool mainDone;
         int i;
-        if (h >= 0)
+        if (itf)
         {
-            int start = h;
-            while (start > 0 && CommentLineRx.IsMatch(lines[start - 1]) && !SepRx.IsMatch(lines[start - 1])) start--;
-            bodyLines = StripBlankTail(lines.GetRange(0, start));
-            main.TrimTail = true;
-            mainDone = false;
+            // the interface declaration ends with the first sub-block (no END_INTERFACE)
+            int h = lines.FindIndex(l => SubStartRx.IsMatch(l) || OldEndRx.IsMatch(l));
+            if (h < 0) h = lines.Count;
+            int start = h < lines.Count ? BlockStart(lines, h, 0) : h;
+            var head = lines.GetRange(0, start);
+            CheckSegment(head, 0, null);
+            main.D = Join(StripBlank(head));
             i = start;
         }
         else
         {
-            bodyLines = lines.GetRange(0, e);
-            mainDone = true;
+            int e = lines.FindIndex(l => MainEndRx.IsMatch(l));
+            int h = lines.FindIndex(l => SubStartRx.IsMatch(l));
+            if (e < 0) throw new PlainTextException("END_FUNCTION_BLOCK / END_PROGRAM / END_FUNCTION (own line, column 1) is missing");
+            if (h >= 0 && h < e)
+                throw new PlainTextException($"line {h + 1}: '{lines[h].Trim()}' before {lines[e].Trim()} - methods, properties and actions follow after the END_ line of the POU");
+            var body = lines.GetRange(0, e);
+            CheckSegment(body, 0, null);
+            (main.D, main.I, main.Lang) = SplitBlock(body, 0, "POU");
             i = e + 1;
         }
-        CheckSegment(bodyLines, 0, null);
-        var body = Join(bodyLines);
-        if (itf) main.D = body;
-        else (main.D, main.I, main.Lang) = Split(body, "POU");
         while (true)
         {
-            while (i < lines.Count && string.IsNullOrWhiteSpace(lines[i])) i++;
+            while (i < lines.Count && (string.IsNullOrWhiteSpace(lines[i]) || OldEndRx.IsMatch(lines[i]))) i++;
             if (i >= lines.Count) break;
-            if (MainEndRx.IsMatch(lines[i]))
+            if (MainEndRx.IsMatch(lines[i])) throw new PlainTextException($"line {i + 1}: second {lines[i].Trim()}");
+            int h = i;
+            while (h < lines.Count && !SubStartRx.IsMatch(lines[h]))
             {
-                if (mainDone) throw new PlainTextException($"line {i + 1}: second {lines[i].Trim()}");
-                mainDone = true; i++; continue;
+                if (!CommentLineRx.IsMatch(lines[h]) && !string.IsNullOrWhiteSpace(lines[h]))
+                    throw new PlainTextException($"line {h + 1}: METHOD, PROPERTY or ACTION expected, found '{lines[h].Trim()}'");
+                h++;
             }
-            int j = i;
-            while (j < lines.Count && !SubEndRx.IsMatch(lines[j]))
-            {
-                if (MainEndRx.IsMatch(lines[j]))
-                    throw new PlainTextException($"line {j + 1}: {lines[j].Trim()} inside the block that starts at line {i + 1} - END_METHOD / END_PROPERTY / END_ACTION missing");
-                j++;
-            }
-            if (j >= lines.Count)
-                throw new PlainTextException($"line {i + 1}: a METHOD, PROPERTY or ACTION block ending with END_METHOD / END_PROPERTY / END_ACTION (own line, column 1) is expected");
-            var k = SubEndRx.Match(lines[j]).Groups[1].Value.ToUpperInvariant();
-            var region = lines.GetRange(i, j - i);
+            if (h >= lines.Count) throw new PlainTextException($"line {i + 1}: comment without a METHOD, PROPERTY or ACTION after it");
             PBlock p;
-            if (k == "METHOD")
+            if (Regex.IsMatch(lines[h], @"^PROPERTY\b", IC))
             {
-                var name = FirstMatch(MethodNameRx, region) ?? throw new PlainTextException($"line {i + 1}: block ends with END_METHOD but has no 'METHOD <name>' line");
-                CheckSegment(region, i, "METHOD");
-                p = new PBlock("METHOD", name, i + 1);
-                var mbody = Join(region);
-                if (itf) p.D = mbody;
-                else (p.D, p.I, p.Lang) = Split(mbody, "METHOD");
-            }
-            else if (k == "ACTION")
-            {
-                if (itf) throw new PlainTextException($"line {i + 1}: an interface has no actions");
-                var m = region.Count > 0 ? ActionRx.Match(region[0]) : null;
-                if (m == null || !m.Success) throw new PlainTextException($"line {i + 1}: block ends with END_ACTION but does not start with 'ACTION <name>:'");
-                p = new PBlock("ACTION", m.Groups[1].Value, i + 1);
-                var rest = region.Skip(1).ToList();
-                CheckSegment(rest, i + 1, null);
-                var sm = rest.Count == 1 ? SepRx.Match(rest[0]) : null;
-                if (sm != null && sm.Success && sm.Groups[1].Success) { p.I = ""; p.Lang = sm.Groups[1].Value; }
-                else p.I = Join(rest);
-            }
-            else
-            {
-                int a = region.FindIndex(l => AccRx.IsMatch(l));
-                if (a < 0) a = region.Count;
-                var name = FirstMatch(PropNameRx, region.Take(a)) ?? throw new PlainTextException($"line {i + 1}: block ends with END_PROPERTY but has no 'PROPERTY <name>' line");
-                CheckSegment(region.GetRange(0, a), i, "PROPERTY");
-                p = new PBlock("PROPERTY", name, i + 1) { D = Join(region.Take(a)) };
-                int q = a;
-                while (q < region.Count)
+                // declaration up to the first GET/SET (or the next block / end of the file)
+                int a = h + 1;
+                while (a < lines.Count && !AccRx.IsMatch(lines[a]) && !SubStartRx.IsMatch(lines[a]) && !OldEndRx.IsMatch(lines[a])) a++;
+                int declEnd = a;
+                if (a < lines.Count && SubStartRx.IsMatch(lines[a])) declEnd = BlockStart(lines, a, h + 1);
+                var region = lines.GetRange(i, declEnd - i);
+                var name = FirstMatch(PropNameRx, region) ?? throw new PlainTextException($"line {h + 1}: 'PROPERTY <name>' expected");
+                CheckSegment(region, i, "PROPERTY");
+                p = new PBlock("PROPERTY", name, h + 1) { D = Join(StripBlank(region)) };
+                int q = declEnd;
+                while (true)
                 {
-                    if (string.IsNullOrWhiteSpace(region[q])) { q++; continue; }
-                    var am = AccRx.Match(region[q]);
-                    if (!am.Success) throw new PlainTextException($"line {i + q + 1}: GET or SET (own line) expected in PROPERTY {name}");
+                    while (q < lines.Count && string.IsNullOrWhiteSpace(lines[q])) q++;
+                    if (q >= lines.Count) break;
+                    var am = AccRx.Match(lines[q]);
+                    if (!am.Success) break;
                     var acc = am.Groups[1].Value.ToUpperInvariant();
                     int r = q + 1;
-                    while (r < region.Count && !AccEndRx.IsMatch(region[r])) r++;
-                    if (r >= region.Count) throw new PlainTextException($"line {i + q + 1}: END_{acc} is missing");
-                    if (AccEndRx.Match(region[r]).Groups[1].Value.ToUpperInvariant() != acc) throw new PlainTextException($"line {i + r + 1}: END_{acc} expected");
-                    if (p.Accessors.Any(x => x.Kind == acc)) throw new PlainTextException($"line {i + q + 1}: PROPERTY {name} has two {acc} blocks");
-                    CheckSegment(region.GetRange(q + 1, r - q - 1), i + q + 1, null);
-                    var ab = new PBlock(acc, acc == "GET" ? "Get" : "Set", i + q + 1);
-                    var accBody = Join(region.Skip(q + 1).Take(r - q - 1));
-                    if (itf) ab.D = accBody;
-                    else (ab.D, ab.I, ab.Lang) = Split(accBody, acc);
+                    while (r < lines.Count && !AccEndRx.IsMatch(lines[r])) r++;
+                    if (r >= lines.Count) throw new PlainTextException($"line {q + 1}: END_{acc} is missing");
+                    if (AccEndRx.Match(lines[r]).Groups[1].Value.ToUpperInvariant() != acc) throw new PlainTextException($"line {r + 1}: END_{acc} expected");
+                    if (p.Accessors.Any(x => x.Kind == acc)) throw new PlainTextException($"line {q + 1}: PROPERTY {name} has two {acc} blocks");
+                    var accLines = lines.GetRange(q + 1, r - q - 1);
+                    CheckSegment(accLines, q + 1, null);
+                    var ab = new PBlock(acc, acc == "GET" ? "Get" : "Set", q + 1);
+                    if (itf) ab.D = Join(StripBlank(accLines));
+                    else (ab.D, ab.I, ab.Lang) = SplitBlock(accLines, q + 1, acc);
                     p.Accessors.Add(ab);
                     q = r + 1;
                 }
+                i = q;
+            }
+            else
+            {
+                bool isAction = !Regex.IsMatch(lines[h], @"^METHOD\b", IC);
+                var endRx = new Regex(isAction ? @"^END_ACTION\s*$" : @"^END_METHOD\s*$", IC);
+                int j = h + 1;
+                while (j < lines.Count && !endRx.IsMatch(lines[j])) j++;
+                if (j >= lines.Count) throw new PlainTextException($"line {h + 1}: {(isAction ? "END_ACTION" : "END_METHOD")} (own line, column 1) is missing");
+                if (isAction)
+                {
+                    if (itf) throw new PlainTextException($"line {h + 1}: an interface has no actions");
+                    var m = ActionRx.Match(lines[h]);
+                    p = new PBlock("ACTION", m.Groups[1].Value, h + 1);
+                    var rest = lines.GetRange(h + 1, j - h - 1);
+                    CheckSegment(rest, h + 1, null);
+                    (_, p.I, p.Lang) = SplitBlock(rest, h + 1, "ACTION");
+                }
+                else
+                {
+                    var region = lines.GetRange(i, j - i);
+                    var name = FirstMatch(MethodNameRx, region) ?? throw new PlainTextException($"line {h + 1}: 'METHOD <name>' expected");
+                    CheckSegment(region, i, "METHOD");
+                    p = new PBlock("METHOD", name, h + 1);
+                    if (itf) p.D = Join(StripBlank(region));
+                    else (p.D, p.I, p.Lang) = SplitBlock(region, i, "METHOD");
+                }
+                i = j + 1;
             }
             if (subs.Any(x => x.Name.Equals(p.Name, StringComparison.OrdinalIgnoreCase)))
-                throw new PlainTextException($"line {i + 1}: {p.Name} is defined twice");
+                throw new PlainTextException($"line {p.Line}: {p.Name} is defined twice");
             subs.Add(p);
-            i = j + 1;
         }
-        if (!mainDone) throw new PlainTextException(missingEnd);
         return (main, subs);
     }
 
@@ -613,20 +660,16 @@ public static class PlainText
         var edits = new List<Edit>();
         var lineIds = new HashSet<string>();
 
-        // trimTail: body written before the sub-blocks (methods inside FUNCTION_BLOCK..END_FUNCTION_BLOCK) - its trailing
-        // blank lines cannot be told apart from the separation, so they do not count as a change
-        static bool Same(string p, string orig, bool trimTail)
-        {
-            var o = E(N(orig));
-            return p == o || (trimTail && Join(StripBlankTail(Lines(p))) == Join(StripBlankTail(Lines(o))));
-        }
+        // the text format keeps neither whitespace at the ends of a text nor at the ends of its lines: such differences
+        // do not count as a change (the project text is kept byte for byte)
+        static bool Same(string p, string orig) => Canon(p) == Canon(orig);
 
-        void Cmp(Block xb, string pd, string pi, string plang, string label, List<string> path, bool trimTail = false)
+        void Cmp(Block xb, string pd, string pi, string plang, string label, List<string> path)
         {
             string newDecl = null, newImpl = null;
             if (pd != null)
             {
-                if (xb.DeclNode != null) { if (!Same(pd, xb.Decl, trimTail)) newDecl = Fit(pd, xb.Decl, true); }
+                if (xb.DeclNode != null) { if (!Same(pd, xb.Decl)) newDecl = Fit(pd, xb.Decl, true); }
                 else if (pd != "") res.Warnings.Add($"{label}: has no declaration part in the project - the text is ignored");
             }
             if (pi != null)
@@ -634,7 +677,7 @@ public static class PlainText
                 if (xb.ImplLang == "ST")
                 {
                     if (plang != null) res.Warnings.Add($"{label}: marked as {plang} in the text file but ST in the project - implementation kept");
-                    else if (!Same(pi, xb.Impl, trimTail)) newImpl = Fit(pi, xb.Impl, false);
+                    else if (!Same(pi, xb.Impl)) newImpl = Fit(pi, xb.Impl, false);
                 }
                 else if (xb.ImplLang != null)
                 {
@@ -668,7 +711,7 @@ public static class PlainText
                 return res;
             }
         }
-        Cmp(obj, main.D, obj.Kind != "POU" ? null : main.I, main.Lang, obj.Name, new List<string>(), main.TrimTail);
+        Cmp(obj, main.D, obj.Kind != "POU" ? null : main.I, main.Lang, obj.Name, new List<string>());
 
         // methods, properties, actions
         var xsubs = new Dictionary<string, Block>();
@@ -1170,15 +1213,8 @@ public static class PlainText
                 {
                     var (xml, _) = ReadText(o.FullPath);
                     obj = ObjectFromXml(xml);
-                    text = RenderFile(obj, true);
+                    text = RenderText(obj);
                     issues = SelfCheck(xml, obj, text);
-                    if (issues.Count > 0 && obj.Subs.Count > 0)
-                    {
-                        // e.g. a sub-block declaration with a blank line before its METHOD line: the 0.25 layout keeps it exact
-                        var alt = RenderFile(obj, false);
-                        var altIssues = SelfCheck(xml, obj, alt);
-                        if (altIssues.Count == 0) { text = alt; issues = altIssues; }
-                    }
                 }
                 catch (Exception ex) when (ex is PlainTextException or DecoderFallbackException or IOException)
                 { rep.Warnings.Add($"{o.Include}: {ex.Message}"); continue; }

@@ -1,6 +1,6 @@
-// Tests for the layout of the .st files of TcAgent.exe st export|check|import and tc_plaintext (PlainText.cs):
-// methods, properties and actions inside FUNCTION_BLOCK .. END_FUNCTION_BLOCK (IEC 61131-3 3rd edition), round trip
-// without changes, the 0.25 layout (sub-blocks after END_FUNCTION_BLOCK) still accepted by the import.
+// Tests for the layout of the .st files of TcAgent.exe st export|check|import and tc_plaintext (PlainText.cs): the POU
+// ends with END_FUNCTION_BLOCK after its own body, methods, properties and actions follow after it, implementations are
+// indented by two blanks; round trip without changes, changes and new methods imported, wrong layouts refused.
 //
 // SPDX-License-Identifier: MIT
 using System.Text;
@@ -116,21 +116,69 @@ public sealed class PlainTextLayoutTests : IDisposable
 
     PlainText.Report Export(bool check = false) => PlainText.Export(Sln, null, Out, check: check, clean: false);
 
+    const string Expected = """
+        /// A motor
+        FUNCTION_BLOCK FB_Motor
+        VAR_INPUT
+          Enable : BOOL;
+        END_VAR
+        VAR
+          _speed : LREAL;
+        END_VAR
+
+          IF NOT Enable THEN
+            A_Reset();
+          END_IF
+          // end of the body
+
+        END_FUNCTION_BLOCK
+
+        /// Starts the motor
+        METHOD PUBLIC M_Start : BOOL
+        VAR_INPUT
+          Speed : LREAL;
+        END_VAR
+
+          _speed := Speed;
+          M_Start := TRUE;
+
+        END_METHOD
+
+        PROPERTY PUBLIC P_Speed : LREAL
+
+
+        GET
+        VAR
+        END_VAR
+
+          P_Speed := _speed;
+
+        END_GET
+
+        SET
+        VAR
+        END_VAR
+
+          _speed := P_Speed;
+
+        END_SET
+
+        ACTION A_Reset:
+
+          _speed := 0;
+
+        END_ACTION
+
+
+        """;
+
     [Fact]
-    public void Export_writes_methods_properties_and_actions_inside_the_function_block()
+    public void Export_writes_the_sub_blocks_after_the_end_of_the_function_block()
     {
         var rep = Export();
         Assert.Empty(rep.Errors);
         Assert.DoesNotContain(rep.Warnings, w => w.Contains("reproduce"));
-        var text = File.ReadAllText(St);
-        int end = text.LastIndexOf("END_FUNCTION_BLOCK", StringComparison.Ordinal);
-        int m = text.IndexOf("METHOD PUBLIC M_Start", StringComparison.Ordinal);
-        int p = text.IndexOf("PROPERTY PUBLIC P_Speed", StringComparison.Ordinal);
-        int a = text.IndexOf("ACTION A_Reset:", StringComparison.Ordinal);
-        Assert.True(m > 0 && m < p && p < a && a < end, $"order: METHOD {m}, PROPERTY {p}, ACTION {a}, END_FUNCTION_BLOCK {end}");
-        Assert.Equal(end, text.IndexOf("END_FUNCTION_BLOCK", StringComparison.Ordinal));              // only once
-        Assert.EndsWith("END_ACTION\r\n\r\nEND_FUNCTION_BLOCK\r\n", text);                              // blank line before the END_ marker
-        Assert.Contains("// end of the body\r\n\r\n/// Starts the motor\r\nMETHOD PUBLIC M_Start : BOOL\r\n", text);   // blank line after the body
+        Assert.Equal(Crlf(Expected), File.ReadAllText(St));
     }
 
     [Fact]
@@ -146,25 +194,54 @@ public sealed class PlainTextLayoutTests : IDisposable
     }
 
     [Fact]
-    public void Old_layout_after_END_FUNCTION_BLOCK_is_still_imported_and_check_reports_it()
+    public void Methods_before_END_FUNCTION_BLOCK_are_refused()
     {
         Export();
         var text = File.ReadAllText(St);
-        // 0.25 layout: END_FUNCTION_BLOCK right after the body, the sub-blocks after it
-        int k = text.IndexOf("\r\n\r\n/// Starts the motor", StringComparison.Ordinal);
-        Assert.True(k > 0);
-        const string tail = "\r\nEND_FUNCTION_BLOCK\r\n";
-        var old = text[..(k + 2)] + "END_FUNCTION_BLOCK\r\n" + text[(k + 2)..^tail.Length];
-        Assert.True(old.IndexOf("END_FUNCTION_BLOCK", StringComparison.Ordinal) < old.IndexOf("METHOD PUBLIC M_Start", StringComparison.Ordinal));
-        Assert.EndsWith("END_ACTION\r\n", old);
-        File.WriteAllText(St, old, new UTF8Encoding(false));
+        // layout of earlier TcAgent versions: sub-blocks inside FUNCTION_BLOCK .. END_FUNCTION_BLOCK
+        var inside = text.Replace("END_FUNCTION_BLOCK\r\n\r\n", "").TrimEnd() + "\r\n\r\nEND_FUNCTION_BLOCK\r\n";
+        File.WriteAllText(St, inside, new UTF8Encoding(false));
+        var imp = PlainText.Import(Sln, null, Out);
+        Assert.Contains(imp.Errors, e => e.Contains("follow after the END_ line"));
+        Assert.Empty(imp.Files);
+    }
 
+    [Fact]
+    public void Implementation_without_indentation_is_refused()
+    {
+        Export();
+        File.WriteAllText(St, File.ReadAllText(St).Replace("  M_Start := TRUE;", "M_Start := TRUE;"), new UTF8Encoding(false));
+        var imp = PlainText.Import(Sln, null, Out);
+        Assert.Contains(imp.Errors, e => e.Contains("must be indented by two blanks"));
+        Assert.Empty(imp.Files);
+    }
+
+    [Fact]
+    public void Whitespace_at_line_ends_is_not_a_change()
+    {
+        Export();
+        // an editor that removes trailing blanks turns the indented empty lines into empty lines
+        File.WriteAllText(St, string.Join("\r\n", File.ReadAllText(St).Split("\r\n").Select(l => l.TrimEnd())), new UTF8Encoding(false));
         var imp = PlainText.Import(Sln, null, Out);
         Assert.Empty(imp.Errors);
-        Assert.Empty(imp.Files);                                                                      // same content -> no change
-        Assert.Contains("differs: " + Rel, Export(check: true).Differences);                         // a re-export rewrites it once
+        Assert.Empty(imp.Files);
+    }
+
+    [Fact]
+    public void New_method_is_created()
+    {
         Export();
-        Assert.Equal(text, File.ReadAllText(St));
+        var text = File.ReadAllText(St).Replace("ACTION A_Reset:", "METHOD M_Stop\r\nVAR_INPUT\r\nEND_VAR\r\n\r\n  _speed := 0.0;\r\n  A_Reset();\r\n\r\nEND_METHOD\r\n\r\nACTION A_Reset:");
+        File.WriteAllText(St, text, new UTF8Encoding(false));
+        var imp = PlainText.Import(Sln, null, Out);
+        Assert.Empty(imp.Errors);
+        Assert.Contains(imp.Lines, l => l.Contains("new METHOD FB_Motor.M_Stop"));
+        PlainText.WriteFiles(imp);
+        var xml = File.ReadAllText(Pou);
+        Assert.Contains("<Method Name=\"M_Stop\"", xml);
+        Assert.Contains("_speed := 0.0;\r\nA_Reset();]]></ST>", xml);                              // indentation removed
+        Export();                                                                                     // new sub-objects come last in the project
+        Assert.Empty(PlainText.Import(Sln, null, Out).Files);
     }
 
     [Fact]

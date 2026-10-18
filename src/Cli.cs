@@ -816,7 +816,7 @@ public static partial class Cli
   TcAgent.exe st export --solution <sln> [--plc <names>] [--out <folder>] [--clean]
   TcAgent.exe st check  --solution <sln> [--plc <names>] [--out <folder>]
   TcAgent.exe st import --solution <sln> [--plc <names>] [--from <folder>] [--dry-run] [--force]
-      PLC code as plain-text ST files (one .st per POU/GVL/DUT/interface, methods/properties/actions inside) and back -
+      PLC code as plain-text ST files (one .st per POU/GVL/DUT/interface with its methods/properties/actions) and back -
       works on the project files, no IDE. Default folder: <solution folder>\st\<PLC project>\<folder>\<name>.st, plus
       <PLC project>\references.json with the library references of the .plcproj (export/check only, import ignores it).
       export writes only changed files (--clean also removes .st files without object, never references.json). check:

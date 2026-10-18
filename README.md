@@ -28,7 +28,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 |---|---|---|
 | **Your context** | The agent knows the object, line and selection you are working on – ask "what does *this* do?" | `tc_editor_context` |
 | **PLC code** | Read, change (optionally as a diff to approve), create POUs, methods, properties, DUTs, GVLs; implement interfaces in one step | `tc_plc_read`, `tc_plc_write`, `tc_plc_create` |
-| **Plain-text ST** | The whole PLC code as `.st` files (one per POU, methods/properties/actions inside) for reviews, Git diffs and bulk edits – and back into the project, Ids kept, nothing deleted; also as CI gate | `tc_plaintext` |
+| **Plain-text ST** | The whole PLC code as `.st` files (one per POU with its methods/properties/actions) for reviews, Git diffs and bulk edits – and back into the project, Ids kept, nothing deleted; also as CI gate | `tc_plaintext` |
 | **SFC step chains** | Read and write sequential function charts as text – steps, actions, transitions, alternative and parallel branches, jumps; renumber steps, step comments, SFC flags | `tc_sfc` |
 | **Lessons learned** | The agent remembers hard-won solutions – what the problem was, why, and how it was solved – and recalls them by itself when the same error comes up again (project, personal or team file) | `tc_lessons` |
 | **Program documentation** | Explains the project: call hierarchy, call graph, inheritance hierarchy, class diagram, step chains (SFC and CASE), a short description for every FB, method and function (from comments or derived from the code), findings – one HTML page with zoomable diagrams, explanations kept as project memory; task overview with cycle times and a static risk analysis | `tc_doc` |

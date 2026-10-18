@@ -311,10 +311,9 @@ mirror of the project that the pipeline keeps up to date.
 ### What the agent does
 
 `tc_plaintext action=export` writes one `.st` file per POU, GVL, DUT and interface to `<solution folder>\st\<PLC
-project>\<folder>\<name>.st` – TwinCAT's declaration and implementation text; methods as `METHOD … END_METHOD`,
-properties as `PROPERTY … GET … END_GET SET … END_SET END_PROPERTY` and actions as `ACTION A_Reset: … END_ACTION`
-inside `FUNCTION_BLOCK … END_FUNCTION_BLOCK` (IEC 61131-3 3rd edition; files with the sub-objects after
-`END_FUNCTION_BLOCK` are imported as well). Next to the code folders it writes `<PLC project>\references.json` with the
+project>\<folder>\<name>.st` – TwinCAT's declaration and implementation text, the implementation indented by two
+blanks; after `END_FUNCTION_BLOCK` the methods as `METHOD … END_METHOD`, properties as `PROPERTY …` with
+`GET … END_GET` / `SET … END_SET` and actions as `ACTION A_Reset: … END_ACTION`. Next to the code folders it writes `<PLC project>\references.json` with the
 library references of the project (name, version, distributor, namespace – the format of the SRCI repository).
 `action=check` lists files that differ from the project. `action=import dryRun=true`
 shows what an import would change; `action=import` takes the files back into the existing project: changed parts are
@@ -326,8 +325,8 @@ is refused while the solution is open in an IDE.
 
 ### Details worth knowing
 
-- A line `// @implementation` separates declaration and implementation where it is not obvious (e.g. a comment after
-  the last `END_VAR`) – keep it when you edit.
+- Keep the implementation indented by two blanks (the declaration is not indented) – that is how the import tells
+  them apart; trailing blanks removed by an editor do not matter.
 - SFC, LD, FBD and CFC bodies are not text: the file shows `// @implementation SFC - not plain text, kept as it is in
   the project`, the body stays untouched (ST actions of an SFC chart are normal `ACTION` blocks).
 - Renaming or moving objects through the files is refused; delete objects in TwinCAT (`tc_delete`).

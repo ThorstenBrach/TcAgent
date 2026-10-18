@@ -1,7 +1,7 @@
 # Plain-text ST files
 
 TcAgent can write the PLC code of a TwinCAT project as plain Structured Text files – one `.st` file per POU, GVL, DUT
-and interface, with the methods, properties and actions inside the POU file – and take changed files back into the
+and interface, with the methods, properties and actions in the POU file – and take changed files back into the
 existing project. Use it for code reviews and diffs in Git, for editing with any text editor or AI tool, and as a CI
 gate that keeps a committed text mirror of the project up to date.
 
@@ -78,10 +78,11 @@ warning.
 
 ## File format
 
-The text is TwinCAT's own declaration and implementation text, unchanged, plus `END_` markers on their own line
-(column 1). Methods, properties and actions are written **inside** the POU, before its `END_` marker (IEC 61131-3 3rd
-edition layout), in the order of the project file: a blank line after the POU body, before every sub-block and before
-the closing `END_` marker.
+Every block (POU, method, `GET`, `SET`, action) is written the same way: its declaration, an empty line, its
+implementation **indented by two blanks** and an empty line, then the `END_` line (column 1) and an empty line.
+Whitespace at the beginning and end of TwinCAT's declaration and implementation text is not written; empty lines inside
+the implementation are indented too. The POU ends with its `END_FUNCTION_BLOCK` (`END_PROGRAM`, `END_FUNCTION`) right
+after its own body; its methods, properties and actions follow **after** it, in the order of the project file.
 
 ```
 // comments and attributes before the header belong to the declaration
@@ -89,91 +90,99 @@ FUNCTION_BLOCK FB_Axis EXTENDS FB_Base
 VAR_INPUT
   Execute : BOOL;
 END_VAR
-_trig(CLK := Execute);                   <- implementation of the POU
+
+  _trig(CLK := Execute);                 <- implementation of the POU, indented by two blanks
+
+END_FUNCTION_BLOCK                       <- END_PROGRAM / END_FUNCTION / END_FUNCTION_BLOCK
 
 /// comments directly above a header belong to that method/property/action
 METHOD PUBLIC M_Start : BOOL
 VAR_INPUT
   Speed : LREAL;
 END_VAR
-M_Start := TRUE;
+
+  M_Start := TRUE;
+
 END_METHOD
 
-PROPERTY PUBLIC P_Speed : LREAL
+PROPERTY PUBLIC P_Speed : LREAL          <- no END_PROPERTY: two empty lines, then GET / SET
+
+
 GET
 VAR
 END_VAR
-P_Speed := _speed;
+
+  P_Speed := _speed;
+
 END_GET
+
 SET
-_speed := P_Speed;
+
+  _speed := P_Speed;
+
 END_SET
-END_PROPERTY
 
 ACTION A_Reset:
-_speed := 0;
+
+  _speed := 0;
+
 END_ACTION
 
-END_FUNCTION_BLOCK                       <- END_PROGRAM / END_FUNCTION / END_FUNCTION_BLOCK
 ```
 
 | Object | Content of the `.st` file |
 |---|---|
-| POU (program, function block, function) | declaration, implementation, then `METHOD … END_METHOD`, `PROPERTY … GET … END_GET SET … END_SET END_PROPERTY`, `ACTION <name>: … END_ACTION`, then `END_PROGRAM`/`END_FUNCTION_BLOCK`/`END_FUNCTION`. Without sub-objects the `END_` marker follows the body directly |
-| Interface (`.TcIO`) | declaration, the methods and properties with declarations only (`PROPERTY P : INT` / `GET` / `END_GET` / `END_PROPERTY`), then `END_INTERFACE` |
-| GVL, DUT | the declaration only (`VAR_GLOBAL … END_VAR`, `TYPE … END_TYPE` are complete) |
+| POU (program, function block, function) | declaration, implementation, `END_PROGRAM`/`END_FUNCTION_BLOCK`/`END_FUNCTION`, then `METHOD … END_METHOD`, `PROPERTY …` with `GET … END_GET` / `SET … END_SET`, `ACTION <name>: … END_ACTION` |
+| Interface (`.TcIO`) | declaration and two empty lines (no `END_INTERFACE`), then the methods (declaration, empty line, `END_METHOD`) and properties (`PROPERTY P : INT`, `GET` / `END_GET`, `SET` / `END_SET`) without implementations |
+| GVL, DUT | the declaration (`VAR_GLOBAL … END_VAR`, `TYPE … END_TYPE` are complete) and two empty lines |
 
-**How the import finds the end of the POU body:** the first `METHOD <name>`, `PROPERTY <name>` or `ACTION <name>:` line
-in column 1 ends it. Comment and attribute lines directly above that header (`//`, `(*`, `{attribute ...}`, no blank line
-in between) belong to the sub-block – so keep a blank line between the POU code and the first sub-block, as the export
-does. Blank lines at the end of the POU code do not count as a change.
+**How the import reads it:** the POU body ends at its `END_` line; after it every block starts with its
+`METHOD <name>`, `PROPERTY <name>` or `ACTION <name>:` line in column 1 – comment and attribute lines directly above it
+(`//`, `(*`, `{attribute ...}`) belong to it. A property ends at the next block (or the end of the file); an
+`END_PROPERTY` / `END_INTERFACE` line is accepted and ignored. A method or action before the `END_` line of the POU (the
+layout of earlier builds) is refused – export again.
 
-**The older layout is still accepted:** `END_FUNCTION_BLOCK` (`END_PROGRAM`, `END_FUNCTION`, `END_INTERFACE`) right after
-the body, the sub-blocks after it. Both layouts import identically, also mixed. Text folders written by earlier builds
-therefore import unchanged, but `st check` reports their POUs with sub-objects as `differs` until the next `st export`
-rewrites them (once). The export itself uses the older layout only for a POU that the inside layout cannot reproduce exactly
-(e.g. a method declaration with a blank line between its doc comment and its `METHOD` line).
-
-**Safety net:** after splitting, no declaration or implementation may contain a block line (`METHOD …`, `PROPERTY …`,
-`ACTION …:`, `GET`, `SET`, `END_METHOD`, `END_PROPERTY`, `END_ACTION`, `END_GET`, `END_SET`, `END_FUNCTION_BLOCK`,
-`END_PROGRAM`, `END_FUNCTION`, `END_INTERFACE` – also indented). Such a file is refused with its line number, e.g. a
-`METHOD` without its `END_METHOD`, or an indented method inside the POU code.
+**Safety net:** no declaration or implementation may contain a block line (`METHOD …`, `PROPERTY …`, `ACTION …:`, `GET`,
+`SET`, `END_METHOD`, `END_PROPERTY`, `END_ACTION`, `END_GET`, `END_SET`, `END_FUNCTION_BLOCK`, `END_PROGRAM`,
+`END_FUNCTION`, `END_INTERFACE` – also indented). Such a file is refused with its line number, e.g. a `METHOD` without
+its `END_METHOD`.
 
 ### Declaration and implementation
 
-On import the body of a POU, method, `GET` or `SET` is split into declaration and implementation:
+On import a block is split into declaration and implementation:
 
-1. at a line `// @implementation` if there is one;
-2. otherwise after the **last** line that starts with `END_VAR`;
-3. otherwise after the header line (`FUNCTION_BLOCK …`, `PROGRAM …`, `FUNCTION …`, `METHOD …`) – a `GET`/`SET` without
-   `END_VAR` is all implementation.
+1. the implementation is the indented part at the end of the block – lines that start with two blanks (or a tab), and
+   empty lines between them; the two blanks are removed;
+2. the declaration is the rest. It ends with its last `END_VAR` line or, without `END_VAR`, with the header line
+   (`FUNCTION_BLOCK …`, `PROGRAM …`, `FUNCTION …`, `METHOD …`); a `GET`/`SET` without `END_VAR` has an empty declaration.
+   Between the declaration and the implementation only empty lines and comments may stand – code there that is not
+   indented is refused with its line number.
 
-The export checks every block: if this rule would not give back exactly TwinCAT's declaration and implementation – e.g.
-a comment after the last `END_VAR`, a method without `VAR` blocks but with comments after the header, `END_VAR` in a
-comment of the implementation – it writes the separator line `// @implementation` between them. Keep that line when you
-edit the file; import removes it.
+The export checks every object: if the text would not give back TwinCAT's declaration and implementation, it reports
+the object as a warning (`the text does not reproduce the project exactly`).
 
 ### Graphical implementations
 
-SFC, LD, FBD, CFC (and other non-ST) implementations are not plain text. The file contains the declaration and the line
+SFC, LD, FBD, CFC (and other non-ST) implementations are not plain text. The file contains the declaration and,
+indented as an implementation, the line
 
 ```
-// @implementation SFC - not plain text, kept as it is in the project
+  // @implementation SFC - not plain text, kept as it is in the project
 ```
 
 instead of the implementation. Import keeps such implementations untouched – only the declaration can be changed.
 Actions of an SFC chart are ordinary `ACTION` blocks when they are written in ST. SFC transitions, `<Folder>` entries
 inside a POU and other XML (ObjectProperties …) are not exported and stay as they are.
 
-### Line ends, trailing newlines, encoding
+### Line ends, whitespace, encoding
 
-* `.st` files (and `references.json`) are UTF-8 without BOM, CRLF line ends. Non-ASCII characters (umlauts …) stay as they are. Import accepts
-  LF line ends too (e.g. Git with `core.autocrlf`); `st check` compares independent of line ends.
-* TwinCAT declarations usually end with a line end, implementations usually not. In the file the `END_` marker is always
-  on its own line. On import a block counts as **unchanged** when its text equals what the export writes for it – then
-  the project text is kept byte for byte, including its own line ends (some generated files use LF). A changed block
-  keeps the style of the original text: a trailing line end only if the original had one, LF only if the original was
-  LF-only, otherwise CRLF. New blocks: the declaration ends with a line end, the implementation not.
+* `.st` files (and `references.json`) are UTF-8 without BOM, CRLF line ends. Non-ASCII characters (umlauts …) stay as
+  they are. Import accepts LF line ends too (e.g. Git with `core.autocrlf`); `st check` compares independent of line ends.
+* On import a block counts as **unchanged** when its text equals the project text apart from whitespace at the
+  beginning and end of the text and at the ends of its lines (what the file does not keep, also when an editor removes
+  trailing blanks) – then the project text is kept byte for byte, including its own line ends. A changed block keeps the
+  style of the original text: a trailing line end only if the original had one, LF only if the original was LF-only,
+  otherwise CRLF. New blocks: the declaration ends with a line end, the implementation not.
 
 ## What import does
 
