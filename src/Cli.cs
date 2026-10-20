@@ -12,6 +12,7 @@
 //   TcAgent.exe install --path <folder>             copy TcAgent to a fixed folder for pipelines, e.g. C:\Tools\TcAgent
 //   TcAgent.exe ci [--config <file>] [--dry-run]    run the steps of .tcagent\pipeline.json of the repository (CliCi.cs)
 //   TcAgent.exe st export|check|import --solution <sln>   PLC code as plain-text .st files and back - no IDE (CliPlainText.cs)
+//   TcAgent.exe tcunit list|run --solution <sln>   TcUnit tests from the code / run a selection with live progress (CliTcUnit.cs)
 //
 // Exit codes: 0 = OK, 1 = compiler errors / failed tests, 2 = wrong call, 3 = infrastructure problem (IDE, activation, timeout).
 // Without arguments TcAgent.exe is the MCP server as before.
@@ -29,7 +30,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit";
 
     sealed class Options
     {
@@ -45,6 +46,7 @@ public static partial class Cli
         public int TimeoutSec = 1800, LoadTimeoutSec = 300;
         public string Config, Only, From; public bool DryRun, Init;      // ci (CliCi.cs); From/DryRun also st import
         public string Sub; public bool Clean, Force;                      // st export|check|import (CliPlainText.cs)
+        public readonly List<string> Tests = new(); public bool TimeoutGiven, Download;   // tcunit run (CliTcUnit.cs)
     }
 
     public static int Run(string[] args)
@@ -60,11 +62,12 @@ public static partial class Cli
         if (o.Command is "doctor") { Program.ClientName = "cli:doctor"; return Doctor(o); }
         if (o.Command is "ci") { Program.ClientName = "cli:ci"; return Ci(o); }   // CliCi.cs - every step is its own TcAgent.exe
         if (o.Command is "st") { Program.ClientName = "cli:st"; return PlainTextCli(o); }   // CliPlainText.cs - project files only, no IDE
+        if (o.Command is "tcunit" && o.Sub == "list") { Program.ClientName = "cli:tcunit"; return TcUnitList(o); }   // CliTcUnit.cs - project files only
 
         Program.ClientName = "cli:" + o.Command;
 
         // an explicit --target that is not allowed: refuse before the IDE is started (the same check runs again later)
-        if (o.Command is "test" or "sil" or "hil" && !string.IsNullOrWhiteSpace(o.Target) && !o.Target.Trim().Equals("local", StringComparison.OrdinalIgnoreCase))
+        if (o.Command is "test" or "sil" or "hil" or "tcunit" && !string.IsNullOrWhiteSpace(o.Target) && !o.Target.Trim().Equals("local", StringComparison.OrdinalIgnoreCase))
         {
             try { new Policy(o.Command == "hil" ? o.Allow : Enumerable.Empty<string>()).Check("tc_activate", () => o.Target.Trim()); }
             catch (Exception ex) { return Refused(o, "target", ex.Message + " (pass --target or set TCAGENT_ALLOW_TARGETS for the CI machine)"); }
@@ -107,7 +110,8 @@ public static partial class Cli
                     Say(tc.InstanceInfo);
                 }
                 sta.Run(() => { tc.RequireSysMan(); ShowAllMessages(tc); return 0; });
-                guard = new DialogGuard(tc.AttachedPid, o.CloseDialogs);
+                // tcunit run from the TcUnit Tests window: the IDE is the user's own - report its dialogs, never close them
+                guard = new DialogGuard(tc.AttachedPid, o.CloseDialogs && !(o.Command == "tcunit" && o.Attach != null));
             }
             catch (Exception ex) { return InfraError(o, "connect", "Could not open the TwinCAT solution: " + Msg(ex)); }
 
@@ -126,6 +130,7 @@ public static partial class Cli
                 "test" => Test(o, tc, ownIde),
                 "sil" => TestRun(o, tc, ownIde, hil: false),
                 "hil" => TestRun(o, tc, ownIde, hil: true),
+                "tcunit" => TcUnitCli(o, tc),
                 _ => Usage
             };
         }
@@ -709,7 +714,7 @@ public static partial class Cli
                 case "--seconds": o.Seconds = int.Parse(Val()); break;
                 case "--target": o.Target = Val(); break;
                 case "--plc": o.Plc.AddRange(Val().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)); break;
-                case "--timeout": o.TimeoutSec = int.Parse(Val()); break;
+                case "--timeout": o.TimeoutSec = int.Parse(Val()); o.TimeoutGiven = true; break;
                 case "--load-timeout": o.LoadTimeoutSec = int.Parse(Val()); break;
                 case "--progid": o.ProgId = Val(); break;
                 case "--visible": o.Visible = true; break;
@@ -731,9 +736,11 @@ public static partial class Cli
                 case "--init": o.Init = true; break;
                 case "--clean": o.Clean = true; break;
                 case "--force": o.Force = true; break;
+                case "--tests": o.Tests.AddRange(Val().Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)); break;
+                case "--download": o.Download = true; break;
                 default:
                     // st: the sub-command (export, check, import) is the first argument that is not an option
-                    if (o.Command == "st" && o.Sub == null && !a.StartsWith("-")) { o.Sub = a.ToLowerInvariant(); break; }
+                    if (o.Command is "st" or "tcunit" && o.Sub == null && !a.StartsWith("-")) { o.Sub = a.ToLowerInvariant(); break; }
                     throw new Exception("Unknown option " + a);
             }
         }
@@ -742,6 +749,8 @@ public static partial class Cli
         if ((o.Clean || o.Force) && o.Command != "st") throw new Exception("--clean and --force are only for st");
         if (o.Command is "help" or "version") return o;
         if (o.Command is "st") { ValidateSt(o); return o; }
+        if ((o.Tests.Count > 0 || o.Download) && o.Command != "tcunit") throw new Exception("--tests and --download are only for tcunit run");
+        if (o.Command is "tcunit") { ValidateTcUnit(o); return o; }
         if (o.Command is "install") return o;
         if (o.Command is "ci") return o;                  // the steps are checked by ci itself (CliCi.cs)
         if (o.Command is "doctor")
@@ -824,6 +833,19 @@ public static partial class Cli
       actions/objects, never deletes; --dry-run lists the changes. Refused (exit 2) while the solution is open in an IDE.
       Graphical implementations (SFC, LD, FBD, CFC) stay as they are. Format: docs/PLAINTEXT.md.
 
+  TcAgent.exe tcunit list --solution <sln> [--plc <name>]
+      TcUnit tests read from the code (no IDE): PLC projects, suites, instances, tests with file, line, the /// description
+      and the paths of the enable bools (bRunSuite, bRun_<TestMethod>) as JSON. Format: docs/TCUNIT_TESTS.md.
+
+  TcAgent.exe tcunit run --solution <sln>|--attach [pid] [--tests <a,b>] [--plc <name>] [--target local|<AmsNetId>]
+                         [--timeout <s>] [--junit <file>] [--no-build] [--download]
+      Runs the selected tests: build + activation only if the code changed, reset of the PLC via ADS, enable bools
+      (TRUE = selected, FALSE = the rest), start, live progress and results, reset again (TwinCAT stays in Run mode).
+      --tests: instances (MAIN.fbMotor), suite types, MAIN.fbMotor@Test or test names; default all. Writes one JSON
+      event per line (plan, step, suite, running, result, progress, done). Settings: .tcagent\tcunit.json (plcProject,
+      target, timeout, progress). --download activates even if the code did not change. A remote target must be in
+      TCAGENT_ALLOW_TARGETS. Exit 0 = passed, 1 = failed tests/build, 2 = refused/unknown tests, 3 = infrastructure/timeout.
+
   TcAgent.exe feedback [--open] [--markdown <file.md>] [--summary] [--path <file|folder>]
       Report of the tc_feedback entries (TCAGENT_FEEDBACK or the default store), grouped by tool, as Markdown
       ready to paste into GitHub issues - to stdout or into the file. --open: only open entries; --summary: counts only.
@@ -884,6 +906,8 @@ Options
   --clean                  st export: remove .st files whose object no longer exists (references.json is kept)
   --force                  st import: write even if it cannot be checked whether the solution is open in an IDE
   --init                   ci: write a starter .tcagent\pipeline.json (never overwrites)
+  --tests <a,b>            tcunit run: instances, suite types, instance@test or test names (default: all)
+  --download               tcunit run: build and activate even if the runtime runs the current code
 
 Exit codes: 0 OK, 1 compiler errors, failed tests, lock or st check differences, st import errors, 2 wrong call, refused
             (test/sil/hil: target not allowed; st import: solution open in an IDE) or no lock file (lock --check),
