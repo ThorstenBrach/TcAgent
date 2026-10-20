@@ -252,8 +252,8 @@ docs/                   installation, tool reference, CI pipelines (docs/pipelin
 ## Legal
 
 TcAgent is an independent open-source project and is not affiliated with Beckhoff Automation, Microsoft,
-Anthropic, GitHub, Google or OpenAI. TwinCAT is a registered trademark of Beckhoff Automation GmbH; all other trademarks
-belong to their owners. TcAgent contains no code from Beckhoff.
+Anthropic, GitHub, Google or OpenAI. TwinCAT is a registered trademark of Beckhoff Automation GmbH & Co. KG; all other
+trademarks belong to their owners. The source code of TcAgent contains no code from Beckhoff.
 Check the license terms of your TwinCAT installation for your use case. Third-party components and their licenses:
 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md). Use at your own risk, see [LICENSE](LICENSE).
 

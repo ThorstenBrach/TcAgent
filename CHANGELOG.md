@@ -15,6 +15,10 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   Text folders of earlier builds are rewritten by the next `st export`; their import is refused (methods before the
   `END_` line, code not indented). Round trip without changes for all checked objects. Tests: `PlainTextRepositoryTests`
   (objects of a real library with their reference text files), `PlainTextLayoutTests` rewritten.
+- THIRD-PARTY-NOTICES: System.Reactive, the Adobe Glyph List (BSD-3-Clause) and the Adobe Core 14 AFM files embedded in
+  PdfPig with their license texts. The VSIX ships the third-party notices of the .NET runtime
+  (`THIRD-PARTY-NOTICES-DOTNET.TXT` next to `TcAgent.exe`).
+- README: the source code contains no code from Beckhoff; trademark owner Beckhoff Automation GmbH & Co. KG.
 
 ### Security
 - Bridge pipe `TcAgentBridge.<pid>` only for the user who runs Visual Studio / the XAE Shell and only on this PC: own DACL,

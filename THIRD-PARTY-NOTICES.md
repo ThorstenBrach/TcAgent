@@ -7,7 +7,10 @@ the following third-party components. Their license texts follow below.
 |---|---|---|
 | .NET runtime and libraries (incl. `Microsoft.Extensions.*`) | runtime of `TcAgent.exe` (self-contained) | MIT – .NET Foundation and Contributors |
 | Beckhoff.TwinCAT.Ads (`TwinCAT.Ads`, `TwinCAT.Ads.Abstractions`, `TwinCAT.Ads.Server`) | ADS communication with the runtime | MIT – Beckhoff Automation GmbH & Co. KG |
+| System.Reactive | used by the ADS communication | MIT – .NET Foundation and Contributors |
 | PdfPig (`UglyToad.PdfPig.*`) | reading PDF documents for `tc_docs` | Apache License 2.0 |
+| Adobe Glyph List, Zapf Dingbats Glyph List (embedded in PdfPig) | mapping PDF glyph names to characters | BSD-3-Clause – Adobe Systems Incorporated |
+| Adobe Core 14 AFM files (embedded in PdfPig) | metrics of the 14 standard PDF fonts | Adobe AFM license (below) |
 
 **Not included in the package:**
 
@@ -18,6 +21,10 @@ the following third-party components. Their license texts follow below.
 ---
 
 ## .NET runtime and libraries
+
+Applies to the .NET runtime, `Microsoft.Extensions.*`, `System.*` packages and System.Reactive. The .NET runtime contains
+further third-party components; their notices are in `THIRD-PARTY-NOTICES-DOTNET.TXT` next to `TcAgent.exe` (copied
+unchanged from the .NET runtime package).
 
 The MIT License (MIT)
 
@@ -281,4 +288,64 @@ Apache License
    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
    See the License for the specific language governing permissions and
    limitations under the License.
+```
+
+---
+
+## Adobe Glyph List and Zapf Dingbats Glyph List
+
+Embedded in PdfPig.
+
+```text
+Copyright 1997, 1998, 2002, 2007, 2010 Adobe Systems Incorporated.
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or
+without modification, are permitted provided that the
+following conditions are met:
+
+Redistributions of source code must retain the above
+copyright notice, this list of conditions and the following
+disclaimer.
+
+Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following
+disclaimer in the documentation and/or other materials
+provided with the distribution.
+
+Neither the name of Adobe Systems Incorporated nor the names
+of its contributors may be used to endorse or promote
+products derived from this software without specific prior
+written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND
+CONTRIBUTORS "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES,
+INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
+MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR
+CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR
+OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+```
+
+---
+
+## Adobe Core 14 AFM files
+
+Embedded in PdfPig: font metrics of Courier, Helvetica, Times (each regular, bold, italic/oblique, bold italic/oblique),
+Symbol and ZapfDingbats, with their copyright notices (Copyright (c) 1985-1997 Adobe Systems Incorporated. All Rights
+Reserved. Helvetica and Times are trademarks of Linotype-Hell AG and/or its subsidiaries. ITC Zapf Dingbats is a
+registered trademark of International Typeface Corporation).
+
+```text
+This file and the 14 PostScript(R) AFM files it accompanies may be used, copied, and distributed for any purpose and
+without charge, with or without modification, provided that all copyright notices are retained; that the AFM files
+are not distributed without this file; that all modifications to this file or any of the AFM files are prominently
+noted in the modified file(s); and that this paragraph is not modified. Adobe Systems has no responsibility or
+obligation to support the use of the AFM files.
 ```

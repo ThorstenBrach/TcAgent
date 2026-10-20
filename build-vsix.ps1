@@ -25,6 +25,13 @@ if ($LASTEXITCODE -ne 0) { throw "dotnet publish failed - see build-vsix.log" }
 Get-ChildItem "$stage\tcagent" -Filter 'Interop.*.dll' | Remove-Item -Force
 Get-ChildItem "$stage\tcagent" -Filter '*.pdb' | Remove-Item -Force
 Copy-Item "$here\setup-clients.ps1", "$here\setup-runner.ps1", "$here\SKILL.md", "$here\THIRD-PARTY-NOTICES.md", "$here\LICENSE" "$stage\tcagent\"
+# the self-contained .NET runtime brings third-party components of its own: ship its notices unchanged
+$nugetRoot = if ($env:NUGET_PACKAGES) { $env:NUGET_PACKAGES } else { Join-Path $env:USERPROFILE '.nuget\packages' }
+$rtPack = Get-ChildItem (Join-Path $nugetRoot 'microsoft.netcore.app.runtime.win-x64') -Directory -Filter '8.0.*' -ErrorAction SilentlyContinue |
+          Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+$rtNotices = if ($rtPack) { Join-Path $rtPack.FullName 'THIRD-PARTY-NOTICES.TXT' }
+if (-not $rtNotices -or -not (Test-Path $rtNotices)) { throw "THIRD-PARTY-NOTICES.TXT of the .NET 8 runtime pack not found under $nugetRoot - it must be shipped with TcAgent.exe" }
+Copy-Item $rtNotices "$stage\tcagent\THIRD-PARTY-NOTICES-DOTNET.TXT"
 # never ship Visual Studio automation assemblies (Microsoft license) - TcAgent loads them from the user's VS
 Get-ChildItem "$stage\tcagent" -Include 'envdte*.dll','Microsoft.VisualStudio.Interop.dll' -Recurse | Remove-Item -Force
 New-Item -ItemType Directory -Force "$stage\tcagent\agents" | Out-Null
