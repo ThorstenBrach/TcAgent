@@ -154,6 +154,9 @@ public static class Confirm
             case "tc_packages_change":
                 return $"TwinCAT Package Manager on this PC: {S("action")} {S("packages") ?? S("name")}" +
                        (B("allowDowngrade") ? " (downgrade allowed)" : "") + " - runs with administrator rights (Windows asks again).";
+            case "tc_test_run":
+                return $"Run TcUnit tests {(string.IsNullOrWhiteSpace(S("tests")) ? "(all)" : S("tests"))}{(string.IsNullOrEmpty(target) ? " on the local runtime" : on)}: " +
+                       "build and activate if the code changed, reset and start the PLC, write the test selection via ADS.";
             case "tc_runtime_startup":
                 return $"Set the start mode of the local TwinCAT runtime to '{S("mode")}' (takes effect from the next boot).";
             default:

@@ -359,6 +359,18 @@ public sealed partial class ToolRegistry
         Add("tc_test_results", "Returns the result of the last TcUnit run (suites, tests, successes, failures with test name and message) from the PLC runtime messages.",
             Schema(), a => tc.Sta.Run(() => tc.TestResults()));
 
+        Add("tc_test_run", "TcUnit tests of the open solution (docs/TCUNIT_TESTS.md). action=list: suites, instances and tests from the code " +
+                           "with description and enable bools (no runtime). action=run (default): runs the selection - build and activation " +
+                           "only if the code changed, reset of the PLC, enable bools via ADS (TRUE = selected, FALSE = the rest), start, " +
+                           "results per test, reset again; TwinCAT stays in Run mode. Runtime action: allowed targets only, with confirmation.",
+            Schema(P("action", "string", "run (default) or list"),
+                   P("tests", "string", "Comma-separated: instance (MAIN.fbMotor), suite type (FB_Motor_Test), MAIN.fbMotor@Test or test name; empty = all"),
+                   P("plc", "string", "PLC project name (default: the only one with tests, or plcProject in .tcagent\\tcunit.json)"),
+                   P("target", "string", "local (default) or the AmsNetId of a test PLC allowed in TCAGENT_ALLOW_TARGETS"),
+                   P("timeout", "integer", "Max. seconds for the run (default 300 or timeout in .tcagent\\tcunit.json)"),
+                   P("download", "boolean", "Build and activate even if the runtime runs the current code")),
+            a => TestRun(a));
+
         // ---------------------------------------------------------- Tasks, boot project, startup mode, licenses
         Add("tc_task", "Real-time tasks: list, create (name, cycleUs, priority, withImage), set (path, cycleUs, priority, autoStart, cores) or " +
                        "assign (name = TIRT task, program = POU called by it, default MAIN, plcProjectPath): creates the PLC task reference " +
@@ -465,6 +477,52 @@ public sealed partial class ToolRegistry
                 foreach (ISymbol s in loader.Symbols) Walk(s, 0);
                 return sb.Length > 0 ? sb.ToString() : "no symbols";
             });
+    }
+
+    // ------------------------------------------------------------------ TcUnit (TcUnitDiscovery.cs, TcUnitRun.cs)
+    string TestRun(JsonObject a)
+    {
+        var sln = tc.Sta.Run(() => (string)tc.RequireDte().Solution.FullName);
+        if ((Str(a, "action") ?? "run").Equals("list", StringComparison.OrdinalIgnoreCase))
+        {
+            var d = TcUnitDiscovery.Discover(sln);
+            var sb = new StringBuilder();
+            foreach (var p in d.Projects.Where(p => p.Suites.Count > 0))
+            {
+                var mode = p.RunMode switch { "sequence" => "TcUnit.RUN_IN_SEQUENCE", "parallel" => "TcUnit.RUN (parallel)", _ => "no TcUnit.RUN found" };
+                sb.AppendLine($"{p.Name} ({p.TreePath}): {p.Instances.Count} suite instance(s), {p.TestCount} test(s) in the code, {mode}");
+                foreach (var i in p.Instances)
+                {
+                    var s = i.Suite;
+                    var desc = i.Description ?? s.Description;
+                    sb.AppendLine($"  {i.Path} : {s.Type}{(desc != null ? " - " + desc : "")}" +
+                                  (s.RunSuiteVar == null ? " [no bRunSuite: runs as a whole]" : "") + (s.Dynamic ? " [test names known only at run time]" : ""));
+                    foreach (var t in s.Tests)
+                        sb.AppendLine($"    {t.Name}{(t.Description != null ? " - " + t.Description : "")}{(t.EnableVar == null ? " [no bRun_" + (t.Method ?? t.Name) + "]" : "")}  ({Path.GetFileName(t.File)}:{t.Line})");
+                }
+                foreach (var n in p.Notes) sb.AppendLine("  note: " + n);
+            }
+            return sb.Length > 0 ? sb.ToString() : "No TcUnit test suites (FUNCTION_BLOCK ... EXTENDS TcUnit.FB_TestSuite) in the solution.";
+        }
+
+        var o = new TcUnitRun.Options { Solution = sln, Plc = Str(a, "plc"), Target = Str(a, "target"), Download = Bool(a, "download", false) };
+        if (Str(a, "tests") is string tests) o.Tests.Add(tests);
+        if (Int(a, "timeout", 0) is int sec && sec > 0) o.Timeout = TimeSpan.FromSeconds(Math.Max(10, sec));
+        var steps = new List<string>();
+        var run = new TcUnitRun(tc, e => { if ((string)e["event"] == "step") steps.Add((string)e["text"]); });
+        var rc = run.Run(o);
+        var res = new StringBuilder(run.Summary).AppendLine();
+        foreach (var g in run.Results.Where(r => r.Selected || r.Status != "skipped").GroupBy(r => r.Instance))
+        {
+            res.AppendLine($"  {g.Key}: {g.Count(r => r.Status == "passed")} passed, {g.Count(r => r.Status == "failed")} failed");
+            foreach (var r in g.Where(r => r.Status != "passed"))
+                res.AppendLine($"    {r.Status.ToUpperInvariant()} {r.Name}{(r.Message != null ? ": " + r.Message.Replace("\n", " | ") : "")}");
+        }
+        var skippedOff = run.Results.Count(r => !r.Selected && r.Status == "skipped");
+        if (skippedOff > 0) res.AppendLine($"  {skippedOff} test(s) switched off for this run");
+        res.AppendLine("Steps: " + string.Join(" / ", steps));
+        if (rc is Cli.Usage or Cli.Infra) throw new Exception(res.ToString());
+        return res.ToString();
     }
 
     // ------------------------------------------------------------------ PLC helpers
@@ -1408,6 +1466,7 @@ public sealed partial class ToolRegistry
     string TargetOf(string tool, JsonObject a) => tool switch
     {
         "ads_write" => Str(a, "netId"),
+        "tc_test_run" => Str(a, "target") is string t && !t.Trim().Equals("local", StringComparison.OrdinalIgnoreCase) ? t.Trim() : null,
         "tc_activate" when !string.IsNullOrEmpty(Str(a, "netId")) => Str(a, "netId"),
         "tc_runtime_mode" when !string.IsNullOrEmpty(Str(a, "netId")) => Str(a, "netId"),
         "tc_activate" or "tc_plc_online" or "tc_runtime_mode" => tc.Sta.Run(() => (string)((dynamic)tc.RequireSysMan()).GetTargetNetId()),
