@@ -32,7 +32,7 @@
     </Reference>
     <PackageReference Include="EnvDTE" Version="17.0.32112.339" />
     <PackageReference Include="EnvDTE80" Version="17.0.32112.339" />
-    <PackageReference Include="Beckhoff.TwinCAT.Ads" Version="6.1.332" />
+    <PackageReference Include="Beckhoff.TwinCAT.Ads" Version="7.0.389" />
     <!-- PDF text for tc_docs (Apache-2.0) -->
     <PackageReference Include="PdfPig" Version="0.1.16" />
   </ItemGroup>

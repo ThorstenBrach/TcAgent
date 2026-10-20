@@ -6,7 +6,7 @@ the following third-party components. Their license texts follow below.
 | Component | Used for | License |
 |---|---|---|
 | .NET runtime and libraries (incl. `Microsoft.Extensions.*`) | runtime of `TcAgent.exe` (self-contained) | MIT – .NET Foundation and Contributors |
-| Beckhoff.TwinCAT.Ads (`TwinCAT.Ads`, `TwinCAT.Ads.Abstractions`, `TwinCAT.Ads.Server`) | ADS communication with the runtime | MIT – Beckhoff Automation GmbH & Co. KG |
+| Beckhoff.TwinCAT.Ads (`TwinCAT.Ads`, `TwinCAT.Ads.Abstractions`, `TwinCAT.Ads.Server`, `TwinCAT.Ads.ConfigurationProviders`) | ADS communication with the runtime | MIT – Beckhoff Automation GmbH & Co. KG |
 | System.Reactive | used by the ADS communication | MIT – .NET Foundation and Contributors |
 | PdfPig (`UglyToad.PdfPig.*`) | reading PDF documents for `tc_docs` | Apache License 2.0 |
 | Adobe Glyph List, Zapf Dingbats Glyph List (embedded in PdfPig) | mapping PDF glyph names to characters | BSD-3-Clause – Adobe Systems Incorporated |
@@ -55,7 +55,7 @@ SOFTWARE.
 ## Beckhoff.TwinCAT.Ads
 
 The MIT License (MIT)
-Copyright (c) 2015 Beckhoff Automation GmbH & Co. KG
+Copyright (c) 2024 Beckhoff Automation GmbH & Co. KG
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
