@@ -994,6 +994,24 @@ Reads the IDE error list, split into compiler/project messages and PLC runtime/T
 
 Returns the result of the last TcUnit run (suites, tests, passes, failures with test names and messages) from the PLC runtime messages.
 
+### `tc_test_run`
+
+TcUnit tests of the open solution ([TCUNIT_TESTS.md](TCUNIT_TESTS.md)). `action=list`: suites, instances and tests read
+from the code with their `///` description, file and line and the enable bools (read only, no runtime).
+`action=run` (default): runs the selection – build and activation only if the code changed since the last download,
+reset of the PLC via ADS, enable bools `bRunSuite` / `bRun_<TestMethod>` (TRUE = selected, FALSE = the rest), start,
+results per test (with `EXP`/`ACT`/`MSG`), reset again; TwinCAT stays in Run mode. Runtime action: allowed targets only,
+with confirmation. Same run as `TcAgent.exe tcunit run` and the TcUnit Tests window.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string |  | run (default) or list |
+| `tests` | string |  | Comma-separated: instance (`MAIN.fbMotor`), suite type (`FB_Motor_Test`), `MAIN.fbMotor@Test` or a test name; empty = all |
+| `plc` | string |  | PLC project (default: the only one with tests, or `plcProject` in `.tcagent\tcunit.json`) |
+| `target` | string |  | `local` (default) or the AmsNetId of a test PLC allowed in `TCAGENT_ALLOW_TARGETS` |
+| `timeout` | integer |  | Max. seconds for the run (default 300 or `timeout` in `.tcagent\tcunit.json`) |
+| `download` | boolean |  | Build and activate even if the runtime runs the current code |
+
 ## Runtime (enabled targets only)
 
 ### `tc_runtime_mode`

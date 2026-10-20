@@ -47,7 +47,9 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
    questions (reading, searching, explaining). If the user says "don't check/build", don't.
    `tc_build` (real build, produces code and files) only before `tc_activate`/download or when the user asks for it.
 6. **Save:** `tc_save`. Otherwise tool changes exist only in the IDE, not on disk/in Git.
-7. **Tests:** `tc_test_results` returns the result of the last TcUnit run (suites, tests, failures with names).
+7. **Tests:** `tc_test_run` runs TcUnit tests: `action=list` shows the suites and tests of the code, `tests=` selects
+   (instance `MAIN.fbMotor`, suite type, `MAIN.fbMotor@Test` or test name; empty = all) - build/activation only if the
+   code changed, results per test. `tc_test_results` returns the result of the last TcUnit run (suites, tests, failures with names).
    TcUnit output appears in the IDE as "errors" in the error list - these are runtime messages, not
    compiler errors; `tc_errors kind=compile|runtime` separates them.
 8. **Writing TcUnit tests:** build them so that the TcUnit test window can list, describe and select them

@@ -574,6 +574,7 @@ call `apply` again for the same changes.
 ### Example prompts
 
 - *"Write a TcUnit test suite for FB_ConveyorControl."*
+- *"Run only the tests of FB_Motor_Test."*
 - *"What did the last TcUnit run report?"*
 - *"Which tests failed, and why?"*
 - *"Show me only the compiler errors, not the TcUnit messages."*
@@ -584,6 +585,8 @@ call `apply` again for the same changes.
   `EXTENDS TcUnit.FB_TestSuite`, instantiated in a program that calls `TcUnit.RUN();` cyclically.
 - Running them on a target means build, activate, start the PLC
   ([Runtime](#runtime-activate-online-ads)) – each runtime action with your confirmation.
+- `tc_test_run` lists the tests of the code (`action=list`) and runs a selection on the local runtime (or an allowed test
+  PLC) with results per test – see [TcUnit Tests window](#tcunit-tests-window).
 - `tc_test_results` returns the result of the last TcUnit run from the PLC runtime messages: suites, tests, passes,
   failures with test names and messages.
 - TcUnit output appears in the IDE error list as "errors". These are runtime messages, not compiler errors;
@@ -596,14 +599,19 @@ call `apply` again for the same changes.
 - For automated runs without an AI use `TcAgent.exe test`, `sil` (runtime of the build PC) or `hil` (remote test PLC) –
   see [CI pipeline](#ci-pipeline).
 - Write suites with the enable bools `bRunSuite` / `bRun_<Test>` and a `///` description per test – the agent does
-  this on its own. Tests written this way run unchanged everywhere and can later be selected one by one.
+  this on its own. Tests written this way run unchanged everywhere and can be selected one by one in the TcUnit
+  Tests window.
 
-### TcUnit test window (planned)
+### TcUnit Tests window
 
-A window **TcUnit Tests** like the Visual Studio Test Explorer – tree of suites and tests, run all / selected / failed,
-progress bar, red/green with the failure message – also in the XAE Shell. Use, configuration and how to write tests
-for it: [TCUNIT_TESTS.md](TCUNIT_TESTS.md).
-
+**View > Other Windows > TcUnit Tests** (or the **Tests** button of the TcAgent Chat) – like the Visual Studio Test
+Explorer, also in the XAE Shell: tree of PLC project, suite instances and tests read from the code, **Run all / Run
+selected / Run failed / Cancel / Refresh**, search and status filter, counters, a progress bar "Test 12 of 87: name" with
+the remaining time, red/green per test with the failure message (`EXP`, `ACT`, `MSG`), double-click opens the test
+method. The run builds and activates only if the code changed, switches the tests that are not selected off via ADS and
+leaves TwinCAT in Run mode. The same run for the agent (*"Run only the tests of FB_Motor_Test"*, tool `tc_test_run`) and
+on the command line (`TcAgent.exe tcunit list|run`). Use, configuration and how to write tests for it:
+[TCUNIT_TESTS.md](TCUNIT_TESTS.md).
 ---
 
 ## Program documentation
@@ -1679,7 +1687,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 88 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 89 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
@@ -1692,7 +1700,7 @@ All 88 tools and the section of this guide that covers them. Parameters: [TOOLS.
 | `tc_plaintext` | [Plain-text ST files](#plain-text-st-files) |
 | `tc_sfc` | [SFC step chains](#sfc-step-chains) |
 | `tc_refactor` | [Refactoring names and comments](#refactoring-names-and-comments) |
-| `tc_test_results` | [Tests with TcUnit](#tests-with-tcunit) |
+| `tc_test_run`, `tc_test_results` | [Tests with TcUnit](#tests-with-tcunit) |
 | `tc_doc` | [Program documentation](#program-documentation) |
 | `tc_risk_rules` | [Risk analysis and your own risk rules](#risk-analysis-and-your-own-risk-rules) |
 | `tc_userdoc` | [User manuals](#user-manuals) |

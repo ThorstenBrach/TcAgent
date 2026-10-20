@@ -5,6 +5,27 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.28.0] – 2026-10-20
+
+### Added
+- **TcUnit Tests window** in Visual Studio 2022 and the TwinCAT XAE Shell (View > Other Windows > TcUnit Tests, or the
+  Tests button of the TcAgent Chat), close to the Test Explorer: tree PLC project > suite instance > test read from the
+  code, Run all / Run selected / Run failed / Cancel / Refresh, search and status filter, counters, progress bar
+  "Test n of N: name" with the remaining time, details with description, `EXP`/`ACT`/`MSG`, duration and code
+  position; double-click opens the test method. The tree is read again after a build and when code files are saved.
+  Guide: `docs/TCUNIT_TESTS.md`.
+- `TcAgent.exe tcunit list --solution <sln>`: TcUnit suites, instances and tests from the project files (no IDE) as
+  JSON – file, line, `///` description, paths of the enable bools `bRunSuite` / `bRun_<TestMethod>`; suites through
+  base suites, instances in PROGRAMs and GVLs (also arrays), test names known only at run time are marked.
+- `TcAgent.exe tcunit run` and tool **`tc_test_run`**: runs a selection of tests (`--tests` / `tests`: instances, suite
+  types, `instance@test` or test names). Build and activation only if the code changed since the last download,
+  reset of the PLC via ADS, all enable bools written (TRUE = selected, FALSE = the rest), start via ADS, live results
+  per test from TcUnit's own test table, failure texts from the runtime messages, reset again – TwinCAT stays in Run
+  mode, no IDE login. One JSON event per line for the window, `cancel` on stdin stops the run, optional JUnit file.
+  Optional settings in `.tcagent\tcunit.json` (`plcProject`, `target`, `timeout`, `progress` block). A remote target
+  must be allowed in `TCAGENT_ALLOW_TARGETS`; the window asks once per run for it.
+- Menu entry View > Other Windows > TcAgent Chat (Visual Studio 2022 and XAE Shell).
+- Unit tests for the test discovery and the selection (`TcUnitDiscoveryTests`).
 ## [0.27.0] – 2026-10-20
 
 ### Changed
