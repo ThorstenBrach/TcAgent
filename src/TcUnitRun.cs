@@ -178,7 +178,7 @@ public sealed class TcUnitRun
                     tc.Sta.Run(() => { dynamic sm = tc.RequireSysMan(); sm.ActivateConfiguration(); sm.StartRestartTwinCAT(); return 0; }, 300_000);
                 }
                 catch (Exception ex) { return Done("error", Cli.Infra, "Activation failed: " + Msg(ex) + " - are all licenses on the target activated (trial licenses are activated by a person)?"); }
-                policy.Audit("tcunit run", new JsonObject { ["solution"] = sln, ["target"] = target }, true, "activated", sw.ElapsedMilliseconds);
+                policy.Audit("tc_test_run", new JsonObject { ["solution"] = sln, ["target"] = target }, true, "activated", sw.ElapsedMilliseconds);
                 if (WaitState(target, 10000, AdsState.Run, 120) != AdsState.Run)
                     return Done("error", Cli.Infra, $"TwinCAT on {target} did not reach Run mode within 120 s - missing licenses, real-time blocked (Hyper-V/VBS) or a configuration error.");
                 var plc = WaitState(target, project.AmsPort, null, 60);
@@ -197,7 +197,7 @@ public sealed class TcUnitRun
             foreach (var (path, value) in sel.Writes)
                 try { ads.WriteBool(path, value); }
                 catch (Exception ex) { return Done("error", Cli.Infra, $"Writing {path} := {value} failed: {Msg(ex)} - is the code in the runtime older than the files? Run with download."); }
-            policy.Audit("tcunit run", new JsonObject { ["target"] = target, ["writes"] = sel.Writes.Count, ["tests"] = string.Join(",", o.Tests) }, true, "selection written", sw.ElapsedMilliseconds);
+            policy.Audit("tc_test_run", new JsonObject { ["target"] = target, ["writes"] = sel.Writes.Count, ["tests"] = string.Join(",", o.Tests) }, true, "selection written", sw.ElapsedMilliseconds);
             var runStart = DateTime.Now;
             ads.Control(AdsState.Run);
             started = true;
