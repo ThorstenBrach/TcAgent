@@ -46,6 +46,8 @@ namespace TcAgentBridge
                 server = new Thread(ServerLoop) { IsBackground = true, Name = "TcAgentBridge" };
                 server.Start();
                 Instance = this;
+                // View > Other Windows > TcAgent Chat / TcUnit Tests (Menus.ctmenu from TcAgentBridge.vsct)
+                ui?.BeginInvoke(new Action(AddMenuCommands), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 // Hotkey "ask from code" (default Ctrl+Shift+Q, "askHotkey" in chat-backends.json)
                 ui?.BeginInvoke(new Action(InstallHotkey), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 // VSIX installation: deploy TcAgent, generate interop, set up AI clients (first time after confirmation)
@@ -129,6 +131,7 @@ namespace TcAgentBridge
                     {
                         case "context": return Context();
                         case "chat_show": ShowChat(); return new Dictionary<string, object> { ["shown"] = true };
+                        case "tcunit_show": ShowTcUnit(true); return new Dictionary<string, object> { ["shown"] = true };
                         case "confirm": return ConfirmAction(Str(req, "title"), Str(req, "text"));
                         case "choice": return ChoiceAction(Str(req, "title"), Str(req, "text"));
                         case "probe": return Probe();
@@ -403,6 +406,55 @@ namespace TcAgentBridge
             chatFrame = frame;
             Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(activate ? frame.Show() : frame.ShowNoActivate());
             Log("Chat window created (IVsUIShell)");
+        }
+
+        // ------------------------------------------------------------------ TcUnit Tests window (TcUnitWindow.cs)
+        IVsWindowFrame tcunitFrame;
+
+        internal void ShowTcUnit(bool activate)
+        {
+            if (tcunitFrame != null && (activate ? tcunitFrame.Show() : tcunitFrame.ShowNoActivate()) == 0) return;
+            try
+            {
+                var w = FindToolWindow(typeof(TcUnitPane), 0, true);
+                if (w?.Frame is IVsWindowFrame f) { tcunitFrame = f; Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(activate ? f.Show() : f.ShowNoActivate()); return; }
+            }
+            catch (Exception ex) { Log("FindToolWindow (TcUnit): " + Inner(ex) + " - creating window directly"); }
+            var shell = (IVsUIShell)GetService(typeof(SVsUIShell)) ?? throw new Exception("SVsUIShell not available");
+            var pane = new TcUnitPane();
+            Guid empty = Guid.Empty, persist = typeof(TcUnitPane).GUID, auto = Guid.Empty;
+            Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(shell.CreateToolWindow(
+                (uint)__VSCREATETOOLWIN.CTW_fInitNew, 0, pane, ref empty, ref persist, ref auto, null, "TcUnit Tests", null, out var frame));
+            tcunitFrame = frame;
+            Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(activate ? frame.Show() : frame.ShowNoActivate());
+            Log("TcUnit window created (IVsUIShell)");
+        }
+
+        /// <summary>Opens a TwinCAT tree path in the editor and sets the cursor (TcUnit window: double-click on a test).</summary>
+        internal void OpenInEditor(string path, string part, int line) => Open(path, part, line, 1);
+
+        internal void LogLine(string msg) => Log(msg);
+
+        // Commands of TcAgentBridge.vsct: View > Other Windows > TcAgent Chat / TcUnit Tests
+        static readonly Guid CommandSet = new Guid("c3f1a2d4-7b8e-4c5a-9d6f-1e2b3a4c5d6e");
+        const int CmdTcUnitTests = 0x0100, CmdChat = 0x0101;
+
+        void AddMenuCommands()
+        {
+            try
+            {
+                if (!(GetService(typeof(System.ComponentModel.Design.IMenuCommandService)) is OleMenuCommandService mcs)) { Log("Menu: IMenuCommandService not available"); return; }
+                mcs.AddCommand(new System.ComponentModel.Design.MenuCommand((s, e) =>
+                {
+                    try { ShowTcUnit(true); } catch (Exception ex) { Log("TcUnit window: " + Inner(ex)); }
+                }, new System.ComponentModel.Design.CommandID(CommandSet, CmdTcUnitTests)));
+                mcs.AddCommand(new System.ComponentModel.Design.MenuCommand((s, e) =>
+                {
+                    try { ShowChat(); } catch (Exception ex) { Log("Chat window: " + Inner(ex)); }
+                }, new System.ComponentModel.Design.CommandID(CommandSet, CmdChat)));
+                Log("Menu commands registered");
+            }
+            catch (Exception ex) { Log("Menu: " + Inner(ex)); }
         }
 
         static bool ShowChatOnStartup()

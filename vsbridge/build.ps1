@@ -43,8 +43,21 @@ foreach ($n in 'Microsoft.VisualStudio.Shell.15.0', 'Microsoft.VisualStudio.Shel
 
 $out = Join-Path $here 'bin'
 New-Item -ItemType Directory -Force -Path $out | Out-Null
+# menu commands (View > Other Windows > TcAgent Chat / TcUnit Tests): TcAgentBridge.vsct -> .cto with VSCT.exe of the
+# VS SDK build tools (NuGet cache, restored by build-vsix.ps1), as resource Menus.ctmenu in VSPackage.resources like the VS SDK build
+$menuRes = @()
+$vsct = Get-ChildItem "$env:USERPROFILE\.nuget\packages\microsoft.vssdk.buildtools" -Recurse -Filter VSCT.exe -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+$cto = Join-Path $out 'TcAgentBridge.cto'; $resFile = Join-Path $out 'VSPackage.resources'
+if ($vsct) {
+    & $vsct.FullName "$here\TcAgentBridge.vsct" $cto "-I$(Join-Path $vsct.Directory.Parent.FullName 'inc')" | Out-Null
+    if ($LASTEXITCODE -eq 0) {
+        $w = New-Object System.Resources.ResourceWriter($resFile)
+        $w.AddResource('Menus.ctmenu', [IO.File]::ReadAllBytes($cto)); $w.Generate(); $w.Close()
+        $menuRes = @("/resource:$resFile,VSPackage.resources")
+    } else { Write-Host "VSCT failed - no menu entries (the TcUnit window opens from the chat's Tests button)" -ForegroundColor Yellow }
+} else { Write-Host "VSCT.exe not found (NuGet package Microsoft.VSSDK.BuildTools - run build-vsix.ps1 once) - no menu entries" -ForegroundColor Yellow }
 for ($i = 1; $i -le 25; $i++) {
-    $args_ = @('/nologo', '/target:library', '/optimize+', '/langversion:latest', '/nowarn:1701,1702,CS1998', "/out:$out\TcAgentBridge.dll") +
+    $args_ = @('/nologo', '/target:library', '/optimize+', '/langversion:latest', '/nowarn:1701,1702,CS1998', "/out:$out\TcAgentBridge.dll") + $menuRes +
              ($refs | ForEach-Object { "/r:$_" }) + (Get-ChildItem "$here\*.cs" | ForEach-Object { $_.FullName })
     $output = & $csc @args_ 2>&1 | Out-String
     if ($LASTEXITCODE -eq 0) { Write-Host $output; break }
@@ -57,6 +70,7 @@ for ($i = 1; $i -le 25; $i++) {
     if ($added -eq 0) { Write-Host $output -ForegroundColor Red; throw "Build failed" }
 }
 if (-not (Test-Path "$out\TcAgentBridge.dll")) { throw "Build failed" }
+Remove-Item $cto, $resFile -ErrorAction SilentlyContinue
 Copy-Item "$here\TcAgentBridge.pkgdef", "$here\extension.vsixmanifest" $out -Force
 Copy-Item "$here\..\LICENSE" "$out\LICENSE.txt" -Force
 Copy-Item "$here\..\docs\img\icon.png" "$out\icon.png" -Force

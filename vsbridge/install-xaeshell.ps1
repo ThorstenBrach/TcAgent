@@ -82,10 +82,23 @@ if (-not $Uninstall) {
         if ($index.ContainsKey($n)) { $refs.Add($index[$n]) }
     }
     New-Item -ItemType Directory -Force -Path $out | Out-Null
+    # menu commands (View > Other Windows > TcAgent Chat / TcUnit Tests): TcAgentBridge.vsct -> .cto with VSCT.exe of the
+    # VS SDK build tools (NuGet cache, restored by build-vsix.ps1), as resource Menus.ctmenu in VSPackage.resources like the VS SDK build
+    $menuRes = @()
+    $vsct = Get-ChildItem "$env:USERPROFILE\.nuget\packages\microsoft.vssdk.buildtools" -Recurse -Filter VSCT.exe -ErrorAction SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
+    $cto = Join-Path $out 'TcAgentBridge.cto'; $resFile = Join-Path $out 'VSPackage.resources'
+    if ($vsct) {
+        & $vsct.FullName "$here\TcAgentBridge.vsct" $cto "-I$(Join-Path $vsct.Directory.Parent.FullName 'inc')" | Out-Null
+        if ($LASTEXITCODE -eq 0) {
+            $w = New-Object System.Resources.ResourceWriter($resFile)
+            $w.AddResource('Menus.ctmenu', [IO.File]::ReadAllBytes($cto)); $w.Generate(); $w.Close()
+            $menuRes = @("/resource:$resFile,VSPackage.resources")
+        } else { Write-Host "VSCT failed - no menu entries (the TcUnit window opens from the chat's Tests button)" -ForegroundColor Yellow }
+    } else { Write-Host "VSCT.exe not found (NuGet package Microsoft.VSSDK.BuildTools - run build-vsix.ps1 once) - no menu entries" -ForegroundColor Yellow }
     $built = $false
     for ($i = 1; $i -le 25; $i++) {
         $a = @('/nologo', '/target:library', '/platform:anycpu', '/optimize+', '/langversion:latest', '/define:XAESHELL',
-               '/nowarn:1701,1702,CS1998,CS0618', "/out:$out\TcAgentBridge.dll") + ($refs | ForEach-Object { "/r:$_" }) +
+               '/nowarn:1701,1702,CS1998,CS0618', "/out:$out\TcAgentBridge.dll") + $menuRes + ($refs | ForEach-Object { "/r:$_" }) +
              (Get-ChildItem "$here\*.cs" | ForEach-Object { $_.FullName })
         $output = & $csc @a 2>&1 | Out-String
         if ($LASTEXITCODE -eq 0) { $built = $true; break }
@@ -95,6 +108,7 @@ if (-not $Uninstall) {
         if ($added -eq 0) { Write-Host $output -ForegroundColor Red; throw "Build for the XAE Shell failed - please send this output" }
     }
     if (-not $built) { throw "Build for the XAE Shell failed" }
+    Remove-Item $cto, $resFile -ErrorAction SilentlyContinue
 
     Copy-Item "$here\TcAgentBridge.pkgdef" $out -Force
     Copy-Item "$here\..\LICENSE" "$out\LICENSE.txt" -Force

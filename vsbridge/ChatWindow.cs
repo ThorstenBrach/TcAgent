@@ -55,6 +55,7 @@ namespace TcAgentBridge
         readonly Button setup = new Button { Content = "Set up clients", Padding = new Thickness(8, 2, 8, 2), Margin = new Thickness(0, 0, 6, 0),
                                              ToolTip = "Register TcAgent in Claude, Copilot, Gemini and Codex (setup-clients.ps1)" };
         readonly Button clear = new Button { Content = "New chat", Padding = new Thickness(8, 2, 8, 2), ToolTip = "Clear history - next request starts without previous conversation" };
+        readonly Button tests = new Button { Content = "Tests", Padding = new Thickness(8, 2, 8, 2), Margin = new Thickness(0, 0, 6, 0), ToolTip = "TcUnit Tests window: run and watch the TcUnit tests of this solution" };
         readonly TextBlock status = new TextBlock { Margin = new Thickness(0, 4, 0, 0), Opacity = 0.75 };
         readonly TextBlock versionLabel = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(6, 0, 8, 0), FontSize = 11, Opacity = 0.7 };
 
@@ -174,6 +175,10 @@ namespace TcAgentBridge
             {
                 status.Text = "Setting up AI clients ...";
                 System.Threading.Tasks.Task.Run(() => { Installer.Run(true, _ => { }, m => BridgePackage.Instance?.Notify(m)); UpdateVersionLabel(); });
+            };
+            tests.Click += (s, e) =>
+            {
+                try { BridgePackage.Instance?.ShowTcUnit(true); } catch (Exception ex) { status.Text = "TcUnit window: " + ex.Message; }
             };
             clear.Click += (s, e) => { history.Clear(); msgs.Children.Clear(); cur = null; KillSession(); UpdateVersionLabel(); status.Text = "New conversation."; WarmUp(); };
             // Pre-start the Claude session as soon as the window becomes visible or the backend changes

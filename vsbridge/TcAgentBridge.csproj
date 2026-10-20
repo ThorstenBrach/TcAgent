@@ -27,6 +27,9 @@
     <!-- the VS SDK requires this file name; build-vsix.ps1 copies it from extension.vsixmanifest (the single source) -->
     <None Include="source.extension.vsixmanifest"><SubType>Designer</SubType></None>
     <Content Include="TcAgentBridge.pkgdef" IncludeInVSIX="true" />
+    <!-- menu commands (View > Other Windows): compiled by the VS SDK into the resource Menus.ctmenu, registered in the pkgdef -->
+    <VSCTCompile Include="TcAgentBridge.vsct"><ResourceName>Menus.ctmenu</ResourceName></VSCTCompile>
+    <EmbeddedResource Include="VSPackage.resx"><MergeWithCTO>true</MergeWithCTO><ManifestResourceName>VSPackage</ManifestResourceName></EmbeddedResource>
     <!-- copied into this folder by build-vsix.ps1 (linked files lose their target name in the VSIX) -->
     <Content Include="LICENSE.txt" IncludeInVSIX="true" />
     <Content Include="icon.png" IncludeInVSIX="true" />

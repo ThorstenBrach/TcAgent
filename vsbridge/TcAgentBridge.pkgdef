@@ -18,3 +18,11 @@
 "Orientation"="Right"
 "Style"="Tabbed"
 "Window"="{3AE79031-E1BC-11D0-8F78-00A0C9110057}"
+[$RootKey$\ToolWindows\{5b0f6c8e-2d3a-4f61-9a7e-3c1d2b8e4f70}]
+@="{86c8609c-4aac-4e7e-95e6-6b96179a3c4f}"
+"Name"="TcAgentBridge.TcUnitPane"
+"Orientation"="Bottom"
+"Style"="Tabbed"
+"Window"="{34E76E81-EE4A-11D0-AE2E-00A0C90FFFC3}"
+[$RootKey$\Menus]
+"{86c8609c-4aac-4e7e-95e6-6b96179a3c4f}"=", Menus.ctmenu, 1"
