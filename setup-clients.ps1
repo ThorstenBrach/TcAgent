@@ -41,6 +41,8 @@ function Has-Cmd($name) { return [bool](Get-Command $name -ErrorAction SilentlyC
 # ------------------------------------------------------------------ Environment variables (from an existing Claude configuration)
 $claudeConfigs = @()
 $claudeConfigs += Get-ChildItem "$env:LOCALAPPDATA\Packages\Claude_*\LocalCache\Roaming\Claude\claude_desktop_config.json" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
+# newer Claude Desktop (MSIX) keeps its data outside the package folder
+$claudeConfigs += Get-ChildItem "$env:LOCALAPPDATA\Claude-Data\Claude_*\claude_desktop_config.json" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
 if (Test-Path "$env:APPDATA\Claude") { $claudeConfigs += "$env:APPDATA\Claude\claude_desktop_config.json" }
 $envVars = [ordered]@{}
 foreach ($c in $claudeConfigs) {

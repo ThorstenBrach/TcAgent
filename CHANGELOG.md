@@ -5,6 +5,8 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.27.0] – 2026-10-20
+
 ### Changed
 - **Format of the plain-text ST files** (`st export|check|import`, `tc_plaintext`): every block is its declaration, an empty
   line, the implementation indented by two blanks, an empty line and the `END_` line; the POU ends with its own
@@ -317,7 +319,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.26.2...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.27.0...HEAD
+[0.27.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.26.2...v0.27.0
 [0.26.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.24.3...v0.26.2
 [0.24.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.23.1...v0.24.3
 [0.23.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.20.4...v0.23.1

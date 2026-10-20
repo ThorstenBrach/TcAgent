@@ -47,6 +47,29 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
 7. **Tests:** `tc_test_results` returns the result of the last TcUnit run (suites, tests, failures with names).
    TcUnit output appears in the IDE as "errors" in the error list - these are runtime messages, not
    compiler errors; `tc_errors kind=compile|runtime` separates them.
+8. **Writing TcUnit tests:** build them so that the TcUnit test window can list, describe and select them
+   (`docs/TCUNIT_TESTS.md`). Applies to new suites and to every test you add to an existing suite:
+   - One suite = one FB `EXTENDS TcUnit.FB_TestSuite`; one test = one method, called from the suite body.
+     The name in `TEST('...')` is the method name, so a result maps to its method.
+   - Enable bools with exactly these names and initial value `TRUE`: `bRunSuite` for the suite and
+     `bRun_<TestMethod>` per test. The suite body keeps running; only the test calls are inside the IFs:
+     ```
+     VAR
+         bRunSuite                     : BOOL := TRUE;
+         bRun_WhenStartedExpectRunning : BOOL := TRUE;
+     END_VAR
+
+     IF bRunSuite THEN
+         IF bRun_WhenStartedExpectRunning THEN WhenStartedExpectRunning(); END_IF
+     END_IF
+     ```
+     Inline tests (`TEST('X') ... TEST_FINISHED();` in the body) get the same IF with `bRun_X`.
+     Never set these bools to FALSE in code - tests are selected only at runtime via ADS, so without
+     anyone selecting, all tests run (pipeline, `sil`/`hil`).
+   - A `///` comment above every test method and above every suite instance in the test program: one sentence
+     what it checks (language as in the coding rules). It is shown as the test's description.
+   - `TcUnit.RUN_IN_SEQUENCE()` gives progress and results per test; do not switch an existing project from
+     `TcUnit.RUN()` without asking (it changes how the suites run).
 
 ## Coding rules (what the code must follow) vs. this guide (how to work with TcAgent)
 

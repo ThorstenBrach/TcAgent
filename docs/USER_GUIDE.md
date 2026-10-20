@@ -595,6 +595,14 @@ call `apply` again for the same changes.
 - Keep tests in a separate PLC project or solution so the production PLC never contains test code.
 - For automated runs without an AI use `TcAgent.exe test`, `sil` (runtime of the build PC) or `hil` (remote test PLC) –
   see [CI pipeline](#ci-pipeline).
+- Write suites with the enable bools `bRunSuite` / `bRun_<Test>` and a `///` description per test – the agent does
+  this on its own. Tests written this way run unchanged everywhere and can later be selected one by one.
+
+### TcUnit test window (planned)
+
+A window **TcUnit Tests** like the Visual Studio Test Explorer – tree of suites and tests, run all / selected / failed,
+progress bar, red/green with the failure message – also in the XAE Shell. Use, configuration and how to write tests
+for it: [TCUNIT_TESTS.md](TCUNIT_TESTS.md).
 
 ---
 

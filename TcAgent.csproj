@@ -9,7 +9,7 @@
     <PlatformTarget>x64</PlatformTarget>
     <InvariantGlobalization>true</InvariantGlobalization>
     <!-- fixed package versions (licenses checked for exactly these, see THIRD-PARTY-NOTICES.md); packages.lock.json is
-         committed so every build ships the same dependencies. After changing a version: dotnet restore --force-evaluate -->
+         committed so every build ships the same dependencies. After changing a version: dotnet restore with the option force-evaluate -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
     <NoWarn>CA1416;CS8632</NoWarn>
     <!-- false for the VSIX build: the interop is not shipped but generated on the target machine (InteropResolver.cs) -->
