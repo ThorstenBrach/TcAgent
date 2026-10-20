@@ -62,7 +62,8 @@ Skip this if your project already is in GitHub.
 
 **Private repository!** A self-hosted runner executes whatever a workflow says. On a public repository anyone could open a
 pull request whose workflow runs on your PC. GitHub: *New repository* → name → **Private** → no README/.gitignore
-(you bring your own).
+(you bring your own). The example workflows also skip pull requests from forks (`if:` on each job) - keep that line
+when you adapt them.
 
 1. Copy [pipeline/twincat.gitignore](pipeline/twincat.gitignore) as `.gitignore` into the **root of the repository**
    (the folder that will contain `.github`). It keeps out what TwinCAT and Visual Studio generate, NuGet packages of the

@@ -1,5 +1,7 @@
 # TwinCAT check + TcUnit tests with TcAgent on a Windows shell runner (tag "twincat"), running as a user,
 # concurrent = 1 on that machine (see docs/PIPELINE.md). Copy to .gitlab-ci.yml.
+# Merge requests from forks: do not enable "Run pipelines in the parent project" for them - they would run their code
+# on this runner. Keep the runner protected or assigned to this project only.
 variables:
   SOLUTION: MyMachine.sln
   TCAGENT: C:\Tools\TcAgent\TcAgent.exe

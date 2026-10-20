@@ -6,6 +6,8 @@
 trigger:
   branches: { include: [main] }
   tags: { include: ['v*'] }
+# Pull requests from forks: keep them off this agent (Project settings > Pipelines > the pipeline > Triggers >
+# Pull request validation: "Build pull requests from forks of this repository" off) - they would run their code here.
 pr:
   branches: { include: ['*'] }
 

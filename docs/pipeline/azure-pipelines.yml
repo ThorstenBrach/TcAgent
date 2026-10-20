@@ -2,6 +2,8 @@
 # The agent must run as a user, one job at a time per machine (see docs/PIPELINE.md).
 trigger:
   branches: { include: [main] }
+# Pull requests from forks: keep them off this agent (Project settings > Pipelines > the pipeline > Triggers >
+# Pull request validation: "Build pull requests from forks of this repository" off) - they would run their code here.
 pr:
   branches: { include: ['*'] }
 

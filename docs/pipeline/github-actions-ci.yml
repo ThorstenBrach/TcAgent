@@ -20,6 +20,8 @@ defaults:
 
 jobs:
   twincat:
+    # never run pull requests from forks on this machine: a fork's workflow would run its own code on your PC
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
     runs-on: [self-hosted, windows, twincat]
     steps:
       - uses: actions/checkout@v4
