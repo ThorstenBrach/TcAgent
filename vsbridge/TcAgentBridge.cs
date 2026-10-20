@@ -80,7 +80,7 @@ namespace TcAgentBridge
             {
                 try
                 {
-                    using (var pipe = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte))
+                    using (var pipe = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.None, 0, 0, PipeAccess()))
                     {
                         pipe.WaitForConnection();
                         var reader = new StreamReader(pipe, new UTF8Encoding(false));
@@ -99,6 +99,18 @@ namespace TcAgentBridge
                 }
                 catch (Exception ex) { Log("Pipe error: " + ex.Message); Thread.Sleep(500); }
             }
+        }
+
+        // Only the user who runs Visual Studio may use the pipe, and only on this PC: without an own DACL Windows grants
+        // Everyone/Anonymous read access and the pipe is reachable over SMB (\\<pc>\pipe\...). Deny wins over allow.
+        static PipeSecurity PipeAccess()
+        {
+            var ps = new PipeSecurity();
+            ps.AddAccessRule(new PipeAccessRule(new System.Security.Principal.SecurityIdentifier(System.Security.Principal.WellKnownSidType.NetworkSid, null),
+                                                PipeAccessRights.FullControl, System.Security.AccessControl.AccessControlType.Deny));
+            ps.AddAccessRule(new PipeAccessRule(System.Security.Principal.WindowsIdentity.GetCurrent().User,
+                                                PipeAccessRights.FullControl, System.Security.AccessControl.AccessControlType.Allow));
+            return ps;
         }
 
         Dictionary<string, object> Handle(Dictionary<string, object> req)

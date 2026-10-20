@@ -58,6 +58,8 @@ public static class Confirm
             }
             // no answer within the time limit (dialog still open / user away) = no - never run the action unconfirmed
             catch (TimeoutException ex) { Log.Error("Confirmation via the bridge: " + ex.Message); return false; }
+            // a foreign program behind the pipe name = no, not "nobody could be asked"
+            catch (UntrustedBridgeException ex) { Log.Error("Confirmation via the bridge: " + ex.Message); return false; }
             catch (Exception ex) { Log.Error("Confirmation via the bridge: " + ex.Message); }
         }
         if (Mcp.CanElicit)
@@ -97,6 +99,7 @@ public static class Confirm
                 return r["choice"]?.ToString();
             }
             catch (TimeoutException ex) { Log.Error("Choice via the bridge: " + ex.Message); return "cancel"; }
+            catch (UntrustedBridgeException ex) { Log.Error("Choice via the bridge: " + ex.Message); return "cancel"; }
             catch (Exception ex) { Log.Error("Choice via the bridge: " + ex.Message); return null; }     // e.g. older bridge without 'choice'
         }
         string ViaClient()

@@ -16,6 +16,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   `END_` line, code not indented). Round trip without changes for all checked objects. Tests: `PlainTextRepositoryTests`
   (objects of a real library with their reference text files), `PlainTextLayoutTests` rewritten.
 
+### Security
+- Bridge pipe `TcAgentBridge.<pid>` only for the user who runs Visual Studio / the XAE Shell and only on this PC: own DACL,
+  network access (SMB) denied. Before, Windows granted Everyone/Anonymous read access and the pipe was reachable over the network.
+- TcAgent only talks to a bridge served by Visual Studio or the XAE Shell (server process id must match the pipe name)
+  and connects with impersonation level Identification. A foreign program behind the pipe name is refused, and a
+  confirmation asked through it counts as "no".
+
 ## [0.26.2] – 2026-10-17
 
 ### Added
