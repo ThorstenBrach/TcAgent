@@ -70,6 +70,8 @@ namespace TcAgentBridge
         readonly Button runFailed = Btn("Run failed", "Run the tests that failed in the last run");
         readonly Button cancel = Btn("■ Cancel", "Stop the PLC (reset); tests that have not finished stay \"not run\"");
         readonly Button refresh = Btn("↻ Refresh", "Read the tests from the code again");
+        readonly Button report = Btn("Report", "HTML report of the last run - the command of \"report\" in .tcagent\\tcunit.json or TcAgent's own report - opened in the browser");
+        readonly TextBlock selection = new TextBlock { Margin = new Thickness(6, 2, 6, 2), FontWeight = FontWeights.SemiBold };
         readonly ComboBox projectBox = new ComboBox { MinWidth = 120, Margin = new Thickness(0, 0, 6, 0), Visibility = Visibility.Collapsed, ToolTip = "PLC project" };
         readonly TextBox search = new TextBox { MinWidth = 140, Margin = new Thickness(0, 0, 6, 0), VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "Search (name, suite, description)" };
         readonly ComboBox filter = new ComboBox { MinWidth = 90, ToolTip = "Show only tests with this status" };
@@ -98,7 +100,7 @@ namespace TcAgentBridge
             filter.SelectedIndex = 0;
 
             var bar = new WrapPanel { Margin = new Thickness(6, 6, 6, 2) };
-            foreach (var b in new UIElement[] { runAll, runSel, runFailed, cancel, refresh, projectBox, search, filter }) bar.Children.Add(b);
+            foreach (var b in new UIElement[] { runAll, runSel, runFailed, cancel, refresh, report, projectBox, search, filter }) bar.Children.Add(b);
             cancel.IsEnabled = false;
 
             var detailsPanel = new DockPanel();
@@ -123,18 +125,23 @@ namespace TcAgentBridge
             split.Children.Add(tree); split.Children.Add(splitter); split.Children.Add(detailsPanel);
 
             var root = new DockPanel();
-            foreach (var top in new UIElement[] { bar, counters, progress, progressText }) { DockPanel.SetDock(top, Dock.Top); root.Children.Add(top); }
+            // counters left, selection / run progress ("4 of 6 done (67 %)") right
+            var countRow = new DockPanel();
+            DockPanel.SetDock(selection, Dock.Right);
+            countRow.Children.Add(selection); countRow.Children.Add(counters);
+            foreach (var top in new UIElement[] { bar, countRow, progress, progressText }) { DockPanel.SetDock(top, Dock.Top); root.Children.Add(top); }
             DockPanel.SetDock(status, Dock.Bottom);
             root.Children.Add(status);
             root.Children.Add(split);
             Content = root;
-            foreach (var t in new[] { counters, progressText, status }) t.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            foreach (var t in new[] { counters, selection, progressText, status }) t.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
 
             runAll.Click += (s, e) => StartRun(null, "all tests");
             runSel.Click += (s, e) => RunSelected();
             runFailed.Click += (s, e) => RunFailed();
             cancel.Click += (s, e) => Cancel();
             refresh.Click += (s, e) => Discover();
+            report.Click += (s, e) => MakeReport();
             search.TextChanged += (s, e) => ApplyFilter();
             filter.SelectionChanged += (s, e) => ApplyFilter();
             projectBox.SelectionChanged += (s, e) => { if (projectBox.SelectedItem is string p && p != project) { project = p; Discover(); } };
@@ -274,6 +281,7 @@ namespace TcAgentBridge
             tree.Items.Add(projNode);
             ApplyFilter();
             UpdateCounters();
+            UpdateSelection();
             var n = suites.Sum(x => x.Tests.Count);
             status.Text = $"{n} test(s) in {suites.Count} suite instance(s)" + (runMode == "parallel" ? " - TcUnit.RUN(): during a run only the overall progress" : runMode == null ? " - no TcUnit.RUN / RUN_IN_SEQUENCE found" : "") +
                           (string.IsNullOrEmpty(configTarget) || configTarget.Equals("local", StringComparison.OrdinalIgnoreCase) ? "" : " - target " + configTarget);
@@ -301,8 +309,9 @@ namespace TcAgentBridge
                       (!sn.Selectable && sn.Tests.Count > 0 ? "\nWhole suite only: not every test has a bRun_<TestMethod> bool." : "") +
                       (sn.Dynamic ? "\nTest names are built at run time: they appear after the first run." : "");
             sn.Item = new TreeViewItem { IsExpanded = true, Tag = sn, Header = Header(sn, "○", sn.Path + " : " + sn.Type, tip, out sn.Glyph, out sn.Extra, sn.Check) };
-            sn.Check.Checked += (s, e) => { foreach (var t in sn.Tests) if (t.Check != null) t.Check.IsChecked = true; };
-            sn.Check.Unchecked += (s, e) => { foreach (var t in sn.Tests) if (t.Check != null) t.Check.IsChecked = false; };
+            // ticking the suite ticks all its tests; a partly ticked suite shows the third state (only those tests run)
+            sn.Check.Checked += (s, e) => { if (syncing) return; Tick(sn, true); };
+            sn.Check.Unchecked += (s, e) => { if (syncing) return; Tick(sn, false); };
             foreach (var t in sn.Tests) sn.Item.Items.Add(BuildTest(sn, t));
             UpdateSuite(sn);
             return sn.Item;
@@ -313,8 +322,53 @@ namespace TcAgentBridge
             t.Check = new CheckBox { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 4, 0), IsEnabled = sn.Selectable || t.Enable != null };
             var tip = (t.Description ?? t.Name) + (t.Enable == null ? "\nNo bRun_ bool: runs with its suite." : "");
             t.Item = new TreeViewItem { Tag = t, Header = Header(t, "○", t.Name, tip, out t.Glyph, out t.Extra, t.Check) };
+            t.Check.Checked += (s, e) => SyncSuite(sn);
+            t.Check.Unchecked += (s, e) => SyncSuite(sn);
             UpdateTest(t);
             return t.Item;
+        }
+
+        bool syncing;
+
+        void Tick(SuiteNode sn, bool on)
+        {
+            syncing = true;
+            try { foreach (var t in sn.Tests) if (t.Check != null && (!on || t.Check.IsEnabled)) t.Check.IsChecked = on; }
+            finally { syncing = false; }
+            UpdateSelection();
+        }
+
+        /// <summary>Suite checkbox from its tests: all ticked = ticked, some = third state, none = empty.</summary>
+        void SyncSuite(SuiteNode sn)
+        {
+            if (syncing || sn.Check == null) return;
+            var boxes = sn.Tests.Where(t => t.Check?.IsEnabled == true).ToList();
+            int on = boxes.Count(t => t.Check.IsChecked == true);
+            syncing = true;
+            try { if (boxes.Count > 0) sn.Check.IsChecked = on == 0 ? false : on == boxes.Count ? true : (bool?)null; }
+            finally { syncing = false; }
+            UpdateSelection();
+        }
+
+        /// <summary>Tests "Run selected" would run: the ticked ones, whole suites where single tests cannot be switched off.</summary>
+        int TickedCount() => suites.Sum(s => s.Check?.IsChecked == true && !s.Selectable ? s.Tests.Count : s.Tests.Count(t => t.Check?.IsChecked == true));
+
+        // run progress: tests of the run and the ones that have a result
+        int runTotal;
+        readonly HashSet<string> runFinished = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        void UpdateSelection()
+        {
+            if (running != null)
+            {
+                var total = Math.Max(runTotal, runFinished.Count);
+                selection.Text = total == 0 ? "" : $"{runFinished.Count} of {total} done ({100.0 * runFinished.Count / total:0} %)";
+                if (total > 0) { progress.Maximum = total; progress.Value = runFinished.Count; }
+                return;
+            }
+            var ticked = TickedCount();
+            var all = suites.Sum(s => s.Tests.Count);
+            selection.Text = ticked > 0 ? $"{ticked} of {all} test(s) selected" : $"{all} test(s)";
         }
 
         // ------------------------------------------------------------------ status display
@@ -495,8 +549,9 @@ namespace TcAgentBridge
             catch (Exception ex) { status.Text = "TcAgent.exe could not be started: " + ex.Message; return; }
             BridgePackage.Instance?.LogLine("TcUnit run: " + exe + " " + args);
             runStarted = DateTime.Now;
-            expected = 0;
+            expected = 0; runTotal = 0; runFinished.Clear();
             SetRunning(true);
+            UpdateSelection();
             status.Text = "Starting " + what + " ...";
             Progress("Preparing ...", 0, 1);
             var p = running;
@@ -535,9 +590,50 @@ namespace TcAgentBridge
 
         void SetRunning(bool on)
         {
-            runAll.IsEnabled = runSel.IsEnabled = refresh.IsEnabled = projectBox.IsEnabled = !on;
+            runAll.IsEnabled = runSel.IsEnabled = refresh.IsEnabled = projectBox.IsEnabled = report.IsEnabled = !on;
             cancel.IsEnabled = on;
             runFailed.IsEnabled = !on && suites.SelectMany(s => s.Tests).Any(t => t.Status == "failed");
+        }
+
+        /// <summary>HTML report of the last run (TcAgent.exe tcunit report) and open it in the browser.</summary>
+        void MakeReport()
+        {
+            var exe = TcAgentExe();
+            var sln = SolutionPath();
+            if (exe == null || string.IsNullOrEmpty(sln)) { status.Text = exe == null ? "TcAgent.exe not found." : "No solution open."; return; }
+            report.IsEnabled = false;
+            status.Text = "Creating the test report ...";
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                string html = null, msg = null;
+                try
+                {
+                    using (var p = Start(exe, "tcunit report --solution " + Quote(sln), false))
+                    {
+                        var err = p.StandardError.ReadToEndAsync();
+                        var ser = new JavaScriptSerializer();
+                        for (string line; (line = p.StandardOutput.ReadLine()) != null;)
+                        {
+                            if (!line.StartsWith("{")) continue;
+                            try
+                            {
+                                var ev = ser.Deserialize<Dictionary<string, object>>(line);
+                                if (S(ev, "event") == "report") { html = B(ev, "ok") ? S(ev, "html") : null; msg = S(ev, "message"); }
+                            }
+                            catch { }
+                        }
+                        p.WaitForExit(330_000);
+                        if (html == null && msg == null) msg = err.Result.Trim();
+                    }
+                    if (html != null) Process.Start(new ProcessStartInfo(html) { UseShellExecute = true });
+                }
+                catch (Exception ex) { msg = ex.Message; }
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    report.IsEnabled = running == null;
+                    status.Text = html != null ? "Test report: " + html : "Report not created: " + msg;
+                }));
+            });
         }
 
         void Cancel()
@@ -570,6 +666,8 @@ namespace TcAgentBridge
                     foreach (var r in L(ev, "tests"))
                         if (Find(S(r, "instance"), S(r, "test"), false) is TestNode t) { t.Status = S(r, "status"); t.Message = null; t.Duration = null; UpdateTest(t); }
                     foreach (var s in suites) UpdateSuite(s);
+                    runTotal = Math.Max(expected, L(ev, "tests").Count(r => S(r, "status") == "notrun"));
+                    UpdateSelection();
                     Progress($"0 of {expected} test(s)", 0, expected);
                     break;
                 case "step":
@@ -613,9 +711,8 @@ namespace TcAgentBridge
                     UpdateSuite(suites.First(x => x.Path == t.Instance));
                     UpdateCounters();
                     if (Selected() == t) ShowDetails();
-                    var all = suites.SelectMany(s => s.Tests).ToList();
-                    int done = all.Count(x => x.Status is "passed" or "failed") ;
-                    if (progress.Maximum < done) progress.Maximum = done;
+                    if (t.Status is "passed" or "failed" or "skipped") runFinished.Add(t.Instance + "@" + t.Name);
+                    UpdateSelection();
                     break;
                 }
                 case "done":

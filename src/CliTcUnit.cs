@@ -3,6 +3,7 @@
 //   TcAgent.exe tcunit list --solution <sln> [--plc <name>]          tests from the code as JSON, no IDE
 //   TcAgent.exe tcunit run  --solution <sln>|--attach [pid] [--tests <a,b>] [--target ...] [--junit <file>]
 //                                                                    one JSON event per line (TcUnit Tests window)
+//   TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>]   HTML report of the last run (TcUnitReport.cs)
 // tcunit run stops when a line "cancel" arrives on stdin (or Ctrl+C): the PLC is reset, open tests stay "notrun".
 //
 // SPDX-License-Identifier: MIT
@@ -15,8 +16,10 @@ public static partial class Cli
 {
     static void ValidateTcUnit(Options o)
     {
-        if (o.Sub is not ("list" or "run")) throw new Exception("tcunit needs list or run, e.g. TcAgent.exe tcunit list --solution <sln>");
-        if (o.Sub == "list" && o.Solution == null) throw new Exception("tcunit list needs --solution <path to .sln>");
+        if (o.Sub is not ("list" or "run" or "report")) throw new Exception("tcunit needs list, run or report, e.g. TcAgent.exe tcunit list --solution <sln>");
+        if (o.Sub is "list" or "report" && o.Solution == null) throw new Exception($"tcunit {o.Sub} needs --solution <path to .sln>");
+        if (o.Sub == "report" && (o.Tests.Count > 0 || o.Download)) throw new Exception("--tests and --download are options of tcunit run");
+        if (o.Out != null && o.Sub != "report") throw new Exception("--out is an option of tcunit report");
         if (o.Sub == "list" && (o.Tests.Count > 0 || o.Download || o.Junit != null)) throw new Exception("--tests, --download and --junit are options of tcunit run");
         if (o.Solution == null && o.Attach == null) throw new Exception("--solution <path to .sln> (or --attach) is required");
         if (o.Solution != null && o.Attach != null) throw new Exception("use either --solution or --attach");
@@ -50,6 +53,27 @@ public static partial class Cli
         };
         Console.WriteLine(json.ToJsonString(Indented));
         return Ok;
+    }
+
+    /// <summary>HTML report of the last run: the command of "report" in .tcagent\tcunit.json or TcAgent's own report.
+    /// Writes the file and a JSON line {"event":"report","html":...} for the window.</summary>
+    static int TcUnitReportCli(Options o)
+    {
+        var sln = Path.GetFullPath(o.Solution);
+        var cfg = TcUnitConfig.Load(Path.GetDirectoryName(sln));
+        try
+        {
+            var html = TcUnitReport.Make(sln, o.Junit, o.Out, cfg, Say);
+            Say("REPORT OK: " + html);
+            Console.WriteLine(new JsonObject { ["event"] = "report", ["ok"] = true, ["html"] = html }.ToJsonString(Compact));
+            return Ok;
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine("ERROR (report): " + Msg(ex));
+            Console.WriteLine(new JsonObject { ["event"] = "report", ["ok"] = false, ["message"] = Msg(ex) }.ToJsonString(Compact));
+            return ex is FileNotFoundException ? Failed : Infra;
+        }
     }
 
     static int TcUnitCli(Options o, TwinCatSession tc)

@@ -607,8 +607,8 @@ call `apply` again for the same changes.
 **View > Other Windows > TcUnit Tests** (or the **Tests** button of the TcAgent Chat) – like the Visual Studio Test
 Explorer, also in the XAE Shell: tree of PLC project, suite instances and tests read from the code, **Run all / Run
 selected / Run failed / Cancel / Refresh**, search and status filter, counters, a progress bar "Test 12 of 87: name" with
-the remaining time, red/green per test with the failure message (`EXP`, `ACT`, `MSG`), double-click opens the test
-method. The run builds and activates only if the code changed, switches the tests that are not selected off via ADS and
+the remaining time and "4 of 6 done (67 %)", red/green per test with the failure message (`EXP`, `ACT`, `MSG`),
+double-click opens the test method, **Report** makes the HTML test report of the last run. The run builds and activates only if the code changed, switches the tests that are not selected off via ADS and
 leaves TwinCAT in Run mode. The same run for the agent (*"Run only the tests of FB_Motor_Test"*, tool `tc_test_run`) and
 on the command line (`TcAgent.exe tcunit list|run`). Use, configuration and how to write tests for it:
 [TCUNIT_TESTS.md](TCUNIT_TESTS.md).

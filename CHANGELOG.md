@@ -24,6 +24,12 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   mode, no IDE login. One JSON event per line for the window, `cancel` on stdin stops the run, optional JUnit file.
   Optional settings in `.tcagent\tcunit.json` (`plcProject`, `target`, `timeout`, `progress` block). A remote target
   must be allowed in `TCAGENT_ALLOW_TARGETS`; the window asks once per run for it.
+- TcUnit Tests window: button **Report** (HTML test report of the last run, opened in the browser), counter "n of N
+  test(s) selected" / "4 of 6 done (67 %)" during a run, a partly ticked suite shows the third checkbox state.
+- `TcAgent.exe tcunit report --solution <sln>`: HTML report of the last run. Every run keeps its results as JUnit XML in
+  `%LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\last.xml`; the report is made by the command of `report` in
+  `.tcagent\tcunit.json` (placeholders `{junit}`, `{html}`, `{solution}`, `{solutionDir}`) or by TcAgent's own report
+  (summary, pass rate, suites with tests, durations and failure texts).
 - Menu entry View > Other Windows > TcAgent Chat (Visual Studio 2022 and XAE Shell).
 - Unit tests for the test discovery and the selection (`TcUnitDiscoveryTests`).
 ## [0.27.0] – 2026-10-20

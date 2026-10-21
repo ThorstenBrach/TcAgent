@@ -20,16 +20,17 @@ The same run is available to the AI agent (tool `tc_test_run`) and on the comman
 | Control | What it does |
 |---|---|
 | **Run all** | Runs every test of the PLC project. |
-| **Run selected** | Runs the ticked suites/tests – or, if nothing is ticked, the selected one. The others are switched off for this run (section 4). |
+| **Run selected** | Runs the ticked suites/tests – or, if nothing is ticked, the selected one. The others are switched off for this run (section 4). A suite with only some tests ticked shows a partly filled box: only the ticked tests run. |
 | **Run failed** | Runs the tests that failed in the last run. |
 | **Cancel** | Stops the run: reset of the PLC; tests that have not finished stay "not run". |
 | **Refresh** | Reads the tests from the code again. |
+| **Report** | HTML test report of the last run, opened in the browser (section 5, key `report`). |
 | Search box / status filter | Narrows the tree, e.g. to failed tests or to a name (also suite names and descriptions). |
 | Double-click a test, **Open code** | Opens the test method in the TwinCAT editor at its `TEST(...)` line. |
 
 Status symbols: ○ not run, ◐ running, ✔ passed, ✖ failed, ⊘ skipped (switched off for this run, or skipped by TcUnit).
-The counters at the top show passed / failed / skipped / not run; each suite shows its number of tests, failures and
-duration. A test whose checkbox is greyed out has no `bRun_` bool: it can only run with its whole suite.
+The counters at the top show passed / failed / skipped / not run; on the right the number of ticked tests and, while a
+run is going, "4 of 6 done (67 %)". Each suite shows its number of tests, failures and duration. A test whose checkbox is greyed out has no `bRun_` bool: it can only run with its whole suite.
 
 The **details pane** shows for the selected test its description (the `///` comment, section 3), the status and
 duration, the failure message (`EXP`, `ACT`, `MSG` from TcUnit), the file and line and the path of its enable bool.
@@ -115,7 +116,8 @@ Optional, in `<solution folder>\.tcagent\tcunit.json` (versioned in Git with the
   "plcProject": "Tests",
   "target": "local",
   "timeout": "00:05:00",
-  "progress": "GVL_Progress.Progress"
+  "progress": "GVL_Progress.Progress",
+  "report": "python ..\\..\\SRCI\\SRCI_TEST_CASES\\tools\\report.py --tcunit-xml {junit} --name TwinCAT -o {html}"
 }
 ```
 
@@ -125,6 +127,7 @@ Optional, in `<solution folder>\.tcagent\tcunit.json` (versioned in Git with the
 | `target` | `local` | `local` or the AmsNetId of a test PLC (must be in `TCAGENT_ALLOW_TARGETS`) |
 | `timeout` | 5 minutes | maximum duration of a run (`"hh:mm:ss"` or seconds); then the PLC is reset and open tests stay "not run" |
 | `progress` | empty | ADS path of a progress block, see below |
+| `report` | TcAgent's own report | command line that makes the HTML report (button **Report**, `tcunit report`), run in the solution folder; `{junit}` = results of the last run (JUnit XML), `{html}` = file to write, also `{solution}`, `{solutionDir}` |
 
 **Progress block (optional):** if the test project has a block like `TestProgressFB` in the SRCI tests
 (`GVL_Progress.Progress` with the outputs `Total`, `Current`, `Done`, `Test`, `Remaining`, `Finished`), TcAgent reads
@@ -144,6 +147,10 @@ The same run is available on the command line and to the AI agent:
   line (`plan`, `step`, `suite`, `running`, `result`, `progress`, `done`); a line `cancel` on stdin (or Ctrl+C) stops
   the run. `--download` builds and activates even if the code did not change. Exit code 0 = all passed, 1 = failed
   tests or build errors, 2 = refused target or unknown test names, 3 = infrastructure problem or timeout.
+- `TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>]` – the HTML report of the last run
+  (every run keeps its results as JUnit XML in `%LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\last.xml`, outside the
+  repository): the `report` command of the configuration, or TcAgent's own report (summary, pass rate, every suite with
+  its tests, durations and failure texts). No IDE needed.
 - In the chat: *"Run only the tests of FB_Motor_Test"* (tool `tc_test_run`, `action=list` lists the tests).
 
 Pipelines keep using `sil` / `hil` ([PIPELINE.md](PIPELINE.md)); there nobody switches tests off, so all tests run.

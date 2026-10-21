@@ -63,6 +63,7 @@ public static partial class Cli
         if (o.Command is "ci") { Program.ClientName = "cli:ci"; return Ci(o); }   // CliCi.cs - every step is its own TcAgent.exe
         if (o.Command is "st") { Program.ClientName = "cli:st"; return PlainTextCli(o); }   // CliPlainText.cs - project files only, no IDE
         if (o.Command is "tcunit" && o.Sub == "list") { Program.ClientName = "cli:tcunit"; return TcUnitList(o); }   // CliTcUnit.cs - project files only
+        if (o.Command is "tcunit" && o.Sub == "report") { Program.ClientName = "cli:tcunit"; return TcUnitReportCli(o); }
 
         Program.ClientName = "cli:" + o.Command;
 
@@ -846,6 +847,11 @@ public static partial class Cli
       target, timeout, progress). --download activates even if the code did not change. A remote target must be in
       TCAGENT_ALLOW_TARGETS. Exit 0 = passed, 1 = failed tests/build, 2 = refused/unknown tests, 3 = infrastructure/timeout.
 
+  TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>]
+      HTML report of the last tcunit run (or of the JUnit file given): the command of ""report"" in .tcagent\tcunit.json
+      (placeholders {junit} {html} {solution} {solutionDir}, run in the solution folder) or TcAgent's own report.
+      Default output: %LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\report.html. No IDE needed.
+
   TcAgent.exe feedback [--open] [--markdown <file.md>] [--summary] [--path <file|folder>]
       Report of the tc_feedback entries (TCAGENT_FEEDBACK or the default store), grouped by tool, as Markdown
       ready to paste into GitHub issues - to stdout or into the file. --open: only open entries; --summary: counts only.
@@ -886,7 +892,7 @@ Options
   --no-boot-project        test/sil/hil: do not create a boot project (test: PLC must start by itself)
   --disable-io / --keep-io test/sil/hil: disable all I/O devices (default: test/sil only in a Visual Studio
                            started by TcAgent, hil never)
-  --out <file>             library/archive/scope/doc/sbom: output file; sil/hil: Scope export (default scope-<sil|hil>.csv);
+  --out <file>             library/archive/scope/doc/sbom/tcunit report: output file; sil/hil: Scope export (default scope-<sil|hil>.csv);
                            st export/check: text folder (default <solution folder>\st)
   --sarif <file>           analyze: SARIF output
   --settings <file.csa>    analyze: static analysis settings to load first

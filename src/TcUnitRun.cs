@@ -28,7 +28,7 @@ namespace TcAgent;
 /// <summary>Optional settings of the solution: &lt;solution folder&gt;\.tcagent\tcunit.json.</summary>
 public sealed class TcUnitConfig
 {
-    public string PlcProject, Target, Progress, File;
+    public string PlcProject, Target, Progress, Report, File;
     public TimeSpan Timeout = TimeSpan.FromMinutes(5);
     public readonly List<string> Errors = new();
 
@@ -40,7 +40,7 @@ public sealed class TcUnitConfig
         {
             var j = JsonNode.Parse(System.IO.File.ReadAllText(c.File), documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) as JsonObject;
             string S(string k) => j?[k] is JsonValue v && v.ToString().Trim() is { Length: > 0 } s ? s : null;
-            c.PlcProject = S("plcProject"); c.Target = S("target"); c.Progress = S("progress");
+            c.PlcProject = S("plcProject"); c.Target = S("target"); c.Progress = S("progress"); c.Report = S("report");
             if (j?["timeout"] is JsonValue t)
             {
                 if (t.TryGetValue<double>(out var sec)) c.Timeout = TimeSpan.FromSeconds(sec);
@@ -211,6 +211,8 @@ public sealed class TcUnitRun
 
             foreach (var r in Results.Where(r => r.Selected && r.Status is "running")) r.Status = "notrun";
             int failed = Results.Count(r => r.Status == "failed"), passed = Results.Count(r => r.Status == "passed");
+            // every run also leaves its results for tcunit report (TcUnitReport.cs)
+            try { WriteJunit(TcUnitReport.LastJunit(sln), project, outcome, quiet: true); } catch (Exception ex) { Step("Results for the report not written: " + Msg(ex)); }
             if (o.Junit != null) WriteJunit(o.Junit, project, outcome);
             var tail = string.Create(CultureInfo.InvariantCulture, $"{passed} passed, {failed} failed, {Results.Count(r => r.Status == "skipped")} skipped, {Results.Count(r => r.Selected && r.Status == "notrun")} not run ({sw.Elapsed.TotalSeconds:0.0} s)");
             return outcome switch
@@ -399,7 +401,7 @@ public sealed class TcUnitRun
            .SelectMany(s => s.Cases).FirstOrDefault(c => c.Name.Equals(r.Name, StringComparison.OrdinalIgnoreCase) && c.Failure != null)?.Failure is string f
             ? string.Join("\n", f.Split('\n').Distinct()) : null;
 
-    void WriteJunit(string path, TcUnitDiscovery.Project p, string outcome)
+    void WriteJunit(string path, TcUnitDiscovery.Project p, string outcome, bool quiet = false)
     {
         var r = new TcUnitResults { Finished = outcome == "finished" };
         foreach (var g in Results.Where(x => x.Selected || x.Status == "skipped").GroupBy(x => x.Instance))
@@ -417,7 +419,7 @@ public sealed class TcUnitRun
         var suites = JUnit.TestSuites(r, p.Name).ToList();
         if (outcome != "finished") suites.Add(JUnit.ErrorSuite("TcUnit", "run", outcome == "cancelled" ? "The run was cancelled." : "TcUnit did not finish in time."));
         JUnit.Write(path, "TcAgent tcunit", suites);
-        Step("JUnit: " + Path.GetFullPath(path));
+        if (!quiet) Step("JUnit: " + Path.GetFullPath(path));
     }
 
     // ------------------------------------------------------------------ IDE: build, boot project, target
