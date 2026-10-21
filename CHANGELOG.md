@@ -36,6 +36,11 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   `tc_test_run tests=@file` run a saved selection.
 - Menu entry View > Other Windows > TcAgent Chat (Visual Studio 2022 and XAE Shell).
 - Unit tests for the test discovery and the selection (`TcUnitDiscoveryTests`).
+
+### Fixed
+- Update of `%LOCALAPPDATA%\TcAgent\app\<version>\` while an AI client still runs `TcAgent.exe` from there: the running
+  file is set aside (`*.old-<time>`, deleted at the next start) and the new one copied, instead of keeping the old
+  TcAgent with the message "still in use".
 ## [0.27.0] – 2026-10-20
 
 ### Changed

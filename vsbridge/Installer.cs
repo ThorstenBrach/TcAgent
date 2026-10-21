@@ -160,12 +160,25 @@ namespace TcAgentBridge
             // (size + time) so that a rebuild with the same version number is copied as well
             var stamp = SourceStamp();
             var stampFile = Path.Combine(AppDir, ".source-stamp");
+            // files set aside by an earlier update: delete them once their process has ended
+            if (Directory.Exists(AppDir))
+                foreach (var old in Directory.GetFiles(AppDir, "*.old-*", SearchOption.AllDirectories))
+                    try { File.Delete(old); } catch { }
             if (File.Exists(Exe) && File.Exists(stampFile) && File.ReadAllText(stampFile) == stamp) return;
             foreach (var f in Directory.GetFiles(Source, "*", SearchOption.AllDirectories))
             {
                 var dst = Path.Combine(AppDir, f.Substring(Source.Length).TrimStart('\\'));
                 Directory.CreateDirectory(Path.GetDirectoryName(dst));
-                File.Copy(f, dst, true);
+                try { File.Copy(f, dst, true); }
+                catch (IOException) when (File.Exists(dst))
+                {
+                    // an AI client (Claude, the TcAgent Chat ...) runs this TcAgent.exe: a running program can be renamed but
+                    // not overwritten - set it aside (it keeps running), copy the new file; the next start deletes the old one
+                    var aside = dst + ".old-" + DateTime.Now.ToString("yyyyMMddHHmmss");
+                    File.Move(dst, aside);
+                    File.Copy(f, dst, true);
+                    log("in use, set aside: " + aside);
+                }
             }
             try { File.WriteAllText(stampFile, stamp); } catch { }
             log("TcAgent copied to " + AppDir);
