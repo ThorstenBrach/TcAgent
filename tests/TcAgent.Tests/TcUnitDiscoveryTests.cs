@@ -259,6 +259,19 @@ public sealed class TcUnitDiscoveryTests : IDisposable
     }
 
     [Fact]
+    public void SavedSelectionFilesAreExpanded()
+    {
+        File.WriteAllText(Path.Combine(dir, "a.tcunit.json"), """{ "project": "TestPlc", "tests": [ "MAIN.fbMotor", "MAIN.fbDerived@Inline" ] }""");
+        File.WriteAllText(Path.Combine(dir, "b.txt"), "# comment\nGVL_Tests.fbMotor2@WhenStoppedExpectStandstill\n\n");
+        var items = TcUnitDiscovery.ExpandSelectionFiles(new[] { "@a.tcunit.json", "@" + Path.Combine(dir, "b.txt"), "Old" }, dir);
+        Assert.Equal(new[] { "MAIN.fbMotor", "MAIN.fbDerived@Inline", "GVL_Tests.fbMotor2@WhenStoppedExpectStandstill", "Old" }, items);
+        var sel = TcUnitDiscovery.Select(Project(), items);
+        Assert.Empty(sel.Errors);
+        Assert.Contains(("MAIN.fbMotor.bRunSuite", true), sel.Writes);
+        Assert.Throws<FileNotFoundException>(() => TcUnitDiscovery.ExpandSelectionFiles(new[] { "@missing.json" }, dir));
+    }
+
+    [Fact]
     public void JsonListsBoolPaths()
     {
         var json = TcUnitDiscovery.ToJson(TcUnitDiscovery.Discover(Sln)).ToJsonString();

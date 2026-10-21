@@ -30,6 +30,10 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   `%LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\last.xml`; the report is made by the command of `report` in
   `.tcagent\tcunit.json` (placeholders `{junit}`, `{html}`, `{solution}`, `{solutionDir}`) or by TcAgent's own report
   (summary, pass rate, suites with tests, durations and failure texts).
+- TcUnit Tests window laid out like the Visual Studio Test Explorer: icon tool bar, status filter buttons with counts
+  (several combinable), framed search box, list with resizable columns Test / Duration / Traits / Error Message,
+  "Test Detail Summary". Test selections can be saved and loaded (`*.tcunit.json`); `tcunit run --tests @file` and
+  `tc_test_run tests=@file` run a saved selection.
 - Menu entry View > Other Windows > TcAgent Chat (Visual Studio 2022 and XAE Shell).
 - Unit tests for the test discovery and the selection (`TcUnitDiscoveryTests`).
 ## [0.27.0] – 2026-10-20

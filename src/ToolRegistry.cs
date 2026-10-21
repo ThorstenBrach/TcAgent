@@ -364,7 +364,7 @@ public sealed partial class ToolRegistry
                            "only if the code changed, reset of the PLC, enable bools via ADS (TRUE = selected, FALSE = the rest), start, " +
                            "results per test, reset again; TwinCAT stays in Run mode. Runtime action: allowed targets only, with confirmation.",
             Schema(P("action", "string", "run (default) or list"),
-                   P("tests", "string", "Comma-separated: instance (MAIN.fbMotor), suite type (FB_Motor_Test), MAIN.fbMotor@Test or test name; empty = all"),
+                   P("tests", "string", "Comma-separated: instance (MAIN.fbMotor), suite type (FB_Motor_Test), MAIN.fbMotor@Test, test name or @file (saved test selection *.tcunit.json); empty = all"),
                    P("plc", "string", "PLC project name (default: the only one with tests, or plcProject in .tcagent\\tcunit.json)"),
                    P("target", "string", "local (default) or the AmsNetId of a test PLC allowed in TCAGENT_ALLOW_TARGETS"),
                    P("timeout", "integer", "Max. seconds for the run (default 300 or timeout in .tcagent\\tcunit.json)"),

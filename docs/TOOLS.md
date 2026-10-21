@@ -1006,7 +1006,7 @@ with confirmation. Same run as `TcAgent.exe tcunit run` and the TcUnit Tests win
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `action` | string |  | run (default) or list |
-| `tests` | string |  | Comma-separated: instance (`MAIN.fbMotor`), suite type (`FB_Motor_Test`), `MAIN.fbMotor@Test` or a test name; empty = all |
+| `tests` | string |  | Comma-separated: instance (`MAIN.fbMotor`), suite type (`FB_Motor_Test`), `MAIN.fbMotor@Test`, a test name or `@<file>` (saved test selection, relative to the solution folder); empty = all |
 | `plc` | string |  | PLC project (default: the only one with tests, or `plcProject` in `.tcagent\tcunit.json`) |
 | `target` | string |  | `local` (default) or the AmsNetId of a test PLC allowed in `TCAGENT_ALLOW_TARGETS` |
 | `timeout` | integer |  | Max. seconds for the run (default 300 or `timeout` in `.tcagent\tcunit.json`) |

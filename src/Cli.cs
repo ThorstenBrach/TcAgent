@@ -912,7 +912,8 @@ Options
   --clean                  st export: remove .st files whose object no longer exists (references.json is kept)
   --force                  st import: write even if it cannot be checked whether the solution is open in an IDE
   --init                   ci: write a starter .tcagent\pipeline.json (never overwrites)
-  --tests <a,b>            tcunit run: instances, suite types, instance@test or test names (default: all)
+  --tests <a,b>            tcunit run: instances, suite types, instance@test, test names or @<file> (saved test
+                           selection *.tcunit.json or one entry per line; default: all)
   --download               tcunit run: build and activate even if the runtime runs the current code
 
 Exit codes: 0 OK, 1 compiler errors, failed tests, lock or st check differences, st import errors, 2 wrong call, refused

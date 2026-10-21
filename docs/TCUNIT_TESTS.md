@@ -17,21 +17,28 @@ The same run is available to the AI agent (tool `tc_test_run`) and on the comman
 
 ## 2. Using it
 
-| Control | What it does |
+The window is laid out like the Test Explorer: a tool bar, below it the progress bar, then the list with the columns
+**Test**, **Duration**, **Traits** and **Error Message** (drag the column borders in the header to change their width)
+and the **Test Detail Summary** at the bottom.
+
+| Tool bar | What it does |
 |---|---|
-| **Run all** | Runs every test of the PLC project. |
-| **Run selected** | Runs the ticked suites/tests – or, if nothing is ticked, the selected one. The others are switched off for this run (section 4). A suite with only some tests ticked shows a partly filled box: only the ticked tests run. |
-| **Run failed** | Runs the tests that failed in the last run. |
-| **Cancel** | Stops the run: reset of the PLC; tests that have not finished stay "not run". |
-| **Refresh** | Reads the tests from the code again. |
-| **Report** | HTML test report of the last run, opened in the browser (section 5, key `report`). |
-| Search box / status filter | Narrows the tree, e.g. to failed tests or to a name (also suite names and descriptions). |
-| Double-click a test, **Open code** | Opens the test method in the TwinCAT editor at its `TEST(...)` line. |
+| ▶▶ **Run All Tests** | Runs every test of the PLC project. |
+| ▶ **Run** | Runs the ticked suites/tests – or, if nothing is ticked, the selected line. The others are switched off for this run (section 4). A suite with only some tests ticked shows a partly filled box: only the ticked tests run. |
+| ▶✖ **Run Failed Tests** | Runs the tests that failed in the last run. |
+| ■ **Cancel** | Stops the run: reset of the PLC; tests that have not finished stay "not run". |
+| ⟳ **Refresh** | Reads the tests from the code again. |
+| Status filter buttons ⚗ ✔ ✖ ○ ⊘ | Show the number of all / passed / failed / not run / skipped tests. A click shows only those (several can be combined); ⚗ or a second click shows all again. |
+| 📄 **Test report** | HTML test report of the last run, opened in the browser (section 5, key `report`). |
+| 💾 **Save** / 📂 **Load** test selection | Saves the ticked suites and tests as a `*.tcunit.json` file (default folder `.tcagent` of the solution, can be versioned with the project) and ticks them again later. The same file works on the command line: `tcunit run --tests @file` (section 6). |
+| Search box (right) | Narrows the list to tests whose name, suite or description contains the text. |
+| Double-click a test, **Open code**, Enter | Opens the test method in the TwinCAT editor at its `TEST(...)` line. Double-click on a suite opens/closes it; Space ticks the selected line. |
 
 Status symbols: ○ not run, ◐ running, ✔ passed, ✖ failed, ⊘ skipped (switched off for this run, or skipped by TcUnit).
-The counters at the top show passed / failed / skipped / not run; on the right the number of ticked tests and, while a
-run is going, "4 of 6 done (67 %)". Each suite shows its number of tests, failures and duration. A test whose checkbox is greyed out has no `bRun_` bool: it can only run with its whole suite.
-
+Right of the progress bar: the number of ticked tests and, while a run is going, "4 of 6 done (67 %)". Each suite line
+shows its number of tests, its duration, its type in **Traits** and the number of failed tests; **Traits** of a test:
+`Ordered` (`TEST_ORDERED`), `No bRun_` (runs only with its suite), `Skipped`. A test whose checkbox is greyed out has no
+`bRun_` bool: it can only run with its whole suite.
 The **details pane** shows for the selected test its description (the `///` comment, section 3), the status and
 duration, the failure message (`EXP`, `ACT`, `MSG` from TcUnit), the file and line and the path of its enable bool.
 
@@ -143,7 +150,8 @@ The same run is available on the command line and to the AI agent:
 - `TcAgent.exe tcunit run --solution <sln> | --attach [pid] [--tests <a,b>] [--plc <name>] [--target local|<AmsNetId>]
   [--timeout <s>] [--junit <file>] [--no-build] [--download]` – the run of section 4. `--tests` takes instances
   (`MAIN.fbMotor`), suite types (`FB_Motor_Test`), single tests (`MAIN.fbMotor@WhenStartedExpectRunning`,
-  `FB_Motor_Test.WhenStartedExpectRunning` or just the test name); default all. The output is one JSON event per
+  `FB_Motor_Test.WhenStartedExpectRunning` or just the test name) or `@<file>` – a test selection saved in the window
+  (`*.tcunit.json`, relative to the solution folder) or a text file with one entry per line; default all. The output is one JSON event per
   line (`plan`, `step`, `suite`, `running`, `result`, `progress`, `done`); a line `cancel` on stdin (or Ctrl+C) stops
   the run. `--download` builds and activates even if the code did not change. Exit code 0 = all passed, 1 = failed
   tests or build errors, 2 = refused target or unknown test names, 3 = infrastructure problem or timeout.

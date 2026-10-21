@@ -115,7 +115,10 @@ public sealed class TcUnitRun
         var disc = TcUnitDiscovery.Discover(sln);
         var project = ChooseProject(disc, o.Plc ?? cfg.PlcProject, out var why);
         if (project == null) return Done("error", Cli.Usage, why);
-        var sel = TcUnitDiscovery.Select(project, o.Tests);
+        List<string> tests;
+        try { tests = TcUnitDiscovery.ExpandSelectionFiles(o.Tests, Path.GetDirectoryName(sln)); }
+        catch (Exception ex) { return Done("error", Cli.Usage, Msg(ex)); }
+        var sel = TcUnitDiscovery.Select(project, tests);
         if (sel.Errors.Count > 0) return Done("error", Cli.Usage, string.Join("; ", sel.Errors));
         foreach (var i in project.Instances)
         {

@@ -472,6 +472,30 @@ public static class TcUnitDiscovery
         return sel;
     }
 
+    /// <summary>Filter entries "@file" replaced by the tests of a saved test selection (TcUnit Tests window, *.tcunit.json):
+    /// {"tests": [...]}, a JSON array or one entry per line (# comments). Relative paths are relative to baseDir.</summary>
+    public static List<string> ExpandSelectionFiles(IEnumerable<string> filter, string baseDir)
+    {
+        var list = new List<string>();
+        foreach (var f in filter ?? Enumerable.Empty<string>())
+        {
+            var it = f?.Trim() ?? "";
+            if (!it.StartsWith("@")) { if (it.Length > 0) list.Add(it); continue; }
+            var path = it[1..].Trim().Trim('"');
+            if (!Path.IsPathRooted(path) && baseDir != null) path = Path.Combine(baseDir, path);
+            if (!File.Exists(path)) throw new FileNotFoundException("Test selection not found: " + path);
+            var text = File.ReadAllText(path).Trim();
+            if (text.StartsWith("{") || text.StartsWith("["))
+            {
+                var node = JsonNode.Parse(text);
+                var arr = node as JsonArray ?? node?["tests"] as JsonArray ?? throw new FormatException(path + ": no \"tests\" list");
+                list.AddRange(arr.Select(x => x?.ToString().Trim()).Where(x => !string.IsNullOrEmpty(x)));
+            }
+            else list.AddRange(text.Split('\n').Select(l => l.Trim()).Where(l => l.Length > 0 && !l.StartsWith("#")));
+        }
+        return list;
+    }
+
     // ------------------------------------------------------------------ JSON (tcunit list)
     public static JsonObject ToJson(Result r) => new()
     {
