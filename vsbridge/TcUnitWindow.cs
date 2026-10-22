@@ -114,6 +114,8 @@ namespace TcAgentBridge
         readonly Button runFailed = Tool("▶✖", Red, "Run Failed Tests (of the last run)");
         readonly Button cancel = Tool("■", Red, "Cancel (reset of the PLC; open tests stay \"not run\")");
         readonly Button refresh = Tool("⟳", null, "Refresh (read the tests from the code again)");
+        readonly Button expandAll = Tool("⊞", null, "Expand all suites");
+        readonly Button collapseAll = Tool("⊟", null, "Collapse all suites");
         readonly Button report = Tool("\U0001F4C4", null, "Test report (HTML of the last run: the command of \"report\" in .tcagent\\tcunit.json or TcAgent's own report)");
         readonly Button save = Tool("\U0001F4BE", null, "Save the ticked tests as a test selection (.tcunit.json)");
         readonly Button load = Tool("\U0001F4C2", null, "Load a test selection (.tcunit.json) - ticks its tests");
@@ -235,7 +237,7 @@ namespace TcAgentBridge
             // toolbar: run buttons | refresh | status filters | report, selections, project ... search box on the right
             var bar = new DockPanel { Margin = new Thickness(4, 4, 4, 2), LastChildFill = true };
             var left = new StackPanel { Orientation = Orientation.Horizontal };
-            foreach (var e in new UIElement[] { runAll, runSel, runFailed, cancel, Separator(), refresh, Separator(), fAll, fPassed, fFailed, fNotRun, fSkipped, Separator(), report, save, load, projectBox })
+            foreach (var e in new UIElement[] { runAll, runSel, runFailed, cancel, Separator(), refresh, expandAll, collapseAll, Separator(), fAll, fPassed, fFailed, fNotRun, fSkipped, Separator(), report, save, load, projectBox })
                 left.Children.Add(e);
             DockPanel.SetDock(left, Dock.Left);
             bar.Children.Add(left);
@@ -302,6 +304,8 @@ namespace TcAgentBridge
             runFailed.Click += (s, e) => RunFailed();
             cancel.Click += (s, e) => Cancel();
             refresh.Click += (s, e) => Discover();
+            expandAll.Click += (s, e) => ExpandAll(true);
+            collapseAll.Click += (s, e) => ExpandAll(false);
             report.Click += (s, e) => MakeReport();
             save.Click += (s, e) => SaveSelection();
             load.Click += (s, e) => LoadSelection();
@@ -688,6 +692,14 @@ namespace TcAgentBridge
 
         // ------------------------------------------------------------------ list content
         bool IsExpanded(Row r) => r == projectRow ? projectExpanded : r.Suite != null && r.Test == null && r.Suite.Expanded;
+
+        /// <summary>Opens or closes every suite (the project line stays open).</summary>
+        void ExpandAll(bool open)
+        {
+            projectExpanded = true;
+            foreach (var s in suites) s.Expanded = open;
+            Rebuild();
+        }
 
         void Toggle(Row r)
         {

@@ -72,6 +72,7 @@ and the **Test Detail Summary** at the bottom.
 | ▶✖ **Run Failed Tests** | Runs the tests that failed in the last run. |
 | ■ **Cancel** | Stops the run: reset of the PLC; tests that have not finished stay "not run". |
 | ⟳ **Refresh** | Reads the tests from the code again. |
+| ⊞ **Expand all** / ⊟ **Collapse all** | Opens or closes all suites. |
 | Status filter buttons ⚗ ✔ ✖ ○ ⊘ | Show the number of all / passed / failed / not run / skipped tests. A click shows only those (several can be combined); ⚗ shows all again. |
 | 📄 **Test report** | HTML test report of the last run, opened in the browser ([section 8](#8-test-report)). |
 | 💾 **Save** / 📂 **Load** | Saves the ticked suites and tests as a test selection `*.tcunit.json` (default folder `.tcagent` of the solution, can be versioned with the project) and ticks them again later. The same file works on the command line: `tcunit run --tests @file`. |

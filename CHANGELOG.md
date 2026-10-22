@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.28.2] – 2026-10-22
+
+### Added
+- TcUnit Tests window: buttons **Expand all** / **Collapse all** (all suites) in the tool bar, as in the Test Explorer.
+
+### Fixed
+- Test report, view grouped by `reportGroupBy`: the number of suites of a group counts the suites that ran.
+
 ## [0.28.1] – 2026-10-22
 
 0.28.0 was a local test build only; its changes are listed here.
