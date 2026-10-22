@@ -216,6 +216,7 @@ public static class TcUnitReport
           .Append("table.sum{border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;min-width:600px}")
           .Append("table.sum td,table.sum th{padding:7px 14px;border-bottom:1px solid var(--line);text-align:right}table.sum th:first-child,table.sum td:first-child{text-align:left}")
           .Append(".sdoc{padding:4px 18px 10px 18px;border-bottom:1px solid var(--line)}.body ol,.body ul,.sdoc ol,.sdoc ul{margin:4px 0;padding-left:20px}.sdoc h4{margin:8px 0 4px;font-size:13px}")
+          .Append(".bar button.on{background:var(--accent);color:#fff;border-color:var(--accent)}")
           .Append(".hdr{display:grid;grid-template-columns:110px minmax(180px,1.2fr) 2fr 90px;gap:10px;padding:0 14px 4px;color:var(--muted);font-size:12px}.hidden{display:none!important}code{font-size:12.5px}")
           .Append("</style></head><body><header><h1>").Append(E(title)).Append(" &ndash; TcUnit test report</h1><div class='muted'>")
           .Append(E(when.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)))
@@ -243,64 +244,106 @@ public static class TcUnitReport
           .Append("<label><input id='fail' type='checkbox'> only failed</label>")
           .Append(off > 0 ? $"<label><input id='off' type='checkbox'> show the {off} tests switched off for this run</label>" : "<input id='off' type='checkbox' class='hidden' checked>")
           .Append("<button id='open'>expand all</button><button id='close'>collapse all</button></div>");
-        sb.Append("<div class='hdr'><span>Result</span><span>Test</span><span>Description</span><span style='text-align:right'>Time</span></div>");
 
         string Look(Item i) => !i.Selected ? "off" : i.Status;
         string Label(string s) => s switch { "passed" => "&#10004; passed", "failed" => "&#10006; failed", "skipped" => "&#8856; skipped", "off" => "&ndash; switched off", _ => "&#9675; not run" };
-        var order = proj?.Instances.Select(i => i.Path).ToList() ?? new List<string>();
-        var groups = items.GroupBy(i => i.Instance ?? "").OrderBy(g => order.IndexOf(g.Key) is var x && x < 0 ? int.MaxValue : x).ToList();
-        var summary = new List<(string Name, int Run, int Ok, int Bad, int Skip, double Time)>();
-        foreach (var g in groups)
+        TcUnitDiscovery.Instance Inst(Item i) => i.Instance != null && instances.TryGetValue(i.Instance, out var x) ? x : null;
+        var summarySuites = new List<(string Name, int Run, int Ok, int Bad, int Skip, double Time)>();
+        var summaryGroups = new List<(string Name, int Run, int Ok, int Bad, int Skip, double Time)>();
+
+        // one group: a suite instance, or a value of a /// section (reportGroupBy, e.g. a function block under test)
+        void Group(StringBuilder o, string name, string sub, string desc, string details, List<Item> list, List<(string, int, int, int, int, double)> summary)
         {
-            instances.TryGetValue(g.Key, out var inst);
-            var gr = g.Where(i => i.Selected).ToList();
+            var gr = list.Where(i => i.Selected).ToList();
             int gp = gr.Count(i => i.Status == "passed"), gf = gr.Count(i => i.Status == "failed"), gs = gr.Count(i => i.Status is "skipped" or "notrun" or "running");
             var gt = gr.Sum(i => i.Duration ?? 0);
-            if (gr.Count > 0) summary.Add((g.Key, gp + gf, gp, gf, gs, gt));
-            var desc = inst?.Description ?? inst?.Suite.Description;
-            sb.Append("<details class='suite").Append(gr.Count == 0 ? " offsuite" : "").Append("'").Append(gf > 0 ? " open" : "").Append("><summary><span class='name'>").Append(E(g.Key)).Append("</span>")
-              .Append(inst != null ? "<span class='muted'>" + E(inst.Suite.Type) + "</span>" : "")
-              .Append("<span class='desc'>").Append(E(desc)).Append("</span>");
-            if (gp > 0) sb.Append("<span class='pill passed'>&#10004; ").Append(gp).Append("</span>");
-            if (gf > 0) sb.Append("<span class='pill failed'>&#10006; ").Append(gf).Append("</span>");
-            if (gs > 0) sb.Append("<span class='pill skipped'>&#8856; ").Append(gs).Append("</span>");
-            sb.Append("<span class='muted' style='font-size:12px'>").Append(Sec(gt)).Append("</span></summary>");
+            if (gr.Count > 0) summary.Add((name, gp + gf, gp, gf, gs, gt));
+            o.Append("<details class='suite'").Append(gf > 0 ? " open" : "").Append("><summary><span class='name'>").Append(E(name)).Append("</span>")
+             .Append(sub != null ? "<span class='muted'>" + E(sub) + "</span>" : "").Append("<span class='desc'>").Append(E(desc)).Append("</span>");
+            if (gp > 0) o.Append("<span class='pill passed'>&#10004; ").Append(gp).Append("</span>");
+            if (gf > 0) o.Append("<span class='pill failed'>&#10006; ").Append(gf).Append("</span>");
+            if (gs > 0) o.Append("<span class='pill skipped'>&#8856; ").Append(gs).Append("</span>");
+            o.Append("<span class='muted' style='font-size:12px'>").Append(Sec(gt)).Append("</span></summary>");
             // what the suite checks (/// details of the suite FB, e.g. the test case of a generated suite)
-            if (inst?.Suite.Details != null) sb.Append("<div class='sdoc'>").Append(DocHtml(inst.Suite.Details)).Append("</div>");
-            foreach (var i in g)
+            if (details != null) o.Append("<div class='sdoc'>").Append(DocHtml(details)).Append("</div>");
+            foreach (var i in list)
             {
                 var look = Look(i);
                 var t = i.Test;
-                var text = string.Join(" ", g.Key, inst?.Suite.Type, desc, i.Name, t?.Description, t?.Details, i.Message).ToLowerInvariant();
-                sb.Append("<details class='test").Append(look == "off" ? " off" : "").Append("' data-text='").Append(E(text)).Append("' data-fail='").Append(look == "failed" ? 1 : 0).Append(look == "failed" ? "' open>" : "'>")
-                  .Append("<summary><span class='st ").Append(look).Append("'>").Append(Label(look)).Append("</span><span class='tn'>").Append(E(i.Name)).Append("</span><span class='td'>")
-                  .Append(E(t?.Description)).Append("</span><span class='num'>").Append(look is "passed" or "failed" ? Sec(i.Duration) : "").Append("</span></summary><div class='body'>");
-                if (t?.Description != null) sb.Append("<div><b>").Append(E(t.Description)).Append("</b></div>");
-                if (t?.Details != null) sb.Append(DocHtml(t.Details));
-                else if (t == null && inst?.Suite.Details != null) sb.Append("<div class='muted'>Test case of the suite:</div>").Append(DocHtml(inst.Suite.Details));
+                var inst = Inst(i);
+                var sdesc = inst?.Description ?? inst?.Suite.Description;
+                var text = string.Join(" ", i.Instance, inst?.Suite.Type, sdesc, i.Name, t?.Description, t?.Details, i.Message).ToLowerInvariant();
+                o.Append("<details class='test").Append(look == "off" ? " off" : "").Append("' data-text='").Append(E(text)).Append("' data-fail='").Append(look == "failed" ? 1 : 0).Append(look == "failed" ? "' open>" : "'>")
+                 .Append("<summary><span class='st ").Append(look).Append("'>").Append(Label(look)).Append("</span><span class='tn'>").Append(E(i.Name)).Append("</span><span class='td'>")
+                 .Append(E(t?.Description)).Append("</span><span class='num'>").Append(look is "passed" or "failed" ? Sec(i.Duration) : "").Append("</span></summary><div class='body'>");
+                if (t?.Description != null) o.Append("<div><b>").Append(E(t.Description)).Append("</b></div>");
+                if (t?.Details != null) o.Append(DocHtml(t.Details));
+                else if (t == null && inst?.Suite.Details != null) o.Append("<div class='muted'>Test case of the suite:</div>").Append(DocHtml(inst.Suite.Details));
                 if (!string.IsNullOrEmpty(i.Message))
-                    sb.Append("<h4>Failure</h4><pre>").Append(E(string.Join("\n", i.Message.Split('\n').Distinct()).Replace(", ACT:", "\nACT:").Replace(", MSG:", "\nMSG:"))).Append("</pre>");
-                sb.Append("<h4>Details</h4><div class='kv'><span>Suite</span><span>").Append(E(g.Key)).Append(inst != null ? " : " + E(inst.Suite.Type) : "").Append("</span>");
-                if (desc != null) sb.Append("<span>Suite purpose</span><span>").Append(E(desc)).Append("</span>");
+                    o.Append("<h4>Failure</h4><pre>").Append(E(string.Join("\n", i.Message.Split('\n').Distinct()).Replace(", ACT:", "\nACT:").Replace(", MSG:", "\nMSG:"))).Append("</pre>");
+                o.Append("<h4>Details</h4><div class='kv'><span>Suite</span><span>").Append(E(i.Instance)).Append(inst != null ? " : " + E(inst.Suite.Type) : "").Append("</span>");
+                if (sdesc != null) o.Append("<span>Suite purpose</span><span>").Append(E(sdesc)).Append("</span>");
                 if (t != null)
                 {
-                    sb.Append("<span>Code</span><span>").Append(E(Path.GetRelativePath(slnDir, t.File))).Append(':').Append(t.Line).Append(t.Method != null ? " (method " + E(t.Method) + ")" : " (suite body)").Append("</span>");
-                    sb.Append("<span>Enable bool</span><span>").Append(t.EnableVar != null ? "<code>" + E(g.Key + "." + t.EnableVar) + "</code>" : "&ndash; (runs with its suite)").Append("</span>");
-                    if (t.Ordered) sb.Append("<span>Order</span><span>TEST_ORDERED</span>");
+                    o.Append("<span>Code</span><span>").Append(E(Path.GetRelativePath(slnDir, t.File))).Append(':').Append(t.Line).Append(t.Method != null ? " (method " + E(t.Method) + ")" : " (suite body)").Append("</span>");
+                    o.Append("<span>Enable bool</span><span>").Append(t.EnableVar != null ? "<code>" + E(i.Instance + "." + t.EnableVar) + "</code>" : "&ndash; (runs with its suite)").Append("</span>");
+                    if (t.Ordered) o.Append("<span>Order</span><span>TEST_ORDERED</span>");
                 }
-                else sb.Append("<span>Code</span><span class='muted'>test name built at run time / not found in the code</span>");
-                sb.Append("<span>Result</span><span>").Append(Label(look)).Append(look is "passed" or "failed" && i.Duration != null ? " in " + Sec(i.Duration) : "").Append("</span></div></div></details>");
+                else o.Append("<span>Code</span><span class='muted'>test name built at run time / not found in the code</span>");
+                o.Append("<span>Result</span><span>").Append(Label(look)).Append(look is "passed" or "failed" && i.Duration != null ? " in " + Sec(i.Duration) : "").Append("</span></div></div></details>");
             }
-            sb.Append("</details>");
+            o.Append("</details>");
         }
-        if (groups.Count == 0) sb.Append("<p class='muted'>The result file contains no tests.</p>");
 
-        sb.Append("<h2>Summary</h2><table class='sum'><tr><th>Suite</th><th>Tests run</th><th>Passed</th><th>Failed</th><th>Skipped / not run</th><th>Time</th></tr>");
-        foreach (var s in summary)
-            sb.Append("<tr><td>").Append(E(s.Name)).Append("</td><td>").Append(s.Run).Append("</td><td style='color:var(--ok)'>").Append(s.Ok)
-              .Append("</td><td style='color:var(--bad)'>").Append(s.Bad).Append("</td><td style='color:var(--skip)'>").Append(s.Skip).Append("</td><td>").Append(Sec(s.Time)).Append("</td></tr>");
-        sb.Append("<tr><td><b>Total</b></td><td><b>").Append(passed + failed).Append("</b></td><td style='color:var(--ok)'><b>").Append(passed).Append("</b></td><td style='color:var(--bad)'><b>")
-          .Append(failed).Append("</b></td><td style='color:var(--skip)'><b>").Append(skipped + notRun).Append("</b></td><td><b>").Append(Sec(summary.Sum(s => s.Time))).Append("</b></td></tr></table>");
+        void Summary(StringBuilder o, string head, List<(string Name, int Run, int Ok, int Bad, int Skip, double Time)> summary)
+        {
+            o.Append("<h2>Summary</h2><table class='sum'><tr><th>").Append(E(head)).Append("</th><th>Tests run</th><th>Passed</th><th>Failed</th><th>Skipped / not run</th><th>Time</th></tr>");
+            foreach (var s in summary)
+                o.Append("<tr><td>").Append(E(s.Name)).Append("</td><td>").Append(s.Run).Append("</td><td style='color:var(--ok)'>").Append(s.Ok)
+                 .Append("</td><td style='color:var(--bad)'>").Append(s.Bad).Append("</td><td style='color:var(--skip)'>").Append(s.Skip).Append("</td><td>").Append(Sec(s.Time)).Append("</td></tr>");
+            o.Append("<tr><td><b>Total</b></td><td><b>").Append(passed + failed).Append("</b></td><td style='color:var(--ok)'><b>").Append(passed).Append("</b></td><td style='color:var(--bad)'><b>")
+             .Append(failed).Append("</b></td><td style='color:var(--skip)'><b>").Append(skipped + notRun).Append("</b></td><td><b>").Append(Sec(ran.Sum(i => i.Duration ?? 0))).Append("</b></td></tr></table>");
+        }
+
+        // view 1: by suite instance, in the order TcUnit runs them
+        var order = proj?.Instances.Select(i => i.Path).ToList() ?? new List<string>();
+        var bySuite = new StringBuilder();
+        foreach (var g in items.GroupBy(i => i.Instance ?? "").OrderBy(g => order.IndexOf(g.Key) is var x && x < 0 ? int.MaxValue : x))
+        {
+            var inst = Inst(g.First());
+            Group(bySuite, g.Key, inst?.Suite.Type, inst?.Description ?? inst?.Suite.Description, inst?.Suite.Details, g.ToList(), summarySuites);
+        }
+        if (items.Count == 0) bySuite.Append("<p class='muted'>The result file contains no tests.</p>");
+        Summary(bySuite, "Suite", summarySuites);
+
+        // view 2 (optional): by the values of a /// section of the tests, e.g. "Blocks: MC_GroupResetFB" - a test with
+        // several values is in every group, tests without the section at the end
+        var key = cfg.ReportGroupBy?.Trim().TrimEnd(':');
+        StringBuilder byKey = null;
+        if (!string.IsNullOrEmpty(key))
+        {
+            var rx = new System.Text.RegularExpressions.Regex(@"^" + System.Text.RegularExpressions.Regex.Escape(key) + @"\s*:\s*(.+)$", System.Text.RegularExpressions.RegexOptions.IgnoreCase | System.Text.RegularExpressions.RegexOptions.Multiline);
+            List<string> Values(Item i)
+            {
+                var m = i.Test?.Details == null ? null : rx.Match(i.Test.Details);
+                return m?.Success == true ? m.Groups[1].Value.Split(',').Select(v => v.Trim()).Where(v => v.Length > 0).Distinct().ToList() : new List<string>();
+            }
+            var without = "(no " + key + ")";
+            var groups = items.SelectMany(i => (Values(i) is var v && v.Count > 0 ? v : new List<string> { without }).Select(v => (v, i)))
+                              .GroupBy(x => x.v).OrderBy(g => g.Key == without ? 1 : 0).ThenBy(g => g.Key, StringComparer.OrdinalIgnoreCase).ToList();
+            byKey = new StringBuilder();
+            foreach (var g in groups)
+            {
+                var list = g.Select(x => x.i).ToList();
+                Group(byKey, g.Key, $"{list.Select(i => i.Instance).Distinct().Count()} suite(s)", null, null, list, summaryGroups);
+            }
+            Summary(byKey, key, summaryGroups);
+            sb.Append("<div class='bar' style='position:static;margin-top:-8px'><span class='muted'>Group by</span><button id='g-key' class='on'>").Append(E(key))
+              .Append("</button><button id='g-suite'>Suite</button></div>");
+        }
+        sb.Append("<div class='hdr'><span>Result</span><span>Test</span><span>Description</span><span style='text-align:right'>Time</span></div>");
+        if (byKey != null) sb.Append("<div id='v-key'>").Append(byKey).Append("</div><div id='v-suite' class='hidden'>").Append(bySuite).Append("</div>");
+        else sb.Append(bySuite);
         sb.Append("<p class='muted'>Descriptions are the <code>///</code> comments of the test methods and suite instances in the code. Report of TcAgent ")
           .Append(E(Program.ServerVersion)).Append(" &ndash; results: ").Append(E(junit)).Append("</p></main><script>")
           .Append("const q=document.getElementById('q'),f=document.getElementById('fail'),o=document.getElementById('off');")
@@ -309,6 +352,8 @@ public static class TcUnitReport
           .Append("c.classList.toggle('hidden',!ok);any=any||ok});b.classList.toggle('hidden',!any);if(s||f.checked)b.open=any})}")
           .Append("q.addEventListener('input',apply);f.addEventListener('change',apply);o.addEventListener('change',apply);")
           .Append("document.getElementById('open').onclick=()=>document.querySelectorAll('details').forEach(d=>{if(!d.classList.contains('hidden'))d.open=true});")
+          .Append("const gk=document.getElementById('g-key'),gs=document.getElementById('g-suite');function view(x){document.getElementById('v-key').classList.toggle('hidden',x!=='key');")
+          .Append("document.getElementById('v-suite').classList.toggle('hidden',x!=='suite');gk.classList.toggle('on',x==='key');gs.classList.toggle('on',x==='suite')}if(gk){gk.onclick=()=>view('key');gs.onclick=()=>view('suite')}")
           .Append("document.getElementById('close').onclick=()=>document.querySelectorAll('details').forEach(d=>d.open=false);apply();</script></body></html>");
         return sb.ToString();
     }

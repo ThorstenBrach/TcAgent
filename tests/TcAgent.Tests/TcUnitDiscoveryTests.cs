@@ -286,6 +286,7 @@ public sealed class TcUnitDiscoveryTests : IDisposable
             IF ( bRun_GEN_04_A )
             THEN
               /// GEN-04 / Block A: not executed
+              /// Blocks: A
               Run( Active := TEST_ORDERED('GEN_04_A'), Idx := 1 );
             END_IF
             Run( Active := TEST_ORDERED('GEN_04_B'),
@@ -295,7 +296,7 @@ public sealed class TcUnitDiscoveryTests : IDisposable
         var motor = Project().Suites.Single(s => s.Type == "FB_Motor_Test");
         var a = motor.Tests.Single(t => t.Name == "GEN_04_A");
         Assert.Equal("GEN-04 / Block A: not executed", a.Description);
-        Assert.Equal("Steps:\n1. Prepare.\nExpected:\n- Nothing sent.", a.Details);      // details of the called method
+        Assert.Equal("Blocks: A\nSteps:\n1. Prepare.\nExpected:\n- Nothing sent.", a.Details);      // own line + text of the called method
         var b = motor.Tests.Single(t => t.Name == "GEN_04_B");
         Assert.Equal("GEN-04: valid command, not executed", b.Description);
         Assert.Null(b.Method);

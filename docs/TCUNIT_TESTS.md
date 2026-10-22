@@ -152,6 +152,7 @@ Optional, in `<solution folder>\.tcagent\tcunit.json` (versioned in Git with the
 | `target` | `local` | `local` or the AmsNetId of a test PLC (must be in `TCAGENT_ALLOW_TARGETS`) |
 | `timeout` | 5 minutes | maximum duration of a run (`"hh:mm:ss"` or seconds); then the PLC is reset and open tests stay "not run" |
 | `progress` | empty | ADS path of a progress block, see below |
+| `reportGroupBy` | empty | TcAgent's report also groups the tests by the values of this `///` section, e.g. `Blocks` for `/// Blocks: MC_GroupResetFB` (several values comma-separated; switch between the views in the report) |
 | `report` | TcAgent's own report | command line that makes the HTML report (button **Report**, `tcunit report`), run in the solution folder; `{junit}` = results of the last run (JUnit XML), `{html}` = file to write, also `{solution}`, `{solutionDir}` |
 
 **Progress block (optional):** if the test project has a block like `TestProgressFB` in the SRCI tests
@@ -183,7 +184,11 @@ suite instance with its purpose (the `///` comment of the instance or suite), ev
 `///` comment of the test method), result, duration, failure text (`EXP`/`ACT`/`MSG`), code position and enable bool;
 cards with tests run, passed, failed, skipped and pass rate; run information (time, duration, target, PC, git branch
 and commit, TcAgent version, selection); a summary per suite; search, "only failed" and the tests switched off for
-this run hidden unless asked for. Good descriptions in the code (section 3) make a good report.
+this run hidden unless asked for. Good descriptions in the code (section 3) make a good report. With `reportGroupBy` (section 5)
+the report can also be read by another key than the suite, e.g. by the function block under test: a test with
+`/// Blocks: MC_GroupResetFB` is listed under MC_GroupResetFB (a test about several blocks under each of them). For a
+test called in the suite body, a `///` line directly above the call adds to the text of the called method, e.g.
+`/// Blocks: MC_GroupResetFB` above `Run( Active := TEST_ORDERED('GEN_04_MC_GroupResetFB'), ... )`.
 - In the chat: *"Run only the tests of FB_Motor_Test"* (tool `tc_test_run`, `action=list` lists the tests).
 
 Pipelines keep using `sil` / `hil` ([PIPELINE.md](PIPELINE.md)); there nobody switches tests off, so all tests run.

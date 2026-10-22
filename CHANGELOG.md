@@ -5,7 +5,9 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
-## [0.28.0] – 2026-10-20
+## [0.28.1] – 2026-10-22
+
+0.28.0 was a local test build only; its changes are listed here.
 
 ### Added
 - **TcUnit Tests window** in Visual Studio 2022 and the TwinCAT XAE Shell (View > Other Windows > TcUnit Tests, or the
@@ -37,6 +39,9 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   (`Setup:`, `Steps:` with `1.` lines, `Expected:` with `-` lines, `Link:` ...); `tcunit list` returns them as
   `details`, the window shows them in the details, the report under every test (the case of a generated suite under
   each of its tests).
+- Test report grouped by a `///` section: `reportGroupBy` in `.tcagent\tcunit.json` (e.g. `Blocks` for the function
+  block under test) adds a second view to the report, switchable with the suite view; a test with several values is
+  listed under each of them. A `///` line directly above a call in the suite body adds to the text of the called method.
 - TcUnit Tests window laid out like the Visual Studio Test Explorer: icon tool bar, status filter buttons with counts
   (several combinable), framed search box, list with resizable columns Test / Duration / Traits / Error Message,
   "Test Detail Summary". Test selections can be saved and loaded (`*.tcunit.json`); `tcunit run --tests @file` and

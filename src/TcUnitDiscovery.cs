@@ -223,7 +223,8 @@ public static class TcUnitDiscovery
                         if (callee != null && methods.TryGetValue(callee, out var called))
                         {
                             desc ??= called.Description;
-                            details ??= called.Details;
+                            // the line above the call adds to the text of the method (e.g. "Blocks: MC_GroupResetFB")
+                            details = details == null ? called.Details : called.Details == null ? details : details + "\n" + called.Details;
                         }
                     }
                     s.Tests.Add(new Test

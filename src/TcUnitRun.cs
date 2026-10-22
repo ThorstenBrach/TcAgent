@@ -28,7 +28,7 @@ namespace TcAgent;
 /// <summary>Optional settings of the solution: &lt;solution folder&gt;\.tcagent\tcunit.json.</summary>
 public sealed class TcUnitConfig
 {
-    public string PlcProject, Target, Progress, Report, File;
+    public string PlcProject, Target, Progress, Report, ReportGroupBy, File;
     public TimeSpan Timeout = TimeSpan.FromMinutes(5);
     public readonly List<string> Errors = new();
 
@@ -40,7 +40,7 @@ public sealed class TcUnitConfig
         {
             var j = JsonNode.Parse(System.IO.File.ReadAllText(c.File), documentOptions: new JsonDocumentOptions { CommentHandling = JsonCommentHandling.Skip, AllowTrailingCommas = true }) as JsonObject;
             string S(string k) => j?[k] is JsonValue v && v.ToString().Trim() is { Length: > 0 } s ? s : null;
-            c.PlcProject = S("plcProject"); c.Target = S("target"); c.Progress = S("progress"); c.Report = S("report");
+            c.PlcProject = S("plcProject"); c.Target = S("target"); c.Progress = S("progress"); c.Report = S("report"); c.ReportGroupBy = S("reportGroupBy");
             if (j?["timeout"] is JsonValue t)
             {
                 if (t.TryGetValue<double>(out var sec)) c.Timeout = TimeSpan.FromSeconds(sec);
