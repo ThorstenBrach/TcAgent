@@ -63,7 +63,7 @@ public static class JUnit
                 if (c.Failed)
                     tc.Add(new XElement("failure", new XAttribute("message", FirstLine(c.Failure) ?? "test failed"), new XAttribute("type", "AssertionFailed"),
                         c.Failure ?? $"status={c.Status}, asserts={c.Asserts}"));
-                else if (c.Skipped) tc.Add(new XElement("skipped"));
+                else if (c.Skipped) tc.Add(c.Status.Length > "SKIPPED".Length ? new XElement("skipped", new XAttribute("message", c.Status)) : new XElement("skipped"));
                 suite.Add(tc);
             }
             if (s.Cases.Count == 0 && (s.Tests ?? 0) > 0)

@@ -46,7 +46,7 @@ public static partial class Cli
         public int TimeoutSec = 1800, LoadTimeoutSec = 300;
         public string Config, Only, From; public bool DryRun, Init;      // ci (CliCi.cs); From/DryRun also st import
         public string Sub; public bool Clean, Force;                      // st export|check|import (CliPlainText.cs)
-        public readonly List<string> Tests = new(); public bool TimeoutGiven, Download;   // tcunit run (CliTcUnit.cs)
+        public readonly List<string> Tests = new(); public bool TimeoutGiven, Download, BuiltIn;   // tcunit run/report (CliTcUnit.cs)
     }
 
     public static int Run(string[] args)
@@ -739,6 +739,7 @@ public static partial class Cli
                 case "--force": o.Force = true; break;
                 case "--tests": o.Tests.AddRange(Val().Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)); break;
                 case "--download": o.Download = true; break;
+                case "--builtin": o.BuiltIn = true; break;
                 default:
                     // st: the sub-command (export, check, import) is the first argument that is not an option
                     if (o.Command is "st" or "tcunit" && o.Sub == null && !a.StartsWith("-")) { o.Sub = a.ToLowerInvariant(); break; }
@@ -847,10 +848,11 @@ public static partial class Cli
       target, timeout, progress). --download activates even if the code did not change. A remote target must be in
       TCAGENT_ALLOW_TARGETS. Exit 0 = passed, 1 = failed tests/build, 2 = refused/unknown tests, 3 = infrastructure/timeout.
 
-  TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>]
+  TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>] [--builtin]
       HTML report of the last tcunit run (or of the JUnit file given): the command of ""report"" in .tcagent\tcunit.json
       (placeholders {junit} {html} {solution} {solutionDir}, run in the solution folder) or TcAgent's own report.
-      Default output: %LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\report.html. No IDE needed.
+      --builtin uses TcAgent's own report even if ""report"" is set. Default output:
+      %LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\report.html. No IDE needed.
 
   TcAgent.exe feedback [--open] [--markdown <file.md>] [--summary] [--path <file|folder>]
       Report of the tc_feedback entries (TCAGENT_FEEDBACK or the default store), grouped by tool, as Markdown

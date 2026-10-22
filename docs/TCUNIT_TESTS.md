@@ -157,8 +157,15 @@ The same run is available on the command line and to the AI agent:
   tests or build errors, 2 = refused target or unknown test names, 3 = infrastructure problem or timeout.
 - `TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>]` – the HTML report of the last run
   (every run keeps its results as JUnit XML in `%LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\last.xml`, outside the
-  repository): the `report` command of the configuration, or TcAgent's own report (summary, pass rate, every suite with
-  its tests, durations and failure texts). No IDE needed.
+  repository): the `report` command of the configuration, or TcAgent's own report. `--builtin` uses TcAgent's own
+  report even if `report` is set. No IDE needed.
+
+**TcAgent's own report** works for every project, without configuration. It is made from the run and the code: every
+suite instance with its purpose (the `///` comment of the instance or suite), every test with its description (the
+`///` comment of the test method), result, duration, failure text (`EXP`/`ACT`/`MSG`), code position and enable bool;
+cards with tests run, passed, failed, skipped and pass rate; run information (time, duration, target, PC, git branch
+and commit, TcAgent version, selection); a summary per suite; search, "only failed" and the tests switched off for
+this run hidden unless asked for. Good descriptions in the code (section 3) make a good report.
 - In the chat: *"Run only the tests of FB_Motor_Test"* (tool `tc_test_run`, `action=list` lists the tests).
 
 Pipelines keep using `sil` / `hil` ([PIPELINE.md](PIPELINE.md)); there nobody switches tests off, so all tests run.

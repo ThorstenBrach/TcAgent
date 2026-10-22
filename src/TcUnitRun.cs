@@ -215,7 +215,17 @@ public sealed class TcUnitRun
             foreach (var r in Results.Where(r => r.Selected && r.Status is "running")) r.Status = "notrun";
             int failed = Results.Count(r => r.Status == "failed"), passed = Results.Count(r => r.Status == "passed");
             // every run also leaves its results for tcunit report (TcUnitReport.cs)
-            try { WriteJunit(TcUnitReport.LastJunit(sln), project, outcome, quiet: true); } catch (Exception ex) { Step("Results for the report not written: " + Msg(ex)); }
+            try
+            {
+                WriteJunit(TcUnitReport.LastJunit(sln), project, outcome, quiet: true);
+                TcUnitReport.SaveRun(sln, new JsonObject
+                {
+                    ["project"] = project.Name, ["target"] = target, ["started"] = runStart.ToString("o"), ["seconds"] = Math.Round(sw.Elapsed.TotalSeconds, 1),
+                    ["outcome"] = outcome, ["filter"] = string.Join(",", tests), ["runMode"] = project.RunMode, ["tcagent"] = Program.ServerVersion,
+                    ["results"] = new JsonArray(Results.Select(r => { var j = r.Json(); j["selected"] = r.Selected; return (JsonNode)j; }).ToArray())
+                });
+            }
+            catch (Exception ex) { Step("Results for the report not written: " + Msg(ex)); }
             if (o.Junit != null) WriteJunit(o.Junit, project, outcome);
             var tail = string.Create(CultureInfo.InvariantCulture, $"{passed} passed, {failed} failed, {Results.Count(r => r.Status == "skipped")} skipped, {Results.Count(r => r.Selected && r.Status == "notrun")} not run ({sw.Elapsed.TotalSeconds:0.0} s)");
             return outcome switch
@@ -414,7 +424,8 @@ public sealed class TcUnitRun
                 s.Cases.Add(new TcUnitResults.Case
                 {
                     Suite = g.Key, Name = x.Name, Duration = x.Duration,
-                    Status = x.Status switch { "passed" => "PASS", "failed" => "FAIL", "skipped" => "SKIPPED", _ => "SKIPPED (not run)" },
+                    Status = !x.Selected ? "SKIPPED (switched off for this run)"
+                           : x.Status switch { "passed" => "PASS", "failed" => "FAIL", "skipped" => "SKIPPED", _ => "SKIPPED (not run)" },
                     Failure = x.Status == "failed" ? x.Message ?? "failed" : null
                 });
             r.Suites.Add(s);

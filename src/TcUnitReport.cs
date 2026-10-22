@@ -1,11 +1,14 @@
 // HTML test report of the last TcUnit run (TcAgent.exe tcunit report, button "Report" of the TcUnit Tests window).
 //
-// Every tcunit run (window, command line, tc_test_run) also writes its results as JUnit XML to
-// %LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\last.xml. The report is made from that file:
-//   - with "report" in .tcagent\tcunit.json: that command line, run in the solution folder, e.g.
-//       "report": "python ..\\..\\SRCI\\SRCI_TEST_CASES\\tools\\report.py --tcunit-xml {junit} --name TwinCAT -o {html}"
-//     placeholders: {junit} (JUnit file), {html} (report file to write), {solution} (.sln), {solutionDir}
-//   - otherwise TcAgent's own report: one self-contained HTML file (summary, suites, tests, failure texts).
+// Every tcunit run (window, command line, tc_test_run) leaves its results in %LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\:
+//   last.xml   JUnit XML (for report tools of your own and CI systems)
+//   last.json  the run: target, time, duration, outcome, filter, every test with status, message, duration, selected
+// The report is made from them:
+//   - TcAgent's own report (default): works for every project - suites and tests with the /// descriptions of the code
+//     (TcUnitDiscovery), status, duration, failure text (EXP/ACT/MSG), code position and enable bool, summary per suite,
+//     run information (target, TcAgent, git commit); search, "only failed", tests switched off for this run hidden
+//   - with "report" in .tcagent\tcunit.json: that command line instead, run in the solution folder, e.g. a report of a
+//     test case catalog; placeholders {junit} (JUnit file), {html} (report file to write), {solution}, {solutionDir}
 //
 // SPDX-License-Identifier: MIT
 using System.Diagnostics;
@@ -13,6 +16,8 @@ using System.Globalization;
 using System.Net;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Nodes;
 using System.Xml.Linq;
 
 namespace TcAgent;
@@ -29,18 +34,27 @@ public static class TcUnitReport
     }
 
     public static string LastJunit(string sln) => Path.Combine(Dir(sln), "last.xml");
+    public static string LastRun(string sln) => Path.Combine(Dir(sln), "last.json");
     public static string DefaultHtml(string sln) => Path.Combine(Dir(sln), "report.html");
+
+    public static void SaveRun(string sln, JsonObject run)
+    {
+        Directory.CreateDirectory(Dir(sln));
+        File.WriteAllText(LastRun(sln), run.ToJsonString(new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
+    }
 
     /// <summary>Makes the report. Returns the HTML file, throws with a readable message if it cannot be made.</summary>
     public static string Make(string sln, string junit, string html, TcUnitConfig cfg, Action<string> say)
     {
+        bool lastRun = junit == null;
         junit = Path.GetFullPath(junit ?? LastJunit(sln));
         html = Path.GetFullPath(html ?? DefaultHtml(sln));
         if (!File.Exists(junit)) throw new FileNotFoundException("No results yet - run the tests first (" + junit + ").");
         Directory.CreateDirectory(Path.GetDirectoryName(html)!);
         if (string.IsNullOrWhiteSpace(cfg.Report))
         {
-            File.WriteAllText(html, BuiltIn(junit, Path.GetFileNameWithoutExtension(sln)), new UTF8Encoding(false));
+            var run = lastRun && File.Exists(LastRun(sln)) ? JsonNode.Parse(File.ReadAllText(LastRun(sln))) as JsonObject : null;
+            File.WriteAllText(html, BuiltIn(sln, junit, run, cfg), new UTF8Encoding(false));
             return html;
         }
         var slnDir = Path.GetDirectoryName(Path.GetFullPath(sln))!;
@@ -65,59 +79,203 @@ public static class TcUnitReport
     }
 
     // ------------------------------------------------------------------ TcAgent's own report
-    static string E(string s) => WebUtility.HtmlEncode(s ?? "");
-    static double D(XElement e, string a) => double.TryParse((string)e.Attribute(a), NumberStyles.Float, CultureInfo.InvariantCulture, out var d) ? d : 0;
-
-    static string BuiltIn(string junit, string title)
+    sealed class Item
     {
-        var doc = XDocument.Load(junit);
-        var suites = doc.Descendants("testsuite").Where(s => s.Elements("testcase").Any()).ToList();
-        string Status(XElement tc) => tc.Element("failure") != null || tc.Element("error") != null ? "failed" : tc.Element("skipped") != null ? "skipped" : "passed";
-        var all = suites.SelectMany(s => s.Elements("testcase")).ToList();
-        int passed = all.Count(t => Status(t) == "passed"), failed = all.Count(t => Status(t) == "failed"), skipped = all.Count(t => Status(t) == "skipped");
-        var when = File.GetLastWriteTime(junit).ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture);
-        var sb = new StringBuilder();
-        sb.Append("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'>")
-          .Append("<title>").Append(E(title)).Append(" - TcUnit test report</title><style>")
-          .Append(":root{--bg:#f7f8fa;--card:#fff;--fg:#1d2330;--muted:#5d6675;--line:#dfe3ea;--ok:#1f8a4c;--okbg:#e6f4ec;--bad:#c62f2f;--badbg:#fbe9e9;--skip:#8a6a00;--skipbg:#fbf2dc}")
-          .Append("@media(prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1c2027;--fg:#e6e9ef;--muted:#9aa3b2;--line:#2e343e;--ok:#4cc38a;--okbg:#17301f;--bad:#ff6b6b;--badbg:#3a1d1d;--skip:#e0b04a;--skipbg:#33290f}}")
-          .Append("*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 'Segoe UI',system-ui,sans-serif}")
-          .Append("main{max-width:1200px;margin:0 auto;padding:24px 28px 40px}h1{margin:0 0 4px;font-size:22px}h2{font-size:16px;margin:26px 0 8px}.muted{color:var(--muted)}")
-          .Append(".cards{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 16px;min-width:130px}")
-          .Append(".card b{display:block;font-size:24px}.ok b{color:var(--ok)}.bad b{color:var(--bad)}.skip b{color:var(--skip)}")
-          .Append(".meter{height:8px;border-radius:4px;background:var(--line);overflow:hidden;display:flex;margin:4px 0 18px}.meter i{display:block}")
-          .Append("table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden}")
-          .Append("th,td{text-align:left;padding:6px 10px;border-top:1px solid var(--line);vertical-align:top}th{font-weight:600;color:var(--muted);border-top:0}")
-          .Append(".st{font-weight:600;border-radius:4px;padding:0 6px}.st.passed{color:var(--ok);background:var(--okbg)}.st.failed{color:var(--bad);background:var(--badbg)}.st.skipped{color:var(--skip);background:var(--skipbg)}")
-          .Append("pre{margin:4px 0 0;white-space:pre-wrap;font:12px Consolas,monospace;color:var(--bad)}td.num{text-align:right;white-space:nowrap}</style></head><body><main>")
-          .Append("<h1>").Append(E(title)).Append(" &ndash; TcUnit test report</h1><div class='muted'>Run of ").Append(E(when))
-          .Append(" &middot; ").Append(E(Environment.MachineName)).Append(" &middot; TcAgent ").Append(E(Program.ServerVersion)).Append("</div>")
-          .Append("<div class='cards'><div class='card'><b>").Append(all.Count).Append("</b>tests</div><div class='card ok'><b>").Append(passed)
-          .Append("</b>passed</div><div class='card bad'><b>").Append(failed).Append("</b>failed</div><div class='card skip'><b>").Append(skipped)
-          .Append("</b>skipped / not run</div><div class='card'><b>").Append((all.Count - skipped) == 0 ? "-" : (100.0 * passed / (all.Count - skipped)).ToString("0", CultureInfo.InvariantCulture) + " %")
-          .Append("</b>pass rate</div></div>");
-        string Pct(int n) => all.Count == 0 ? "0" : (100.0 * n / all.Count).ToString("0.##", CultureInfo.InvariantCulture);
-        sb.Append("<div class='meter'><i style='width:").Append(Pct(passed)).Append("%;background:var(--ok)'></i><i style='width:").Append(Pct(failed))
-          .Append("%;background:var(--bad)'></i><i style='width:").Append(Pct(skipped)).Append("%;background:var(--skip)'></i></div>");
-        foreach (var s in suites)
-        {
-            var cases = s.Elements("testcase").ToList();
-            sb.Append("<h2>").Append(E((string)s.Attribute("name"))).Append(" <span class='muted'>&ndash; ")
-              .Append(cases.Count(c => Status(c) == "passed")).Append(" passed, ").Append(cases.Count(c => Status(c) == "failed")).Append(" failed, ")
-              .Append(cases.Count(c => Status(c) == "skipped")).Append(" skipped</span></h2><table><tr><th>Test</th><th>Result</th><th class='num'>Duration</th></tr>");
-            foreach (var c in cases)
+        public string Instance, Name, Status, Message;
+        public double? Duration;
+        public bool Selected = true;
+        public TcUnitDiscovery.Test Test;
+    }
+
+    static string E(string s) => WebUtility.HtmlEncode(s ?? "");
+    static string Sec(double? s) => s == null ? "" : s < 1 ? (s.Value * 1000).ToString("0", CultureInfo.InvariantCulture) + " ms" : s.Value.ToString("0.00", CultureInfo.InvariantCulture) + " s";
+
+    /// <summary>Results: from the run record (last.json), otherwise from the JUnit file.</summary>
+    static List<Item> Items(string junit, JsonObject run)
+    {
+        if (run?["results"] is JsonArray arr)
+            return arr.OfType<JsonObject>().Select(r => new Item
             {
-                var st = Status(c);
-                var msg = (string)(c.Element("failure") ?? c.Element("error"))?.Attribute("message");
-                var body = (c.Element("failure") ?? c.Element("error"))?.Value;
-                sb.Append("<tr><td>").Append(E((string)c.Attribute("name")));
-                if (st == "failed") sb.Append("<pre>").Append(E(string.IsNullOrWhiteSpace(body) ? msg : body)).Append("</pre>");
-                sb.Append("</td><td><span class='st ").Append(st).Append("'>").Append(st).Append("</span></td><td class='num'>")
-                  .Append(st == "skipped" ? "" : D(c, "time").ToString("0.000", CultureInfo.InvariantCulture) + " s").Append("</td></tr>");
+                Instance = (string)r["instance"], Name = (string)r["test"], Status = (string)r["status"], Message = (string)r["message"],
+                Duration = r["duration"] is JsonValue d && d.TryGetValue<double>(out var x) ? x : null, Selected = (bool?)r["selected"] ?? true
+            }).ToList();
+        var list = new List<Item>();
+        foreach (var s in XDocument.Load(junit).Descendants("testsuite"))
+            foreach (var c in s.Elements("testcase"))
+            {
+                var fail = c.Element("failure") ?? c.Element("error");
+                var skip = c.Element("skipped");
+                list.Add(new Item
+                {
+                    Instance = (string)s.Attribute("name"), Name = (string)c.Attribute("name"),
+                    Status = fail != null ? "failed" : skip != null ? "skipped" : "passed",
+                    Message = fail == null ? null : string.IsNullOrWhiteSpace(fail.Value) ? (string)fail.Attribute("message") : fail.Value.Trim(),
+                    Duration = double.TryParse((string)c.Attribute("time"), NumberStyles.Float, CultureInfo.InvariantCulture, out var t) ? t : null,
+                    Selected = !(((string)skip?.Attribute("message"))?.Contains("switched off", StringComparison.OrdinalIgnoreCase) ?? false)
+                });
+                if (((string)skip?.Attribute("message"))?.Contains("not run", StringComparison.OrdinalIgnoreCase) == true) list[^1].Status = "notrun";
             }
-            sb.Append("</table>");
+        return list;
+    }
+
+    static string Git(string dir, string args)
+    {
+        try
+        {
+            var psi = new ProcessStartInfo("git", args) { WorkingDirectory = dir, UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true };
+            using var p = Process.Start(psi)!;
+            var o = p.StandardOutput.ReadToEnd().Trim();
+            return p.WaitForExit(5000) && p.ExitCode == 0 ? o : null;
         }
-        if (suites.Count == 0) sb.Append("<p class='muted'>The result file contains no tests.</p>");
-        return sb.Append("</main></body></html>").ToString();
+        catch { return null; }
+    }
+
+    static string BuiltIn(string sln, string junit, JsonObject run, TcUnitConfig cfg)
+    {
+        var items = Items(junit, run);
+        // descriptions, code positions and enable bools from the code
+        TcUnitDiscovery.Project proj = null;
+        try
+        {
+            var d = TcUnitDiscovery.Discover(sln);
+            var name = (string)run?["project"] ?? cfg.PlcProject;
+            proj = d.Projects.FirstOrDefault(p => name != null && p.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
+                   ?? d.Projects.FirstOrDefault(p => p.Instances.Any(i => items.Any(x => x.Instance == i.Path)));
+        }
+        catch { }
+        var instances = proj?.Instances.ToDictionary(i => i.Path, StringComparer.OrdinalIgnoreCase) ?? new Dictionary<string, TcUnitDiscovery.Instance>();
+        foreach (var it in items)
+            if (it.Instance != null && instances.TryGetValue(it.Instance, out var inst))
+                it.Test = inst.Suite.Tests.FirstOrDefault(t => t.Name.Equals(it.Name, StringComparison.OrdinalIgnoreCase));
+
+        var ran = items.Where(i => i.Selected).ToList();
+        int passed = ran.Count(i => i.Status == "passed"), failed = ran.Count(i => i.Status == "failed"),
+            skipped = ran.Count(i => i.Status == "skipped"), notRun = ran.Count(i => i.Status is "notrun" or "running"), off = items.Count(i => !i.Selected);
+        var slnDir = Path.GetDirectoryName(Path.GetFullPath(sln))!;
+        var title = proj?.Name ?? (string)run?["project"] ?? Path.GetFileNameWithoutExtension(sln);
+        var when = DateTime.TryParse((string)run?["started"], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var st) ? st : File.GetLastWriteTime(junit);
+        var commit = Git(slnDir, "rev-parse --short HEAD");
+        var branch = Git(slnDir, "rev-parse --abbrev-ref HEAD");
+        var dirty = commit != null && !string.IsNullOrEmpty(Git(slnDir, "status --porcelain --untracked-files=no"));
+        var outcome = (string)run?["outcome"];
+        var filter = (string)run?["filter"];
+
+        var sb = new StringBuilder();
+        sb.Append("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>")
+          .Append(E(title)).Append(" - TcUnit test report</title><style>")
+          .Append(":root{--bg:#f7f8fa;--card:#fff;--fg:#1d2330;--muted:#5d6675;--line:#dfe3ea;--ok:#1f8a4c;--okbg:#e6f4ec;--bad:#c62f2f;--badbg:#fbe9e9;--skip:#a26b00;--skipbg:#fbf2dc;--none:#8a93a3;--accent:#2b5fb4}")
+          .Append("@media(prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1c2027;--fg:#e6e9ef;--muted:#9aa3b2;--line:#2e343e;--ok:#4cc38a;--okbg:#17301f;--bad:#ff6b6b;--badbg:#3a1d1d;--skip:#e0b04a;--skipbg:#33290f;--none:#6b7482;--accent:#7aa7ff}}")
+          .Append("*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.45 system-ui,'Segoe UI',sans-serif}")
+          .Append("header{padding:24px 28px 8px}h1{margin:0 0 4px;font-size:22px}h2{font-size:18px;margin:28px 0 10px}.muted{color:var(--muted)}main{padding:0 28px 40px;max-width:1300px}")
+          .Append(".cards{display:flex;flex-wrap:wrap;gap:12px;margin:16px 0}.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px;min-width:140px}")
+          .Append(".card b{display:block;font-size:24px}.card.ok b{color:var(--ok)}.card.bad b{color:var(--bad)}.card.skip b{color:var(--skip)}")
+          .Append(".meter{height:8px;border-radius:4px;background:var(--line);overflow:hidden;display:flex;margin:4px 0 6px}.meter i{display:block}")
+          .Append(".bar{display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin:10px 0 18px;position:sticky;top:0;background:var(--bg);padding:8px 0;z-index:2}")
+          .Append(".bar input[type=search]{padding:7px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);min-width:280px}")
+          .Append(".bar button{padding:6px 10px;border:1px solid var(--line);border-radius:8px;background:var(--card);color:var(--fg);cursor:pointer}")
+          .Append("details.suite{background:var(--card);border:1px solid var(--line);border-radius:10px;margin:8px 0}")
+          .Append("details.suite>summary{cursor:pointer;padding:10px 14px;display:flex;gap:10px;align-items:center;list-style:none}details.suite>summary::-webkit-details-marker{display:none}")
+          .Append("details.suite>summary .name{font-weight:600}details.suite>summary .desc{flex:1;color:var(--muted)}details.suite[open]>summary{border-bottom:1px solid var(--line)}")
+          .Append(".pill{border-radius:999px;padding:1px 9px;font-size:12px;font-weight:600;white-space:nowrap}.pill.passed{background:var(--okbg);color:var(--ok)}.pill.failed{background:var(--badbg);color:var(--bad)}.pill.skipped{background:var(--skipbg);color:var(--skip)}")
+          .Append("details.test{border-top:1px solid var(--line)}details.test:first-of-type{border-top:0}")
+          .Append("details.test>summary{cursor:pointer;display:grid;grid-template-columns:110px minmax(180px,1.2fr) 2fr 90px;gap:10px;padding:7px 14px;align-items:center;list-style:none}")
+          .Append("details.test>summary::-webkit-details-marker{display:none}details.test>summary:hover{background:var(--bg)}")
+          .Append(".st{font-weight:600;font-size:13px;white-space:nowrap}.st.passed{color:var(--ok)}.st.failed{color:var(--bad)}.st.skipped{color:var(--skip)}.st.notrun,.st.off{color:var(--none)}")
+          .Append(".tn{font-family:ui-monospace,Consolas,monospace;font-size:12.5px;overflow-wrap:anywhere}.td{color:var(--muted)}.num{text-align:right;color:var(--muted);font-size:12.5px}")
+          .Append(".body{padding:4px 18px 14px 134px}.body h4{margin:10px 0 4px;font-size:13px}.kv{display:grid;grid-template-columns:120px 1fr;gap:2px 10px;font-size:13px}.kv span:nth-child(odd){color:var(--muted)}")
+          .Append("pre{white-space:pre-wrap;margin:2px 0;font:12px ui-monospace,Consolas,monospace;color:var(--bad);background:var(--badbg);padding:8px 10px;border-radius:6px}")
+          .Append("table.sum{border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;min-width:600px}")
+          .Append("table.sum td,table.sum th{padding:7px 14px;border-bottom:1px solid var(--line);text-align:right}table.sum th:first-child,table.sum td:first-child{text-align:left}")
+          .Append(".hdr{display:grid;grid-template-columns:110px minmax(180px,1.2fr) 2fr 90px;gap:10px;padding:0 14px 4px;color:var(--muted);font-size:12px}.hidden{display:none!important}code{font-size:12.5px}")
+          .Append("</style></head><body><header><h1>").Append(E(title)).Append(" &ndash; TcUnit test report</h1><div class='muted'>")
+          .Append(E(when.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)))
+          .Append(run?["seconds"] is JsonValue secs ? " &middot; " + E(secs.ToString()) + " s" : "")
+          .Append(" &middot; target ").Append(E((string)run?["target"] ?? "?"))
+          .Append(" &middot; ").Append(E(Environment.MachineName))
+          .Append(commit != null ? " &middot; git " + E(branch) + " " + E(commit) + (dirty ? " (uncommitted changes)" : "") : "")
+          .Append(" &middot; TcAgent ").Append(E((string)run?["tcagent"] ?? Program.ServerVersion));
+        if (proj?.RunMode != null) sb.Append(" &middot; ").Append(proj.RunMode == "sequence" ? "TcUnit.RUN_IN_SEQUENCE" : "TcUnit.RUN");
+        sb.Append("</div>");
+        if (!string.IsNullOrEmpty(filter)) sb.Append("<div class='muted'>Selection: <code>").Append(E(filter)).Append("</code></div>");
+        if (outcome is "cancelled" or "timeout") sb.Append("<div class='st failed' style='margin-top:6px'>The run was ").Append(outcome == "cancelled" ? "cancelled" : "stopped after the timeout").Append(" - tests without a result are \"not run\".</div>");
+
+        string Card(string cls, string label, string value) => $"<div class='card {cls}'><span class='muted'>{label}</span><b>{value}</b></div>";
+        var rate = passed + failed == 0 ? "&ndash;" : (100.0 * passed / (passed + failed)).ToString("0.0", CultureInfo.InvariantCulture) + " %";
+        sb.Append("<div class='cards'>").Append(Card("", "Tests run", (passed + failed).ToString())).Append(Card("ok", "Passed", passed.ToString()))
+          .Append(Card("bad", "Failed", failed.ToString())).Append(Card("skip", "Skipped / not run", (skipped + notRun).ToString()))
+          .Append(Card("", "Pass rate", rate));
+        if (off > 0) sb.Append(Card("", "Switched off", off.ToString()));
+        sb.Append("</div>");
+        string Pct(int n) => ran.Count == 0 ? "0" : (100.0 * n / ran.Count).ToString("0.##", CultureInfo.InvariantCulture);
+        sb.Append("<div class='meter'><i style='width:").Append(Pct(passed)).Append("%;background:var(--ok)'></i><i style='width:").Append(Pct(failed))
+          .Append("%;background:var(--bad)'></i><i style='width:").Append(Pct(skipped + notRun)).Append("%;background:var(--skip)'></i></div></header><main>");
+        sb.Append("<div class='bar'><input id='q' type='search' placeholder='Filter: suite, test, description, message ...'>")
+          .Append("<label><input id='fail' type='checkbox'> only failed</label>")
+          .Append(off > 0 ? $"<label><input id='off' type='checkbox'> show the {off} tests switched off for this run</label>" : "<input id='off' type='checkbox' class='hidden' checked>")
+          .Append("<button id='open'>expand all</button><button id='close'>collapse all</button></div>");
+        sb.Append("<div class='hdr'><span>Result</span><span>Test</span><span>Description</span><span style='text-align:right'>Time</span></div>");
+
+        string Look(Item i) => !i.Selected ? "off" : i.Status;
+        string Label(string s) => s switch { "passed" => "&#10004; passed", "failed" => "&#10006; failed", "skipped" => "&#8856; skipped", "off" => "&ndash; switched off", _ => "&#9675; not run" };
+        var order = proj?.Instances.Select(i => i.Path).ToList() ?? new List<string>();
+        var groups = items.GroupBy(i => i.Instance ?? "").OrderBy(g => order.IndexOf(g.Key) is var x && x < 0 ? int.MaxValue : x).ToList();
+        var summary = new List<(string Name, int Run, int Ok, int Bad, int Skip, double Time)>();
+        foreach (var g in groups)
+        {
+            instances.TryGetValue(g.Key, out var inst);
+            var gr = g.Where(i => i.Selected).ToList();
+            int gp = gr.Count(i => i.Status == "passed"), gf = gr.Count(i => i.Status == "failed"), gs = gr.Count(i => i.Status is "skipped" or "notrun" or "running");
+            var gt = gr.Sum(i => i.Duration ?? 0);
+            if (gr.Count > 0) summary.Add((g.Key, gp + gf, gp, gf, gs, gt));
+            var desc = inst?.Description ?? inst?.Suite.Description;
+            sb.Append("<details class='suite").Append(gr.Count == 0 ? " offsuite" : "").Append("'").Append(gf > 0 ? " open" : "").Append("><summary><span class='name'>").Append(E(g.Key)).Append("</span>")
+              .Append(inst != null ? "<span class='muted'>" + E(inst.Suite.Type) + "</span>" : "")
+              .Append("<span class='desc'>").Append(E(desc)).Append("</span>");
+            if (gp > 0) sb.Append("<span class='pill passed'>&#10004; ").Append(gp).Append("</span>");
+            if (gf > 0) sb.Append("<span class='pill failed'>&#10006; ").Append(gf).Append("</span>");
+            if (gs > 0) sb.Append("<span class='pill skipped'>&#8856; ").Append(gs).Append("</span>");
+            sb.Append("<span class='muted' style='font-size:12px'>").Append(Sec(gt)).Append("</span></summary>");
+            foreach (var i in g)
+            {
+                var look = Look(i);
+                var t = i.Test;
+                var text = string.Join(" ", g.Key, inst?.Suite.Type, desc, i.Name, t?.Description, i.Message).ToLowerInvariant();
+                sb.Append("<details class='test").Append(look == "off" ? " off" : "").Append("' data-text='").Append(E(text)).Append("' data-fail='").Append(look == "failed" ? 1 : 0).Append(look == "failed" ? "' open>" : "'>")
+                  .Append("<summary><span class='st ").Append(look).Append("'>").Append(Label(look)).Append("</span><span class='tn'>").Append(E(i.Name)).Append("</span><span class='td'>")
+                  .Append(E(t?.Description)).Append("</span><span class='num'>").Append(look is "passed" or "failed" ? Sec(i.Duration) : "").Append("</span></summary><div class='body'>");
+                if (t?.Description != null) sb.Append("<div>").Append(E(t.Description)).Append("</div>");
+                if (!string.IsNullOrEmpty(i.Message))
+                    sb.Append("<h4>Failure</h4><pre>").Append(E(string.Join("\n", i.Message.Split('\n').Distinct()).Replace(", ACT:", "\nACT:").Replace(", MSG:", "\nMSG:"))).Append("</pre>");
+                sb.Append("<h4>Details</h4><div class='kv'><span>Suite</span><span>").Append(E(g.Key)).Append(inst != null ? " : " + E(inst.Suite.Type) : "").Append("</span>");
+                if (desc != null) sb.Append("<span>Suite purpose</span><span>").Append(E(desc)).Append("</span>");
+                if (t != null)
+                {
+                    sb.Append("<span>Code</span><span>").Append(E(Path.GetRelativePath(slnDir, t.File))).Append(':').Append(t.Line).Append(t.Method != null ? " (method " + E(t.Method) + ")" : " (suite body)").Append("</span>");
+                    sb.Append("<span>Enable bool</span><span>").Append(t.EnableVar != null ? "<code>" + E(g.Key + "." + t.EnableVar) + "</code>" : "&ndash; (runs with its suite)").Append("</span>");
+                    if (t.Ordered) sb.Append("<span>Order</span><span>TEST_ORDERED</span>");
+                }
+                else sb.Append("<span>Code</span><span class='muted'>test name built at run time / not found in the code</span>");
+                sb.Append("<span>Result</span><span>").Append(Label(look)).Append(look is "passed" or "failed" && i.Duration != null ? " in " + Sec(i.Duration) : "").Append("</span></div></div></details>");
+            }
+            sb.Append("</details>");
+        }
+        if (groups.Count == 0) sb.Append("<p class='muted'>The result file contains no tests.</p>");
+
+        sb.Append("<h2>Summary</h2><table class='sum'><tr><th>Suite</th><th>Tests run</th><th>Passed</th><th>Failed</th><th>Skipped / not run</th><th>Time</th></tr>");
+        foreach (var s in summary)
+            sb.Append("<tr><td>").Append(E(s.Name)).Append("</td><td>").Append(s.Run).Append("</td><td style='color:var(--ok)'>").Append(s.Ok)
+              .Append("</td><td style='color:var(--bad)'>").Append(s.Bad).Append("</td><td style='color:var(--skip)'>").Append(s.Skip).Append("</td><td>").Append(Sec(s.Time)).Append("</td></tr>");
+        sb.Append("<tr><td><b>Total</b></td><td><b>").Append(passed + failed).Append("</b></td><td style='color:var(--ok)'><b>").Append(passed).Append("</b></td><td style='color:var(--bad)'><b>")
+          .Append(failed).Append("</b></td><td style='color:var(--skip)'><b>").Append(skipped + notRun).Append("</b></td><td><b>").Append(Sec(summary.Sum(s => s.Time))).Append("</b></td></tr></table>");
+        sb.Append("<p class='muted'>Descriptions are the <code>///</code> comments of the test methods and suite instances in the code. Report of TcAgent ")
+          .Append(E(Program.ServerVersion)).Append(" &ndash; results: ").Append(E(junit)).Append("</p></main><script>")
+          .Append("const q=document.getElementById('q'),f=document.getElementById('fail'),o=document.getElementById('off');")
+          .Append("function apply(){const s=q.value.toLowerCase();document.querySelectorAll('details.suite').forEach(b=>{let any=false;")
+          .Append("b.querySelectorAll('details.test').forEach(c=>{const ok=(!s||c.dataset.text.includes(s))&&(!f.checked||c.dataset.fail==='1')&&(o.checked||!c.classList.contains('off'));")
+          .Append("c.classList.toggle('hidden',!ok);any=any||ok});b.classList.toggle('hidden',!any);if(s||f.checked)b.open=any})}")
+          .Append("q.addEventListener('input',apply);f.addEventListener('change',apply);o.addEventListener('change',apply);")
+          .Append("document.getElementById('open').onclick=()=>document.querySelectorAll('details').forEach(d=>{if(!d.classList.contains('hidden'))d.open=true});")
+          .Append("document.getElementById('close').onclick=()=>document.querySelectorAll('details').forEach(d=>d.open=false);apply();</script></body></html>");
+        return sb.ToString();
     }
 }

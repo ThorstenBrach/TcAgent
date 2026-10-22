@@ -29,7 +29,10 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 - `TcAgent.exe tcunit report --solution <sln>`: HTML report of the last run. Every run keeps its results as JUnit XML in
   `%LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\last.xml`; the report is made by the command of `report` in
   `.tcagent\tcunit.json` (placeholders `{junit}`, `{html}`, `{solution}`, `{solutionDir}`) or by TcAgent's own report
-  (summary, pass rate, suites with tests, durations and failure texts).
+  for every project: suites and tests with the `///` descriptions of the code, result, duration, failure text, code
+  position and enable bool, run information (target, git commit, TcAgent, selection), summary per suite, search and
+  filters; tests switched off for the run are counted separately (run record `last.json` next to `last.xml`).
+  `tcunit report --builtin` uses it even if `report` is set.
 - TcUnit Tests window laid out like the Visual Studio Test Explorer: icon tool bar, status filter buttons with counts
   (several combinable), framed search box, list with resizable columns Test / Duration / Traits / Error Message,
   "Test Detail Summary". Test selections can be saved and loaded (`*.tcunit.json`); `tcunit run --tests @file` and

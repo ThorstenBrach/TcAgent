@@ -19,7 +19,7 @@ public static partial class Cli
         if (o.Sub is not ("list" or "run" or "report")) throw new Exception("tcunit needs list, run or report, e.g. TcAgent.exe tcunit list --solution <sln>");
         if (o.Sub is "list" or "report" && o.Solution == null) throw new Exception($"tcunit {o.Sub} needs --solution <path to .sln>");
         if (o.Sub == "report" && (o.Tests.Count > 0 || o.Download)) throw new Exception("--tests and --download are options of tcunit run");
-        if (o.Out != null && o.Sub != "report") throw new Exception("--out is an option of tcunit report");
+        if ((o.Out != null || o.BuiltIn) && o.Sub != "report") throw new Exception("--out and --builtin are options of tcunit report");
         if (o.Sub == "list" && (o.Tests.Count > 0 || o.Download || o.Junit != null)) throw new Exception("--tests, --download and --junit are options of tcunit run");
         if (o.Solution == null && o.Attach == null) throw new Exception("--solution <path to .sln> (or --attach) is required");
         if (o.Solution != null && o.Attach != null) throw new Exception("use either --solution or --attach");
@@ -63,6 +63,7 @@ public static partial class Cli
         var cfg = TcUnitConfig.Load(Path.GetDirectoryName(sln));
         try
         {
+            if (o.BuiltIn) cfg.Report = null;
             var html = TcUnitReport.Make(sln, o.Junit, o.Out, cfg, Say);
             Say("REPORT OK: " + html);
             Console.WriteLine(new JsonObject { ["event"] = "report", ["ok"] = true, ["html"] = html }.ToJsonString(Compact));
