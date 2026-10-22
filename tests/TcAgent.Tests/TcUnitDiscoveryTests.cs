@@ -280,6 +280,28 @@ public sealed class TcUnitDiscoveryTests : IDisposable
     }
 
     [Fact]
+    public void InlineCallsTakeTheCommentAboveOrTheCalledMethod()
+    {
+        Pou(@"Suites\FB_Motor_Test.TcPOU", "FB_Motor_Test", "FUNCTION_BLOCK FB_Motor_Test EXTENDS TcUnit.FB_TestSuite\nVAR\n  bRunSuite : BOOL := TRUE;\nEND_VAR\n", """
+            IF ( bRun_GEN_04_A )
+            THEN
+              /// GEN-04 / Block A: not executed
+              Run( Active := TEST_ORDERED('GEN_04_A'), Idx := 1 );
+            END_IF
+            Run( Active := TEST_ORDERED('GEN_04_B'),
+                 Idx    := 2 );
+            """,
+            ("Run", "/// GEN-04: valid command, not executed\n/// Steps:\n/// 1. Prepare.\n/// Expected:\n/// - Nothing sent.\nMETHOD Run : BOOL\nVAR_INPUT\n  Active : BOOL;\n  Idx : INT;\nEND_VAR\n", "IF Active THEN TEST_FINISHED(); END_IF\n"));
+        var motor = Project().Suites.Single(s => s.Type == "FB_Motor_Test");
+        var a = motor.Tests.Single(t => t.Name == "GEN_04_A");
+        Assert.Equal("GEN-04 / Block A: not executed", a.Description);
+        Assert.Equal("Steps:\n1. Prepare.\nExpected:\n- Nothing sent.", a.Details);      // details of the called method
+        var b = motor.Tests.Single(t => t.Name == "GEN_04_B");
+        Assert.Equal("GEN-04: valid command, not executed", b.Description);
+        Assert.Null(b.Method);
+    }
+
+    [Fact]
     public void DocTextIsSplitIntoDescriptionAndDetails()
     {
         Assert.Equal(("Motor block: start, stop", null), TcUnitDiscovery.SplitDoc("Motor block: start, stop"));

@@ -198,22 +198,38 @@ public static class TcUnitDiscovery
         string Enable(string n) => vars.FirstOrDefault(v => v.Equals("bRun_" + n, StringComparison.OrdinalIgnoreCase));
         s.RunSuiteVar = vars.FirstOrDefault(v => v.Equals("bRunSuite", StringComparison.OrdinalIgnoreCase));
         var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var methods = chain.SelectMany(c => c.Methods).GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase).ToDictionary(g => g.Key, g => g.First(), StringComparer.OrdinalIgnoreCase);
         foreach (var pou in chain)
         {
             foreach (var part in new[] { pou }.Concat(pou.Methods))
             {
                 var impl = part.Impl ?? "";
                 var code = StripComments(impl);
-                foreach (Match m in LiteralTest.Matches(code))
+                var raw = impl.Replace("\r\n", "\n").Split('\n');
+                var literals = LiteralTest.Matches(code);
+                foreach (Match m in literals)
                 {
                     var name = m.Groups["name"].Value;
                     if (!names.Add(name)) continue;
                     var lineInPart = code[..m.Index].Count(ch => ch == '\n') + 1;
                     bool inMethod = part != pou;
+                    // the text of a test: its own method; for a call in the suite body (M( Active := TEST_ORDERED('X'), ... ))
+                    // a /// comment directly above the call, otherwise the method it calls
+                    var (desc, details) = inMethod && literals.Count == 1 ? (part.Description, part.Details) : (null, null);
+                    if (!inMethod || literals.Count > 1)
+                    {
+                        (desc, details) = SplitDoc(DocAbove(raw, lineInPart - 1));
+                        var callee = Callee(code.Split('\n'), lineInPart - 1);
+                        if (callee != null && methods.TryGetValue(callee, out var called))
+                        {
+                            desc ??= called.Description;
+                            details ??= called.Details;
+                        }
+                    }
                     s.Tests.Add(new Test
                     {
                         Name = name, Method = inMethod ? part.Name : null, Ordered = m.Groups["ord"].Success,
-                        Description = inMethod ? part.Description : null, Details = inMethod ? part.Details : null,
+                        Description = desc, Details = details,
                         EnableVar = Enable(inMethod ? part.Name : name) ?? (inMethod ? Enable(name) : null),
                         File = part.File, Line = part.ImplLine + lineInPart - 1, PartLine = lineInPart, EditorPath = part.EditorPath
                     });
@@ -228,6 +244,19 @@ public static class TcUnitDiscovery
 
     static readonly Regex LiteralTest = new(@"\bTEST(?<ord>_ORDERED)?\s*\(\s*'(?<name>[^']*)'", RegexOptions.IgnoreCase);
     static readonly Regex TestCall = new(@"\bTEST(?:_ORDERED)?\s*\((?<arg>[^)]*)\)", RegexOptions.IgnoreCase);
+
+    static readonly Regex CallStart = new(@"^\s*(?<name>[A-Za-z_]\w*)\s*\(", RegexOptions.CultureInvariant);
+
+    /// <summary>The method called by the statement on line i (or the line above it, for a call over several lines).</summary>
+    static string Callee(string[] code, int i)
+    {
+        for (int k = i; k >= 0 && k >= i - 1; k--)
+        {
+            var m = CallStart.Match(code[k]);
+            if (m.Success && !m.Groups["name"].Value.StartsWith("TEST", StringComparison.OrdinalIgnoreCase)) return m.Groups["name"].Value;
+        }
+        return null;
+    }
 
     static bool IsTestSuiteBase(string t) => t.Equals("FB_TestSuite", StringComparison.OrdinalIgnoreCase);
 
