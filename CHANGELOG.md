@@ -33,6 +33,10 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   position and enable bool, run information (target, git commit, TcAgent, selection), summary per suite, search and
   filters; tests switched off for the run are counted separately (run record `last.json` next to `last.xml`).
   `tcunit report --builtin` uses it even if `report` is set.
+- Test case texts in the code: below its first line the `///` comment of a test method or suite may hold sections
+  (`Setup:`, `Steps:` with `1.` lines, `Expected:` with `-` lines, `Link:` ...); `tcunit list` returns them as
+  `details`, the window shows them in the details, the report under every test (the case of a generated suite under
+  each of its tests).
 - TcUnit Tests window laid out like the Visual Studio Test Explorer: icon tool bar, status filter buttons with counts
   (several combinable), framed search box, list with resizable columns Test / Duration / Traits / Error Message,
   "Test Detail Summary". Test selections can be saved and loaded (`*.tcunit.json`); `tcunit run --tests @file` and

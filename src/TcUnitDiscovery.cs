@@ -22,14 +22,14 @@ public static class TcUnitDiscovery
 {
     public sealed class Test
     {
-        public string Name, Method, Description, EnableVar, File, EditorPath;
+        public string Name, Method, Description, Details, EnableVar, File, EditorPath;
         public int Line, PartLine;
         public bool Ordered;
     }
 
     public sealed class Suite
     {
-        public string Type, Description, File, EditorPath, RunSuiteVar;
+        public string Type, Description, Details, File, EditorPath, RunSuiteVar;
         public int Line;
         public bool Dynamic;
         public readonly List<Test> Tests = new();
@@ -113,7 +113,7 @@ public static class TcUnitDiscovery
     // ------------------------------------------------------------------ PLC project
     sealed class Pou
     {
-        public string Name, Kind, Extends, Description, File, EditorPath, Decl, Impl;
+        public string Name, Kind, Extends, Description, Details, File, EditorPath, Decl, Impl;
         /// <summary>File lines: first line of the declaration text, the FUNCTION_BLOCK/METHOD line, first line of the implementation.</summary>
         public int DeclLine, HeaderLine, ImplLine;
         public readonly List<Pou> Methods = new();
@@ -193,7 +193,7 @@ public static class TcUnitDiscovery
     static Suite BuildSuite(List<Pou> chain)
     {
         var fb = chain[0];
-        var s = new Suite { Type = fb.Name, Description = fb.Description, File = fb.File, Line = fb.HeaderLine, EditorPath = fb.EditorPath };
+        var s = new Suite { Type = fb.Name, Description = fb.Description, Details = fb.Details, File = fb.File, Line = fb.HeaderLine, EditorPath = fb.EditorPath };
         var vars = new HashSet<string>(chain.SelectMany(c => c.Vars.Select(v => v.Name)), StringComparer.OrdinalIgnoreCase);
         string Enable(string n) => vars.FirstOrDefault(v => v.Equals("bRun_" + n, StringComparison.OrdinalIgnoreCase));
         s.RunSuiteVar = vars.FirstOrDefault(v => v.Equals("bRunSuite", StringComparison.OrdinalIgnoreCase));
@@ -213,7 +213,7 @@ public static class TcUnitDiscovery
                     s.Tests.Add(new Test
                     {
                         Name = name, Method = inMethod ? part.Name : null, Ordered = m.Groups["ord"].Success,
-                        Description = inMethod ? part.Description : null,
+                        Description = inMethod ? part.Description : null, Details = inMethod ? part.Details : null,
                         EnableVar = Enable(inMethod ? part.Name : name) ?? (inMethod ? Enable(name) : null),
                         File = part.File, Line = part.ImplLine + lineInPart - 1, PartLine = lineInPart, EditorPath = part.EditorPath
                     });
@@ -280,7 +280,7 @@ public static class TcUnitDiscovery
             p.Name = h.Groups["name"].Value;
             p.Extends = h.Groups["ext"].Success ? h.Groups["ext"].Value : null;
             var hl = LineOf(code, h.Groups["kind"].Index);
-            p.Description = DocAbove(lines, hl);
+            (p.Description, p.Details) = SplitDoc(DocAbove(lines, hl));
             p.HeaderLine += hl;
         }
         ReadVars(p, lines);
@@ -299,7 +299,7 @@ public static class TcUnitDiscovery
         return (text, info.HasLineInfo() ? info.LineNumber : 0);
     }
 
-    /// <summary>The /// lines directly above line index i (attribute pragmas in between are skipped), joined by blanks.</summary>
+    /// <summary>The /// lines directly above line index i (attribute pragmas in between are skipped), one per line.</summary>
     static string DocAbove(string[] lines, int i)
     {
         var doc = new List<string>();
@@ -310,7 +310,23 @@ public static class TcUnitDiscovery
             if (t.StartsWith("{") && t.EndsWith("}")) continue;
             break;
         }
-        return doc.Count == 0 ? null : string.Join(" ", doc.Where(x => x.Length > 0));
+        while (doc.Count > 0 && doc[0].Length == 0) doc.RemoveAt(0);
+        while (doc.Count > 0 && doc[^1].Length == 0) doc.RemoveAt(doc.Count - 1);
+        return doc.Count == 0 ? null : string.Join("\n", doc);
+    }
+
+    static readonly Regex Section = new(@"^(?:[A-Za-z][\w /()-]{0,30}:(?:\s|$)|(?:\d+[.)]|[-*])\s)", RegexOptions.CultureInvariant);
+
+    /// <summary>A /// text split into the description (the first sentence or lines up to an empty line, a "Keyword:" line or a
+    /// list) and the details below it (Setup:, Steps:, Expected: ... - shown by the window and the report), null if none.</summary>
+    public static (string Description, string Details) SplitDoc(string doc)
+    {
+        if (string.IsNullOrWhiteSpace(doc)) return (null, null);
+        var lines = doc.Replace("\r\n", "\n").Split('\n').Select(l => l.Trim()).ToList();
+        int n = 1;
+        while (n < lines.Count && lines[n].Length > 0 && !Section.IsMatch(lines[n])) n++;
+        var details = string.Join("\n", lines.Skip(n)).Trim('\n');
+        return (string.Join(" ", lines.Take(n)), details.Length == 0 ? null : details);
     }
 
     static readonly Regex VarLine = new(@"^\s*(?<names>\w+(?:\s*,\s*\w+)*)\s*(?:AT\s+%\S+\s*)?:\s*(?<type>[^;]+?)\s*(?::=.*)?;", RegexOptions.IgnoreCase);
@@ -331,7 +347,7 @@ public static class TcUnitDiscovery
             if (!m.Success) continue;
             var type = m.Groups["type"].Value.Trim();
             foreach (var n in m.Groups["names"].Value.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-                p.Vars.Add((n, type, DocAbove(rawLines, i), p.DeclLine + i));
+                p.Vars.Add((n, type, SplitDoc(DocAbove(rawLines, i)).Description, p.DeclLine + i));
         }
     }
 
@@ -511,11 +527,11 @@ public static class TcUnitDiscovery
             ["runMode"] = p.RunMode, ["tests"] = p.TestCount,
             ["suites"] = new JsonArray(p.Suites.Select(s => (JsonNode)new JsonObject
             {
-                ["type"] = s.Type, ["description"] = s.Description, ["file"] = s.File, ["line"] = s.Line, ["editorPath"] = s.EditorPath,
+                ["type"] = s.Type, ["description"] = s.Description, ["details"] = s.Details, ["file"] = s.File, ["line"] = s.Line, ["editorPath"] = s.EditorPath,
                 ["runSuiteVar"] = s.RunSuiteVar, ["testsSelectable"] = s.TestsSelectable, ["dynamic"] = s.Dynamic,
                 ["tests"] = new JsonArray(s.Tests.Select(t => (JsonNode)new JsonObject
                 {
-                    ["name"] = t.Name, ["method"] = t.Method, ["description"] = t.Description, ["enableVar"] = t.EnableVar,
+                    ["name"] = t.Name, ["method"] = t.Method, ["description"] = t.Description, ["details"] = t.Details, ["enableVar"] = t.EnableVar,
                     ["ordered"] = t.Ordered, ["file"] = t.File, ["line"] = t.Line, ["editorPath"] = t.EditorPath, ["editorLine"] = t.PartLine
                 }).ToArray())
             }).ToArray()),

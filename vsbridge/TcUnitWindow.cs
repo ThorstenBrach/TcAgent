@@ -48,7 +48,7 @@ namespace TcAgentBridge
         // ------------------------------------------------------------------ model
         sealed class TestNode
         {
-            public string Instance, Name, Description, EditorPath, File, Enable;
+            public string Instance, Name, Description, Details, EditorPath, File, Enable;
             public int Line, EditorLine;
             public bool Ordered, Ticked;
             public string Status = "notrun", Message;
@@ -58,7 +58,7 @@ namespace TcAgentBridge
 
         sealed class SuiteNode
         {
-            public string Path, Type, Description, File, EditorPath, RunSuite;
+            public string Path, Type, Description, Details, File, EditorPath, RunSuite;
             public int Line;
             public bool Selectable, Dynamic, Expanded = true;
             public bool? Ticked = false;
@@ -501,7 +501,7 @@ namespace TcAgentBridge
                 types.TryGetValue(S(inst, "suite") ?? "", out var type);
                 var sn = new SuiteNode
                 {
-                    Path = S(inst, "path"), Type = S(inst, "suite"), Description = S(inst, "description") ?? S(type, "description"),
+                    Path = S(inst, "path"), Type = S(inst, "suite"), Description = S(inst, "description") ?? S(type, "description"), Details = S(type, "details"),
                     File = S(type, "file"), Line = I(type, "line"), EditorPath = S(type, "editorPath"), RunSuite = S(inst, "runSuite"),
                     Selectable = B(type, "testsSelectable"), Dynamic = B(type, "dynamic")
                 };
@@ -511,7 +511,7 @@ namespace TcAgentBridge
                     var enable = L(inst, "tests").FirstOrDefault(x => S(x, "name") == S(t, "name"));
                     var tn = new TestNode
                     {
-                        Instance = sn.Path, Name = S(t, "name"), Description = S(t, "description"), EditorPath = S(t, "editorPath"),
+                        Instance = sn.Path, Name = S(t, "name"), Description = S(t, "description"), Details = S(t, "details"), EditorPath = S(t, "editorPath"),
                         File = S(t, "file"), Line = I(t, "line"), EditorLine = I(t, "editorLine"), Enable = S(enable, "enable"), Ordered = B(t, "ordered")
                     };
                     if (lastResults.TryGetValue(tn.Instance + "@" + tn.Name, out var r)) { tn.Status = r.Status; tn.Message = r.Message; tn.Duration = r.Duration; }
@@ -813,6 +813,8 @@ namespace TcAgentBridge
             {
                 sb.AppendLine(t.Instance + " @ " + t.Name);
                 if (t.Description != null) sb.AppendLine(t.Description);
+                if (t.Details != null) { sb.AppendLine(); sb.AppendLine(t.Details); }
+                else if (r.Suite?.Details != null && t.File == null) { sb.AppendLine(); sb.AppendLine(r.Suite.Details); }
                 sb.AppendLine();
                 sb.AppendLine("Status:   " + Text(t.Status) + (t.Duration is double d ? "   (" + Seconds(d) + ")" : ""));
                 if (!string.IsNullOrEmpty(t.Message)) { sb.AppendLine(); sb.AppendLine(t.Message.Replace(", ACT:", "\nACT:").Replace(", MSG:", "\nMSG:")); sb.AppendLine(); }
@@ -823,6 +825,7 @@ namespace TcAgentBridge
             {
                 sb.AppendLine(s.Path + " : " + s.Type);
                 if (s.Description != null) sb.AppendLine(s.Description);
+                if (s.Details != null) { sb.AppendLine(); sb.AppendLine(s.Details); }
                 sb.AppendLine();
                 sb.AppendLine($"{s.Tests.Count} test(s): {s.Tests.Count(x => x.Status == "passed")} passed, {s.Tests.Count(x => x.Status == "failed")} failed, {s.Tests.Count(x => x.Status == "skipped")} skipped");
                 sb.AppendLine("Enable:   " + (s.RunSuite ?? "- (no bRunSuite: the suite always runs)"));

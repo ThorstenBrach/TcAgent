@@ -118,6 +118,35 @@ public static class TcUnitReport
         return list;
     }
 
+    static readonly System.Text.RegularExpressions.Regex Heading = new(@"^([A-Za-z][\w /()-]{0,30}):\s*(.*)$"), Numbered = new(@"^\d+[.)]\s+(.*)$"), Bullet = new(@"^[-*]\s+(.*)$");
+
+    /// <summary>The details of a /// text as HTML: "Keyword:" lines as headings, "1." and "-" lines as lists, links clickable.</summary>
+    static string DocHtml(string details)
+    {
+        var sb = new StringBuilder();
+        string list = null;
+        void Close() { if (list != null) { sb.Append("</").Append(list).Append('>'); list = null; } }
+        void Open(string kind) { if (list == kind) return; Close(); sb.Append('<').Append(kind).Append('>'); list = kind; }
+        static string Text(string s) => System.Text.RegularExpressions.Regex.Replace(E(s), @"https?://[^\s<]+", m => "<a href='" + m.Value + "'>" + m.Value + "</a>");
+        foreach (var raw in details.Split('\n'))
+        {
+            var l = raw.Trim();
+            if (l.Length == 0) { Close(); continue; }
+            System.Text.RegularExpressions.Match m;
+            if ((m = Numbered.Match(l)).Success) { Open("ol"); sb.Append("<li>").Append(Text(m.Groups[1].Value)).Append("</li>"); continue; }
+            if ((m = Bullet.Match(l)).Success) { Open("ul"); sb.Append("<li>").Append(Text(m.Groups[1].Value)).Append("</li>"); continue; }
+            Close();
+            if ((m = Heading.Match(l)).Success && !l.StartsWith("http", StringComparison.OrdinalIgnoreCase))
+            {
+                sb.Append("<h4>").Append(E(m.Groups[1].Value)).Append("</h4>");
+                if (m.Groups[2].Value.Length > 0) sb.Append("<div>").Append(Text(m.Groups[2].Value)).Append("</div>");
+            }
+            else sb.Append("<div>").Append(Text(l)).Append("</div>");
+        }
+        Close();
+        return sb.ToString();
+    }
+
     static string Git(string dir, string args)
     {
         try
@@ -186,6 +215,7 @@ public static class TcUnitReport
           .Append("pre{white-space:pre-wrap;margin:2px 0;font:12px ui-monospace,Consolas,monospace;color:var(--bad);background:var(--badbg);padding:8px 10px;border-radius:6px}")
           .Append("table.sum{border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:10px;overflow:hidden;min-width:600px}")
           .Append("table.sum td,table.sum th{padding:7px 14px;border-bottom:1px solid var(--line);text-align:right}table.sum th:first-child,table.sum td:first-child{text-align:left}")
+          .Append(".sdoc{padding:4px 18px 10px 18px;border-bottom:1px solid var(--line)}.body ol,.body ul,.sdoc ol,.sdoc ul{margin:4px 0;padding-left:20px}.sdoc h4{margin:8px 0 4px;font-size:13px}")
           .Append(".hdr{display:grid;grid-template-columns:110px minmax(180px,1.2fr) 2fr 90px;gap:10px;padding:0 14px 4px;color:var(--muted);font-size:12px}.hidden{display:none!important}code{font-size:12.5px}")
           .Append("</style></head><body><header><h1>").Append(E(title)).Append(" &ndash; TcUnit test report</h1><div class='muted'>")
           .Append(E(when.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)))
@@ -235,15 +265,19 @@ public static class TcUnitReport
             if (gf > 0) sb.Append("<span class='pill failed'>&#10006; ").Append(gf).Append("</span>");
             if (gs > 0) sb.Append("<span class='pill skipped'>&#8856; ").Append(gs).Append("</span>");
             sb.Append("<span class='muted' style='font-size:12px'>").Append(Sec(gt)).Append("</span></summary>");
+            // what the suite checks (/// details of the suite FB, e.g. the test case of a generated suite)
+            if (inst?.Suite.Details != null) sb.Append("<div class='sdoc'>").Append(DocHtml(inst.Suite.Details)).Append("</div>");
             foreach (var i in g)
             {
                 var look = Look(i);
                 var t = i.Test;
-                var text = string.Join(" ", g.Key, inst?.Suite.Type, desc, i.Name, t?.Description, i.Message).ToLowerInvariant();
+                var text = string.Join(" ", g.Key, inst?.Suite.Type, desc, i.Name, t?.Description, t?.Details, i.Message).ToLowerInvariant();
                 sb.Append("<details class='test").Append(look == "off" ? " off" : "").Append("' data-text='").Append(E(text)).Append("' data-fail='").Append(look == "failed" ? 1 : 0).Append(look == "failed" ? "' open>" : "'>")
                   .Append("<summary><span class='st ").Append(look).Append("'>").Append(Label(look)).Append("</span><span class='tn'>").Append(E(i.Name)).Append("</span><span class='td'>")
                   .Append(E(t?.Description)).Append("</span><span class='num'>").Append(look is "passed" or "failed" ? Sec(i.Duration) : "").Append("</span></summary><div class='body'>");
-                if (t?.Description != null) sb.Append("<div>").Append(E(t.Description)).Append("</div>");
+                if (t?.Description != null) sb.Append("<div><b>").Append(E(t.Description)).Append("</b></div>");
+                if (t?.Details != null) sb.Append(DocHtml(t.Details));
+                else if (t == null && inst?.Suite.Details != null) sb.Append("<div class='muted'>Test case of the suite:</div>").Append(DocHtml(inst.Suite.Details));
                 if (!string.IsNullOrEmpty(i.Message))
                     sb.Append("<h4>Failure</h4><pre>").Append(E(string.Join("\n", i.Message.Split('\n').Distinct()).Replace(", ACT:", "\nACT:").Replace(", MSG:", "\nMSG:"))).Append("</pre>");
                 sb.Append("<h4>Details</h4><div class='kv'><span>Suite</span><span>").Append(E(g.Key)).Append(inst != null ? " : " + E(inst.Suite.Type) : "").Append("</span>");

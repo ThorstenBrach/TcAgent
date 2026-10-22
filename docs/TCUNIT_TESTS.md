@@ -87,6 +87,24 @@ TEST_FINISHED();
 - **Descriptions:** a `///` comment above every test method and above every suite instance in the test program,
   e.g. `/// UT-GPIB: GPIB commands and GpibSerialFB (without hardware)`. It is the tooltip and the description in
   the window.
+- **The whole test case in the code:** below the first line the `///` comment of a test method (or of a suite) may
+  describe the test case in sections – a line `Keyword: text` starts a section, `1.` and `-` lines are lists, links
+  become clickable. The window shows it in the details, the report (section 6) under every test:
+
+  ```
+  /// UT-FN-001: IEC date is days since 1990
+  /// Setup: Pure function test of the library conversion functions, no SDK.
+  /// Steps:
+  /// 1. Convert the dates 1990-01-01 and 2026-09-26 with DATE_TO_IEC_DATE.
+  /// Expected:
+  /// - 1990-01-01 gives 0.
+  /// - 2026-09-26 gives 13417.
+  /// Link: https://example.com/cases/UT-FN-001
+  METHOD UT_FN_001_IecDateIsDaysSince1990
+  ```
+
+  The first line (up to an empty `///` line or the first section) is the description; a sentence wrapped over several
+  lines stays one description.
 - **Test program:** `TcUnit.RUN_IN_SEQUENCE()` runs the suites one after the other and gives progress per test.
   With `TcUnit.RUN()` all suites run at the same time; the window then shows only the overall progress.
 - Suites may extend other suites (`EXTENDS FB_MyBaseTestSuite`); their tests and bools count for the derived suite.

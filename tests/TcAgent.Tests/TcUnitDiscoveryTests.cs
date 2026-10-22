@@ -280,6 +280,20 @@ public sealed class TcUnitDiscoveryTests : IDisposable
     }
 
     [Fact]
+    public void DocTextIsSplitIntoDescriptionAndDetails()
+    {
+        Assert.Equal(("Motor block: start, stop", null), TcUnitDiscovery.SplitDoc("Motor block: start, stop"));
+        // a sentence wrapped over two lines stays one description
+        Assert.Equal(("Test suite for FB_LabPsu; the serial line is replaced by a mock.", (string)null),
+                     TcUnitDiscovery.SplitDoc("Test suite for FB_LabPsu; the serial\nline is replaced by a mock."));
+        var (d, details) = TcUnitDiscovery.SplitDoc("UT-FN-001: IEC date is days since 1990\nSetup: no SDK.\nSteps:\n1. Convert 1990-01-01.\nExpected:\n- 0\n\nLink: https://x");
+        Assert.Equal("UT-FN-001: IEC date is days since 1990", d);
+        Assert.Equal("Setup: no SDK.\nSteps:\n1. Convert 1990-01-01.\nExpected:\n- 0\n\nLink: https://x", details);
+        // an empty /// line ends the description
+        Assert.Equal(("Short.", "More text."), TcUnitDiscovery.SplitDoc("Short.\n\nMore text."));
+    }
+
+    [Fact]
     public void StripCommentsKeepsLinesAndStrings()
     {
         var s = "a (* x\ny *) b // c\nTEST('it''s // no comment');";

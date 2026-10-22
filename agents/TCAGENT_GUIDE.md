@@ -69,7 +69,9 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
      Never set these bools to FALSE in code - tests are selected only at runtime via ADS, so without
      anyone selecting, all tests run (pipeline, `sil`/`hil`).
    - A `///` comment above every test method and above every suite instance in the test program: one sentence
-     what it checks (language as in the coding rules). It is shown as the test's description.
+     what it checks (language as in the coding rules). It is shown as the test's description. If the project has test
+     case texts (setup, steps, expected result), put them below that line as sections - `Setup: ...`, `Steps:` with
+     `1.` lines, `Expected:` with `-` lines, `Link: <url>` - the window and the test report show them.
    - `TcUnit.RUN_IN_SEQUENCE()` gives progress and results per test; do not switch an existing project from
      `TcUnit.RUN()` without asking (it changes how the suites run).
 
