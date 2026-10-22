@@ -335,7 +335,9 @@ public static class TcUnitReport
             foreach (var g in groups)
             {
                 var list = g.Select(x => x.i).ToList();
-                Group(byKey, g.Key, $"{list.Select(i => i.Instance).Distinct().Count()} suite(s)", null, null, list, summaryGroups);
+                // the suites of the tests that ran (all suites if nothing of this group ran)
+                var suitesRun = (list.Any(i => i.Selected) ? list.Where(i => i.Selected) : list).Select(i => i.Instance).Distinct().Count();
+                Group(byKey, g.Key, $"{suitesRun} suite(s)", null, null, list, summaryGroups);
             }
             Summary(byKey, key, summaryGroups);
             sb.Append("<div class='bar' style='position:static;margin-top:-8px'><span class='muted'>Group by</span><button id='g-key' class='on'>").Append(E(key))
