@@ -109,8 +109,17 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   PdfPig with their license texts. The VSIX ships the third-party notices of the .NET runtime
   (`THIRD-PARTY-NOTICES-DOTNET.TXT` next to `TcAgent.exe`).
 - README: the source code contains no code from Beckhoff; trademark owner Beckhoff Automation GmbH & Co. KG.
+- Fixed versions of the shipped packages (instead of `6.1.*` / `0.1.*`) and a NuGet lock file `packages.lock.json` in
+  the repository: the VSIX ships only versions whose licenses were checked. Beckhoff.TwinCAT.Ads 7.0.389 (current
+  release line, MIT; adds TwinCAT.Ads.ConfigurationProviders and Microsoft.Extensions.Configuration*, MIT), PdfPig 0.1.16.
+- `setup-clients.ps1` also reads the configuration of newer Claude Desktop versions (`%LOCALAPPDATA%\Claude-Data\Claude_*\`).
+- TcUnit conventions for agents (SKILL.md, agent guide, USER_GUIDE): suites with the enable bools `bRunSuite` /
+  `bRun_<Test>` and a `///` description per test, so tests can later be selected one by one.
 
 ### Security
+- Pipeline examples: pull requests from forks never run on the self-hosted TwinCAT runner - the GitHub workflows skip
+  them (`if:` on each job), the Azure Pipelines and GitLab examples name the setting that keeps them off; RUNNER_SETUP
+  mentions the guard.
 - Bridge pipe `TcAgentBridge.<pid>` only for the user who runs Visual Studio / the XAE Shell and only on this PC: own DACL,
   network access (SMB) denied. Before, Windows granted Everyone/Anonymous read access and the pipe was reachable over the network.
 - TcAgent only talks to a bridge served by Visual Studio or the XAE Shell (server process id must match the pipe name)
