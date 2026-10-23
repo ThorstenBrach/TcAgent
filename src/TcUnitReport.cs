@@ -8,7 +8,10 @@
 //     (TcUnitDiscovery), status, duration, failure text (EXP/ACT/MSG), code position and enable bool, summary per suite,
 //     run information (target, TcAgent, git commit); search, "only failed", tests switched off for this run hidden
 //   - with "report" in .tcagent\tcunit.json: that command line instead, run in the solution folder, e.g. a report of a
-//     test case catalog; placeholders {junit} (JUnit file), {html} (report file to write), {solution}, {solutionDir}
+//     test case catalog; placeholders {junit} (JUnit file), {html} (report file to write), {solution}, {solutionDir}.
+//     Runs only after the user approved it once for this solution and command text (window question or --approve <id>)
+// Every text from the code or the runtime is HTML-encoded, only http(s) links are clickable, a Content-Security-Policy
+// allows no external resources and no script but the report's own.
 //
 // SPDX-License-Identifier: MIT
 using System.Diagnostics;
@@ -43,14 +46,51 @@ public static class TcUnitReport
         File.WriteAllText(LastRun(sln), run.ToJsonString(new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
     }
 
-    /// <summary>Makes the report. Returns the HTML file, throws with a readable message if it cannot be made.</summary>
-    public static string Make(string sln, string junit, string html, TcUnitConfig cfg, Action<string> say)
+    // approved report commands: ids of solution path + command text (Guards.ReportApprovalId), per Windows user
+    static string ApprovalsFile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "tcunit-report-approved.json");
+
+    static HashSet<string> Approvals()
     {
+        try { return (JsonNode.Parse(File.ReadAllText(ApprovalsFile)) as JsonArray)?.Select(x => x?.ToString()).Where(x => x != null).ToHashSet() ?? new(); }
+        catch { return new(); }
+    }
+
+    public static bool IsApproved(string sln, string command) => Approvals().Contains(Guards.ReportApprovalId(sln, command));
+
+    static void Approve(string sln, string command)
+    {
+        var all = Approvals();
+        all.Add(Guards.ReportApprovalId(sln, command));
+        Directory.CreateDirectory(Path.GetDirectoryName(ApprovalsFile)!);
+        File.WriteAllText(ApprovalsFile, new JsonArray(all.Order().Select(x => (JsonNode)x).ToArray()).ToJsonString(), new UTF8Encoding(false));
+    }
+
+    /// <summary>Makes the report. Returns the HTML file, throws with a readable message if it cannot be made.
+    /// The command of "report" in tcunit.json comes from the solution (a cloned repository, say) and runs only after the user
+    /// approved it once for this solution and exactly this command text (approveId = Guards.ReportApprovalId); until then
+    /// TcAgent's own report is made and pendingApproval is the id to approve.</summary>
+    public static string Make(string sln, string junit, string html, TcUnitConfig cfg, Action<string> say, string approveId, out string pendingApproval)
+    {
+        pendingApproval = null;
         bool lastRun = junit == null;
         junit = Path.GetFullPath(junit ?? LastJunit(sln));
         html = Path.GetFullPath(html ?? DefaultHtml(sln));
         if (!File.Exists(junit)) throw new FileNotFoundException("No results yet - run the tests first (" + junit + ").");
         Directory.CreateDirectory(Path.GetDirectoryName(html)!);
+        if (!string.IsNullOrWhiteSpace(cfg.Report))
+        {
+            var id = Guards.ReportApprovalId(sln, cfg.Report);
+            if (approveId != null && approveId != id)
+                throw new UnauthorizedAccessException("The approval does not match the report command of " + cfg.File + " (changed since the question?) - nothing was run.");
+            if (approveId == id) Approve(sln, cfg.Report);
+            else if (!IsApproved(sln, cfg.Report))
+            {
+                say($"The report command of {cfg.File} is not approved yet - TcAgent's own report instead. Command: {cfg.Report}");
+                say($"To run it: TcAgent.exe tcunit report --solution \"{sln}\" --approve {id} (only if you trust this solution)");
+                pendingApproval = id;
+                cfg = new TcUnitConfig { PlcProject = cfg.PlcProject, ReportGroupBy = cfg.ReportGroupBy, File = cfg.File };
+            }
+        }
         if (string.IsNullOrWhiteSpace(cfg.Report))
         {
             var run = lastRun && File.Exists(LastRun(sln)) ? JsonNode.Parse(File.ReadAllText(LastRun(sln))) as JsonObject : null;
@@ -127,7 +167,20 @@ public static class TcUnitReport
         string list = null;
         void Close() { if (list != null) { sb.Append("</").Append(list).Append('>'); list = null; } }
         void Open(string kind) { if (list == kind) return; Close(); sb.Append('<').Append(kind).Append('>'); list = kind; }
-        static string Text(string s) => System.Text.RegularExpressions.Regex.Replace(E(s), @"https?://[^\s<]+", m => "<a href='" + m.Value + "'>" + m.Value + "</a>");
+        // links: only absolute http(s) URLs, found in the raw text and encoded for the attribute and the text separately
+        static string Text(string s)
+        {
+            var sb = new StringBuilder();
+            int at = 0;
+            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(s ?? "", @"https?://[^\s<>""']+"))
+            {
+                sb.Append(E(s[at..m.Index]));
+                var href = Guards.SafeHref(m.Value);
+                sb.Append(href != null ? "<a href=\"" + E(href) + "\" rel=\"noopener noreferrer\">" + E(m.Value) + "</a>" : E(m.Value));
+                at = m.Index + m.Length;
+            }
+            return sb.Append(E((s ?? "")[at..])).ToString();
+        }
         foreach (var raw in details.Split('\n'))
         {
             var l = raw.Trim();
@@ -190,7 +243,12 @@ public static class TcUnitReport
         var filter = (string)run?["filter"];
 
         var sb = new StringBuilder();
-        sb.Append("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta name='viewport' content='width=device-width,initial-scale=1'><title>")
+        // Content-Security-Policy: no external resources, only TcAgent's own script (hash) - text from the code or the runtime
+        // that would get through as HTML could not run a script anyway
+        var csp = "default-src 'none'; style-src 'unsafe-inline'; img-src data:; script-src 'sha256-" +
+                  Convert.ToBase64String(SHA256.HashData(Encoding.UTF8.GetBytes(Script))) + "'";
+        sb.Append("<!doctype html><html lang='en'><head><meta charset='utf-8'><meta http-equiv='Content-Security-Policy' content=\"").Append(csp)
+          .Append("\"><meta name='viewport' content='width=device-width,initial-scale=1'><title>")
           .Append(E(title)).Append(" - TcUnit test report</title><style>")
           .Append(":root{--bg:#f7f8fa;--card:#fff;--fg:#1d2330;--muted:#5d6675;--line:#dfe3ea;--ok:#1f8a4c;--okbg:#e6f4ec;--bad:#c62f2f;--badbg:#fbe9e9;--skip:#a26b00;--skipbg:#fbf2dc;--none:#8a93a3;--accent:#2b5fb4}")
           .Append("@media(prefers-color-scheme:dark){:root{--bg:#14171c;--card:#1c2027;--fg:#e6e9ef;--muted:#9aa3b2;--line:#2e343e;--ok:#4cc38a;--okbg:#17301f;--bad:#ff6b6b;--badbg:#3a1d1d;--skip:#e0b04a;--skipbg:#33290f;--none:#6b7482;--accent:#7aa7ff}}")
@@ -245,7 +303,8 @@ public static class TcUnitReport
           .Append(off > 0 ? $"<label><input id='off' type='checkbox'> show the {off} tests switched off for this run</label>" : "<input id='off' type='checkbox' class='hidden' checked>")
           .Append("<button id='open'>expand all</button><button id='close'>collapse all</button></div>");
 
-        string Look(Item i) => !i.Selected ? "off" : i.Status;
+        // the status goes into class names: only the known values (last.json may come from anywhere)
+        string Look(Item i) => !i.Selected ? "off" : i.Status is "passed" or "failed" or "skipped" ? i.Status : "notrun";
         string Label(string s) => s switch { "passed" => "&#10004; passed", "failed" => "&#10006; failed", "skipped" => "&#8856; skipped", "off" => "&ndash; switched off", _ => "&#9675; not run" };
         TcUnitDiscovery.Instance Inst(Item i) => i.Instance != null && instances.TryGetValue(i.Instance, out var x) ? x : null;
         var summarySuites = new List<(string Name, int Run, int Ok, int Bad, int Skip, double Time)>();
@@ -348,15 +407,19 @@ public static class TcUnitReport
         else sb.Append(bySuite);
         sb.Append("<p class='muted'>Descriptions are the <code>///</code> comments of the test methods and suite instances in the code. Report of TcAgent ")
           .Append(E(Program.ServerVersion)).Append(" &ndash; results: ").Append(E(junit)).Append("</p></main><script>")
-          .Append("const q=document.getElementById('q'),f=document.getElementById('fail'),o=document.getElementById('off');")
-          .Append("function apply(){const s=q.value.toLowerCase();document.querySelectorAll('details.suite').forEach(b=>{let any=false;")
-          .Append("b.querySelectorAll('details.test').forEach(c=>{const ok=(!s||c.dataset.text.includes(s))&&(!f.checked||c.dataset.fail==='1')&&(o.checked||!c.classList.contains('off'));")
-          .Append("c.classList.toggle('hidden',!ok);any=any||ok});b.classList.toggle('hidden',!any);if(s||f.checked)b.open=any})}")
-          .Append("q.addEventListener('input',apply);f.addEventListener('change',apply);o.addEventListener('change',apply);")
-          .Append("document.getElementById('open').onclick=()=>document.querySelectorAll('details').forEach(d=>{if(!d.classList.contains('hidden'))d.open=true});")
-          .Append("const gk=document.getElementById('g-key'),gs=document.getElementById('g-suite');function view(x){document.getElementById('v-key').classList.toggle('hidden',x!=='key');")
-          .Append("document.getElementById('v-suite').classList.toggle('hidden',x!=='suite');gk.classList.toggle('on',x==='key');gs.classList.toggle('on',x==='suite')}if(gk){gk.onclick=()=>view('key');gs.onclick=()=>view('suite')}")
-          .Append("document.getElementById('close').onclick=()=>document.querySelectorAll('details').forEach(d=>d.open=false);apply();</script></body></html>");
+          .Append(Script).Append("</script></body></html>");
         return sb.ToString();
     }
+
+    // the only script of the report (fixed text, its hash is in the Content-Security-Policy)
+    const string Script =
+        "const q=document.getElementById('q'),f=document.getElementById('fail'),o=document.getElementById('off');" +
+        "function apply(){const s=q.value.toLowerCase();document.querySelectorAll('details.suite').forEach(b=>{let any=false;" +
+        "b.querySelectorAll('details.test').forEach(c=>{const ok=(!s||c.dataset.text.includes(s))&&(!f.checked||c.dataset.fail==='1')&&(o.checked||!c.classList.contains('off'));" +
+        "c.classList.toggle('hidden',!ok);any=any||ok});b.classList.toggle('hidden',!any);if(s||f.checked)b.open=any})}" +
+        "q.addEventListener('input',apply);f.addEventListener('change',apply);o.addEventListener('change',apply);" +
+        "document.getElementById('open').onclick=()=>document.querySelectorAll('details').forEach(d=>{if(!d.classList.contains('hidden'))d.open=true});" +
+        "const gk=document.getElementById('g-key'),gs=document.getElementById('g-suite');function view(x){document.getElementById('v-key').classList.toggle('hidden',x!=='key');" +
+        "document.getElementById('v-suite').classList.toggle('hidden',x!=='suite');gk.classList.toggle('on',x==='key');gs.classList.toggle('on',x==='suite')}if(gk){gk.onclick=()=>view('key');gs.onclick=()=>view('suite')}" +
+        "document.getElementById('close').onclick=()=>document.querySelectorAll('details').forEach(d=>d.open=false);apply();";
 }

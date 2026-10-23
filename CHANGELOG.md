@@ -5,6 +5,38 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.28.3] – 2026-10-23
+
+### Security
+- `tc_packages_change`: tcpkg no longer runs through `cmd.exe` with administrator rights. A feed name like `x&calc` went
+  unchecked into that command line. Now TcAgent itself runs elevated (`TcAgent.exe tcpkg-elevated`, UAC prompt) and
+  starts `tcpkg.exe` directly, without a shell, and only from the program folders or `C:\TwinCAT`, never from a PATH
+  folder the user can write to.
+- tcpkg arguments are checked before the confirmation and again in the elevated process (`Guards.TcpkgArgs`):
+  - package ids and versions: only `[A-Za-z0-9._-]`
+  - feed names: words of `[A-Za-z0-9._-]` separated by single blanks (the Beckhoff feeds are named like "Beckhoff Stable Feed")
+  - feed sources: an http(s) URL or an absolute folder, without quotes and shell characters
+  - options: a fixed set only
+  `tc_packages` (read only) checks the same.
+- Confirmations: if nobody can be asked (no question dialog in the AI client, no TcAgentBridge dialog in the IDE),
+  `ads_write`, activation, PLC start/stop and the other runtime actions are refused with a clear message instead of
+  running unconfirmed. Running without a question needs the deliberate setting `TCAGENT_CONFIRM=off` (pipelines,
+  unattended agents). The command line (`test`, `sil`, `hil`, `tcunit run`) is not affected.
+- TcUnit test report:
+  - The command of `report` in `.tcagent\tcunit.json` comes with the solution and runs only after you approve it once for
+    this solution and exactly this command text: in the TcUnit Tests window a question shows the command, or use
+    `tcunit report --approve <id>`. Until then TcAgent's own report is made. Approvals are kept per Windows user in
+    `%LOCALAPPDATA%\TcAgent\tcunit-report-approved.json`.
+  - TcAgent's own report: only absolute http(s) links are clickable, and they are encoded for the attribute. A status
+    from `last.json` only becomes a known class name. A Content-Security-Policy allows no external resources and no
+    script but the report's own (hash).
+  - The window opens only an `.html` file that exists.
+- TcUnit runs: `tc_test_run` names the target of `.tcagent\tcunit.json` in the confirmation and in the whitelist check
+  (`TcUnitRun` checked it already). A saved test selection cannot set a target (a `"target"` key is refused).
+  `--tests @file` / `tests=@file` read only `*.tcunit.json` and `*.txt` files.
+- Unit tests: `GuardsTests` (tcpkg arguments, quoting, confirmation without a channel, report links, report approval),
+  selection files without a target.
+
 ## [0.28.2] – 2026-10-22
 
 ### Added

@@ -30,7 +30,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -47,12 +47,16 @@ public static partial class Cli
         public string Config, Only, From; public bool DryRun, Init;      // ci (CliCi.cs); From/DryRun also st import
         public string Sub; public bool Clean, Force;                      // st export|check|import (CliPlainText.cs)
         public readonly List<string> Tests = new(); public bool TimeoutGiven, Download, BuiltIn;   // tcunit run/report (CliTcUnit.cs)
+        public string Approve;                                                                      // tcunit report --approve <id>
+
     }
 
     public static int Run(string[] args)
     {
         // works on the feedback files only - no solution, no IDE
         if (args[0].Equals("feedback", StringComparison.OrdinalIgnoreCase)) return Feedback.RunCli(args);
+        // the elevated part of tc_packages_change (Packages.cs), started by TcAgent itself through the UAC prompt
+        if (args[0].Equals("tcpkg-elevated", StringComparison.Ordinal)) return ToolRegistry.RunElevatedTcpkg(args);
         Options o;
         try { o = ParseArgs(args); }
         catch (Exception ex) { Console.Error.WriteLine("Error: " + ex.Message); Console.Error.WriteLine("TcAgent.exe help shows the usage."); return Usage; }
@@ -740,6 +744,7 @@ public static partial class Cli
                 case "--tests": o.Tests.AddRange(Val().Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)); break;
                 case "--download": o.Download = true; break;
                 case "--builtin": o.BuiltIn = true; break;
+                case "--approve": o.Approve = Val().Trim().ToLowerInvariant(); break;
                 default:
                     // st: the sub-command (export, check, import) is the first argument that is not an option
                     if (o.Command is "st" or "tcunit" && o.Sub == null && !a.StartsWith("-")) { o.Sub = a.ToLowerInvariant(); break; }
@@ -848,9 +853,11 @@ public static partial class Cli
       target, timeout, progress). --download activates even if the code did not change. A remote target must be in
       TCAGENT_ALLOW_TARGETS. Exit 0 = passed, 1 = failed tests/build, 2 = refused/unknown tests, 3 = infrastructure/timeout.
 
-  TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>] [--builtin]
+  TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>] [--builtin] [--approve <id>]
       HTML report of the last tcunit run (or of the JUnit file given): the command of ""report"" in .tcagent\tcunit.json
       (placeholders {junit} {html} {solution} {solutionDir}, run in the solution folder) or TcAgent's own report.
+      The command runs only after you approved it once for this solution and command text: until then TcAgent's own
+      report is made and the id to approve is shown; --approve <id> approves and runs it (only if you trust the solution).
       --builtin uses TcAgent's own report even if ""report"" is set. Default output:
       %LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\report.html. No IDE needed.
 

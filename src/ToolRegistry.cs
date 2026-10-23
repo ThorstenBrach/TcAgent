@@ -1466,7 +1466,8 @@ public sealed partial class ToolRegistry
     string TargetOf(string tool, JsonObject a) => tool switch
     {
         "ads_write" => Str(a, "netId"),
-        "tc_test_run" => Str(a, "target") is string t && !t.Trim().Equals("local", StringComparison.OrdinalIgnoreCase) ? t.Trim() : null,
+        // the target of the call, otherwise the one of .tcagent\tcunit.json (TcUnitRun checks the whitelist again)
+        "tc_test_run" => (Str(a, "target") ?? TcUnitConfig.Load(SolutionDir()).Target) is string t && !t.Trim().Equals("local", StringComparison.OrdinalIgnoreCase) ? t.Trim() : null,
         "tc_activate" when !string.IsNullOrEmpty(Str(a, "netId")) => Str(a, "netId"),
         "tc_runtime_mode" when !string.IsNullOrEmpty(Str(a, "netId")) => Str(a, "netId"),
         "tc_activate" or "tc_plc_online" or "tc_runtime_mode" => tc.Sta.Run(() => (string)((dynamic)tc.RequireSysMan()).GetTargetNetId()),
@@ -1523,17 +1524,20 @@ public sealed partial class ToolRegistry
         try
         {
             policy.Check(name, () => TargetOf(name, args), args);
+            // values that are not allowed are refused before anybody is asked to confirm them (Packages.cs)
+            if (name == "tc_packages_change") PackagesChangeArgs(args);
             if (Confirm.Needed(name, args))
             {
                 string target = null;
                 try { target = TargetOf(name, args); } catch { }
                 var what = Confirm.Describe(name, args, target);
                 var ok = Confirm.Ask(name, what, tc.AttachedPid);
-                if (ok == false && Confirm.LastNotShown)
-                    throw new OperationCanceledException("NOT executed: the confirmation could not be shown (the AI client cannot ask in this mode " +
-                        "and no TcAgentBridge dialog is reachable in the IDE). Ask the user in the chat; nothing was changed: " + what);
-                if (ok == false) throw new OperationCanceledException("Rejected by the user: " + what + " - do not retry without asking.");
-                if (ok == null) Log.Info("No confirmation possible (no channel) - " + what);
+                // no answer and nobody to ask are refusals too (Guards.cs) - without a question only with TCAGENT_CONFIRM=off
+                if (Guards.ConfirmRefusal(ok, Confirm.LastNotShown, what) is { } refused)
+                {
+                    if (ok == null) Log.Info("No confirmation possible (no channel), refused - " + what);
+                    throw new OperationCanceledException(refused);
+                }
             }
             Log.Info($"{name} started{LogAttrs(args)}");
             // tc_refactor apply/result wait for the user themselves (job with its own dialog watch) - see RefactorJobs.cs

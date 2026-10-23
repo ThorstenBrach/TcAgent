@@ -13,6 +13,7 @@
   <ItemGroup>
     <Compile Include="..\..\src\PlainText.cs" Link="src\PlainText.cs" />
     <Compile Include="..\..\src\TcUnitDiscovery.cs" Link="src\TcUnitDiscovery.cs" />
+    <Compile Include="..\..\src\Guards.cs" Link="src\Guards.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

@@ -6,7 +6,8 @@
 //                     off               = never ask (pipelines, unattended agents)
 //
 // Channel: from the TcAgent Chat a Yes/No dialog in Visual Studio (TcAgentBridge); in other clients the client's own
-// question dialog (MCP elicitation), if it supports one. Without any channel the call runs as before (only the whitelist).
+// question dialog (MCP elicitation), if it supports one. Without any channel the call is refused: running without a
+// question needs the deliberate setting TCAGENT_CONFIRM=off (pipelines, unattended agents).
 //
 // SPDX-License-Identifier: MIT
 using System.Text.Json.Nodes;

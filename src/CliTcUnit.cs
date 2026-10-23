@@ -3,7 +3,8 @@
 //   TcAgent.exe tcunit list --solution <sln> [--plc <name>]          tests from the code as JSON, no IDE
 //   TcAgent.exe tcunit run  --solution <sln>|--attach [pid] [--tests <a,b>] [--target ...] [--junit <file>]
 //                                                                    one JSON event per line (TcUnit Tests window)
-//   TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>]   HTML report of the last run (TcUnitReport.cs)
+//   TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>] [--builtin] [--approve <id>]
+//                                                                    HTML report of the last run (TcUnitReport.cs)
 // tcunit run stops when a line "cancel" arrives on stdin (or Ctrl+C): the PLC is reset, open tests stay "notrun".
 //
 // SPDX-License-Identifier: MIT
@@ -19,7 +20,8 @@ public static partial class Cli
         if (o.Sub is not ("list" or "run" or "report")) throw new Exception("tcunit needs list, run or report, e.g. TcAgent.exe tcunit list --solution <sln>");
         if (o.Sub is "list" or "report" && o.Solution == null) throw new Exception($"tcunit {o.Sub} needs --solution <path to .sln>");
         if (o.Sub == "report" && (o.Tests.Count > 0 || o.Download)) throw new Exception("--tests and --download are options of tcunit run");
-        if ((o.Out != null || o.BuiltIn) && o.Sub != "report") throw new Exception("--out and --builtin are options of tcunit report");
+        if ((o.Out != null || o.BuiltIn || o.Approve != null) && o.Sub != "report") throw new Exception("--out, --builtin and --approve are options of tcunit report");
+        if (o.Approve != null && !System.Text.RegularExpressions.Regex.IsMatch(o.Approve, "^[0-9a-f]{16}$")) throw new Exception("--approve: the id shown by tcunit report expected");
         if (o.Sub == "list" && (o.Tests.Count > 0 || o.Download || o.Junit != null)) throw new Exception("--tests, --download and --junit are options of tcunit run");
         if (o.Solution == null && o.Attach == null) throw new Exception("--solution <path to .sln> (or --attach) is required");
         if (o.Solution != null && o.Attach != null) throw new Exception("use either --solution or --attach");
@@ -64,9 +66,12 @@ public static partial class Cli
         try
         {
             if (o.BuiltIn) cfg.Report = null;
-            var html = TcUnitReport.Make(sln, o.Junit, o.Out, cfg, Say);
+            var html = TcUnitReport.Make(sln, o.Junit, o.Out, cfg, Say, o.Approve, out var pending);
             Say("REPORT OK: " + html);
-            Console.WriteLine(new JsonObject { ["event"] = "report", ["ok"] = true, ["html"] = html }.ToJsonString(Compact));
+            var ev = new JsonObject { ["event"] = "report", ["ok"] = true, ["html"] = html };
+            // the window asks the user whether the command of tcunit.json may run (tcunit report --approve <id>)
+            if (pending != null) ev["approval"] = new JsonObject { ["id"] = pending, ["command"] = cfg.Report, ["file"] = cfg.File };
+            Console.WriteLine(ev.ToJsonString(Compact));
             return Ok;
         }
         catch (Exception ex)

@@ -268,7 +268,18 @@ public sealed class TcUnitDiscoveryTests : IDisposable
         var sel = TcUnitDiscovery.Select(Project(), items);
         Assert.Empty(sel.Errors);
         Assert.Contains(("MAIN.fbMotor.bRunSuite", true), sel.Writes);
-        Assert.Throws<FileNotFoundException>(() => TcUnitDiscovery.ExpandSelectionFiles(new[] { "@missing.json" }, dir));
+        Assert.Throws<FileNotFoundException>(() => TcUnitDiscovery.ExpandSelectionFiles(new[] { "@missing.tcunit.json" }, dir));
+    }
+
+    [Fact]
+    public void SelectionFilesCannotSetTheTargetOrReadOtherFiles()
+    {
+        File.WriteAllText(Path.Combine(dir, "remote.tcunit.json"), """{ "tests": [ "MAIN.fbMotor" ], "target": "5.1.2.3.1.1" }""");
+        var ex = Assert.Throws<FormatException>(() => TcUnitDiscovery.ExpandSelectionFiles(new[] { "@remote.tcunit.json" }, dir));
+        Assert.Contains("target", ex.Message);
+        // any other file of the PC is not read as a selection
+        File.WriteAllText(Path.Combine(dir, "secret.ini"), "password=x");
+        Assert.Throws<ArgumentException>(() => TcUnitDiscovery.ExpandSelectionFiles(new[] { "@secret.ini" }, dir));
     }
 
     [Fact]

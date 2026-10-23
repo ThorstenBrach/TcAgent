@@ -985,24 +985,22 @@ namespace TcAgentBridge
                 string html = null, msg = null;
                 try
                 {
-                    using (var p = Start(exe, "tcunit report --solution " + Quote(sln), false))
+                    var approval = RunReport(exe, "tcunit report --solution " + Quote(sln), out html, out msg);
+                    // the command of "report" in tcunit.json comes with the solution: it runs only if the user agrees once
+                    // (per solution and command text); TcAgent's own report is already made
+                    if (approval != null && html != null && (bool)Dispatcher.Invoke(new Func<bool>(() => MessageBox.Show(
+                            "The test report of this solution is made by a command of its own (" + S(approval, "file") + "):\n\n" + S(approval, "command") +
+                            "\n\nRun this command now and from now on (until it changes)? Only if you trust this solution - it runs as you, on this PC." +
+                            "\n\nNo: TcAgent's own report (already created).",
+                            "TcAgent - report command", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes)))
                     {
-                        var err = p.StandardError.ReadToEndAsync();
-                        var ser = new JavaScriptSerializer();
-                        for (string line; (line = p.StandardOutput.ReadLine()) != null;)
-                        {
-                            if (!line.StartsWith("{")) continue;
-                            try
-                            {
-                                var ev = ser.Deserialize<Dictionary<string, object>>(line);
-                                if (S(ev, "event") == "report") { html = B(ev, "ok") ? S(ev, "html") : null; msg = S(ev, "message"); }
-                            }
-                            catch { }
-                        }
-                        p.WaitForExit(330_000);
-                        if (html == null && msg == null) msg = err.Result.Trim();
+                        Dispatcher.BeginInvoke(new Action(() => status.Text = "Creating the test report with the command of tcunit.json ..."));
+                        RunReport(exe, "tcunit report --solution " + Quote(sln) + " --approve " + Quote(S(approval, "id")), out html, out msg);
                     }
-                    if (html != null) Process.Start(new ProcessStartInfo(html) { UseShellExecute = true });
+                    // only an HTML file is opened (the path comes from the output of TcAgent.exe)
+                    if (html != null && (html.EndsWith(".html", StringComparison.OrdinalIgnoreCase) || html.EndsWith(".htm", StringComparison.OrdinalIgnoreCase)) && File.Exists(html))
+                        Process.Start(new ProcessStartInfo(html) { UseShellExecute = true });
+                    else if (html != null) { msg = "not an HTML file: " + html; html = null; }
                 }
                 catch (Exception ex) { msg = ex.Message; }
                 Dispatcher.BeginInvoke(new Action(() =>
@@ -1011,6 +1009,33 @@ namespace TcAgentBridge
                     status.Text = html != null ? "Test report: " + html : "Report not created: " + msg;
                 }));
             });
+        }
+
+        /// <summary>One TcAgent.exe tcunit report; returns the "approval" of the report event (command not approved yet) or null.</summary>
+        Dictionary<string, object> RunReport(string exe, string args, out string html, out string msg)
+        {
+            html = null; msg = null;
+            Dictionary<string, object> approval = null;
+            using (var p = Start(exe, args, false))
+            {
+                var err = p.StandardError.ReadToEndAsync();
+                var ser = new JavaScriptSerializer();
+                for (string line; (line = p.StandardOutput.ReadLine()) != null;)
+                {
+                    if (!line.StartsWith("{")) continue;
+                    try
+                    {
+                        var ev = ser.Deserialize<Dictionary<string, object>>(line);
+                        if (S(ev, "event") != "report") continue;
+                        html = B(ev, "ok") ? S(ev, "html") : null; msg = S(ev, "message");
+                        approval = ev.TryGetValue("approval", out var a) ? a as Dictionary<string, object> : null;
+                    }
+                    catch { }
+                }
+                p.WaitForExit(330_000);
+                if (html == null && msg == null) msg = err.Result.Trim();
+            }
+            return approval;
         }
 
         void Cancel()

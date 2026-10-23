@@ -3,7 +3,9 @@
 //   tc_packages          read only: installed packages, available packages/workloads, all versions of one package,
 //                        outdated packages, details of a package, configured feeds, feed check, tcpkg settings
 //   tc_packages_change   install, upgrade, uninstall, repair packages; add, edit, remove feeds.
-//                        Always confirmed by the user (runtime class) and run elevated (UAC prompt on this PC).
+//                        Always confirmed by the user (runtime class) and run elevated (UAC prompt on this PC):
+//                        TcAgent.exe tcpkg-elevated starts tcpkg.exe of the program folders directly, without cmd.exe.
+// Package ids, versions, feed names and options are checked against fixed character sets first (Guards.TcpkgArgs).
 //
 // Command syntax from the TwinCAT installation documentation (InfoSys "Working with the command line": list, install,
 // upgrade, uninstall, repair, show, source, config). Installing XAE packages usually needs Visual Studio / XAE Shell closed.
@@ -98,6 +100,26 @@ public sealed partial class ToolRegistry
     string PackagesChange(JsonObject a)
     {
         var action = (Str(a, "action") ?? "").ToLowerInvariant();
+        var args = PackagesChangeArgs(a);
+        var cmd = "tcpkg " + string.Join(" ", args.Select(QuoteArg));
+        if (DryRun(a)) return "PROPOSAL (nothing executed): " + cmd;
+        var ideOpen = action is "install" or "upgrade" or "uninstall" or "repair" && System.Diagnostics.Process.GetProcessesByName("devenv").Length +
+                      System.Diagnostics.Process.GetProcessesByName("TcXaeShell").Length + System.Diagnostics.Process.GetProcessesByName("TcXaeShell64").Length > 0;
+        var (code, output) = RunTcpkg(args, elevated: true, timeoutMs: 3_600_000);
+        output = CleanTcpkg(output);
+        var o = new StringBuilder($"{cmd}  (exit code {code})\n{Tail(output, 30_000)}");
+        if (code != 0 && ideOpen)
+            o.Append("\nVisual Studio / XAE Shell is open - XAE packages can usually only be changed with the IDE closed. Ask the user to close it and retry.");
+        if (code == 0 && action is "install" or "upgrade" or "repair")
+            o.Append("\nCheck the result with tc_packages action=installed. Visual Studio integrations take effect after the IDE is restarted.");
+        return o.ToString();
+    }
+
+    /// <summary>The tcpkg arguments of a tc_packages_change call, checked (Guards.TcpkgArgs). Also called before the
+    /// confirmation, so a value that is not allowed is refused before anybody is asked.</summary>
+    static List<string> PackagesChangeArgs(JsonObject a)
+    {
+        var action = (Str(a, "action") ?? "").ToLowerInvariant();
         var args = new List<string>();
         List<string> Pkgs() => (Str(a, "packages") ?? throw new Exception("packages is required"))
             .Split(new[] { ' ', ',', ';' }, StringSplitOptions.RemoveEmptyEntries).ToList();
@@ -138,21 +160,18 @@ public sealed partial class ToolRegistry
                 break;
             default: throw new Exception("action: install, upgrade, uninstall, repair, feed_add, feed_edit or feed_remove");
         }
-        var cmd = "tcpkg " + string.Join(" ", args.Select(QuoteArg));
-        if (DryRun(a)) return "PROPOSAL (nothing executed): " + cmd;
-        var ideOpen = action is "install" or "upgrade" or "uninstall" or "repair" && System.Diagnostics.Process.GetProcessesByName("devenv").Length +
-                      System.Diagnostics.Process.GetProcessesByName("TcXaeShell").Length + System.Diagnostics.Process.GetProcessesByName("TcXaeShell64").Length > 0;
-        var (code, output) = RunTcpkg(args, elevated: true, timeoutMs: 3_600_000);
-        output = CleanTcpkg(output);
-        var o = new StringBuilder($"{cmd}  (exit code {code})\n{Tail(output, 30_000)}");
-        if (code != 0 && ideOpen)
-            o.Append("\nVisual Studio / XAE Shell is open - XAE packages can usually only be changed with the IDE closed. Ask the user to close it and retry.");
-        if (code == 0 && action is "install" or "upgrade" or "repair")
-            o.Append("\nCheck the result with tc_packages action=installed. Visual Studio integrations take effect after the IDE is restarted.");
-        return o.ToString();
+        try { Guards.TcpkgArgs(args); }
+        catch (ArgumentException ex) { throw new Exception("NOT executed: " + ex.Message); }
+        return args;
     }
 
     // ------------------------------------------------------------------ tcpkg process
+    static readonly string[] TcpkgLocations = { @"Beckhoff\TcPkg\tcpkg.exe", @"Beckhoff\TwinCAT\TcPkg\tcpkg.exe", @"Beckhoff\TcPkg\bin\tcpkg.exe" };
+
+    static IEnumerable<string> ProgramRoots() =>
+        new[] { Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), @"C:\TwinCAT" }
+            .Where(r => !string.IsNullOrEmpty(r));
+
     static string TcpkgExe()
     {
         foreach (var d in (Environment.GetEnvironmentVariable("PATH") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries))
@@ -171,28 +190,72 @@ public sealed partial class ToolRegistry
 
     static string QuoteArg(string s) => s.Length > 0 && s.IndexOfAny(new[] { ' ', '"', '\t' }) < 0 ? s : "\"" + s.Replace("\"", "\\\"") + "\"";
 
+    /// <summary>tcpkg.exe for the elevated run: only from the program folders or C:\TwinCAT - a tcpkg.exe in a folder of
+    /// PATH the user can write to must not run with administrator rights.</summary>
+    static string TrustedTcpkgExe()
+    {
+        foreach (var root in ProgramRoots())
+            foreach (var rel in TcpkgLocations)
+                if (File.Exists(Path.Combine(root, rel))) return Path.Combine(root, rel);
+        var exe = Path.GetFullPath(TcpkgExe());
+        if (!ProgramRoots().Select(r => r.TrimEnd('\\') + "\\").Any(r => exe.StartsWith(r, StringComparison.OrdinalIgnoreCase)))
+            throw new Exception($"tcpkg.exe ({exe}) is not in the program folders or C:\\TwinCAT - it is not started with administrator rights.");
+        return exe;
+    }
+
+    static (int code, string output) RunTcpkgDirect(string exe, IReadOnlyList<string> args, int timeoutMs)
+    {
+        // no shell: every argument goes to tcpkg as it is
+        var psi = new ProcessStartInfo(exe)
+        {
+            UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
+            StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
+        };
+        foreach (var x in args) psi.ArgumentList.Add(x);
+        psi.EnvironmentVariables["NO_COLOR"] = "1";
+        using var p = Process.Start(psi)!;
+        var so = p.StandardOutput.ReadToEndAsync();
+        var se = p.StandardError.ReadToEndAsync();
+        if (!p.WaitForExit(timeoutMs)) { try { p.Kill(true); } catch { } return (-1, "Timeout after " + timeoutMs / 1000 + " s\n" + so.Result); }
+        return (p.ExitCode, so.Result + (se.Result.Trim().Length > 0 ? "\n" + se.Result : ""));
+    }
+
+    static readonly Regex ElevatedLog = new(@"^tcagent-tcpkg-[0-9a-f]{32}\.log$");
+
+    /// <summary>TcAgent.exe tcpkg-elevated &lt;log&gt; &lt;tcpkg arguments&gt;: the part that runs with administrator rights.
+    /// Checks the arguments again, starts tcpkg without a shell and writes its output to the log file.</summary>
+    public static int RunElevatedTcpkg(string[] argv)
+    {
+        try
+        {
+            if (argv.Length < 3) return 2;
+            var log = Path.GetFullPath(argv[1]);
+            if (!ElevatedLog.IsMatch(Path.GetFileName(log)) || !Directory.Exists(Path.GetDirectoryName(log))) return 2;
+            var args = argv.Skip(2).ToList();
+            Guards.TcpkgArgs(args);
+            var (code, output) = RunTcpkgDirect(TrustedTcpkgExe(), args, 3_600_000);
+            File.WriteAllText(log, output, new UTF8Encoding(false));
+            return code;
+        }
+        catch (Exception ex)
+        {
+            try { if (argv.Length > 1 && ElevatedLog.IsMatch(Path.GetFileName(argv[1]))) File.WriteAllText(argv[1], "Error: " + ex.Message); } catch { }
+            return 2;
+        }
+    }
+
     static (int code, string output) RunTcpkg(List<string> args, bool elevated, int timeoutMs)
     {
-        var exe = TcpkgExe();
-        var argLine = string.Join(" ", args.Select(QuoteArg));
-        if (!elevated)
-        {
-            var psi = new ProcessStartInfo(exe, argLine)
-            {
-                UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
-                StandardOutputEncoding = Encoding.UTF8, StandardErrorEncoding = Encoding.UTF8
-            };
-            psi.EnvironmentVariables["NO_COLOR"] = "1";
-            using var p = Process.Start(psi)!;
-            var so = p.StandardOutput.ReadToEndAsync();
-            var se = p.StandardError.ReadToEndAsync();
-            if (!p.WaitForExit(timeoutMs)) { try { p.Kill(true); } catch { } return (-1, "Timeout after " + timeoutMs / 1000 + " s\n" + so.Result); }
-            return (p.ExitCode, so.Result + (se.Result.Trim().Length > 0 ? "\n" + se.Result : ""));
-        }
-        // elevated: Windows cannot redirect the output of a "runas" process - let cmd write it to a file
+        // package ids, versions, feed names and options only from fixed character sets (Guards.cs)
+        try { Guards.TcpkgArgs(args); }
+        catch (ArgumentException ex) { throw new Exception("NOT executed: " + ex.Message); }
+        if (!elevated) return RunTcpkgDirect(TcpkgExe(), args, timeoutMs);
+        // elevated: Windows cannot redirect the output of a "runas" process - TcAgent.exe itself runs elevated, starts
+        // tcpkg without cmd.exe and writes the output to a file
+        TrustedTcpkgExe();
+        var self = Environment.ProcessPath ?? throw new Exception("Path of TcAgent.exe unknown");
         var log = Path.Combine(Path.GetTempPath(), $"tcagent-tcpkg-{Guid.NewGuid():N}.log");
-        var run = new ProcessStartInfo(Path.Combine(Environment.SystemDirectory, "cmd.exe"),
-                                       $"/d /c \"\"{exe}\" {argLine} > \"{log}\" 2>&1\"")
+        var run = new ProcessStartInfo(self, string.Join(" ", new[] { "tcpkg-elevated", log }.Concat(args).Select(Guards.QuoteArg)))
         {
             UseShellExecute = true, Verb = "runas", WindowStyle = ProcessWindowStyle.Hidden
         };

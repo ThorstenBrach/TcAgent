@@ -144,7 +144,7 @@ apply to **every** client:
 |---|---|
 | `TCAGENT_ALLOW_TARGETS` | AmsNetIds allowed for activation, online commands, ADS writes. Default `local` = this PC only |
 | `TCAGENT_MODE` | `agent` (default), `propose` (code changes only as a diff; reading, check and build still work, no other changes), `ask` (read-only) |
-| `TCAGENT_CONFIRM` | `runtime` (default): you confirm every activation, PLC start/stop, ADS write, runtime mode change, route and package change – a Yes/No dialog in Visual Studio for the TcAgent Chat, the client's own question dialog elsewhere · `all`: also project changes · `off` |
+| `TCAGENT_CONFIRM` | `runtime` (default): you confirm every activation, PLC start/stop, ADS write, runtime mode change, route and package change – a Yes/No dialog in Visual Studio for the TcAgent Chat, the client's own question dialog elsewhere; if nobody can be asked, the action is refused · `all`: also project changes · `off`: never ask (pipelines - a deliberate setting) |
 | `TCAGENT_SOLUTION` | optional, part of the solution path to pin one Visual Studio instance. Not needed normally: the chat always uses its own IDE, a single open solution is found automatically, with several the user picks from a list |
 | `TCAGENT_AUDIT` | audit log of every changing call (default `%LOCALAPPDATA%\TcAgent\audit.jsonl`) |
 | `TCAGENT_RULES` | additional coding rules (files/folders, `;`-separated); `TCAGENT_RULES_GATE=0` disables the one-time gate |

@@ -529,11 +529,17 @@ public static class TcUnitDiscovery
             if (!it.StartsWith("@")) { if (it.Length > 0) list.Add(it); continue; }
             var path = it[1..].Trim().Trim('"');
             if (!Path.IsPathRooted(path) && baseDir != null) path = Path.Combine(baseDir, path);
+            // only selection files: no other file of the PC ends up in the test names or error texts
+            if (!(path.EndsWith(".tcunit.json", StringComparison.OrdinalIgnoreCase) || path.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)))
+                throw new ArgumentException("Test selection: a *.tcunit.json or *.txt file expected, not " + path);
             if (!File.Exists(path)) throw new FileNotFoundException("Test selection not found: " + path);
             var text = File.ReadAllText(path).Trim();
             if (text.StartsWith("{") || text.StartsWith("["))
             {
                 var node = JsonNode.Parse(text);
+                // a selection only picks tests; the target comes from the call or tcunit.json and passes the whitelist
+                if (node is JsonObject so && so.ContainsKey("target"))
+                    throw new FormatException(path + ": a test selection cannot set the target system (\"target\") - pass --target or use .tcagent\\tcunit.json");
                 var arr = node as JsonArray ?? node?["tests"] as JsonArray ?? throw new FormatException(path + ": no \"tests\" list");
                 list.AddRange(arr.Select(x => x?.ToString().Trim()).Where(x => !string.IsNullOrEmpty(x)));
             }

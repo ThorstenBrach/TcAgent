@@ -316,6 +316,11 @@ it in the browser – one self-contained file to archive or send:
 Good descriptions in the code make a good report – no separate report tool is needed. Every run keeps its results in
 `%LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\` (`last.xml` JUnit, `last.json` the run), outside the repository.
 For a report tool of your own set `report` in the configuration; `tcunit report --builtin` still makes TcAgent's own.
+The command comes with the solution (a cloned repository, say), so it runs only after you approved it once for this
+solution and exactly this command text: the window shows the command and asks; on the command line `tcunit report`
+prints an id, `tcunit report --approve <id>` approves and runs it. Until then, and after the command changed, TcAgent's
+own report is made. TcAgent's own report encodes every text of the code and the runtime, links only http(s) URLs and
+allows no external resources (Content-Security-Policy).
 
 ## 9. Without the window
 
@@ -326,12 +331,12 @@ For a report tool of your own set `report` in the configuration; `tcunit report 
   [--timeout <s>] [--junit <file>] [--no-build] [--download]` – the run of [section 6](#6-what-happens-during-a-run).
   `--tests` takes instances (`MAIN.fbMotor`), suite types (`FB_Motor_Test`), single tests
   (`MAIN.fbMotor@WhenStartedExpectRunning`, `FB_Motor_Test.WhenStartedExpectRunning` or just the test name) or
-  `@<file>` – a test selection saved in the window (`*.tcunit.json`, relative to the solution folder) or a text file
-  with one entry per line; default all. The output is one JSON event per line (`plan`, `step`, `suite`, `running`,
+  `@<file>` – a test selection saved in the window (`*.tcunit.json`, relative to the solution folder) or a `*.txt` file
+  with one entry per line (a selection never sets the target); default all. The output is one JSON event per line (`plan`, `step`, `suite`, `running`,
   `result`, `progress`, `done`); a line `cancel` on stdin (or Ctrl+C) stops the run. `--download` builds and activates
   even if the code did not change. Exit code 0 = all passed, 1 = failed tests or build errors, 2 = refused target or
   unknown test names, 3 = infrastructure problem or timeout.
-- `TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>] [--builtin]` – the report of
+- `TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>] [--builtin] [--approve <id>]` – the report of
   [section 8](#8-test-report). No IDE needed.
 - In the chat: *"Run only the tests of FB_Motor_Test"*, *"Which tests failed and why?"* (tool `tc_test_run`,
   `action=list` lists the tests).

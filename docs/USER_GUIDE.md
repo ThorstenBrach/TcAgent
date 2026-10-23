@@ -1501,8 +1501,9 @@ real machines without agreement.** The agent cannot widen the list – only you 
 - No answer counts as "no". A declined confirmation is final.
 - Dry runs (`dryRun=true`) never ask.
 - `tc_refactor` always asks per change (Apply / Apply all / Reject / Cancel), whatever the setting.
-- Clients without a question dialog fall back to the whitelist only. Keep per-tool-call confirmation enabled in such
-  clients, especially for `tc_activate`, `tc_plc_online` and `ads_write` on systems with real hardware.
+- If nobody can be asked (a client without a question dialog and no TcAgentBridge dialog in the IDE), the action is
+  refused with a message - it never runs unconfirmed. To run runtime actions without a question (pipelines, unattended
+  agents) set `TCAGENT_CONFIRM=off` deliberately; the whitelist still applies.
 
 ### Things the agent never does
 
