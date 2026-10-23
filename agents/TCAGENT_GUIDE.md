@@ -356,7 +356,8 @@ treat them like project rules for that library.
   For Visual Studio message boxes TcAgent may only see the title ('Microsoft Visual Studio'): then ask the user what the
   dialog says and to close it - do not close it yourself, and do not retry the tool while it is open.
 - Runtime actions (activate, PLC start/stop, ADS write, runtime mode, routes) may need the user's confirmation
-  (`TCAGENT_CONFIRM`). A declined confirmation is final - do not retry or work around it.
+  (`TCAGENT_CONFIRM`). A declined confirmation is final - do not retry or work around it. If the call is refused
+  because nobody can be asked (no question dialog), ask the user in the chat; never set `TCAGENT_CONFIRM=off` yourself.
 
 ## Pipeline
 

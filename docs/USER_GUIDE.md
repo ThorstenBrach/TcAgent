@@ -1212,7 +1212,8 @@ the project's settings), `sarifFile` (SARIF export, 4026.20+), `metricsFile` (st
   `verify_feeds`, `config` (filters `package`, `type=Workload`, `feed`, `prerelease`).
 - `tc_packages_change`: `install`, `upgrade` (also `all`), `uninstall`, `repair`, `feed_add`, `feed_edit`,
   `feed_remove`. **Only when you ask, always confirmed by you, and run with administrator rights (UAC prompt).** Close
-  Visual Studio / XAE Shell before changing XAE packages. `dryRun=true` only shows the `tcpkg` command.
+  Visual Studio / XAE Shell before changing XAE packages. `dryRun=true` only shows the `tcpkg` command. Package ids, versions,
+  feed names and sources are checked first (no quotes or shell characters); tcpkg runs without a shell.
 
 Version mismatches between IDE integrations (for example Scope) are fixed by upgrading the workload.
 

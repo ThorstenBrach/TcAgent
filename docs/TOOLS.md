@@ -824,7 +824,7 @@ TwinCAT Package Manager (tcpkg, TwinCAT 4026+), read only: installed packages an
 
 ### `tc_packages_change`
 
-TwinCAT Package Manager, changes: install, upgrade, uninstall, repair packages; add, edit, remove feeds. Always confirmed by the user and run with administrator rights (UAC prompt). Close Visual Studio / XAE Shell before changing XAE packages.
+TwinCAT Package Manager, changes: install, upgrade, uninstall, repair packages; add, edit, remove feeds. Always confirmed by the user and run with administrator rights (UAC prompt): tcpkg.exe of the program folders, started without a shell. Package ids and versions only `[A-Za-z0-9._-]`, feed names words of these characters with single blanks, sources an http(s) URL or an absolute folder - other values are refused before the confirmation. Close Visual Studio / XAE Shell before changing XAE packages.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
