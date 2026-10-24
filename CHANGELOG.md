@@ -5,6 +5,17 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.28.4] – 2026-10-24
+
+### Fixed
+- `tc_check` / `TcAgent.exe check` ("Check all objects") crashed the TwinCAT XAE Shell in solutions with Remote Manager
+  3.1.4020.56 (access violation in `TwinCAT System Manager.dll` 4020.56, RPC 0x800706BE, unsaved changes lost;
+  FB-23CB01DE, FB-BDB62B01, FB-CE48B5F9, FB-D1AD25B9). TcAgent called the newest `ITcPlcIECProject*` interface of its
+  interop on the PLC project item from the tree enumeration. That item is a generic tree item; the call reached the
+  old DLL with a method layout it does not have. Now the PLC projects are fetched with `LookupTreeItem` (the real
+  project object), and `CheckAllObjects` is called by name (IDispatch). Checked with 4020.56 (library project plus TcUnit
+  project, no crash, real results) and 4026.19.
+
 ## [0.28.3] – 2026-10-23
 
 ### Security

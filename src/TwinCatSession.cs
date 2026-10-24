@@ -631,9 +631,12 @@ public sealed class TwinCatSession
     public List<ITcSmTreeItem> PlcProjects()
     {
         var list = new List<ITcSmTreeItem>();
+        // the enumeration returns generic tree items; LookupTreeItem returns the PLC project object with its own
+        // methods (CheckAllObjects ...). With Remote Manager 4020.56, calling a project interface on the enumerated item
+        // crashed the IDE.
         foreach (var plc in Children(Item("TIPC")))
             foreach (var c in Children(plc))
-                if (c.ItemType == 600) list.Add(c);
+                if (c.ItemType == 600) list.Add(Item(c.PathName));
         return list;
     }
 
@@ -790,17 +793,20 @@ public sealed class TwinCatSession
         return found.OrderByDescending(p => p.Count(c => c == '^')).ToList();
     }
 
-    // Calls CheckAllObjects via the matching Automation Interface (ITcPlcIECProject*)
+    // Calls CheckAllObjects of the PLC project by name (IDispatch, late binding). Not through the newest ITcPlcIECProject*
+    // interface of the interop: the interop is generated from the type library of the newest TwinCAT build, and with an
+    // older Remote Manager (e.g. 3.1.4020.56) the early-bound call crashed the IDE (access violation in
+    // TwinCAT System Manager.dll) - the interface answers QueryInterface but its methods are laid out differently.
     public bool CheckAllObjects(ITcSmTreeItem plcProject)
     {
-        foreach (var t in typeof(ITcSysManager).Assembly.GetTypes().Where(t => t.IsInterface).OrderByDescending(t => t.Name))
+        try
         {
-            var m = t.GetMethod("CheckAllObjects", Type.EmptyTypes);
-            if (m == null || !t.IsInstanceOfType(plcProject)) continue;
-            m.Invoke(plcProject, null);
+            plcProject.GetType().InvokeMember("CheckAllObjects", System.Reflection.BindingFlags.InvokeMethod, null, plcProject, null);
             return true;
         }
-        return false;
+        catch (COMException ex) when ((uint)ex.ErrorCode == 0x80020006) { return false; }   // DISP_E_UNKNOWNNAME: not available
+        catch (System.Reflection.TargetInvocationException ex) when (ex.InnerException is COMException ce && (uint)ce.ErrorCode == 0x80020006) { return false; }
+        catch (MissingMethodException) { return false; }
     }
 
     /// <param name="Stamp">Timestamp of a runtime message (local time), otherwise null</param>
