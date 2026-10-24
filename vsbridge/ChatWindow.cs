@@ -17,6 +17,7 @@ using Task = System.Threading.Tasks.Task;   // the VS 15 shell (XAE Shell) also 
 using System.Web.Script.Serialization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.VisualStudio.PlatformUI;
@@ -339,7 +340,7 @@ namespace TcAgentBridge
             var id = e.TryGetValue("request_id", out var ri) ? ri as string : null;
             var req = e.TryGetValue("request", out var rq) ? rq as Dictionary<string, object> : null;
             var subtype = req != null && req.TryGetValue("subtype", out var su) ? su as string : null;
-            object response;
+            Dictionary<string, object> response;
             if (subtype == "can_use_tool")
             {
                 var tool = (req.TryGetValue("display_name", out var dn) ? dn as string : null) ?? (req.TryGetValue("tool_name", out var tn) ? tn as string : "?");
@@ -347,6 +348,26 @@ namespace TcAgentBridge
                 var what = req.TryGetValue("description", out var de) ? de as string : null;
                 var why = req.TryGetValue("decision_reason", out var dr) ? dr as string : null;
                 var suggestions = req.TryGetValue("permission_suggestions", out var ps) ? ps as IEnumerable : null;
+                // follow-up question of the agent (tool AskUserQuestion): options to click or a free answer
+                if ((req.TryGetValue("tool_name", out var tq) ? tq as string : null) == "AskUserQuestion" && input != null)
+                {
+                    var answers = (Dictionary<string, object>)Dispatcher.Invoke(new Func<Dictionary<string, object>>(() => AskQuestions(input)));
+                    var ra = new Dictionary<string, object>();
+                    if (answers == null)
+                    {
+                        ra["behavior"] = "deny";
+                        ra["message"] = "The user closed the question without answering. Do not ask the same again; continue without it or ask in your answer.";
+                    }
+                    else
+                    {
+                        var updated = new Dictionary<string, object>(input) { ["answers"] = answers };
+                        ra["behavior"] = "allow";
+                        ra["updatedInput"] = updated;
+                    }
+                    Notice(answers == null ? "Question not answered." : "Answer: " + string.Join("; ", answers.Select(kv => kv.Value)));
+                    WriteControl(s, new Dictionary<string, object> { ["subtype"] = "success", ["request_id"] = id, ["response"] = ra });
+                    return true;
+                }
                 var choice = (string)Dispatcher.Invoke(new Func<string>(() => AskPermission(tool, what, why, input, SuggestionText(suggestions))));
                 var r = new Dictionary<string, object>();
                 if (choice == "deny")
@@ -365,6 +386,12 @@ namespace TcAgentBridge
             }
             // other requests of the protocol are not used by this window - answer so the CLI does not wait
             else response = new Dictionary<string, object> { ["subtype"] = "error", ["request_id"] = id, ["error"] = "not supported by the TcAgent Chat: " + subtype };
+            WriteControl(s, response);
+            return true;
+        }
+
+        void WriteControl(Session s, Dictionary<string, object> response)
+        {
             var json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(new Dictionary<string, object> { ["type"] = "control_response", ["response"] = response }) + "\n";
             try
             {
@@ -372,7 +399,73 @@ namespace TcAgentBridge
                 lock (writeLock) { s.In.Write(bytes, 0, bytes.Length); s.In.Flush(); }
             }
             catch { }   // session ended meanwhile
-            return true;
+        }
+
+        // Questions of AskUserQuestion: {"questions":[{"question","header","options":[{"label","description"}],"multiSelect"}]}.
+        // Returns question -> answer (selected labels separated by ", ", plus the free text), or null if closed without answer.
+        Dictionary<string, object> AskQuestions(Dictionary<string, object> input)
+        {
+            var questions = (input.TryGetValue("questions", out var qs) ? qs as IEnumerable : null)?.OfType<Dictionary<string, object>>().ToList()
+                            ?? new List<Dictionary<string, object>>();
+            if (questions.Count == 0) return null;
+            Dictionary<string, object> result = null;
+            var win = new Window
+            {
+                Title = "TcAgent Chat - question", SizeToContent = SizeToContent.WidthAndHeight, ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false, MaxWidth = 820, MaxHeight = 900, WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+            var owner = Application.Current?.MainWindow;
+            if (owner != null) win.Owner = owner; else win.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            var panel = new StackPanel { Margin = new Thickness(16), MinWidth = 460 };
+            var readers = new List<(string question, Func<string> answer)>();
+            int n = 0;
+            foreach (var q in questions)
+            {
+                var text = q.TryGetValue("question", out var qt) ? qt as string : "?";
+                var header = q.TryGetValue("header", out var hd) ? hd as string : null;
+                bool multi = q.TryGetValue("multiSelect", out var ms) && ms is bool mb && mb;
+                if (n++ > 0) panel.Children.Add(new Separator { Margin = new Thickness(0, 10, 0, 10) });
+                if (!string.IsNullOrEmpty(header)) panel.Children.Add(new TextBlock { Text = header, FontWeight = FontWeights.SemiBold, Opacity = 0.7, Margin = new Thickness(0, 0, 0, 2) });
+                panel.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold, FontSize = 13, Margin = new Thickness(0, 0, 0, 6) });
+                var picks = new List<(ToggleButton box, string label)>();
+                var group = "q" + n;
+                foreach (var o in (q.TryGetValue("options", out var op) ? op as IEnumerable : null)?.OfType<Dictionary<string, object>>() ?? Enumerable.Empty<Dictionary<string, object>>())
+                {
+                    var label = o.TryGetValue("label", out var lb) ? lb as string : "";
+                    var desc = o.TryGetValue("description", out var ds) ? ds as string : null;
+                    var content = new StackPanel();
+                    content.Children.Add(new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap });
+                    if (!string.IsNullOrEmpty(desc)) content.Children.Add(new TextBlock { Text = desc, TextWrapping = TextWrapping.Wrap, Opacity = 0.7, FontSize = 11.5 });
+                    ToggleButton box = multi ? (ToggleButton)new CheckBox { Content = content } : new RadioButton { Content = content, GroupName = group };
+                    box.Margin = new Thickness(0, 2, 0, 4);
+                    picks.Add((box, label));
+                    panel.Children.Add(box);
+                }
+                panel.Children.Add(new TextBlock { Text = picks.Count > 0 ? "Other answer (free text):" : "Answer:", Margin = new Thickness(0, 6, 0, 2), Opacity = 0.8 });
+                var free = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 24, MaxHeight = 120, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+                // typing a free answer to a single choice question replaces the picked option
+                if (!multi) free.TextChanged += (o, ev) => { if (free.Text.Trim().Length > 0) foreach (var p in picks) p.box.IsChecked = false; };
+                foreach (var p in picks) if (!multi) p.box.Checked += (o, ev) => free.Text = "";
+                panel.Children.Add(free);
+                readers.Add((text, () => string.Join(", ", picks.Where(p => p.box.IsChecked == true).Select(p => p.label)
+                                                          .Concat(free.Text.Trim().Length > 0 ? new[] { free.Text.Trim() } : new string[0]))));
+            }
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
+            var ok = new Button { Content = "_Answer", MinWidth = 96, Padding = new Thickness(10, 3, 10, 3), IsDefault = true };
+            var cancel = new Button { Content = "Cancel", MinWidth = 96, Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(10, 3, 10, 3), IsCancel = true };
+            var hint = new TextBlock { Foreground = Brushes.IndianRed, Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
+            ok.Click += (o, ev) =>
+            {
+                var a = readers.ToDictionary(r => r.question, r => (object)r.answer());
+                if (a.Values.Any(v => ((string)v).Length == 0)) { hint.Text = "Please answer every question."; return; }
+                result = a; win.Close();
+            };
+            cancel.Click += (o, ev) => win.Close();
+            buttons.Children.Add(hint); buttons.Children.Add(ok); buttons.Children.Add(cancel);
+            panel.Children.Add(buttons);
+            win.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
+            win.ShowDialog();
+            return result;
         }
 
         // "Read in D:\...\**" from the suggested rules ({"type":"addRules","rules":[{"toolName":"Read","ruleContent":"//d/x/**"}]},
@@ -517,7 +610,7 @@ namespace TcAgentBridge
             s.Answer.Clear(); s.Summary = null;
             s.TurnSw = Stopwatch.StartNew();
             s.Turn = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var prompt = BuildPrompt(text, ctx, followUp: s.Greeted);
+            var prompt = BuildPrompt(text, ctx, followUp: s.Greeted, askTool: true);
             s.Greeted = true;
             status.Text = $"{be.Name} is working ... ({(warm ? "session running" : "session starting")})";
             StartAgent(be.Name);
@@ -670,7 +763,7 @@ namespace TcAgentBridge
             SystemLine("cancelled", true);
         }
 
-        string BuildPrompt(string text, string ctx, bool followUp)
+        string BuildPrompt(string text, string ctx, bool followUp, bool askTool = false)
         {
             var sb = new StringBuilder();
             var buildRule = buildBox.IsChecked == true
@@ -687,6 +780,9 @@ namespace TcAgentBridge
             sb.AppendLine("You are working in a TwinCAT 3 project (Visual Studio). Use the MCP tools of the \"tcagent\" server (tc_*, ads_*) " +
                           "and follow the TcAgent guide (skill twincat-tcagent or AGENTS.md/GEMINI.md/copilot-instructions.md). " +
                           "Answer concisely, in the language of the user's request; name changed objects with their tree path. Before writing code for the first time, call tc_coding_rules once and follow the rules. " + buildRule);
+            // the persistent Claude session answers AskUserQuestion with a dialog in this window (options or free text)
+            if (askTool) sb.AppendLine("If you need a decision or missing information from the user before you can go on, ask with the AskUserQuestion tool " +
+                                       "(2-4 short options; the user can also type a free answer) instead of ending your answer with a question. Do not ask about things you can find out with the tools.");
             if (ctx != null) sb.AppendLine("\n[User's editor context]\n" + ctx);
             if (history.Count > 0)
             {

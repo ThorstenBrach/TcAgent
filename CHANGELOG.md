@@ -14,6 +14,10 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
   (default; closing the dialog = deny). Before, such calls were refused without a question and the agent only reported
   that it had no access. Technically: the persistent session runs with `--permission-prompt-tool stdio` and the window
   answers the `can_use_tool` requests.
+- TcAgent Chat (Claude Code backend): follow-up questions of the agent come as a dialog. Each question shows its
+  options to click, with their descriptions (several at once if the question allows it), plus a field for a free answer.
+  The answer goes back to the agent, and Cancel tells it that the question was not answered. The agent is asked to use
+  this tool (`AskUserQuestion`) for decisions instead of ending its answer with a question.
 
 ### Fixed
 - `tc_check` / `TcAgent.exe check` ("Check all objects") crashed the TwinCAT XAE Shell in solutions with Remote Manager

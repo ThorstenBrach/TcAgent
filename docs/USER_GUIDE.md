@@ -109,6 +109,8 @@ work without the extension. The extension runs **inside** the IDE process and ad
 - **Permission questions** (Claude backend) – if the agent needs something its rules do not allow, e.g. a file outside
   the solution folder, the chat asks: **Allow once**, **Allow for this session** (e.g. reading in that folder until the
   chat session ends) or **Deny** (default).
+- **Follow-up questions** (Claude backend) – when the agent needs a decision, a dialog shows the question with options
+  to click and a field for a free answer.
 - **Inline question** – press **Ctrl+Shift+Q** in the TwinCAT editor, type, press Enter. You stay in the code; the answer
   streams into the chat window. Esc cancels. (The hotkey can be changed with `askHotkey` in
   `%LOCALAPPDATA%\TcAgent\chat-backends.json`.)
