@@ -7,6 +7,14 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [0.28.4] – 2026-10-24
 
+### Added
+- TcAgent Chat (Claude Code backend): when Claude needs a permission its rules do not give, e.g. reading a file
+  outside the solution folder and the shared folders, the chat window now asks. Options: **Allow once**, **Allow for
+  this session** (the rule Claude Code suggests, e.g. Read in that folder, until the chat session ends) or **Deny**
+  (default; closing the dialog = deny). Before, such calls were refused without a question and the agent only reported
+  that it had no access. Technically: the persistent session runs with `--permission-prompt-tool stdio` and the window
+  answers the `can_use_tool` requests.
+
 ### Fixed
 - `tc_check` / `TcAgent.exe check` ("Check all objects") crashed the TwinCAT XAE Shell in solutions with Remote Manager
   3.1.4020.56 (access violation in `TwinCAT System Manager.dll` 4020.56, RPC 0x800706BE, unsaved changes lost;

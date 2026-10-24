@@ -261,6 +261,9 @@ namespace TcAgentBridge
             {
                 if (!Regex.IsMatch(a, @"--allowedTools\s[^-]*\bRead\b")) a = a.Replace("--allowedTools ", "--allowedTools Read ");
                 if (!a.Contains("--add-dir")) { Directory.CreateDirectory(AttachDir); a += " --add-dir " + Quote(AttachDir); }
+                // permission questions (e.g. a file outside the shared folders) come to this window as can_use_tool requests
+                // instead of being refused silently - only the persistent session can answer them (stdin stays open)
+                if (IsPersistent(be) && !a.Contains("--permission-prompt-tool")) a += " --permission-prompt-tool stdio";
             }
             var (f, prefix) = Resolve(be.Exe);
             return (f, (prefix + " " + a).Trim());
@@ -308,6 +311,7 @@ namespace TcAgentBridge
 
         void OnSessionLine(Session s, string line)
         {
+            if (line.IndexOf("\"control_request\"", StringComparison.Ordinal) >= 0 && ControlRequest(s, line)) return;
             var t = s.TurnSw?.Elapsed.TotalSeconds ?? 0;
             var (show, final, stat, sum, done) = ClaudeEvent(line, t, s.Answer.Length > 0);
             if (s.Turn == null) return;                     // do not show output before the first question (startup)
@@ -316,6 +320,124 @@ namespace TcAgentBridge
             if (show != null) AgentAppend(show);
             if (stat != null) Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => status.Text = stat));
             if (done) s.Turn.TrySetResult(s.Answer.ToString());
+        }
+
+        // ------------------------------------------------------------------ Permission questions of Claude Code
+        // With --permission-prompt-tool stdio Claude Code asks this window before a tool call its rules do not allow
+        // (a file outside the working folder and the shared folders, a command ...):
+        //   {"type":"control_request","request_id":..,"request":{"subtype":"can_use_tool","tool_name":"Read","input":{..},
+        //    "description":"D:\\...","decision_reason":"Path is outside allowed working directories","permission_suggestions":[..]}}
+        // The answer goes back on stdin as control_response: allow (once, or with the suggested rules for this session) or deny.
+        readonly object writeLock = new object();
+
+        bool ControlRequest(Session s, string line)
+        {
+            Dictionary<string, object> e;
+            try { e = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(line); }
+            catch { return false; }
+            if (e == null || (e.TryGetValue("type", out var ty) ? ty as string : null) != "control_request") return false;
+            var id = e.TryGetValue("request_id", out var ri) ? ri as string : null;
+            var req = e.TryGetValue("request", out var rq) ? rq as Dictionary<string, object> : null;
+            var subtype = req != null && req.TryGetValue("subtype", out var su) ? su as string : null;
+            object response;
+            if (subtype == "can_use_tool")
+            {
+                var tool = (req.TryGetValue("display_name", out var dn) ? dn as string : null) ?? (req.TryGetValue("tool_name", out var tn) ? tn as string : "?");
+                var input = req.TryGetValue("input", out var ip) ? ip as Dictionary<string, object> : null;
+                var what = req.TryGetValue("description", out var de) ? de as string : null;
+                var why = req.TryGetValue("decision_reason", out var dr) ? dr as string : null;
+                var suggestions = req.TryGetValue("permission_suggestions", out var ps) ? ps as IEnumerable : null;
+                var choice = (string)Dispatcher.Invoke(new Func<string>(() => AskPermission(tool, what, why, input, SuggestionText(suggestions))));
+                var r = new Dictionary<string, object>();
+                if (choice == "deny")
+                {
+                    r["behavior"] = "deny";
+                    r["message"] = "The user denied this in the TcAgent Chat. Do not retry it; ask the user how to continue.";
+                }
+                else
+                {
+                    r["behavior"] = "allow";
+                    r["updatedInput"] = input ?? new Dictionary<string, object>();
+                    if (choice == "session" && suggestions != null) r["updatedPermissions"] = suggestions;
+                }
+                Notice((choice == "deny" ? "Denied: " : choice == "session" ? "Allowed for this session: " : "Allowed once: ") + tool + (what != null ? " " + what : ""));
+                response = new Dictionary<string, object> { ["subtype"] = "success", ["request_id"] = id, ["response"] = r };
+            }
+            // other requests of the protocol are not used by this window - answer so the CLI does not wait
+            else response = new Dictionary<string, object> { ["subtype"] = "error", ["request_id"] = id, ["error"] = "not supported by the TcAgent Chat: " + subtype };
+            var json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(new Dictionary<string, object> { ["type"] = "control_response", ["response"] = response }) + "\n";
+            try
+            {
+                var bytes = new UTF8Encoding(false).GetBytes(json);
+                lock (writeLock) { s.In.Write(bytes, 0, bytes.Length); s.In.Flush(); }
+            }
+            catch { }   // session ended meanwhile
+            return true;
+        }
+
+        // "Read in D:\...\**" from the suggested rules ({"type":"addRules","rules":[{"toolName":"Read","ruleContent":"//d/x/**"}]},
+        // {"type":"addDirectories","directories":[..]})
+        static string SuggestionText(IEnumerable suggestions)
+        {
+            if (suggestions == null) return null;
+            var parts = new List<string>();
+            foreach (var o in suggestions)
+            {
+                if (!(o is Dictionary<string, object> sg)) continue;
+                if (sg.TryGetValue("rules", out var rs) && rs is IEnumerable rules)
+                    foreach (var x in rules)
+                        if (x is Dictionary<string, object> rule)
+                        {
+                            var content = rule.TryGetValue("ruleContent", out var rc) ? rc as string : null;
+                            // "//d/GitLocal/x/**" -> "D:\GitLocal\x\**"
+                            if (content != null && Regex.IsMatch(content, "^//[a-zA-Z]/")) content = char.ToUpperInvariant(content[2]) + ":" + content.Substring(3).Replace('/', '\\');
+                            parts.Add((rule.TryGetValue("toolName", out var tn) ? tn as string : "?") + (content != null ? " in " + content : ""));
+                        }
+                if (sg.TryGetValue("directories", out var ds) && ds is IEnumerable dirs)
+                    foreach (var d in dirs) parts.Add("folder " + d);
+            }
+            return parts.Count > 0 ? string.Join(", ", parts) : null;
+        }
+
+        // Returns once, session or deny. Closing the window = deny.
+        string AskPermission(string tool, string what, string why, Dictionary<string, object> input, string sessionRule)
+        {
+            string result = "deny";
+            var win = new Window
+            {
+                Title = "TcAgent Chat - permission", SizeToContent = SizeToContent.WidthAndHeight, ResizeMode = ResizeMode.NoResize,
+                ShowInTaskbar = false, MaxWidth = 900, WindowStartupLocation = WindowStartupLocation.CenterOwner
+            };
+            var owner = Application.Current?.MainWindow;
+            if (owner != null) win.Owner = owner; else win.WindowStartupLocation = WindowStartupLocation.CenterScreen;
+            var text = new StringBuilder();
+            text.AppendLine($"Claude wants to use {tool}" + (what != null ? ":" : "."));
+            if (what != null) text.AppendLine("    " + what);
+            if (what == null && input != null)
+                foreach (var kv in input.Take(6)) text.AppendLine($"    {kv.Key} = {Short(Convert.ToString(kv.Value), 200)}");
+            if (why != null) text.AppendLine().AppendLine("Why it asks: " + why);
+            if (sessionRule != null) text.AppendLine().AppendLine("\"Allow for this session\" allows: " + sessionRule + " (until the chat session ends).");
+            var panel = new StackPanel { Margin = new Thickness(16) };
+            panel.Children.Add(new TextBox
+            {
+                Text = text.ToString().TrimEnd(), IsReadOnly = true, BorderThickness = new Thickness(0), MinWidth = 480, MaxHeight = 420,
+                TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Consolas"), FontSize = 12,
+                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
+            });
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
+            var choices = new List<(string key, string label)> { ("once", "Allow _once") };
+            if (sessionRule != null) choices.Add(("session", "Allow for this _session"));
+            choices.Add(("deny", "_Deny"));
+            foreach (var (key, label) in choices)
+            {
+                var b = new Button { Content = label, MinWidth = 96, Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(10, 3, 10, 3), IsCancel = key == "deny", IsDefault = key == "deny" };
+                b.Click += (o, ev) => { result = key; win.Close(); };
+                buttons.Children.Add(b);
+            }
+            panel.Children.Add(buttons);
+            win.Content = panel;
+            win.ShowDialog();
+            return result;
         }
 
         void KillSession()
