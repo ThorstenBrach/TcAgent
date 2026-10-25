@@ -67,6 +67,7 @@ namespace TcAgentBridge
             if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(UpdateVersionLabel)); return; }
             var ext = BridgePackage.BridgeVersion;
             var srv = Installer.RegisteredServerVersion();
+            versionLabel.Visibility = Visibility.Visible;     // only a problem stays visible in the top bar
             if (srv == null)
             {
                 versionLabel.Text = "TcAgent " + ext + " (server not set up)";
@@ -75,9 +76,12 @@ namespace TcAgentBridge
             }
             else if (srv == ext)
             {
+                // all fine: the version is in the "..." menu, the top bar stays clean
                 versionLabel.Text = "TcAgent " + ext;
                 versionLabel.ToolTip = "TcAgent server and extension " + ext;
                 versionLabel.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey); versionLabel.Opacity = 0.7;
+                versionLabel.Visibility = Visibility.Collapsed;
+                return;
             }
             else
             {
@@ -351,7 +355,7 @@ namespace TcAgentBridge
                 // follow-up question of the agent (tool AskUserQuestion): options to click or a free answer
                 if ((req.TryGetValue("tool_name", out var tq) ? tq as string : null) == "AskUserQuestion" && input != null)
                 {
-                    var answers = (Dictionary<string, object>)Dispatcher.Invoke(new Func<Dictionary<string, object>>(() => AskQuestions(input)));
+                    var answers = AskQuestions(input);      // card in the chat (ChatCards.cs), waits for the answer
                     var ra = new Dictionary<string, object>();
                     if (answers == null)
                     {
@@ -364,11 +368,10 @@ namespace TcAgentBridge
                         ra["behavior"] = "allow";
                         ra["updatedInput"] = updated;
                     }
-                    Notice(answers == null ? "Question not answered." : "Answer: " + string.Join("; ", answers.Select(kv => kv.Value)));
                     WriteControl(s, new Dictionary<string, object> { ["subtype"] = "success", ["request_id"] = id, ["response"] = ra });
                     return true;
                 }
-                var choice = (string)Dispatcher.Invoke(new Func<string>(() => AskPermission(tool, what, why, input, SuggestionText(suggestions))));
+                var choice = AskPermission(tool, what, why, input, SuggestionText(suggestions));   // card in the chat (ChatCards.cs)
                 var r = new Dictionary<string, object>();
                 if (choice == "deny")
                 {
@@ -381,7 +384,6 @@ namespace TcAgentBridge
                     r["updatedInput"] = input ?? new Dictionary<string, object>();
                     if (choice == "session" && suggestions != null) r["updatedPermissions"] = suggestions;
                 }
-                Notice((choice == "deny" ? "Denied: " : choice == "session" ? "Allowed for this session: " : "Allowed once: ") + tool + (what != null ? " " + what : ""));
                 response = new Dictionary<string, object> { ["subtype"] = "success", ["request_id"] = id, ["response"] = r };
             }
             // other requests of the protocol are not used by this window - answer so the CLI does not wait
@@ -399,73 +401,6 @@ namespace TcAgentBridge
                 lock (writeLock) { s.In.Write(bytes, 0, bytes.Length); s.In.Flush(); }
             }
             catch { }   // session ended meanwhile
-        }
-
-        // Questions of AskUserQuestion: {"questions":[{"question","header","options":[{"label","description"}],"multiSelect"}]}.
-        // Returns question -> answer (selected labels separated by ", ", plus the free text), or null if closed without answer.
-        Dictionary<string, object> AskQuestions(Dictionary<string, object> input)
-        {
-            var questions = (input.TryGetValue("questions", out var qs) ? qs as IEnumerable : null)?.OfType<Dictionary<string, object>>().ToList()
-                            ?? new List<Dictionary<string, object>>();
-            if (questions.Count == 0) return null;
-            Dictionary<string, object> result = null;
-            var win = new Window
-            {
-                Title = "TcAgent Chat - question", SizeToContent = SizeToContent.WidthAndHeight, ResizeMode = ResizeMode.NoResize,
-                ShowInTaskbar = false, MaxWidth = 820, MaxHeight = 900, WindowStartupLocation = WindowStartupLocation.CenterOwner
-            };
-            var owner = Application.Current?.MainWindow;
-            if (owner != null) win.Owner = owner; else win.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            var panel = new StackPanel { Margin = new Thickness(16), MinWidth = 460 };
-            var readers = new List<(string question, Func<string> answer)>();
-            int n = 0;
-            foreach (var q in questions)
-            {
-                var text = q.TryGetValue("question", out var qt) ? qt as string : "?";
-                var header = q.TryGetValue("header", out var hd) ? hd as string : null;
-                bool multi = q.TryGetValue("multiSelect", out var ms) && ms is bool mb && mb;
-                if (n++ > 0) panel.Children.Add(new Separator { Margin = new Thickness(0, 10, 0, 10) });
-                if (!string.IsNullOrEmpty(header)) panel.Children.Add(new TextBlock { Text = header, FontWeight = FontWeights.SemiBold, Opacity = 0.7, Margin = new Thickness(0, 0, 0, 2) });
-                panel.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap, FontWeight = FontWeights.SemiBold, FontSize = 13, Margin = new Thickness(0, 0, 0, 6) });
-                var picks = new List<(ToggleButton box, string label)>();
-                var group = "q" + n;
-                foreach (var o in (q.TryGetValue("options", out var op) ? op as IEnumerable : null)?.OfType<Dictionary<string, object>>() ?? Enumerable.Empty<Dictionary<string, object>>())
-                {
-                    var label = o.TryGetValue("label", out var lb) ? lb as string : "";
-                    var desc = o.TryGetValue("description", out var ds) ? ds as string : null;
-                    var content = new StackPanel();
-                    content.Children.Add(new TextBlock { Text = label, TextWrapping = TextWrapping.Wrap });
-                    if (!string.IsNullOrEmpty(desc)) content.Children.Add(new TextBlock { Text = desc, TextWrapping = TextWrapping.Wrap, Opacity = 0.7, FontSize = 11.5 });
-                    ToggleButton box = multi ? (ToggleButton)new CheckBox { Content = content } : new RadioButton { Content = content, GroupName = group };
-                    box.Margin = new Thickness(0, 2, 0, 4);
-                    picks.Add((box, label));
-                    panel.Children.Add(box);
-                }
-                panel.Children.Add(new TextBlock { Text = picks.Count > 0 ? "Other answer (free text):" : "Answer:", Margin = new Thickness(0, 6, 0, 2), Opacity = 0.8 });
-                var free = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, MinHeight = 24, MaxHeight = 120, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-                // typing a free answer to a single choice question replaces the picked option
-                if (!multi) free.TextChanged += (o, ev) => { if (free.Text.Trim().Length > 0) foreach (var p in picks) p.box.IsChecked = false; };
-                foreach (var p in picks) if (!multi) p.box.Checked += (o, ev) => free.Text = "";
-                panel.Children.Add(free);
-                readers.Add((text, () => string.Join(", ", picks.Where(p => p.box.IsChecked == true).Select(p => p.label)
-                                                          .Concat(free.Text.Trim().Length > 0 ? new[] { free.Text.Trim() } : new string[0]))));
-            }
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
-            var ok = new Button { Content = "_Answer", MinWidth = 96, Padding = new Thickness(10, 3, 10, 3), IsDefault = true };
-            var cancel = new Button { Content = "Cancel", MinWidth = 96, Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(10, 3, 10, 3), IsCancel = true };
-            var hint = new TextBlock { Foreground = Brushes.IndianRed, Margin = new Thickness(0, 0, 12, 0), VerticalAlignment = VerticalAlignment.Center };
-            ok.Click += (o, ev) =>
-            {
-                var a = readers.ToDictionary(r => r.question, r => (object)r.answer());
-                if (a.Values.Any(v => ((string)v).Length == 0)) { hint.Text = "Please answer every question."; return; }
-                result = a; win.Close();
-            };
-            cancel.Click += (o, ev) => win.Close();
-            buttons.Children.Add(hint); buttons.Children.Add(ok); buttons.Children.Add(cancel);
-            panel.Children.Add(buttons);
-            win.Content = new ScrollViewer { Content = panel, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
-            win.ShowDialog();
-            return result;
         }
 
         // "Read in D:\...\**" from the suggested rules ({"type":"addRules","rules":[{"toolName":"Read","ruleContent":"//d/x/**"}]},
@@ -492,50 +427,10 @@ namespace TcAgentBridge
             return parts.Count > 0 ? string.Join(", ", parts) : null;
         }
 
-        // Returns once, session or deny. Closing the window = deny.
-        string AskPermission(string tool, string what, string why, Dictionary<string, object> input, string sessionRule)
-        {
-            string result = "deny";
-            var win = new Window
-            {
-                Title = "TcAgent Chat - permission", SizeToContent = SizeToContent.WidthAndHeight, ResizeMode = ResizeMode.NoResize,
-                ShowInTaskbar = false, MaxWidth = 900, WindowStartupLocation = WindowStartupLocation.CenterOwner
-            };
-            var owner = Application.Current?.MainWindow;
-            if (owner != null) win.Owner = owner; else win.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-            var text = new StringBuilder();
-            text.AppendLine($"Claude wants to use {tool}" + (what != null ? ":" : "."));
-            if (what != null) text.AppendLine("    " + what);
-            if (what == null && input != null)
-                foreach (var kv in input.Take(6)) text.AppendLine($"    {kv.Key} = {Short(Convert.ToString(kv.Value), 200)}");
-            if (why != null) text.AppendLine().AppendLine("Why it asks: " + why);
-            if (sessionRule != null) text.AppendLine().AppendLine("\"Allow for this session\" allows: " + sessionRule + " (until the chat session ends).");
-            var panel = new StackPanel { Margin = new Thickness(16) };
-            panel.Children.Add(new TextBox
-            {
-                Text = text.ToString().TrimEnd(), IsReadOnly = true, BorderThickness = new Thickness(0), MinWidth = 480, MaxHeight = 420,
-                TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Consolas"), FontSize = 12,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto
-            });
-            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
-            var choices = new List<(string key, string label)> { ("once", "Allow _once") };
-            if (sessionRule != null) choices.Add(("session", "Allow for this _session"));
-            choices.Add(("deny", "_Deny"));
-            foreach (var (key, label) in choices)
-            {
-                var b = new Button { Content = label, MinWidth = 96, Margin = new Thickness(8, 0, 0, 0), Padding = new Thickness(10, 3, 10, 3), IsCancel = key == "deny", IsDefault = key == "deny" };
-                b.Click += (o, ev) => { result = key; win.Close(); };
-                buttons.Children.Add(b);
-            }
-            panel.Children.Add(buttons);
-            win.Content = panel;
-            win.ShowDialog();
-            return result;
-        }
-
         void KillSession()
         {
             var s = sess; sess = null;
+            CancelOpenCards();          // a card that is still open counts as "deny" / "not answered"
             if (s == null) return;
             s.Turn?.TrySetResult(null);
             if (s.Exited) return;
@@ -782,7 +677,10 @@ namespace TcAgentBridge
                           "Answer concisely, in the language of the user's request; name changed objects with their tree path. Before writing code for the first time, call tc_coding_rules once and follow the rules. " + buildRule);
             // the persistent Claude session answers AskUserQuestion with a dialog in this window (options or free text)
             if (askTool) sb.AppendLine("If you need a decision or missing information from the user before you can go on, ask with the AskUserQuestion tool " +
-                                       "(2-4 short options; the user can also type a free answer) instead of ending your answer with a question. Do not ask about things you can find out with the tools.");
+                                       "(2-4 short options; the user can also type a free answer) instead of ending your answer with a question. Do not ask about things you can find out with the tools. " +
+                                       "Tool calls your permissions do not cover (e.g. files outside the working folder) are shown to the user in this chat as a permission question " +
+                                       "(allow once / for this session / deny); you only see the outcome. A denied call is the user's decision - do not try it another way; " +
+                                       "an error after an allowed call is a real error of the tool, not a missing permission.");
             if (ctx != null) sb.AppendLine("\n[User's editor context]\n" + ctx);
             if (history.Count > 0)
             {

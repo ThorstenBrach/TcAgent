@@ -55,19 +55,20 @@ namespace TcAgentBridge
         // ------------------------------------------------------------------ layout
         FrameworkElement BuildView()
         {
-            // top bar: backend + options | setup, new
+            // top bar: backend | (version only if something is wrong) new chat, menu "..." with the options and the other commands
             var top = new DockPanel { Margin = new Thickness(6, 6, 6, 2) };
+            var menuButton = new Button { Content = "⋯", Width = 28, Padding = new Thickness(0, 0, 0, 2), Margin = new Thickness(6, 0, 0, 0), FontSize = 14,
+                                          ToolTip = "Options and more (editor context, check after changes, TcUnit Tests, set up clients)" };
+            menuButton.Click += (s, e) => ShowMenu(menuButton);
+            DockPanel.SetDock(menuButton, Dock.Right);
+            top.Children.Add(menuButton);
             DockPanel.SetDock(clear, Dock.Right);
             top.Children.Add(clear);
-            if (Installer.IsVsixInstall) { DockPanel.SetDock(setup, Dock.Right); top.Children.Add(setup); }
-            DockPanel.SetDock(tests, Dock.Right);
-            top.Children.Add(tests);
             DockPanel.SetDock(versionLabel, Dock.Right);
             top.Children.Add(versionLabel);
             UpdateVersionLabel();
-            var left = new WrapPanel();
-            left.Children.Add(backendBox); left.Children.Add(contextBox); left.Children.Add(buildBox);
-            top.Children.Add(left);
+            backendBox.HorizontalAlignment = HorizontalAlignment.Left;
+            top.Children.Add(backendBox);
 
             scroller.Content = msgs;
             scroller.SizeChanged += (s, e) => UpdateBubbleWidths();
@@ -116,6 +117,30 @@ namespace TcAgentBridge
             send.ToolTip = "Send (Enter)";
             LoadInputHistory();
             return root;
+        }
+
+        // menu of the "..." button: the options (check marks) and the commands that were buttons in the top bar
+        void ShowMenu(FrameworkElement at)
+        {
+            var menu = new ContextMenu { PlacementTarget = at, Placement = PlacementMode.Bottom };
+            MenuItem Item(string header, Action click, string tip = null, bool? check = null)
+            {
+                var mi = new MenuItem { Header = header, ToolTip = tip };
+                if (check != null) { mi.IsCheckable = true; mi.IsChecked = check.Value; }
+                mi.Click += (s, e) => click();
+                return mi;
+            }
+            menu.Items.Add(Item("Send editor context", () => contextBox.IsChecked = contextBox.IsChecked != true,
+                                "Send the open object, cursor line and selection with each request", contextBox.IsChecked == true));
+            menu.Items.Add(Item("Check after changes", () => buildBox.IsChecked = buildBox.IsChecked != true,
+                                "The agent checks for compiler errors (tc_check) once after its changes", buildBox.IsChecked == true));
+            menu.Items.Add(new Separator());
+            menu.Items.Add(Item("TcUnit Tests", () => tests.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), tests.ToolTip as string));
+            if (Installer.IsVsixInstall) menu.Items.Add(Item("Set up clients", () => setup.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), setup.ToolTip as string));
+            menu.Items.Add(new Separator());
+            menu.Items.Add(new MenuItem { Header = versionLabel.Text?.Length > 0 && versionLabel.Visibility == Visibility.Visible ? versionLabel.Text : "TcAgent " + BridgePackage.BridgeVersion,
+                                          IsEnabled = false });
+            menu.IsOpen = true;
         }
 
         void ThemeView()

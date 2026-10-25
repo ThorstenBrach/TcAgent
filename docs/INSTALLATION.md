@@ -13,7 +13,7 @@ All commands are in **PowerShell**. Steps that need administrator rights say so 
    * asks whether it should register itself in the AI clients it finds (same as `setup-clients.ps1`, with backups).
    The result appears in the **TcAgent Chat** window; the log is `%LOCALAPPDATA%\TcAgent\setup.log`.
 3. Sign in to at least one AI client ([step 5](#5-install-and-sign-in-to-ai-clients)). If you install a client later,
-   click **Set up clients** in the chat window.
+   click **⋯ > Set up clients** in the chat window.
 
 Updates: install the newer VSIX – clients are re-registered automatically. Uninstall: *Extensions > Manage Extensions*;
 `%LOCALAPPDATA%\TcAgent\` and the client entries stay (backups `*.bak-*` next to each config file).
@@ -39,7 +39,7 @@ question) is built for the shell with `vsbridge\install-xaeshell.ps1` (close the
 the VSIX itself only installs into Visual Studio 2022. The server (`TcAgent.exe`) for the shell comes from that VSIX: after an
 update install the VSIX of the same version (double-click) and run `install-xaeshell.ps1`; on its next start the shell copies
 the new server from the VSIX and registers it (the chat window shows "TcAgent server x ≠ extension y" in orange until then -
-"Set up clients" does it at once, then "New chat").
+"⋯ > Set up clients" does it at once, then "New chat").
 
 Optional, for the Scope and HMI tools: **TE1300 Scope View** (`tc_scope`) and **TE2000 HMI Engineering** (`tc_hmi*`).
 
@@ -179,7 +179,7 @@ In addition, every client can require confirmation of individual tool calls – 
 | Cursor shows "declaration, line 1" | No click into the editor since VS was opened. Click into the code once. |
 | Chat window: attached PDF/images are not read | The Claude backend needs `Read` in `--allowedTools` - TcAgent adds it automatically together with `--add-dir` for the attachments folder; check a custom `chat-backends.json`. |
 | Chat window: "… could not be started" | CLI not installed or not in PATH; enter the full path under `exe` in `chat-backends.json`. |
-| Setup message "TcAgent.exe … being used by another process" | An AI client (e.g. Claude Desktop) still runs the previous TcAgent.exe. Quit it (tray icon > Quit), then "Set up clients" in the TcAgent Chat. |
+| Setup message "TcAgent.exe … being used by another process" | An AI client (e.g. Claude Desktop) still runs the previous TcAgent.exe. Quit it (tray icon > Quit), then "⋯ > Set up clients" in the TcAgent Chat. |
 | `.tcscopex` shows a plain file icon, "Could not load file with the extension .tcscopex. Please upgrade your TwinCAT Measurement" | The Scope integration in VS and the installed Scope files have different versions. Update them together: `tcpkg upgrade TE1300.ScopeViewProfessional.XAE` (VS closed), then `devenv /updateconfiguration`. |
 | `tc_scope record_start`: "not loaded in Visual Studio" | Open the .tcscopex once in the IDE (double-click), PLC in Run. |
 | VS asks "Save dataset?" during a Scope change | Only with older TcAgent versions - current versions back the recording up and answer the question themselves. |

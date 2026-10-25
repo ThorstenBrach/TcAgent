@@ -103,13 +103,14 @@ work without the extension. The extension runs **inside** the IDE process and ad
 - **TcAgent Chat** – a tool window with backend selection (Claude Code, Copilot CLI, Gemini CLI, Codex CLI). Your prompts
   on the right, the agent's answers on the left, tool calls as compact lines. Enter sends, Shift+Enter makes a new line,
   ↑/↓ brings back earlier prompts (kept across sessions). **New chat** clears the history, **Stop** cancels the running
-  answer. The editor context is sent along automatically.
+  answer. The editor context is sent along automatically. The **⋯** menu holds the options (send editor context, check
+  after changes), **TcUnit Tests**, **Set up clients** and the version.
 - **Documents in the chat** – paste (Ctrl+V), drop or attach (+) manuals, data sheets, screenshots and long texts. Text files
   and Word documents go into the prompt; PDFs and images are read by the agent from the attachments folder.
 - **Permission questions** (Claude backend) – if the agent needs something its rules do not allow, e.g. a file outside
-  the solution folder, the chat asks: **Allow once**, **Allow for this session** (e.g. reading in that folder until the
-  chat session ends) or **Deny** (default).
-- **Follow-up questions** (Claude backend) – when the agent needs a decision, a dialog shows the question with options
+  the solution folder, a card in the chat asks: **Allow once**, **Allow for this session** (e.g. reading in that folder until the
+  chat session ends) or **Deny**. An open card counts as Deny when you start a new chat or stop the answer.
+- **Follow-up questions** (Claude backend) – when the agent needs a decision, a card in the chat shows the question with options
   to click and a field for a free answer.
 - **Inline question** – press **Ctrl+Shift+Q** in the TwinCAT editor, type, press Enter. You stay in the code; the answer
   streams into the chat window. Esc cancels. (The hotkey can be changed with `askHotkey` in
@@ -121,7 +122,7 @@ work without the extension. The extension runs **inside** the IDE process and ad
 - **Confirmation dialogs** in Visual Studio for runtime actions and refactoring when you work from the TcAgent Chat.
 
 The chat window opens when Visual Studio starts (unless `"showOnStartup": false` is set in `chat-backends.json`). The
-agent can also open it with `tc_ide command=chat_show`. If you install an AI client later, click **Set up clients** in
+agent can also open it with `tc_ide command=chat_show`. If you install an AI client later, click **⋯ > Set up clients** in
 the chat window.
 
 To check that the extension is running, ask *"Is the TcAgent bridge running?"* – the agent calls `tc_ide command=ping`.
@@ -133,7 +134,7 @@ shell, run `vsbridge\install-xaeshell.ps1` once (shell closed, asks for administ
 of the same version too - the shell takes the new `TcAgent.exe` from it.
 
 The chat window shows the TcAgent version at the top right. If it says *"TcAgent server x ≠ extension y"* in orange, the chat
-still starts the old server: click **Set up clients**, then **New chat**. The backend you chose last (Claude, Copilot,
+still starts the old server: click **⋯ > Set up clients**, then **New chat**. The backend you chose last (Claude, Copilot,
 Gemini, Codex) is selected again the next time.
 
 ### How the agent works
@@ -609,7 +610,7 @@ call `apply` again for the same changes.
 
 ### TcUnit Tests window
 
-**View > Other Windows > TcUnit Tests** (or the **Tests** button of the TcAgent Chat) – like the Visual Studio Test
+**View > Other Windows > TcUnit Tests** (or **⋯ > TcUnit Tests** in the TcAgent Chat) – like the Visual Studio Test
 Explorer, also in the XAE Shell: tree of PLC project, suite instances and tests read from the code, **Run all / Run
 selected / Run failed / Cancel / Refresh**, search and status filter, counters, a progress bar "Test 12 of 87: name" with
 the remaining time and "4 of 6 done (67 %)", red/green per test with the failure message (`EXP`, `ACT`, `MSG`),
@@ -1636,7 +1637,7 @@ Packaged clients (for example Claude Desktop) may redirect `%LOCALAPPDATA%` to
 | Symptom | Cause and fix |
 |---|---|
 | Tools do not appear in the client | Client not fully restarted. **Claude Desktop: quit via the tray icon ("Quit")**, not only by closing the window. Check the path in the configuration. |
-| After a TcAgent update the old behaviour remains | The client still runs the previous `TcAgent.exe`. Quit it completely (tray icon > Quit), then **Set up clients** in the TcAgent Chat. Ask *"Which TcAgent version is running?"* (`tc_version`). |
+| After a TcAgent update the old behaviour remains | The client still runs the previous `TcAgent.exe`. Quit it completely (tray icon > Quit), then **⋯ > Set up clients** in the TcAgent Chat. Ask *"Which TcAgent version is running?"* (`tc_version`). |
 | "No running Visual Studio/XAE instance" | Open Visual Studio with a TwinCAT solution; with several, pick one from the list or say *"connect to solution X"*. |
 | A tool returns the text of a dialog | A modal IDE dialog blocks TwinCAT. Read it, close it yourself, then continue. `tc_dialogs` lists open dialogs. |
 | `tc_build` reports 0 errors although the code is wrong | Unused POUs are not compiled by a build. Use `tc_check` or `tc_build checkAll=true`. |

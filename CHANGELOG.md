@@ -5,6 +5,19 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.28.5] – 2026-10-25
+
+### Changed
+- TcAgent Chat: permission questions and follow-up questions of the agent are cards in the conversation instead of
+  separate dialog windows. A permission card offers Allow once, Allow for this session and Deny. A question card shows
+  its options to click, a field for another answer, Answer and Skip. After the answer the card stays in the conversation
+  with the decision. New chat, Stop or the end of the session answer an open card with Deny / not answered.
+- TcAgent Chat top bar: only the backend, **New chat** and a **⋯** menu remain. The menu holds Send editor context,
+  Check after changes, TcUnit Tests, Set up clients and the version. The version shows in the top bar only when the
+  server and the extension differ or the server is not set up.
+- The agent in the chat knows that permission questions are shown to the user, so it no longer claims that there was
+  no question. An error after an allowed call is a real tool error.
+
 ## [0.28.4] – 2026-10-24
 
 ### Added
