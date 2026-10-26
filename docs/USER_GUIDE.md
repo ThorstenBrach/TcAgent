@@ -110,8 +110,9 @@ work without the extension. The extension runs **inside** the IDE process and ad
 - **Permission questions** (Claude backend) – if the agent needs something its rules do not allow, e.g. a file outside
   the solution folder, a card in the chat asks: **Allow once**, **Allow for this session** (e.g. reading in that folder until the
   chat session ends) or **Deny**. An open card counts as Deny when you start a new chat or stop the answer.
-- **Follow-up questions** (Claude backend) – when the agent needs a decision, a card in the chat shows the question with options
-  to click and a field for a free answer.
+- **Follow-up questions** (every backend) – when the agent needs a decision, it asks with `tc_ask_user`: a card in the chat
+  shows the question with options to click and a field for a free answer. Outside the chat the AI client shows its own
+  question dialog, if it has one.
 - **Inline question** – press **Ctrl+Shift+Q** in the TwinCAT editor, type, press Enter. You stay in the code; the answer
   streams into the chat window. Esc cancels. (The hotkey can be changed with `askHotkey` in
   `%LOCALAPPDATA%\TcAgent\chat-backends.json`.)
@@ -1695,7 +1696,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 89 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 90 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
@@ -1724,3 +1725,4 @@ All 89 tools and the section of this guide that covers them. Parameters: [TOOLS.
 | `tc_docs`, `tc_docs_add`, `tc_lessons` | [Knowledge: documentation and lessons learned](#knowledge-documentation-and-lessons-learned) |
 | `tc_dialogs` | [IDE dialogs](#ide-dialogs) |
 | `tc_feedback`, `tc_policy` | [Feedback and audit](#feedback-and-audit) |
+| `tc_ask_user` | [What the VS extension adds](#what-the-vs-extension-tcagentbridge-adds) (questions to the user, every client) |

@@ -25,7 +25,7 @@ namespace TcAgentBridge
     [Guid("86c8609c-4aac-4e7e-95e6-6b96179a3c4f")]
     public sealed class BridgePackage : AsyncPackage
     {
-        public const string BridgeVersion = "0.28.5";
+        public const string BridgeVersion = "0.29.0";
         internal static BridgePackage Instance;
         static readonly Guid ExportTypeGuid = new Guid("75161BEE-FB5F-434C-A3C6-86B7CEE2B8FC");
 
@@ -80,26 +80,39 @@ namespace TcAgentBridge
             Log("Pipe: " + name);
             while (!stop)
             {
+                NamedPipeServerStream pipe = null;
                 try
                 {
-                    using (var pipe = new NamedPipeServerStream(name, PipeDirection.InOut, 1, PipeTransmissionMode.Byte, PipeOptions.None, 0, 0, PipeAccess()))
-                    {
-                        pipe.WaitForConnection();
-                        var reader = new StreamReader(pipe, new UTF8Encoding(false));
-                        var writer = new StreamWriter(pipe, new UTF8Encoding(false)) { AutoFlush = true };
-                        string line = reader.ReadLine();
-                        string answer;
-                        try
-                        {
-                            var req = json.Deserialize<Dictionary<string, object>>(line ?? "{}");
-                            answer = json.Serialize(Handle(req));
-                        }
-                        catch (Exception ex) { answer = json.Serialize(new Dictionary<string, object> { ["ok"] = false, ["error"] = Inner(ex) }); }
-                        writer.WriteLine(answer);
-                        try { pipe.WaitForPipeDrain(); } catch { }
-                    }
+                    // several instances: a request that waits for the user (a question card, "ask") must not block the others
+                    pipe = new NamedPipeServerStream(name, PipeDirection.InOut, 4, PipeTransmissionMode.Byte, PipeOptions.None, 0, 0, PipeAccess());
+                    pipe.WaitForConnection();
+                    var p = pipe; pipe = null;
+                    System.Threading.Tasks.Task.Run(() => Serve(p));
                 }
-                catch (Exception ex) { Log("Pipe error: " + ex.Message); Thread.Sleep(500); }
+                catch (Exception ex) { pipe?.Dispose(); Log("Pipe error: " + ex.Message); Thread.Sleep(500); }
+            }
+        }
+
+        void Serve(NamedPipeServerStream pipe)
+        {
+            using (pipe)
+            {
+                try
+                {
+                    var reader = new StreamReader(pipe, new UTF8Encoding(false));
+                    var writer = new StreamWriter(pipe, new UTF8Encoding(false)) { AutoFlush = true };
+                    string line = reader.ReadLine();
+                    string answer;
+                    try
+                    {
+                        var req = json.Deserialize<Dictionary<string, object>>(line ?? "{}");
+                        answer = json.Serialize(Handle(req));
+                    }
+                    catch (Exception ex) { answer = json.Serialize(new Dictionary<string, object> { ["ok"] = false, ["error"] = Inner(ex) }); }
+                    writer.WriteLine(answer);
+                    try { pipe.WaitForPipeDrain(); } catch { }
+                }
+                catch (Exception ex) { Log("Pipe error: " + ex.Message); }
             }
         }
 
@@ -124,6 +137,8 @@ namespace TcAgentBridge
             Dictionary<string, object> r;
             if (cmd == "ping")
                 r = new Dictionary<string, object> { ["version"] = BridgeVersion, ["pid"] = System.Diagnostics.Process.GetCurrentProcess().Id, ["is64bit"] = Environment.Is64BitProcess };
+            // tc_ask_user: waits for the user's answer in the chat - not on the UI thread (the card is shown there)
+            else if (cmd == "ask") r = AskUser(req);
             else
                 r = (Dictionary<string, object>)ui.Invoke(new Func<Dictionary<string, object>>(() =>
                 {
@@ -153,6 +168,17 @@ namespace TcAgentBridge
             r["ms"] = sw.ElapsedMilliseconds;
             Log("-> " + cmd + " ok (" + sw.ElapsedMilliseconds + " ms)");
             return r;
+        }
+
+        // ------------------------------------------------------------------ Question of the agent (tool tc_ask_user)
+        // The question card in the TcAgent Chat (ChatCards.cs); opens the chat window if needed. Waits for the answer.
+        Dictionary<string, object> AskUser(Dictionary<string, object> req)
+        {
+            ui.Invoke(new Action(() => ShowChat()));
+            var chat = ChatControl.Instance ?? throw new Exception("The TcAgent Chat window could not be opened");
+            var answers = chat.AskFromTool(req);
+            Log("tc_ask_user: " + (answers == null ? "not answered" : string.Join("; ", answers.Values)));
+            return new Dictionary<string, object> { ["answered"] = answers != null, ["answers"] = answers ?? new Dictionary<string, object>() };
         }
 
         // ------------------------------------------------------------------ Confirmation before runtime actions

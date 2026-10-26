@@ -118,6 +118,9 @@ namespace TcAgentBridge
                 return Card("\U0001F512 Permission", body);
             }, "deny");
 
+        /// <summary>Question of the TcAgent tool tc_ask_user (any AI client): the same card. Call from a background thread.</summary>
+        internal Dictionary<string, object> AskFromTool(Dictionary<string, object> input) => AskQuestions(input);
+
         // ------------------------------------------------------------------ question card
         // Questions of AskUserQuestion: {"questions":[{"question","header","options":[{"label","description"}],"multiSelect"}]}.
         // Returns question -> answer (selected labels separated by ", ", plus the free text), or null if skipped.

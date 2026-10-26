@@ -148,6 +148,14 @@ Store (`TCAGENT_FEEDBACK`): not set = `<install>\..\..\feedback\feedback.jsonl` 
 | `version` | string |  | resolve: TcAgent version with the fix |
 | `max` | integer |  | list: max. entries (default 200) |
 
+### `tc_ask_user`
+
+Asks the user when a decision or missing information blocks the work: 1-4 questions, each with 2-4 options (recommended option first, with a short description); the user can always answer in free text. Works in every AI client: from the TcAgent Chat a question card in the chat window of the IDE; in other clients the client's own question dialog (MCP elicitation), with the card in the IDE as fallback. Without any channel the agent is told to ask in its reply instead. Returns the answers per question; a skipped question is reported as such - the agent must not invent an answer.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `questions` | array | yes | `[{question, header?, options: [{label, description?}], multiSelect?}]` – 1-4 questions, at most 6 options each |
+
 ## Project tree, configuration, I/O
 
 ### `tc_tree`

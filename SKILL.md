@@ -361,6 +361,10 @@ treat them like project rules for that library.
 - Runtime actions (activate, PLC start/stop, ADS write, runtime mode, routes) may need the user's confirmation
   (`TCAGENT_CONFIRM`). A declined confirmation is final - do not retry or work around it. If the call is refused
   because nobody can be asked (no question dialog), ask the user in the chat; never set `TCAGENT_CONFIRM=off` yourself.
+- **Questions to the user:** when a decision or missing information blocks the work, ask with `tc_ask_user` (1-4 questions,
+  2-4 options each, recommended first; the user can always answer in free text) instead of ending your reply with a question.
+  It works in every AI client (a card in the TcAgent Chat, otherwise the client's question dialog). Never ask what the project
+  or the tools can tell you.
 
 ## Pipeline
 

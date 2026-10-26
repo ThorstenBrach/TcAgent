@@ -69,12 +69,19 @@ namespace TcAgentBridge
             return own;
         }
 
-        /// <summary>Version of the TcAgent.exe the chat and the AI clients start (from mcp-claude.json, folder app\&lt;version&gt;),
-        /// null if not set up.</summary>
+        /// <summary>Version of the TcAgent.exe the chat and the AI clients start: from settings.json (written by the client
+        /// setup, the single source), for older setups from the path app\&lt;version&gt; in mcp-claude.json. null if not set up.</summary>
         public static string RegisteredServerVersion()
         {
             try
             {
+                var settings = Path.Combine(Local, "settings.json");
+                if (File.Exists(settings))
+                {
+                    var js = new System.Web.Script.Serialization.JavaScriptSerializer().Deserialize<Dictionary<string, object>>(File.ReadAllText(settings));
+                    if (js != null && js.TryGetValue("server", out var s) && s is Dictionary<string, object> server &&
+                        server.TryGetValue("version", out var v) && v is string ver && ver.Length > 0) return ver;
+                }
                 var f = Path.Combine(Local, "mcp-claude.json");
                 if (!File.Exists(f)) return null;
                 var m = System.Text.RegularExpressions.Regex.Match(File.ReadAllText(f), @"app[\\/]+([0-9][0-9.]*[0-9])[\\/]+TcAgent\.exe", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
@@ -114,8 +121,8 @@ namespace TcAgentBridge
                     catch (IOException ex)
                     {
                         log("Installer: " + ex);
-                        notify("TcAgent could not be updated because TcAgent.exe is still in use by an AI client (e.g. Claude Desktop). " +
-                               "Quit the AI clients, then click \"Set up clients\" in the TcAgent Chat window.");
+                        notify("TcAgent could not be updated because TcAgent.exe is still in use by an AI client (e.g. a desktop app). " +
+                               "Quit the AI clients, then click \"⋯ > Set up clients\" in the TcAgent Chat window.");
                     }
                     catch (Exception ex) { log("Installer: " + ex); }
                 });
@@ -136,7 +143,7 @@ namespace TcAgentBridge
                     File.WriteAllText(SetupLog, output);
                     var lines = output.Split('\n').Select(l => l.Trim()).Where(l => l.StartsWith("- ")).ToList();
                     notify(code == 0
-                        ? $"TcAgent {BridgePackage.BridgeVersion} registered:\n  " + string.Join("\n  ", lines) + "\nRestart Claude Desktop completely (tray icon > Quit) if you use it."
+                        ? $"TcAgent {BridgePackage.BridgeVersion} registered:\n  " + string.Join("\n  ", lines) + "\nRestart the AI clients you use; quit desktop apps completely (tray icon > Quit)."
                         : $"TcAgent: client setup failed (exit code {code}) - see {SetupLog}");
                 }
                 var state = LoadState();
@@ -148,8 +155,8 @@ namespace TcAgentBridge
             {
                 // an AI client (Claude Desktop, Copilot ...) still runs the previous TcAgent.exe from this folder
                 log("Installer: " + ex);
-                notify("TcAgent could not be updated because TcAgent.exe is still in use by an AI client (e.g. Claude Desktop). " +
-                       "Quit the AI clients (Claude Desktop: tray icon > Quit), then click \"Set up clients\" in the TcAgent Chat window.");
+                notify("TcAgent could not be updated because TcAgent.exe is still in use by an AI client (e.g. a desktop app). " +
+                       "Quit the AI clients (desktop apps: tray icon > Quit), then click \"⋯ > Set up clients\" in the TcAgent Chat window.");
             }
             catch (Exception ex) { log("Installer: " + ex); notify("TcAgent setup: " + ex.Message); }
         }

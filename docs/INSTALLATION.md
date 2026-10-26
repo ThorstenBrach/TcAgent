@@ -88,10 +88,14 @@ powershell -ExecutionPolicy Bypass -File .\setup-clients.ps1 -SolutionDir <folde
 
 The script
 
+* keeps the settings of TcAgent (`TCAGENT_*`) in **`%LOCALAPPDATA%\TcAgent\settings.json`** – the single source for
+  all clients (on the first run they are taken over once from an existing client configuration). Change a setting there
+  and run the script again; every client gets the same values,
 * registers TcAgent as an MCP server in all clients it finds (Claude Desktop, Claude Code, Copilot in VS,
-  Copilot CLI, Gemini CLI, Codex CLI), keeping existing `TCAGENT_*` settings,
-* installs the agent guide as `AGENTS.md`, `GEMINI.md` and `copilot-instructions.md` (globally and, with
-  `-SolutionDir`, also in the project so it reaches the team via Git),
+  Copilot CLI, Gemini CLI, Codex CLI),
+* installs the agent guide for each client (`AGENTS.md`, `GEMINI.md`, `copilot-instructions.md`, the Claude Code skill);
+  with `-SolutionDir` also in the project so it reaches the team via Git: **`AGENTS.md`** is the single source there,
+  `CLAUDE.md` and `GEMINI.md` only import it, `.github\copilot-instructions.md` points to it,
 * creates the chat window configuration (`%LOCALAPPDATA%\TcAgent\chat-backends.json`).
 
 Before each change a backup `*.bak-<date>` is created; only the `tcagent` entry is modified.

@@ -219,7 +219,7 @@ public static class AuditCheck
         if (missing.Count + unsure.Count > 0)
             o.AppendLine("\nPossible causes: the audit is written when a call ENDS (a call that hangs in an IDE dialog or whose process is killed " +
                          "leaves none); older TcAgent versions lost entries when two TcAgent processes wrote audit.jsonl at the same moment " +
-                         "(now shared append with retries); a different TCAGENT_AUDIT per client; packaged clients (Claude Desktop from the Store) " +
+                         "(now shared append with retries); a different TCAGENT_AUDIT per client; packaged clients (desktop apps from the Store) " +
                          "write %LOCALAPPDATA% into %LOCALAPPDATA%\\Packages\\<package>\\LocalCache\\Local - those copies are included above when " +
                          "readable; calls after midnight are in the next day's log.");
         return o.ToString();

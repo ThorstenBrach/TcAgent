@@ -5,6 +5,28 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.29.0] – 2026-10-26
+
+Client neutrality, part 1 – TcAgent works the same with every AI client (concept: `docs/KNOWLEDGE_LAYERS.md`).
+
+### Added
+- **`tc_ask_user`**: the agent asks the user when a decision or missing information blocks the work – 1-4 questions with
+  options (recommended first) and a free answer, in **every** AI client. From the TcAgent Chat: a question card in the
+  chat window; other clients: their own question dialog (MCP elicitation), the card in the IDE as fallback; without any
+  channel the agent is told to ask in its reply. The chat prompt and the guide tell the agent to use it instead of
+  ending a reply with a question (the chat still answers a CLI's own question tool). Tests: `AskQuestionsTests`.
+- **`%LOCALAPPDATA%\TcAgent\settings.json`** – the single source of TcAgent's settings (`TCAGENT_*` environment variables)
+  and of the registered server (path and version). `setup-clients.ps1` sets up every client from it; on the first run
+  the values are taken over once from an existing client configuration (any client, not only one product). The VS
+  extension reads the registered version from there.
+
+### Changed
+- **`AGENTS.md` is the single guide file in the project** (`setup-clients.ps1 -SolutionDir`): `CLAUDE.md` and
+  `GEMINI.md` only import it (`@AGENTS.md`), `.github\copilot-instructions.md` points to it.
+- Messages name no single AI product any more ("quit desktop apps completely" instead of one product's name).
+- TcAgentBridge serves several requests at once (pipe with 4 instances): a question waiting for the user no longer
+  blocks other calls.
+
 ## [0.28.5] – 2026-10-25
 
 ### Changed

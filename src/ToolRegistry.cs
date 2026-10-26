@@ -200,6 +200,7 @@ public sealed partial class ToolRegistry
         RegisterEditorNav();
         RegisterLibraryInventory();
         RegisterPlainText();
+        RegisterAskUser();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +
@@ -1616,7 +1617,7 @@ public sealed partial class ToolRegistry
             if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "TcAgent.dll")) && !File.Exists(Path.Combine(AppContext.BaseDirectory, "TcAgent.exe")) ||
                 file?.StartsWith("System.", StringComparison.Ordinal) == true)
                 msg += " - the files of this running TcAgent were removed or replaced (update while it was running). " +
-                       "Restart the AI client: TcAgent Chat (close/reopen the chat window or restart Visual Studio), Claude Desktop (tray icon > Quit).";
+                       "Restart the AI client: TcAgent Chat (close/reopen the chat window or restart Visual Studio), desktop apps (tray icon > Quit), CLIs (start them again).";
         }
         if (string.IsNullOrWhiteSpace(msg)) msg = e.GetType().Name;
         if (e is not IdeLostException && TwinCatSession.IsIdeLost(ex))

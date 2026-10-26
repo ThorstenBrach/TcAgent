@@ -673,12 +673,13 @@ namespace TcAgentBridge
                 return sb.ToString();
             }
             sb.AppendLine("You are working in a TwinCAT 3 project (Visual Studio). Use the MCP tools of the \"tcagent\" server (tc_*, ads_*) " +
-                          "and follow the TcAgent guide (skill twincat-tcagent or AGENTS.md/GEMINI.md/copilot-instructions.md). " +
+                          "and follow the TcAgent guide (AGENTS.md, or the twincat-tcagent skill). " +
                           "Answer concisely, in the language of the user's request; name changed objects with their tree path. Before writing code for the first time, call tc_coding_rules once and follow the rules. " + buildRule);
-            // the persistent Claude session answers AskUserQuestion with a dialog in this window (options or free text)
-            if (askTool) sb.AppendLine("If you need a decision or missing information from the user before you can go on, ask with the AskUserQuestion tool " +
-                                       "(2-4 short options; the user can also type a free answer) instead of ending your answer with a question. Do not ask about things you can find out with the tools. " +
-                                       "Tool calls your permissions do not cover (e.g. files outside the working folder) are shown to the user in this chat as a permission question " +
+            // tc_ask_user shows a question card in this window - for every backend
+            sb.AppendLine("If you need a decision or missing information from the user before you can go on, ask with the tcagent tool tc_ask_user " +
+                          "(2-4 short options; the user can also type a free answer) instead of ending your answer with a question. Do not ask about things you can find out with the tools.");
+            // permission cards: only the persistent session forwards the CLI's permission questions to this window
+            if (askTool) sb.AppendLine("Tool calls your permissions do not cover (e.g. files outside the working folder) are shown to the user in this chat as a permission question " +
                                        "(allow once / for this session / deny); you only see the outcome. A denied call is the user's decision - do not try it another way; " +
                                        "an error after an allowed call is a real error of the tool, not a missing permission.");
             if (ctx != null) sb.AppendLine("\n[User's editor context]\n" + ctx);

@@ -5,7 +5,9 @@
 #   powershell -ExecutionPolicy Bypass -File .\setup-clients.ps1
 #   powershell -ExecutionPolicy Bypass -File .\setup-clients.ps1 -SolutionDir C:\Projects\MyMachine
 #
-# -SolutionDir: additionally creates AGENTS.md, GEMINI.md, CLAUDE.md and .github\copilot-instructions.md in the project (for Git/team).
+# -SolutionDir: additionally writes the guide into the project (for Git/team): AGENTS.md as the single source, CLAUDE.md and
+#  GEMINI.md import it, .github\copilot-instructions.md points to it.
+# The settings (environment variables of TcAgent) are kept in %LOCALAPPDATA%\TcAgent\settings.json - the single source.
 param(
     [string]$TcAgentExe = (Join-Path $PSScriptRoot 'bin\publish\TcAgent.exe'),
     [string]$Solution = $null,        # TCAGENT_SOLUTION (part of the solution path) - only needed to pin one specific instance
@@ -38,28 +40,51 @@ function Set-Prop($obj, $name, $value) { $obj | Add-Member -NotePropertyName $na
 function Save-Json($path, $obj) { Save-Text $path ($obj | ConvertTo-Json -Depth 30) }
 function Has-Cmd($name) { return [bool](Get-Command $name -ErrorAction SilentlyContinue) }
 
-# ------------------------------------------------------------------ Environment variables (from an existing Claude configuration)
+# ------------------------------------------------------------------ Settings: %LOCALAPPDATA%\TcAgent\settings.json is the single source
+# The settings of TcAgent (environment variables such as TCAGENT_ALLOW_TARGETS, TCAGENT_CONFIRM) live in settings.json;
+# every client below is set up from there - no client's own configuration is the source. On the first run (no
+# settings.json yet) they are taken over once from an existing client configuration.
+$tcDir = Join-Path $env:LOCALAPPDATA 'TcAgent'
+$settingsFile = Join-Path $tcDir 'settings.json'
 $claudeConfigs = @()
 $claudeConfigs += Get-ChildItem "$env:LOCALAPPDATA\Packages\Claude_*\LocalCache\Roaming\Claude\claude_desktop_config.json" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
 # newer Claude Desktop (MSIX) keeps its data outside the package folder
 $claudeConfigs += Get-ChildItem "$env:LOCALAPPDATA\Claude-Data\Claude_*\claude_desktop_config.json" -ErrorAction SilentlyContinue | ForEach-Object { $_.FullName }
 if (Test-Path "$env:APPDATA\Claude") { $claudeConfigs += "$env:APPDATA\Claude\claude_desktop_config.json" }
-$envVars = [ordered]@{}
-foreach ($c in $claudeConfigs) {
-    if (-not (Test-Path $c)) { continue }
-    $j = Read-Json $c
-    if ($j.mcpServers -and $j.mcpServers.tcagent -and $j.mcpServers.tcagent.env) {
-        $j.mcpServers.tcagent.env.PSObject.Properties | ForEach-Object { if (-not $envVars.Contains($_.Name)) { $envVars[$_.Name] = [string]$_.Value } }
-    }
+function Get-TcAgentEnv($j) {
+    foreach ($s in @($j.mcpServers, $j.servers)) { if ($s -and $s.tcagent -and $s.tcagent.env) { return $s.tcagent.env } }
+    return $null
 }
-# Do not carry over TCAGENT_SOLUTION: TcAgent finds the IDE itself (its own IDE in the chat, otherwise the only instance or a selection list).
-# An old fixed value would lead to the wrong target in other projects.
-if ($envVars.Contains('TCAGENT_SOLUTION')) { $envVars.Remove('TCAGENT_SOLUTION') }
+$settings = Read-Json $settingsFile
+$envVars = [ordered]@{}
+if ($settings.env) {
+    $settings.env.PSObject.Properties | ForEach-Object { $envVars[$_.Name] = [string]$_.Value }
+}
+else {
+    $sources = @($claudeConfigs) + @((Join-Path $tcDir 'mcp-claude.json'), (Join-Path $env:USERPROFILE '.mcp.json'),
+                                     (Join-Path $env:USERPROFILE '.copilot\mcp-config.json'), (Join-Path $env:USERPROFILE '.gemini\settings.json'))
+    foreach ($c in $sources) {
+        if (-not (Test-Path $c)) { continue }
+        $e = Get-TcAgentEnv (Read-Json $c)
+        if ($e) { $e.PSObject.Properties | ForEach-Object { if (-not $envVars.Contains($_.Name)) { $envVars[$_.Name] = [string]$_.Value } }; $done.Add("Settings taken over from: $c") }
+    }
+    # Do not carry over TCAGENT_SOLUTION: TcAgent finds the IDE itself (its own IDE in the chat, otherwise the only instance or a selection list).
+    # An old fixed value would lead to the wrong target in other projects.
+    if ($envVars.Contains('TCAGENT_SOLUTION')) { $envVars.Remove('TCAGENT_SOLUTION') }
+}
 if ($Solution) { $envVars['TCAGENT_SOLUTION'] = $Solution }
 if ($AllowTargets) { $envVars['TCAGENT_ALLOW_TARGETS'] = $AllowTargets }
 if ($Search) { $envVars['TCAGENT_SEARCH'] = $Search }
 $envObj = New-Object PSObject
 foreach ($k in $envVars.Keys) { Set-Prop $envObj $k $envVars[$k] }
+# the TcAgent.exe all clients start: path and version (version from the folder app\<version>\, otherwise from the file)
+$m = [regex]::Match($TcAgentExe, 'app[\\/]+([0-9][0-9.]*[0-9])[\\/]+TcAgent\.exe', 'IgnoreCase')
+$serverVersion = if ($m.Success) { $m.Groups[1].Value } else { (Get-Item $TcAgentExe).VersionInfo.ProductVersion }
+$server = New-Object PSObject; Set-Prop $server 'exe' $TcAgentExe; Set-Prop $server 'version' $serverVersion
+Set-Prop $settings 'env' $envObj
+Set-Prop $settings 'server' $server
+Save-Json $settingsFile $settings
+$done.Add("Settings: $settingsFile (single source for all clients)")
 Write-Host "TcAgent: $TcAgentExe"
 Write-Host ("Environment: " + (($envVars.GetEnumerator() | ForEach-Object { if ($_.Key -eq 'TCAGENT_SEARCH') { "$($_.Key)=$(($_.Value -split ':')[0]):***" } else { "$($_.Key)=$($_.Value)" } }) -join '; '))
 
@@ -142,7 +167,6 @@ if ((Has-Cmd 'codex') -or (Test-Path $codexDir)) {
 }
 
 # ------------------------------------------------------------------ Files for the chat window in TwinCAT
-$tcDir = Join-Path $env:LOCALAPPDATA 'TcAgent'
 $m = New-Object PSObject; Set-Prop $m 'mcpServers' (New-Object PSObject)
 $e = New-Object PSObject; Set-Prop $e 'command' $TcAgentExe; Set-Prop $e 'args' @(); Set-Prop $e 'env' $envObj
 Set-Prop $m.mcpServers 'tcagent' $e
@@ -185,8 +209,8 @@ else {
 $guidePath = Join-Path $PSScriptRoot 'agents\TCAGENT_GUIDE.md'
 if (Test-Path $guidePath) {
     $guide = [IO.File]::ReadAllText($guidePath)
-    $blockText = "<!-- tcagent:begin (managed by setup-clients.ps1) -->`n$guide`n<!-- tcagent:end -->"
-    function Merge-Guide($path) {
+    function Merge-Guide($path, [string]$content = $guide) {
+        $blockText = "<!-- tcagent:begin (managed by setup-clients.ps1) -->`n$content`n<!-- tcagent:end -->"
         $old = if (Test-Path $path) { [IO.File]::ReadAllText($path) } else { '' }
         $new = if ($old -match '(?s)<!-- tcagent:begin.*?<!-- tcagent:end -->') {
             [regex]::Replace($old, '(?s)<!-- tcagent:begin.*?<!-- tcagent:end -->', [System.Text.RegularExpressions.MatchEvaluator]{ param($x) $blockText })
@@ -205,9 +229,13 @@ if (Test-Path $guidePath) {
     }
     if ($SolutionDir) {
         if (-not (Test-Path $SolutionDir)) { throw "SolutionDir not found: $SolutionDir" }
-        foreach ($p in @('AGENTS.md', 'GEMINI.md', 'CLAUDE.md', '.github\copilot-instructions.md')) {
-            Merge-Guide (Join-Path $SolutionDir $p); $done.Add("Guide in project: $SolutionDir\$p")
-        }
+        # AGENTS.md is the single source in the project (cross-tool standard, read by Codex, Copilot and others);
+        # CLAUDE.md and GEMINI.md only import it, copilot-instructions.md points to it
+        Merge-Guide (Join-Path $SolutionDir 'AGENTS.md'); $done.Add("Guide in project: $SolutionDir\AGENTS.md")
+        $import = "The TcAgent guide and the project instructions are in AGENTS.md:`n`n@AGENTS.md"
+        foreach ($p in @('CLAUDE.md', 'GEMINI.md')) { Merge-Guide (Join-Path $SolutionDir $p) $import; $done.Add("Guide in project: $SolutionDir\$p (imports AGENTS.md)") }
+        Merge-Guide (Join-Path $SolutionDir '.github\copilot-instructions.md') "The TcAgent guide and the project instructions are in AGENTS.md in the root of this repository - follow it."
+        $done.Add("Guide in project: $SolutionDir\.github\copilot-instructions.md (points to AGENTS.md)")
     }
 }
 else { Write-Host "Note: $guidePath is missing - guides not distributed" -ForegroundColor Yellow }
@@ -216,4 +244,4 @@ Write-Host ""
 Write-Host "Set up:" -ForegroundColor Green
 $done | ForEach-Object { Write-Host "  - $_" }
 Write-Host ""
-Write-Host "CLIs that were not found are skipped. Then restart the clients (quit Claude Desktop completely, reload VS)."
+Write-Host "CLIs that were not found are skipped. Then restart the clients (quit desktop apps completely, reload VS)."
