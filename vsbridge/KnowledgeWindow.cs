@@ -1165,13 +1165,42 @@ namespace TcAgentBridge
             try
             {
                 var r = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(output);
-                feedbackText.Text = S(r, "text");
+                feedbackText.Text = WithEnvironment(S(r, "text"));
                 feedbackUrl = S(r, "url");
                 var repl = ((r.TryGetValue("replaced", out var rv) ? rv as IEnumerable : null) ?? new object[0]).Cast<object>().Select(x => x.ToString()).ToList();
                 feedbackInfo.Text = (repl.Count > 0 ? $"Replaced automatically ({repl.Count}): {string.Join(", ", repl.Take(12))}{(repl.Count > 12 ? " …" : "")}. " : "Nothing found to replace automatically. ") +
                                     "Check and edit the text below before you share it (abbreviations of customers or projects are not known to TcAgent - add them to privateTerms in settings.json).";
             }
             catch { feedbackText.Text = output; }
+        }
+
+        // the server does not know the IDE it runs beside - the bridge fills in its own version, TwinCAT and the IDE
+        static string WithEnvironment(string text)
+        {
+            string tc = null, ide = null;
+            try
+            {
+                using (var k = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry32)
+                                                          .OpenSubKey(@"SOFTWARE\Beckhoff\TwinCAT3\System"))
+                    tc = k?.GetValue("TcVersion") as string;
+            }
+            catch { }
+            try
+            {
+                var p = Process.GetCurrentProcess();
+                var fv = FileVersionInfo.GetVersionInfo(p.MainModule.FileName);
+                var name = p.ProcessName.Equals("devenv", StringComparison.OrdinalIgnoreCase)
+                    ? (fv.ProductMajorPart >= 17 ? "Visual Studio 2022" : fv.ProductMajorPart == 16 ? "Visual Studio 2019" : "Visual Studio")
+                    : p.ProcessName.IndexOf("TcXaeShell", StringComparison.OrdinalIgnoreCase) >= 0 ? $"TwinCAT XAE Shell ({(Environment.Is64BitProcess ? "64" : "32")}-bit)" : p.ProcessName;
+                ide = $"{name} {fv.ProductVersion}";
+            }
+            catch { }
+            string Row(string label, string value) => $"- **{label}:** {value}";
+            var lines = text.Replace("\r\n", "\n").Split('\n').Select(l =>
+                l.StartsWith("- **TcAgent extension (bridge):**") ? Row("TcAgent extension (bridge)", BridgePackage.BridgeVersion) :
+                l.StartsWith("- **TwinCAT version:**") && tc != null ? Row("TwinCAT version", tc) :
+                l.StartsWith("- **IDE and version:**") && ide != null ? Row("IDE and version", ide) : l);
+            return string.Join("\n", lines);
         }
 
         void SaveIssue()

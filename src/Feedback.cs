@@ -284,6 +284,7 @@ public static class Feedback
         var o = new StringBuilder($"[{i.Tool ?? "TcAgent"}] {i.Summary}\n\n");
         o.AppendLine($"- **Type / severity:** {i.Type ?? "-"} / {i.Severity ?? "-"}");
         o.AppendLine($"- **TcAgent:** {i.Version ?? "?"}, client {i.Client ?? "?"}");
+        o.AppendLine("- **TcAgent extension (bridge):** (please add - chat window ⋯, last line)");
         o.AppendLine("- **TwinCAT version:** (please add, e.g. 3.1.4026.19)");
         o.AppendLine("- **IDE and version:** (please add, e.g. Visual Studio 2022 17.14 or TwinCAT XAE Shell 4.0.x)");
         if (!string.IsNullOrWhiteSpace(i.Tool)) o.AppendLine($"- **Tool:** `{i.Tool}`");

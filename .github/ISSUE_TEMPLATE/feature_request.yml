@@ -51,7 +51,7 @@ body:
     id: tcagent
     attributes:
       label: TcAgent version
-      placeholder: "0.42.3"
+      placeholder: "0.42.6"
   - type: input
     id: twincat
     attributes:

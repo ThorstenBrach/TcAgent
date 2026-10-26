@@ -5,6 +5,15 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.42.6] – 2026-10-26
+
+### Changed
+- Issue templates: TcAgent version and the version of the TcAgent extension (bridge) are required fields of bug report
+  and question - after an update the two can differ. The fields are in a fixed order: description, then versions, then
+  the AI client.
+- Knowledge window, tab Feedback: the report text fills in the bridge version, the TwinCAT version (registry) and the IDE
+  with its version (the running Visual Studio or XAE Shell) by itself.
+
 ## [0.42.5] – 2026-10-26
 
 ### Changed

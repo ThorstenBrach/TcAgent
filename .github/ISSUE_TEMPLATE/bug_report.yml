@@ -65,15 +65,23 @@ body:
     id: tcagent
     attributes:
       label: TcAgent version
-      description: Shown in the chat window (⋯) or by TcAgent.exe version
-      placeholder: "0.42.2"
+      description: "TcAgent.exe version (the server) - also shown by tc_version"
+      placeholder: "0.42.6"
+    validations:
+      required: true
+  - type: input
+    id: bridge
+    attributes:
+      label: TcAgent extension (bridge) version
+      description: "Chat window ⋯ (last line) or Extensions > Manage Extensions > TcAgent - can differ from the TcAgent version after an update"
+      placeholder: "0.42.6"
     validations:
       required: true
   - type: input
     id: twincat
     attributes:
       label: TwinCAT version
-      description: TwinCAT XAE build, e.g. in the IDE under Help > About or TwinCAT > About TwinCAT
+      description: "TwinCAT XAE build, e.g. in the IDE under Help > About or TwinCAT > About TwinCAT"
       placeholder: "3.1.4026.19"
     validations:
       required: true
@@ -92,7 +100,7 @@ body:
     id: ide_version
     attributes:
       label: IDE version
-      description: Visual Studio under Help > About, XAE Shell under Help > About
+      description: "Visual Studio under Help > About, XAE Shell under Help > About"
       placeholder: "17.14.x / XAE Shell 4.0.x"
     validations:
       required: true
@@ -105,7 +113,7 @@ body:
     id: log
     attributes:
       label: Log
-      description: The relevant lines of %LOCALAPPDATA%\TcAgent\logs or bridge\bridge.log (anonymized).
+      description: "The relevant lines of %LOCALAPPDATA%\\TcAgent\\logs or bridge\\bridge.log (anonymized)."
       render: text
   - type: checkboxes
     id: anonymized
