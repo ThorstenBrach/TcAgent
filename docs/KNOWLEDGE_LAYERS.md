@@ -286,6 +286,9 @@ gets and where it comes from:
   files from a source or a shared repository stay untouched and can still be updated.
 - Removing or changing files of a shared repository goes the same way as every change there: as a pull request.
   `locked` files can only be changed by their owner.
+- **History view:** the metrics of the run logs over the runs (failed checks, user corrections, minutes per run,
+  moving average) per workflow, every adopted change as a marker, a reverted change as a shaded range, and a list of the
+  changes with before / after values over the following 10 runs. Open proposals can be reviewed from there; export as CSV.
 - The same actions exist for agents and the command line (`tc_knowledge`, `TcAgent.exe knowledge`), so the agent can
   answer "which rules apply here and why?".
 
