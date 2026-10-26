@@ -5,7 +5,8 @@
 //                 (bRunSuite, bRun_<TestMethod>) and one call per test (docs/TCUNIT_TESTS.md, section 4)
 //   InitialOutputs  a complete test: a fresh instance, one call, every output with a known type is compared with its
 //                 declared initial value (or the default of its type)
-//   Test_<Method>   one test per public method: arrange (the inputs as comments), act (the call), and an assertion that
+//   Test_<Method>   one test per public method: arrange (the inputs as comments, a local per parameter), act (the call
+//                 with every parameter), and an assertion that
 //                 FAILS until it is replaced ("TODO") - a skeleton never passes by accident
 //
 // VAR_IN_OUT parameters get local variables, because a call without them does not compile. Pure text (no IDE), so the
@@ -100,6 +101,19 @@ public static class TestSkeleton
     }
 
     // ------------------------------------------------------------------ generate
+    /// <summary>The suite name in the style of the existing suites: the suffix most of them use (e.g. TestSuiteFB, _Test);
+    /// a trailing FB of the block is dropped when the suffix ends with FB. Default &lt;FB&gt;_Test.</summary>
+    public static string SuiteName(string fbName, IEnumerable<string> existingSuites)
+    {
+        var names = existingSuites?.ToList() ?? new List<string>();
+        var suffix = new[] { "TestSuiteFB", "Test_FB", "TestSuite", "_Tests", "_Test", "Tests", "Test" }
+                     .Select(s => (S: s, N: names.Count(n => n.EndsWith(s, StringComparison.OrdinalIgnoreCase))))
+                     .Where(x => x.N > 0).OrderByDescending(x => x.N).ThenByDescending(x => x.S.Length).Select(x => x.S).FirstOrDefault();
+        if (suffix == null) return fbName + "_Test";
+        var bas = suffix.EndsWith("FB") && fbName.EndsWith("FB") && fbName.Length > 2 ? fbName[..^2] : fbName;
+        return bas + suffix;
+    }
+
     public static Suite Generate(string fbName, string fbDecl, IEnumerable<(string Name, string Decl)> methods, string suiteName = null)
     {
         var s = new Suite();
@@ -147,13 +161,14 @@ public static class TestSkeleton
             var test = "Test_" + m.Name;
             var extra = new List<Var>();
             if (m.ReturnType != null) extra.Add(new Var("VAR", "result", m.ReturnType, null));
-            var ioArgs = m.Vars.Where(v => v.Section == "VAR_IN_OUT").ToList();
-            extra.AddRange(ioArgs.Select(v => new Var("VAR", v.Name + "_", v.Type, null)));
+            // every parameter gets a local variable and is passed - a call without a required input or in-out does not compile
+            var mArgs = m.Vars.Where(v => v.Section is "VAR_INPUT" or "VAR_IN_OUT").ToList();
+            extra.AddRange(mArgs.Select(v => new Var("VAR", v.Name + "_", v.Type, null)));
             var impl = new StringBuilder($"TEST('{test}');\n\n// Arrange\n");
             foreach (var v in vars.Where(v => v.Section == "VAR_INPUT")) impl.Append($"// fbUnderTest.{v.Name} := ;   ({v.Type})\n");
-            foreach (var v in m.Vars.Where(v => v.Section == "VAR_INPUT")) impl.Append($"// parameter {v.Name} : {v.Type}\n");
+            foreach (var v in mArgs.Where(v => v.Section == "VAR_INPUT")) impl.Append($"// {v.Name}_ := ;   (parameter {v.Name} : {v.Type})\n");
             impl.Append("\n// Act\n");
-            var args = string.Join(", ", ioArgs.Select(v => $"{v.Name} := {v.Name}_"));
+            var args = string.Join(", ", mArgs.Select(v => $"{v.Name} := {v.Name}_"));
             impl.Append(m.ReturnType != null ? $"result := fbUnderTest.{m.Name}({args});\n" : $"fbUnderTest.{m.Name}({args});\n");
             impl.Append("\n// Assert - TODO: replace with the expected behaviour (fails until then)\n")
                 .Append($"AssertTrue(Condition := FALSE, Message := 'TODO: assert the result of {m.Name}');\n\nTEST_FINISHED();");

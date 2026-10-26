@@ -65,12 +65,19 @@ public sealed class TestSkeletonTests
 
         var start = s.Methods[1];
         Assert.Contains("result : BOOL;", start.Declaration);
-        Assert.Contains("result := fbUnderTest.M_Start();", start.Implementation);
+        Assert.Contains("result := fbUnderTest.M_Start(fRamp := fRamp_);", start.Implementation);   // every parameter is passed
+        Assert.Contains("fRamp_ : REAL;", start.Declaration);
         Assert.Contains("AssertTrue(Condition := FALSE, Message := 'TODO", start.Implementation);
         Assert.Contains("TEST('Test_M_Start');", start.Implementation);              // the test name is the method name
         Assert.Contains("fbUnderTest.M_Reset(nCount := nCount_);", s.Methods[2].Implementation);
         Assert.Contains("_Calc: private", Assert.Single(s.Notes));
     }
+
+    [Theory]
+    [InlineData("MC_ReadActualPositionFB", new[] { "TelegramTestSuiteFB", "AxisTestSuiteFB" }, "MC_ReadActualPositionTestSuiteFB")]
+    [InlineData("FB_Motor", new[] { "FB_Valve_Test" }, "FB_Motor_Test")]
+    [InlineData("FB_Motor", new string[0], "FB_Motor_Test")]
+    public void SuiteNameFollowsTheExistingSuites(string fb, string[] existing, string expected) => Assert.Equal(expected, TestSkeleton.SuiteName(fb, existing));
 
     [Fact]
     public void PlainTextIsImportable()

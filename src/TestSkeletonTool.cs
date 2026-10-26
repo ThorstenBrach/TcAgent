@@ -19,10 +19,25 @@ public sealed partial class ToolRegistry
                                 "suite by hand, then fill in the expected behaviour (tc_plc_write) and add an instance of the suite to the test program " +
                                 "(TcUnit.RUN() must be called). dryRun=true shows the code (plain-text ST) without creating anything.",
             Schema(Req(P("name", "string", "the function block (name or tree path)")),
-                   P("suiteName", "string", "name of the suite (default <FB>_Test - follow the naming of the coding rules)"),
-                   P("parentPath", "string", "folder for the suite (default: the folder of the function block)"),
+                   P("suiteName", "string", "name of the suite (default: in the style of the existing suites, e.g. <FB>TestSuiteFB, otherwise <FB>_Test)"),
+                   P("parentPath", "string", "folder for the suite (default: the folder of the existing suites, a folder Tests/Test, otherwise the folder of the function block)"),
                    P("dryRun", "boolean", "only show the generated code")),
             a => tc.Sta.Run(() => TestSkeletonCall(a)));
+    }
+
+    // The folder for a new suite: where most existing suites of the same PLC project are, otherwise a folder named Tests/Test
+    string TestFolder(string fbPath, List<string> suites)
+    {
+        var project = fbPath.Contains(" Project^") ? fbPath[..(fbPath.IndexOf(" Project^") + 8)] : null;
+        if (project == null) return null;
+        var index = tc.PlcIndex().Where(x => x.Path.StartsWith(project + "^", StringComparison.OrdinalIgnoreCase)).ToList();
+        var suiteFolder = index.Where(x => suites.Contains(x.Name, StringComparer.OrdinalIgnoreCase)).Select(x => x.Path[..x.Path.LastIndexOf('^')])
+                               .GroupBy(p => p, StringComparer.OrdinalIgnoreCase).OrderByDescending(g => g.Count()).Select(g => g.Key).FirstOrDefault();
+        if (suiteFolder != null) return suiteFolder;
+        foreach (var name in new[] { "Tests", "Test", "UnitTests" })
+            foreach (var (n, p) in index.Where(x => x.Name.Equals(name, StringComparison.OrdinalIgnoreCase)))
+                try { if (tc.Item(p).ItemType == 601) return p; } catch { }
+        return null;
     }
 
     string TestSkeletonCall(JsonObject a)
@@ -36,8 +51,16 @@ public sealed partial class ToolRegistry
         var methods = new List<(string, string)>();
         foreach (var c in TwinCatSession.Children(item))
             try { if (c.ItemType == 609 && c is ITcPlcDeclaration md) methods.Add((c.Name, md.DeclarationText)); } catch { }
-        var suite = TestSkeleton.Generate(item.Name, decl, methods, Str(a, "suiteName"));
-        var parentPath = Str(a, "parentPath") ?? path[..path.LastIndexOf('^')];
+        // defaults in the style of the project: the naming of the existing suites, their folder (or a folder Tests/Test)
+        var existing = new List<string>();
+        try
+        {
+            var sln = (string)tc.RequireDte().Solution.FullName;
+            foreach (var p in TcUnitDiscovery.Discover(sln).Projects) existing.AddRange(p.Suites.Select(s => s.Type));
+        }
+        catch { }
+        var suite = TestSkeleton.Generate(item.Name, decl, methods, Str(a, "suiteName") ?? TestSkeleton.SuiteName(item.Name, existing));
+        var parentPath = Str(a, "parentPath") ?? TestFolder(path, existing) ?? path[..path.LastIndexOf('^')];
         var text = TestSkeleton.ToPlainText(suite);
         var notes = suite.Notes.Count > 0 ? "\nNotes: " + string.Join("; ", suite.Notes) : "";
         if (DryRun(a)) return $"PROPOSAL (nothing created): {suite.Fb.Name} under {parentPath} - {suite.Methods.Count} test(s){notes}\n\n{text}";

@@ -270,15 +270,15 @@ Generates the TcUnit test suite of a function block deterministically (docs/DETE
 TcUnit.FB_TestSuite` with the enable bools of the TcUnit Tests window (`bRunSuite`, `bRun_<Test>`), a complete test
 `InitialOutputs` (a fresh instance, one call, every output with a comparable type against its declared initial value or
 the default of its type) and one test `Test_<Method>` per public method – arrange (the inputs as comments), act (the
-call), and an assertion that **fails until the TODO is replaced**. `VAR_IN_OUT` parameters get local variables. Private
+call with every parameter as a local variable), and an assertion that **fails until the TODO is replaced**. The suite name and folder follow the existing suites of the project (e.g. `<FB>TestSuiteFB` in their folder, or a folder `Tests`). Private
 and protected methods and `FB_init`/`FB_exit`/`FB_reinit` are skipped. The agent then writes the expected behaviour and
 declares an instance of the suite in the test program.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | yes | the function block (name or tree path) |
-| `suiteName` | string |  | name of the suite (default `<FB>_Test`) |
-| `parentPath` | string |  | folder for the suite (default: the folder of the function block) |
+| `suiteName` | string |  | name of the suite (default: in the style of the existing suites, otherwise `<FB>_Test`) |
+| `parentPath` | string |  | folder for the suite (default: the folder of the existing suites, a folder `Tests`/`Test`, otherwise the folder of the function block) |
 | `dryRun` | boolean |  | only show the generated code (plain-text ST) |
 
 ### `tc_ask_user`

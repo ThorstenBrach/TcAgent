@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.39.2] – 2026-10-26
+
+### Fixed
+- `tc_test_skeleton` (found in the first real use): every method parameter (`VAR_INPUT` and `VAR_IN_OUT`) gets a local
+  variable and is passed - a call without a required input does not compile. The suite name follows the existing suites
+  (e.g. `<FB>TestSuiteFB`, a trailing `FB` of the block dropped), the default folder is the one of the existing suites
+  or a folder `Tests`/`Test` instead of the folder of the function block (which may be library source).
+
 ## [0.39.1] – 2026-10-26
 
 ### Fixed
