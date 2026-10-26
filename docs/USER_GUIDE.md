@@ -401,6 +401,19 @@ format (a folder with `SKILL.md`), so every agent CLI understands them, and come
   `plc-code-review`). `tc_skills action=list` shows them; the client setup also copies the general ones into the skill
   folders of the agent CLIs.
 
+### Workflows: how a kind of task is always done
+
+A **workflow** is a fixed sequence of steps with checkpoints, e.g. the built-in `new-feature`: clarify the requirement
+(skill `requirements-interview`) → change plan (you agree) → code → `tc_check` until 0 errors → tests (if there are any)
+→ review (skill `plc-code-review`) → save and summary. *"Add a start delay to the conveyor, use the new-feature
+workflow."* – or the agent starts it itself when the task fits.
+
+- A step marked `(requires: check-ok)` is a **checkpoint**: TcAgent does not let the agent continue until the check holds,
+  and it cannot be skipped. Other steps can be skipped when they do not apply.
+- Own workflows: `<level>\workflows\<name>\WORKFLOW.md` (same levels as the rules), steps as a numbered list.
+- **Always, with or without a workflow:** `tc_activate` builds first and refuses to activate with build errors.
+  Saving is always allowed, also with errors.
+
 ### Adding a rule by talking
 
 - *"Remember: step sequences always as CASE over an enum."*
@@ -1723,7 +1736,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 92 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 93 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
@@ -1752,5 +1765,5 @@ All 92 tools and the section of this guide that covers them. Parameters: [TOOLS.
 | `tc_docs`, `tc_docs_add`, `tc_lessons` | [Knowledge: documentation and lessons learned](#knowledge-documentation-and-lessons-learned) |
 | `tc_dialogs` | [IDE dialogs](#ide-dialogs) |
 | `tc_feedback`, `tc_policy` | [Feedback and audit](#feedback-and-audit) |
-| `tc_knowledge`, `tc_skills` | [Coding rules](#coding-rules) (levels, platform, skills) |
+| `tc_knowledge`, `tc_skills`, `tc_workflow` | [Coding rules](#coding-rules) (levels, platform, skills) |
 | `tc_ask_user` | [What the VS extension adds](#what-the-vs-extension-tcagentbridge-adds) (questions to the user, every client) |

@@ -17,6 +17,7 @@
     <Compile Include="..\..\src\AskQuestions.cs" Link="src\AskQuestions.cs" />
     <Compile Include="..\..\src\KnowledgeLayers.cs" Link="src\KnowledgeLayers.cs" />
     <Compile Include="..\..\src\Skills.cs" Link="src\Skills.cs" />
+    <Compile Include="..\..\src\Workflows.cs" Link="src\Workflows.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

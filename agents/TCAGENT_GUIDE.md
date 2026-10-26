@@ -134,6 +134,11 @@ of task. When the task fits one (new function → `requirements-interview`, malf
 `plc-code-review`, or the team's own skills), load it with `tc_skills action=show name=<name>` and follow it. Save a
 procedure as a new skill only when the user asks (`tc_skills action=add`, `dryRun` first).
 
+**Workflows** (`tc_workflow`): `tc_coding_rules` also lists the team's workflows. When the task fits one (e.g. a new
+function → `new-feature`), start it (`tc_workflow action=start name=<name> task=<few words>`), follow the active step and
+mark it done with `action=step` (`skip=true` if it does not apply). Checkpoint steps need their check first (e.g.
+`tc_check` with 0 errors). `tc_activate` builds first and refuses with build errors - fix them, do not work around it.
+
 **Other knowledge sources** - not coding rules, keep them apart:
 `tc_lessons` (solutions to hard TwinCAT problems), `tc_docs` (manuals, read only), `tc_doc` (program documentation /
 project memory), `tc_risk_rules` (what the risk analysis checks - see Program documentation). Skills of the user (e.g. a library-specific coding-rules skill) are additional rules from the user -

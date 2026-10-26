@@ -176,6 +176,32 @@ Skills = how this team does a kind of task, in the open [Agent Skills](https://a
 | `scope` | string |  | add: `project` (default), `personal` or `platform:<name>` |
 | `dryRun` | boolean |  | add/mirror: only show what would be written |
 
+### `tc_workflow`
+
+Engineering workflows = how this team **always** does a kind of task, with checkpoints. `<level>\workflows\<name>\WORKFLOW.md`
+(front matter like a skill); the steps are the numbered list of the body: `1. **id** (requires: check-ok) – text`. From
+the levels built-in (shipped: `new-feature` – requirements → change plan → code → check → tests → review → save), company,
+user, platform and project; `tc_coding_rules` also returns the list. A run is done step by step; TcAgent counts failed
+checks per step and refuses to mark a checkpoint step done until its check holds:
+
+| Checkpoint | Holds when |
+|---|---|
+| `check-ok` | the last `tc_check` / `tc_build` during the step had 0 compiler errors |
+| `build-ok` | the last `tc_build` during the step succeeded |
+| `tests-ok` | the last `tc_test_run` / `tc_test_results` during the step had no failed test |
+
+Checkpoint steps cannot be skipped. The gate before `tc_activate` holds with and without a workflow.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | `list`, `show`, `start`, `step`, `status` or `finish` |
+| `name` | string |  | show/start: workflow name |
+| `task` | string |  | start: the task in a few words |
+| `step` | string |  | step: id of the step that is done (optional – the active one) |
+| `skip` | boolean |  | step: the step does not apply to this task |
+| `note` | string |  | step: short note |
+| `abort` | boolean |  | finish: stop the run before all steps are done |
+
 ### `tc_ask_user`
 
 Asks the user when a decision or missing information blocks the work: 1-4 questions, each with 2-4 options (recommended option first, with a short description); the user can always answer in free text. Works in every AI client: from the TcAgent Chat a question card in the chat window of the IDE; in other clients the client's own question dialog (MCP elicitation), with the card in the IDE as fallback. Without any channel the agent is told to ask in its reply instead. Returns the answers per question; a skipped question is reported as such - the agent must not invent an answer.
@@ -1079,6 +1105,10 @@ Shows the solution's license node as XML; change via `tc_xml_set`. Trial license
 ### `tc_activate`
 
 Optionally sets the target NetId, activates the configuration and restarts TwinCAT in Run mode.
+
+**Gate (since 0.32):** before the activation (and before anybody is asked to confirm it) TcAgent builds the solution –
+without "check all objects", which also checks code that is never called. With build errors the activation is refused
+and the build report is returned. `TCAGENT_ACTIVATE_GATE=0` switches the gate off.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

@@ -5,6 +5,24 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.32.0] – 2026-10-26
+
+### Added
+- **Engineering workflows** (`<level>\workflows\<name>\WORKFLOW.md`, same levels and platform as skills): the steps are
+  the numbered list of the body, `1. **id** (requires: check-ok) – text`. Checkpoints `check-ok`, `build-ok`, `tests-ok`
+  are enforced by TcAgent - a checkpoint step can neither be marked done before its check holds nor be skipped.
+- **`tc_workflow`**: `list`, `show`, `start`, `step` (`skip`), `status`, `finish` (`abort`). A run counts failed checks,
+  checkpoint stops and activate stops per step (the base for the run logs). `tc_coding_rules` also lists the workflows;
+  `tc_knowledge` knows the kind `workflows`.
+- **Built-in workflow `new-feature`**: requirements (skill `requirements-interview`) → change plan → code → check
+  (`check-ok`) → tests (recommended) → review (skill `plc-code-review`) → save.
+- Tests: `WorkflowsTests`.
+
+### Changed
+- **Hard gate before `tc_activate`**: TcAgent builds first (without "check all objects") and refuses the activation with
+  build errors - before anybody is asked to confirm it. Saving stays allowed with errors. `TCAGENT_ACTIVATE_GATE=0`
+  switches the gate off.
+
 ## [0.31.0] – 2026-10-26
 
 ### Added

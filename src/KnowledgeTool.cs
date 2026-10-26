@@ -16,7 +16,7 @@ namespace TcAgent;
 
 public sealed partial class ToolRegistry
 {
-    static readonly string[] KnowledgeKinds = { "coding-rules", "risk-rules", "skills", "lessons", "doc-templates" };
+    static readonly string[] KnowledgeKinds = { "coding-rules", "risk-rules", "skills", "workflows", "lessons", "doc-templates" };
 
     void RegisterKnowledge()
     {
@@ -135,6 +135,7 @@ public sealed partial class ToolRegistry
         "coding-rules" => CodingRules.Entries(dir, pi),
         "risk-rules" => KnowledgeLayers.Resolve("risk-rules", dir, pi.Active, true, (Environment.GetEnvironmentVariable("TCAGENT_RISK_RULES") ?? "").Split(';')),
         "skills" => Skills.Entries(dir, pi.Active),
+        "workflows" => Workflows.Entries(dir, pi.Active),
         "lessons" => KnowledgeLayers.Resolve("lessons", dir, pi.Active, false),
         "doc-templates" => KnowledgeLayers.Resolve("doc-templates", dir, pi.Active, false, pattern: "*.*"),
         _ => throw new Exception("kind: " + string.Join(", ", KnowledgeKinds))

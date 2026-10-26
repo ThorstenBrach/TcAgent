@@ -588,6 +588,13 @@ public sealed class TwinCatSession
         return o.ToString();
     }
 
+    // The gate before tc_activate: a plain build (no "check all objects" - unused code does not break the build)
+    public (bool ok, string report) BuildForActivate()
+    {
+        var report = Build(null, false, checkAll: false);
+        return (report.StartsWith("Build SUCCEEDED"), report);
+    }
+
     // Only "Check all objects": compiler errors without a build (no executable code, no files)
     public string Check()
     {

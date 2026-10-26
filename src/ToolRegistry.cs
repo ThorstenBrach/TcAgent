@@ -64,9 +64,10 @@ public sealed partial class ToolRegistry
             {
                 var dir = SolutionDir();
                 rulesSeen = true;
-                // the skill catalog comes with the rules: name + description only, the agent loads a skill when the task fits
-                var skills = Skills.Catalog(Skills.Entries(dir, KnowledgeLayers.Platforms(dir).Active));
-                var tail = skills != null ? "\n\n" + skills : "";
+                // the workflow and skill catalogs come with the rules: name + description only, the agent loads one when the task fits
+                var active = KnowledgeLayers.Platforms(dir).Active;
+                var tail = string.Concat(new[] { Workflows.Catalog(Workflows.Entries(dir, active)), Skills.Catalog(Skills.Entries(dir, active)) }
+                                             .Where(c => c != null).Select(c => "\n\n" + c));
                 return CodingRules.Text(dir) is { } t
                     ? "Coding guidelines (later sections take precedence in case of conflict):\n\n" + t + tail
                     : "No coding guidelines defined - use common TwinCAT conventions and the style of the existing code.\n" + CodingRules.Where(dir) + tail;
@@ -209,6 +210,7 @@ public sealed partial class ToolRegistry
         RegisterAskUser();
         RegisterKnowledge();
         RegisterSkills();
+        RegisterWorkflows();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +
@@ -1535,6 +1537,8 @@ public sealed partial class ToolRegistry
             policy.Check(name, () => TargetOf(name, args), args);
             // values that are not allowed are refused before anybody is asked to confirm them (Packages.cs)
             if (name == "tc_packages_change") PackagesChangeArgs(args);
+            // nobody is asked to confirm an activation that would be refused anyway
+            if (name == "tc_activate") ActivateGate();
             if (Confirm.Needed(name, args))
             {
                 string target = null;
@@ -1555,6 +1559,7 @@ public sealed partial class ToolRegistry
         }
         catch (Exception ex) { text = "Error: " + ErrorText(ex); isError = true; Log.Error($"{name}: {ex}"); }
         finally { try { File.Delete(busy); } catch { } }
+        try { ObserveWorkflow(name, isError, text); } catch (Exception ex) { Log.Error("Workflow: " + ex.Message); }
         // lessons learned: recall known solutions for this error, remind to save one after a hard-won success
         if (name != "tc_lessons" && Environment.GetEnvironmentVariable("TCAGENT_LESSONS_RECALL") != "0")
         {
