@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Menu commands of TcAgentBridge: View > Other Windows > TcAgent Chat / TcUnit Tests.
+<!-- Menu commands of TcAgentBridge: View > Other Windows > TcAgent Chat / TcUnit Tests / TcAgent Knowledge.
      Compiled to Menus.ctmenu (resource of TcAgentBridge.dll): by the VS SDK build (TcAgentBridge.csproj, build-vsix.ps1)
      and by VSCT.exe in install-xaeshell.ps1 / build.ps1. The handlers are added in BridgePackage.AddMenuCommands.
      SPDX-License-Identifier: MIT -->
@@ -20,6 +20,12 @@
           <ButtonText>TcAgent Chat</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidTcAgentCmdSet" id="cmdidKnowledge" priority="0x0102" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_WNDO_OTRWNDWS1" />
+        <Strings>
+          <ButtonText>TcAgent Knowledge</ButtonText>
+        </Strings>
+      </Button>
     </Buttons>
   </Commands>
   <Symbols>
@@ -27,6 +33,7 @@
     <GuidSymbol name="guidTcAgentCmdSet" value="{c3f1a2d4-7b8e-4c5a-9d6f-1e2b3a4c5d6e}">
       <IDSymbol name="cmdidTcUnitTests" value="0x0100" />
       <IDSymbol name="cmdidChat" value="0x0101" />
+      <IDSymbol name="cmdidKnowledge" value="0x0102" />
     </GuidSymbol>
   </Symbols>
 </CommandTable>

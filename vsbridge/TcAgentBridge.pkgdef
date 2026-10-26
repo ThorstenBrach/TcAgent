@@ -24,5 +24,11 @@
 "Orientation"="Bottom"
 "Style"="Tabbed"
 "Window"="{34E76E81-EE4A-11D0-AE2E-00A0C90FFFC3}"
+[$RootKey$\ToolWindows\{8d2b6f1a-4c3e-4e7a-b9d5-2f6e1c7a9b30}]
+@="{86c8609c-4aac-4e7e-95e6-6b96179a3c4f}"
+"Name"="TcAgentBridge.KnowledgePane"
+"Orientation"="Bottom"
+"Style"="Tabbed"
+"Window"="{34E76E81-EE4A-11D0-AE2E-00A0C90FFFC3}"
 [$RootKey$\Menus]
 "{86c8609c-4aac-4e7e-95e6-6b96179a3c4f}"=", Menus.ctmenu, 1"

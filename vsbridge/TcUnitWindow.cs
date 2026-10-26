@@ -106,8 +106,8 @@ namespace TcAgentBridge
         // ------------------------------------------------------------------ view
         static readonly Brush Green = Frozen(Color.FromRgb(0x2E, 0xA0, 0x43)), Red = Frozen(Color.FromRgb(0xD1, 0x34, 0x38)),
                               Blue = Frozen(Color.FromRgb(0x1E, 0x88, 0xE5)), Gray = Frozen(Color.FromArgb(0xB0, 0x80, 0x80, 0x80));
-        static Brush Frozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
-        static readonly FontFamily Symbols = new FontFamily("Segoe UI Symbol");
+        internal static Brush Frozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
+        internal static readonly FontFamily Symbols = new FontFamily("Segoe UI Symbol");
 
         readonly Button runAll = Tool("▶▶", Green, "Run All Tests (all tests of the PLC project)");
         readonly Button runSel = Tool("▶", Green, "Run (the ticked suites and tests, or the selected line)");
@@ -166,10 +166,10 @@ namespace TcAgentBridge
             return t;
         }
 
-        static readonly ControlTemplate FlatButton = Flat(typeof(Button)), FlatToggle = Flat(typeof(ToggleButton));
+        internal static readonly ControlTemplate FlatButton = Flat(typeof(Button)), FlatToggle = Flat(typeof(ToggleButton));
 
         /// <summary>Column header: flat, with the gripper that resizes the column (PART_HeaderGripper).</summary>
-        static ControlTemplate HeaderTemplate()
+        internal static ControlTemplate HeaderTemplate()
         {
             var grid = new FrameworkElementFactory(typeof(Grid));
             var border = new FrameworkElementFactory(typeof(Border));
@@ -189,7 +189,7 @@ namespace TcAgentBridge
             return new ControlTemplate(typeof(GridViewColumnHeader)) { VisualTree = grid };
         }
 
-        static Button Tool(string glyph, Brush brush, string tip)
+        internal static Button Tool(string glyph, Brush brush, string tip)
         {
             var b = new Button
             {
@@ -221,7 +221,7 @@ namespace TcAgentBridge
 
         static void Count(ToggleButton b, int n) => ((TextBlock)b.Tag).Text = n.ToString();
 
-        static Border Separator()
+        internal static Border Separator()
         {
             var s = new Border { Width = 1, Margin = new Thickness(4, 3, 6, 3) };
             s.SetResourceReference(Border.BackgroundProperty, EnvironmentColors.ToolWindowBorderBrushKey);
@@ -405,7 +405,7 @@ namespace TcAgentBridge
         }
 
         // ------------------------------------------------------------------ TcAgent.exe
-        static string TcAgentExe()
+        internal static string TcAgentExe()
         {
             var env = Environment.GetEnvironmentVariable("TCAGENT_EXE");
             if (!string.IsNullOrEmpty(env) && File.Exists(env)) return env;
@@ -416,7 +416,7 @@ namespace TcAgentBridge
             return reg != null && File.Exists(reg) ? reg : null;
         }
 
-        static string SolutionPath()
+        internal static string SolutionPath()
         {
             try { return (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.Solution?.FullName; } catch { return null; }
         }

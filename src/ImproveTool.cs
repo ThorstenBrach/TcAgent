@@ -47,14 +47,17 @@ public sealed partial class ToolRegistry
             });
     }
 
-    List<Improver.Proposal> Proposals(string dir, string project)
+    List<Improver.Proposal> Proposals(string dir, string project) => CollectProposals(dir, project, tools.Select(t => t.Name));
+
+    /// <summary>The proposals for a project (also for the knowledge manager window: TcAgent.exe knowledge json).</summary>
+    internal static List<Improver.Proposal> CollectProposals(string dir, string project, IEnumerable<string> toolNames)
     {
         var active = KnowledgeLayers.Platforms(dir).Active;
         var input = new Improver.Input
         {
             Project = project, Runs = RunLogs.Load(project), Changes = RunLogs.Changes(project),
             Workflows = Workflows.Entries(dir, active), Skills = Skills.Entries(dir, active),
-            ToolNames = new HashSet<string>(tools.Select(t => t.Name), StringComparer.OrdinalIgnoreCase),
+            ToolNames = new HashSet<string>(toolNames, StringComparer.OrdinalIgnoreCase),
             LessonFolders = { Path.Combine(KnowledgeLayers.ProjectRoot(dir)!, "lessons"), Path.Combine(KnowledgeLayers.UserRoot, "lessons") },
             LessonText = string.Join("\n", Lessons.All(dir).Select(l => l.AllText))
         };

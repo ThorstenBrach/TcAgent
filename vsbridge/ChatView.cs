@@ -58,7 +58,7 @@ namespace TcAgentBridge
             // top bar: backend | (version only if something is wrong) new chat, menu "..." with the options and the other commands
             var top = new DockPanel { Margin = new Thickness(6, 6, 6, 2) };
             var menuButton = new Button { Content = "⋯", Width = 28, Padding = new Thickness(0, 0, 0, 2), Margin = new Thickness(6, 0, 0, 0), FontSize = 14,
-                                          ToolTip = "Options and more (editor context, check after changes, TcUnit Tests, set up clients)" };
+                                          ToolTip = "Options and more (editor context, check after changes, TcUnit Tests, Knowledge, set up clients)" };
             menuButton.Click += (s, e) => ShowMenu(menuButton);
             DockPanel.SetDock(menuButton, Dock.Right);
             top.Children.Add(menuButton);
@@ -136,6 +136,8 @@ namespace TcAgentBridge
                                 "The agent checks for compiler errors (tc_check) once after its changes", buildBox.IsChecked == true));
             menu.Items.Add(new Separator());
             menu.Items.Add(Item("TcUnit Tests", () => tests.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), tests.ToolTip as string));
+            menu.Items.Add(Item("Knowledge", () => { try { BridgePackage.Instance?.ShowKnowledge(true); } catch { } },
+                                "TcAgent Knowledge window: what the agent gets (rules, skills, workflows, lessons) and how the workflows develop"));
             if (Installer.IsVsixInstall) menu.Items.Add(Item("Set up clients", () => setup.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), setup.ToolTip as string));
             menu.Items.Add(new Separator());
             menu.Items.Add(new MenuItem { Header = versionLabel.Text?.Length > 0 && versionLabel.Visibility == Visibility.Visible ? versionLabel.Text : "TcAgent " + BridgePackage.BridgeVersion,

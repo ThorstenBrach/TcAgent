@@ -5,6 +5,21 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.35.0] – 2026-10-26
+
+### Added
+- **Window "TcAgent Knowledge"** in Visual Studio / XAE Shell (View > Other Windows, or **⋯ > Knowledge** in the chat):
+  - **Overview** - KPI tiles (runs, first-time-right, failed checks, corrections and minutes per run, gate stops; the last
+    10 runs against the 10 before, sparkline), the workflows, open improvement proposals, most frequent compiler errors.
+  - **Effective** - every coding rule, risk rule, skill, workflow, lesson and template of every level with status and
+    reason; open the file, switch it off for the project or the user, switch it on.
+  - **Sources** - Git sources and installed items (commit, license, changed locally, newer upstream).
+  - **History** - failed checks and corrections per run, moving average, adopted changes as markers, before/after of
+    every change; export as CSV.
+- **`TcAgent.exe knowledge json|disable|enable [--key <kind/name>] [--level user|project] [--solution <sln>]`** - the
+  data of the window (files only, no IDE); the window itself does no work.
+- README: rows for skills & workflows, self-improvement and skill sources.
+
 ## [0.34.0] – 2026-10-26
 
 ### Added

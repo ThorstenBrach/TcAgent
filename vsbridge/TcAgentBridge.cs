@@ -25,7 +25,7 @@ namespace TcAgentBridge
     [Guid("86c8609c-4aac-4e7e-95e6-6b96179a3c4f")]
     public sealed class BridgePackage : AsyncPackage
     {
-        public const string BridgeVersion = "0.34.0";
+        public const string BridgeVersion = "0.35.0";
         internal static BridgePackage Instance;
         static readonly Guid ExportTypeGuid = new Guid("75161BEE-FB5F-434C-A3C6-86B7CEE2B8FC");
 
@@ -456,14 +456,36 @@ namespace TcAgentBridge
             Log("TcUnit window created (IVsUIShell)");
         }
 
+        // ------------------------------------------------------------------ TcAgent Knowledge window (KnowledgeWindow.cs)
+        IVsWindowFrame knowledgeFrame;
+
+        internal void ShowKnowledge(bool activate)
+        {
+            if (knowledgeFrame != null && (activate ? knowledgeFrame.Show() : knowledgeFrame.ShowNoActivate()) == 0) return;
+            try
+            {
+                var w = FindToolWindow(typeof(KnowledgePane), 0, true);
+                if (w?.Frame is IVsWindowFrame f) { knowledgeFrame = f; Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(activate ? f.Show() : f.ShowNoActivate()); return; }
+            }
+            catch (Exception ex) { Log("FindToolWindow (Knowledge): " + Inner(ex) + " - creating window directly"); }
+            var shell = (IVsUIShell)GetService(typeof(SVsUIShell)) ?? throw new Exception("SVsUIShell not available");
+            var pane = new KnowledgePane();
+            Guid empty = Guid.Empty, persist = typeof(KnowledgePane).GUID, auto = Guid.Empty;
+            Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(shell.CreateToolWindow(
+                (uint)__VSCREATETOOLWIN.CTW_fInitNew, 0, pane, ref empty, ref persist, ref auto, null, "TcAgent Knowledge", null, out var frame));
+            knowledgeFrame = frame;
+            Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(activate ? frame.Show() : frame.ShowNoActivate());
+            Log("Knowledge window created (IVsUIShell)");
+        }
+
         /// <summary>Opens a TwinCAT tree path in the editor and sets the cursor (TcUnit window: double-click on a test).</summary>
         internal void OpenInEditor(string path, string part, int line) => Open(path, part, line, 1);
 
         internal void LogLine(string msg) => Log(msg);
 
-        // Commands of TcAgentBridge.vsct: View > Other Windows > TcAgent Chat / TcUnit Tests
+        // Commands of TcAgentBridge.vsct: View > Other Windows > TcAgent Chat / TcUnit Tests / TcAgent Knowledge
         static readonly Guid CommandSet = new Guid("c3f1a2d4-7b8e-4c5a-9d6f-1e2b3a4c5d6e");
-        const int CmdTcUnitTests = 0x0100, CmdChat = 0x0101;
+        const int CmdTcUnitTests = 0x0100, CmdChat = 0x0101, CmdKnowledge = 0x0102;
 
         void AddMenuCommands()
         {
@@ -478,6 +500,10 @@ namespace TcAgentBridge
                 {
                     try { ShowChat(); } catch (Exception ex) { Log("Chat window: " + Inner(ex)); }
                 }, new System.ComponentModel.Design.CommandID(CommandSet, CmdChat)));
+                mcs.AddCommand(new System.ComponentModel.Design.MenuCommand((s, e) =>
+                {
+                    try { ShowKnowledge(true); } catch (Exception ex) { Log("Knowledge window: " + Inner(ex)); }
+                }, new System.ComponentModel.Design.CommandID(CommandSet, CmdKnowledge)));
                 Log("Menu commands registered");
             }
             catch (Exception ex) { Log("Menu: " + Inner(ex)); }

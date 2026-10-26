@@ -52,6 +52,9 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Runtime** | Activate, login/start/stop, read/write variables via ADS – changes only on allowed targets | `tc_activate`, `tc_plc_online`, `ads_read`, `ads_write` |
 | **Your rules** | Coding rules per project/person/company; "remember that I want X" becomes a rule | `tc_coding_rules`, `tc_coding_rules_add` |
 | **Your risk checks** | Extend the risk analysis with your own rules (regex, tested on the project first), tune or switch off the built-in ones, add checks the agent reviews by reading the code – per project/person/company | `tc_risk_rules` |
+| **Skills & workflows** | How your team does a task, in the open Agent Skills format (built-in: requirements interview, PLC debugging, code review), workflows with checkpoints TcAgent enforces (e.g. `tc_check` with 0 errors before the review; activation only after a clean build), levels company / user / platform / project | `tc_skills`, `tc_workflow`, `tc_knowledge` |
+| **Self-improvement** | Local run logs of the workflows (counts only), KPIs and trends, improvement proposals found by fixed rules – applied only after you agree, measured over the next 10 runs, reverted if they did not help; window **TcAgent Knowledge** with overview, effective knowledge, sources and history | `tc_improve` |
+| **Skill sources** | Skills, workflows and rules from Git repositories with lock file, license check and overlay; `TcAgent.exe sources sync` restores the pinned set in a pipeline | `tc_sources` |
 | **Documentation** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 
 All 95 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).

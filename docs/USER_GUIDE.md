@@ -104,7 +104,20 @@ work without the extension. The extension runs **inside** the IDE process and ad
   on the right, the agent's answers on the left, tool calls as compact lines. Enter sends, Shift+Enter makes a new line,
   ↑/↓ brings back earlier prompts (kept across sessions). **New chat** clears the history, **Stop** cancels the running
   answer. The editor context is sent along automatically. The **⋯** menu holds the options (send editor context, check
-  after changes), **TcUnit Tests**, **Set up clients** and the version.
+  after changes), **TcUnit Tests**, **Knowledge**, **Set up clients** and the version.
+- **TcAgent Knowledge** – a tool window (View > Other Windows, or **⋯ > Knowledge** in the chat) that shows what the agent
+  gets and how the work develops:
+  - **Overview:** tiles for runs, first-time-right, failed checks, corrections and minutes per run and gate stops – the
+    last 10 workflow runs against the 10 before, with a sparkline; the workflows; open improvement proposals; the most
+    frequent compiler errors. Double-click a workflow for its history.
+  - **Effective:** coding rules, risk rules, skills, workflows, lessons and templates of every level with their status
+    (applies, replaced by a later level, locked, forced, switched off) and why. Open the file, switch it off for the
+    project or for you, switch it on (`disabled.json` – the file itself stays unchanged).
+  - **Sources:** the Git sources and the items installed from them – pinned commit, license, changed locally, newer upstream.
+  - **History:** failed checks and corrections per run with a moving average, every adopted change as a marker, and the
+    changes with their values before and after (helped / no effect / worse / reverted); **Export CSV**.
+
+  Decisions (apply a proposal, install, pull, promote) are made in the chat – the agent asks you.
 - **Documents in the chat** – paste (Ctrl+V), drop or attach (+) manuals, data sheets, screenshots and long texts. Text files
   and Word documents go into the prompt; PDFs and images are read by the agent from the attachments folder.
 - **Permission questions** (Claude backend) – if the agent needs something its rules do not allow, e.g. a file outside
