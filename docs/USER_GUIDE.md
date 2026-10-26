@@ -1685,7 +1685,7 @@ license keys in prompts or feedback reports.
 
 ## Configuration reference
 
-<p align="center"><img src="img/knowledge-files.svg" width="900" alt="Where TcAgent keeps its files on company, personal and project level"></p>
+<p align="center"><img src="img/knowledge-files.svg" width="900" alt="Where TcAgent keeps its files on the six levels from built-in to project"></p>
 
 ### Environment variables
 
