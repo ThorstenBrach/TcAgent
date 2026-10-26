@@ -419,7 +419,9 @@ public sealed partial class ToolRegistry
                            "entering a security code for that) - then ask the user to do it.",
             Schema(), a => tc.Sta.Run(() => Licenses()));
 
-        Add("tc_activate", "Optionally sets the target NetId, activates the configuration and restarts TwinCAT in run mode.",
+        Add("tc_activate", "Optionally sets the target NetId, activates the configuration and restarts TwinCAT in run mode. TcAgent builds first " +
+                           "and refuses with build errors - then report the errors and ask the user before changing any code (never fix code on your own just to get " +
+                           "an activation through).",
             Schema(P("netId", "string", "AmsNetId of the target, e.g. 5.12.34.56.1.1 (empty = current target)"),
                    P("restart", "boolean", "Restart TwinCAT (default true)")),
             a => tc.Sta.Run(() =>

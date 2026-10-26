@@ -48,6 +48,8 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
    `tc_build` (real build, produces code and files) only before `tc_activate`/download, for a build checkpoint of a
    workflow, or when the user asks for it - and **always after a clean `tc_check`**: the check pre-compiles without
    generating code and is much faster, so fix the errors with checks and build once (several failed builds cost time).
+   If `tc_activate` refuses because of build errors, show the errors and **ask before changing any code** - the user asked
+   for an activation, not for a code change.
 6. **Save:** `tc_save`. Otherwise tool changes exist only in the IDE, not on disk/in Git.
 7. **Tests:** `tc_test_run` runs TcUnit tests: `action=list` shows the suites and tests of the code, `tests=` selects
    (instance `MAIN.fbMotor`, suite type, `MAIN.fbMotor@Test` or test name; empty = all) - build/activation only if the

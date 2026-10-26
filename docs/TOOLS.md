@@ -1188,7 +1188,8 @@ Optionally sets the target NetId, activates the configuration and restarts TwinC
 
 **Gate (since 0.32):** before the activation (and before anybody is asked to confirm it) TcAgent builds the solution –
 without "check all objects", which also checks code that is never called. With build errors the activation is refused
-and the build report is returned. `TCAGENT_ACTIVATE_GATE=0` switches the gate off.
+and the build report is returned – the agent is told to show the errors and ask before it changes any code.
+`TCAGENT_ACTIVATE_GATE=0` switches the gate off.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

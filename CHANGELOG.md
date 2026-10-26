@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.39.5] – 2026-10-26
+
+### Changed
+- **Activation gate:** after the refusal an agent fixed the code on its own and activated again. The refusal, the
+  description of `tc_activate` and the TcAgent guide now say it clearly: show the errors and ask the user before changing
+  any code - the user asked for an activation, not for a code change.
+
 ## [0.39.4] – 2026-10-26
 
 ### Fixed

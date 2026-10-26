@@ -100,7 +100,9 @@ public sealed partial class ToolRegistry
         if (ok) return;
         if (run != null) run.ActivateStops++;
         Log.Info("tc_activate not executed: build has errors");
-        throw new Exception("NOT activated: the build has errors - fix them (tc_check / tc_build) and activate again.\n\n" + report);
+        throw new Exception("NOT activated: the build has errors. The user asked to activate, not to change the code: show the user these errors " +
+                            "and ask (tc_ask_user) whether you shall fix them - do not change code on your own to get past this gate, and do not " +
+                            "activate again without the user's go-ahead after the fix.\n\n" + report);
     }
 
     // What a tool call means for the running workflow (failed checks with their error codes, checkpoints, skills used)
