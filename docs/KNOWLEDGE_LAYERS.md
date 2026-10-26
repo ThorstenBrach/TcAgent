@@ -78,17 +78,22 @@ splits them into single files – after the user agrees.
 
 ### Common file header
 
+All kinds use the front matter of the Agent Skills standard (see [Skills](#skills)): `name` and `description` at the
+top, TcAgent's own fields under `metadata` with the prefix `tcagent-`. One parser, one format for rules, skills,
+workflows and lessons.
+
 ```markdown
 ---
-title: Naming rules of framework A
-description: one line – shown in lists
-locked: true            # company/platform only: later levels may not replace this file
-force: false            # user only: keep this file even against a platform file
-applies-to: [FB, METHOD, VAR]
-tags: [naming]
-scope: platform:framework-a
-owner: framework-a team
-version: 3
+name: naming
+description: Naming rules of framework A – function blocks, instances, variables
+metadata:
+  tcagent-locked: "true"           # company/platform only: later levels may not replace this file
+  tcagent-force: "false"           # user only: keep this file even against a platform file
+  tcagent-applies-to: FB METHOD VAR
+  tcagent-tags: naming
+  tcagent-scope: platform:framework-a
+  tcagent-owner: framework-a team
+  tcagent-version: "3"
 ---
 ```
 
@@ -108,7 +113,7 @@ Framework rules therefore beat general preferences, and the project beats everyt
 - **locked** (company and platform files): a later level cannot replace the file. TcAgent reports the conflict.
 - **force** (user files): an engineer can keep a personal rule although a platform file says otherwise. When the user
   defines a rule in the chat that contradicts the platform, the agent points this out and asks whether the user wants it
-  anyway; only then the rule is saved with `force: true`. `force` does not override `locked`.
+  anyway; only then the rule is saved with `tcagent-force: "true"`. `force` does not override `locked`.
 
 ### How each kind is combined
 
@@ -130,17 +135,33 @@ like): "create a device driver block", "commission an axis", "write TcUnit tests
 ```markdown
 ---
 name: driver-fb
-description: Create a new device driver FB in framework A
+description: Create a new device driver FB in framework A. Use when the user asks for a driver block for a new device.
+metadata:
+  tcagent-scope: platform:framework-a
+  tcagent-locked: "false"
+  tcagent-owner: framework-a team
 ---
 1. Derive from FB_FwA_DeviceBase …
 ```
 
-- The format is the one of Claude Code skills (`SKILL.md` with `name` and `description`, optional further files).
-- **`tc_skills`** (actions `list`, `show`, `add`) delivers the skills in every AI client. TcAgent resolves levels,
-  platform, `locked` and `force`. The agent gets the list (name and description) together with the coding rules and
-  loads a skill only when the task fits – the context stays small.
-- TcAgent additionally mirrors the valid skills into `.claude\skills`, so Claude Code finds them without a tool call.
-- The TcAgent guide stays the built-in base skill.
+- **Format: the open [Agent Skills](https://agentskills.io/specification) standard** – a folder with `SKILL.md`
+  (YAML front matter + Markdown), optional `scripts\`, `references\`, `assets\`. Claude Code, OpenAI Codex, GitHub
+  Copilot, Gemini CLI, Cursor and others read this format, so the same skill works with every CLI the chat offers.
+- Only the standard fields are used at the top level: `name` (lowercase letters, digits, hyphens, max. 64, equal to the
+  folder name), `description` (what the skill does and when to use it, max. 1024), optional `license`, `compatibility`,
+  `allowed-tools`. TcAgent's own fields (`locked`, `force`, `scope`, `owner`, `version`) go into **`metadata`** with the
+  prefix `tcagent-` – other tools ignore them, and `skills-ref validate` accepts the files.
+- **`tc_skills`** (actions `list`, `show`, `add`) delivers the skills through MCP in every AI client, independent of
+  where a client looks for skills. TcAgent resolves levels, platform, `locked` and `force`. The agent gets the list
+  (name and description) together with the coding rules and loads a skill only when the task fits – the context stays
+  small (the "progressive disclosure" of the standard).
+- Each tool has its own discovery folders (e.g. `.claude\skills` for Claude Code, `.agents\skills` for Codex). TcAgent
+  **mirrors** the resolved skills into the folders of the CLIs that are set up, so a client also finds them without a
+  tool call. The list of mirror folders is configurable.
+- The TcAgent guide stays the built-in base skill and is itself an Agent Skill.
+
+The same applies to project instructions: `AGENTS.md` is the cross-tool standard for instruction files (Linux
+Foundation, read by Codex, Copilot, Gemini CLI and others); TcAgent keeps writing it next to `CLAUDE.md`.
 
 ## Engineering workflows
 
@@ -214,7 +235,7 @@ part of the implementation plan.
 1. Levels × platforms for the existing kinds (coding rules, risk rules, lessons, knowledge, doc templates):
    `TCAGENT_COMPANY`, `platforms\`, `config.json`, detection and the question on ambiguity, file header, `locked`/`force`,
    one file per topic/lesson, split command.
-2. `tc_skills` with the mirror into `.claude\skills`.
+2. `tc_skills` (Agent Skills format) with the mirror into the skill folders of the set-up CLIs.
 3. Workflows and hard gates (`tc_activate` only after a build without errors).
 4. Run logs and the improvement loop (`tc_improve`), moving knowledge up with the name check, pull requests for shared
    levels.
