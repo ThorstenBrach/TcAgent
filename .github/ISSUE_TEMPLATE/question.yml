@@ -40,8 +40,34 @@ body:
       label: TcAgent version
       placeholder: "0.42.3"
   - type: input
-    id: environment
+    id: twincat
     attributes:
-      label: Environment
-      description: TwinCAT build, Visual Studio or XAE Shell, AI client
-      placeholder: "TwinCAT 3.1.4026.x, XAE Shell, Copilot CLI"
+      label: TwinCAT version
+      description: TwinCAT XAE build, e.g. in the IDE under Help > About or TwinCAT > About TwinCAT
+      placeholder: "3.1.4026.19"
+    validations:
+      required: true
+  - type: dropdown
+    id: ide
+    attributes:
+      label: IDE
+      options:
+        - Visual Studio 2022
+        - Visual Studio 2019
+        - TwinCAT XAE Shell (64-bit, 4026)
+        - TwinCAT XAE Shell (32-bit, 4024 and older)
+    validations:
+      required: true
+  - type: input
+    id: ide_version
+    attributes:
+      label: IDE version
+      description: Visual Studio under Help > About, XAE Shell under Help > About
+      placeholder: "17.14.x / XAE Shell 4.0.x"
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: AI client
+      placeholder: "Claude Code, Copilot CLI, Gemini CLI, Codex CLI, TcAgent Chat with ..."

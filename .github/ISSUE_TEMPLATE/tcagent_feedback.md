@@ -11,7 +11,8 @@ labels: ["feedback"]
 - **Type / severity:** bug | missing_feature | usability | docs / minor | major | blocker
 - **TcAgent:** version, client
 - **Tool:** `tc_...`
-- **Environment:** TwinCAT build, Visual Studio or XAE Shell (add it if it matters)
+- **TwinCAT version:** 3.1.4026.x
+- **IDE and version:** Visual Studio 2022 17.x / TwinCAT XAE Shell 4.0.x
 
 **Details**
 

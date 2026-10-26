@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.42.5] – 2026-10-26
+
+### Changed
+- Issue templates: TwinCAT version, IDE (Visual Studio 2022/2019, XAE Shell 64-bit/32-bit) and IDE version as required fields
+  of bug report and question, the AI client as a field of its own; the feature request asks for them optionally. The
+  feedback text of the knowledge window has the lines for TwinCAT and IDE version to fill in.
+
 ## [0.42.4] – 2026-10-26
 
 ### Added
