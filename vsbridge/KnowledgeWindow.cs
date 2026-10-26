@@ -332,6 +332,12 @@ namespace TcAgentBridge
             DockPanel.SetDock(sourceDetail, Dock.Bottom); sp.Children.Add(sourceDetail);
             sp.Children.Add(installedList);
             sourceList.MouseDoubleClick += (s, e) => EditSource(sourceList.SelectedItem as Line);
+            bool SSel() => sourceList.SelectedItem is Line;
+            sourceList.ContextMenu = Menu(("Browse && install …".Replace("&&", "&"), BrowseSource, null), ("Edit …", () => EditSource(sourceList.SelectedItem as Line), SSel),
+                                          ("Remove", RemoveSource, SSel), (null, null, null), ("Add …", () => EditSource(null), null));
+            sourceList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { RemoveSource(); e.Handled = true; } };
+            installedList.ContextMenu = Menu(("Diff", DiffInstalled, () => installedList.SelectedItem is Line), ("Check for updates", () => RunAsync("sources pull --dry-run", true), null),
+                                             ("Update all …", UpdateAll, null));
             return sourcesPage = sp;
         }
 
@@ -566,6 +572,21 @@ namespace TcAgentBridge
 
         // ------------------------------------------------------------------ new / open folder / move / delete
         Dictionary<string, object> LayerOf(Dictionary<string, object> e) => Arr(data?["layers"]).FirstOrDefault(l => S(l, "label") == S(e, "label"));
+
+        /// <summary>A context menu; null in the list = separator. enabled is evaluated when the menu opens.</summary>
+        static ContextMenu Menu(params (string Header, Action Act, Func<bool> Enabled)[] items)
+        {
+            var m = new ContextMenu();
+            foreach (var it in items)
+            {
+                if (it.Header == null) { m.Items.Add(new Separator()); continue; }
+                var i = new MenuItem { Header = it.Header };
+                var act = it.Act; i.Click += (s, e) => act();
+                if (it.Enabled != null) { var en = it.Enabled; m.Opened += (s, e) => i.IsEnabled = en(); }
+                m.Items.Add(i);
+            }
+            return m;
+        }
 
         ContextMenu EntryMenu()
         {
@@ -991,6 +1012,11 @@ namespace TcAgentBridge
             { var b = Text(label, tip); b.Click += (s, e) => act(); tools.Children.Add(b); }
             platformInfo.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             platformList.MouseDoubleClick += (s, e) => OpenPlatform();
+            bool PSel() => platformList.SelectedItem is Line;
+            platformList.ContextMenu = Menu(("Open platform.md", OpenPlatform, PSel), ("Open folder", OpenPlatformFolder, PSel), (null, null, null),
+                                            ("New …", NewPlatform, null), ("Set for this project …", SetPlatforms, null), ("Detect automatically", () => { status.Text = RunCli("knowledge platform --action auto").output; Load(); }, null),
+                                            (null, null, null), ("Delete …", DeletePlatform, PSel));
+            platformList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { DeletePlatform(); e.Handled = true; } };
             var dp = new DockPanel();
             DockPanel.SetDock(tools, Dock.Top); dp.Children.Add(tools);
             DockPanel.SetDock(platformInfo, Dock.Top); dp.Children.Add(platformInfo);
@@ -1031,6 +1057,19 @@ namespace TcAgentBridge
             var f = S((platformList.SelectedItem as Line)?.D, "file");
             if (f == null || !File.Exists(f)) { status.Text = "This platform has no platform.md of its own (only a folder) - create one with New …"; return; }
             try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(f); } catch (Exception ex) { status.Text = ex.Message; }
+        }
+
+        // only a platform folder of the user (or of the company folder without Git) - the delete of KnowledgeOps checks it
+        void DeletePlatform()
+        {
+            var d = (platformList.SelectedItem as Line)?.D;
+            var folder = S(d, "file") is string f ? Path.GetDirectoryName(f) : null;
+            if (folder == null) { status.Text = "This platform has no folder of its own to delete."; return; }
+            if (MessageBox.Show($"Delete the platform {S(d, "name")} with everything in its folder?\n\n{folder}\n\n(rules, skills and lessons of the platform go too)",
+                                "TcAgent Knowledge", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            var (ok, output) = RunCli("knowledge delete --path " + Quote(folder));
+            Report(ok, output, "Delete platform");
+            Load();
         }
 
         void OpenPlatformFolder()
@@ -1076,6 +1115,9 @@ namespace TcAgentBridge
             feedbackList.ItemContainerStyle = item;
             feedbackStatus.SelectionChanged += (s, e) => FillFeedback();
             feedbackList.SelectionChanged += (s, e) => PrepareIssue();
+            bool FSel() => feedbackList.SelectedItems.Count > 0;
+            feedbackList.ContextMenu = Menu(("Share with the TcAgent developers …", ShareIssue, FSel), ("Copy text", () => { try { Clipboard.SetText(feedbackText.Text); } catch { } }, FSel),
+                                            ("Save as …", SaveIssue, FSel), (null, null, null), ("Set status …", SetFeedbackStatus, FSel), ("Anonymize again", PrepareIssue, FSel));
             feedbackText.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             feedbackText.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             feedbackInfo.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);

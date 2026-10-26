@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.42.2] – 2026-10-26
+
+### Added
+- Knowledge window: context menus in Platforms (open, open folder, new, set for the project, detect, **delete** an own
+  platform - also with Del), Sources (browse & install, edit, remove - Del, add; installed: diff, check for updates, update
+  all) and Feedback (share, copy, save, set status, anonymize again).
+
 ## [0.42.1] – 2026-10-26
 
 ### Added
