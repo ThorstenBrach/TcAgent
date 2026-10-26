@@ -5,6 +5,20 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.41.0] – 2026-10-26
+
+### Added
+- **Knowledge window, Sources:** add, edit and remove sources; **Browse & install** shows what a source offers with kind
+  and license and installs after a confirmation that lists license, files and scripts; Check for updates, Update all, Diff.
+- **Knowledge window, Platforms:** the platforms with their detection (libraries, terms), which apply to the project and
+  why, the libraries of the project; New, Open platform.md, Open folder, Set for this project, Detect automatically.
+- **Knowledge window, Feedback:** the `tc_feedback` reports; the selected ones as an anonymized issue text (names of
+  computer, user, solution and projects, `privateTerms`, user folders, solution and network paths, IP addresses /
+  AmsNetIds replaced) that can be edited, copied, saved and shared with the TcAgent developers as a new issue in the
+  browser (sent by the user; `feedbackUrl` in `settings.json`); Set status.
+- CLI for the window: `TcAgent.exe sources add|remove|search|install|pull|diff`, `knowledge feedback --action issue|resolve`,
+  `knowledge platform --action new|set|auto`.
+
 ## [0.40.0] – 2026-10-26
 
 ### Added

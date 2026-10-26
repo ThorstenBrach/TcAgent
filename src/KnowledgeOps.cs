@@ -97,6 +97,33 @@ public static class KnowledgeOps
         return file;
     }
 
+    // ------------------------------------------------------------------ platforms
+    /// <summary>A platform of the user: &lt;user&gt;\platforms\&lt;name&gt;\platform.md with the libraries and terms that detect it.</summary>
+    public static string NewPlatform(string name, string description, string libraries, string terms)
+    {
+        var n = Skills.ValidateName(name);
+        var file = Path.Combine(KnowledgeLayers.UserRoot, "platforms", n, "platform.md");
+        if (File.Exists(file)) throw new ArgumentException(file + " exists already - open it to change it");
+        static string List(string v) => string.Join(", ", (v ?? "").Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.WriteAllText(file, ($"---\nname: {n}\ndescription: {(string.IsNullOrWhiteSpace(description) ? "Automation framework " + n : description.Trim())}\n" +
+                                 $"metadata:\n  tcagent-detect-libraries: \"{List(libraries)}\"\n  tcagent-detect-terms: \"{List(terms)}\"\n---\n" +
+                                 $"# {n}\n\nWhat the agent should know about this framework (base blocks, conventions). Rules, skills and lessons of the\n" +
+                                 $"platform go into the folders coding-rules, skills, lessons next to this file.\n").Replace("\n", "\r\n"));
+        return file;
+    }
+
+    /// <summary>Back to detection: removes "platforms" from .tcagent\config.json.</summary>
+    public static string AutoPlatform(string solutionDir)
+    {
+        var f = Path.Combine(KnowledgeLayers.ProjectRoot(solutionDir)!, "config.json");
+        if (!File.Exists(f)) return "Platform detection is already automatic.";
+        var cfg = JsonNode.Parse(File.ReadAllText(f)) as JsonObject ?? new JsonObject();
+        cfg.Remove("platforms");
+        File.WriteAllText(f, cfg.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+        return "Platform detection is automatic again (" + f + ")";
+    }
+
     // ------------------------------------------------------------------ move
     public static string Move(string solutionDir, string path, string level, IEnumerable<string> platforms)
     {

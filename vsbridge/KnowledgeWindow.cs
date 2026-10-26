@@ -7,7 +7,11 @@
 //               (applies, replaced, locked, forced, switched off) - filter by kind and level; new (from a template), open,
 //               open the folder, move to another level, delete (own levels), switch off / on - toolbar, context menu, Del;
 //               per level kept in Git: local changes, commits behind/ahead, Fetch / Pull / Commit / Push
-//   Sources     the Git sources and the items installed from them (pinned commit, license, changed locally, newer upstream)
+//   Sources     the Git sources (add, edit, remove, browse and install - license, files and scripts shown first) and the
+//               items installed from them (pinned commit, license, changed locally, newer upstream; update, diff)
+//   Platforms   the known platforms with their detection, which apply to the project; new, edit platform.md, set / detect
+//   Feedback    the tc_feedback reports; the selected ones as an anonymized, editable issue text - copy, save, share with the
+//               TcAgent developers (a new issue in the browser, sent by the user), set the status
 //   History     per workflow failed checks and corrections over the runs, moving average, the adopted changes as markers;
 //               the changes with their values before and after; export as CSV
 //
@@ -75,7 +79,7 @@ namespace TcAgentBridge
                               Gray = TcUnitControl.Frozen(Color.FromArgb(0xB0, 0x80, 0x80, 0x80)), TileBack = TcUnitControl.Frozen(Color.FromArgb(0x18, 0x80, 0x80, 0x80));
 
         readonly Button refresh = TcUnitControl.Tool("⟳", null, "Refresh (read the knowledge and the run logs again)");
-        readonly ToggleButton tOverview = Tab("Overview"), tEffective = Tab("Files"), tSources = Tab("Sources"), tHistory = Tab("History");
+        readonly ToggleButton tOverview = Tab("Overview"), tEffective = Tab("Files"), tSources = Tab("Sources"), tPlatforms = Tab("Platforms"), tFeedback = Tab("Feedback"), tHistory = Tab("History");
         readonly ContentControl page = new ContentControl();
         readonly TextBlock status = new TextBlock { Margin = new Thickness(6, 2, 6, 4), Opacity = 0.75, TextTrimming = TextTrimming.CharacterEllipsis };
         readonly TextBlock platform = new TextBlock { Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Opacity = 0.8 };
@@ -103,6 +107,20 @@ namespace TcAgentBridge
         // sources
         readonly ListView sourceList = NewList(), installedList = NewList();
         readonly TextBlock sourcesHeading = Heading(""), installedHeading = Heading("");
+        readonly TextBox sourceDetail = new TextBox { IsReadOnly = true, Height = 160, TextWrapping = TextWrapping.NoWrap, BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(6),
+                                                      HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                                                      FontFamily = new FontFamily("Consolas"), FontSize = 12, Background = Brushes.Transparent };
+        // platforms
+        readonly ListView platformList = NewList();
+        readonly TextBlock platformInfo = new TextBlock { Margin = new Thickness(8, 4, 8, 4), TextWrapping = TextWrapping.Wrap };
+        // feedback
+        readonly ListView feedbackList = new ListView { BorderThickness = new Thickness(0), SelectionMode = SelectionMode.Extended };
+        readonly ComboBox feedbackStatus = new ComboBox { MinWidth = 100, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center,
+                                                          ItemsSource = new[] { "open", "all", "resolved", "wontfix", "duplicate" }, SelectedIndex = 0 };
+        readonly TextBox feedbackText = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(6),
+                                                      FontFamily = new FontFamily("Consolas"), FontSize = 12, BorderThickness = new Thickness(0, 1, 0, 0) };
+        readonly TextBlock feedbackInfo = new TextBlock { Margin = new Thickness(6, 2, 6, 2), TextWrapping = TextWrapping.Wrap, Opacity = 0.85 };
+        string feedbackUrl;
         // history
         readonly ComboBox wfBox = new ComboBox { MinWidth = 160, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
         readonly Canvas chart = new Canvas { Height = 220, Margin = new Thickness(8), ClipToBounds = true };
@@ -181,7 +199,7 @@ namespace TcAgentBridge
             SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             var bar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4, 4, 4, 2) };
-            foreach (var e in new UIElement[] { refresh, TcUnitControl.Separator(), tOverview, tEffective, tSources, tHistory, platform }) bar.Children.Add(e);
+            foreach (var e in new UIElement[] { refresh, TcUnitControl.Separator(), tOverview, tEffective, tSources, tPlatforms, tFeedback, tHistory, platform }) bar.Children.Add(e);
             platform.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             status.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             facts.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
@@ -226,7 +244,7 @@ namespace TcAgentBridge
             chart.SizeChanged += (s, e) => DrawChart();
             export.Click += (s, e) => ExportCsv();
             refresh.Click += (s, e) => Load();
-            foreach (var t in new[] { tOverview, tEffective, tSources, tHistory }) t.Click += (s, e) => Show((ToggleButton)s);
+            foreach (var t in new[] { tOverview, tEffective, tSources, tPlatforms, tFeedback, tHistory }) t.Click += (s, e) => Show((ToggleButton)s);
             IsVisibleChanged += (s, e) => { if (IsVisible && data == null && !loading) Load(); };
             Show(tOverview);
             status.Text = "Reading the knowledge ...";
@@ -234,11 +252,12 @@ namespace TcAgentBridge
 
         void Show(ToggleButton tab)
         {
-            foreach (var t in new[] { tOverview, tEffective, tSources, tHistory }) t.IsChecked = t == tab;
-            page.Content = tab == tOverview ? OverviewPage() : tab == tEffective ? EffectivePage() : tab == tSources ? SourcesPage() : (object)HistoryPage();
+            foreach (var t in new[] { tOverview, tEffective, tSources, tPlatforms, tFeedback, tHistory }) t.IsChecked = t == tab;
+            page.Content = tab == tOverview ? OverviewPage() : tab == tEffective ? EffectivePage() : tab == tSources ? SourcesPage()
+                         : tab == tPlatforms ? PlatformsPage() : tab == tFeedback ? FeedbackPage() : (object)HistoryPage();
         }
 
-        FrameworkElement overviewPage, effectivePage, sourcesPage, historyPage;
+        FrameworkElement overviewPage, effectivePage, sourcesPage, historyPage, platformsPage, feedbackPage;
 
         FrameworkElement OverviewPage()
         {
@@ -278,10 +297,27 @@ namespace TcAgentBridge
             var sp = new DockPanel();
             var h1 = sourcesHeading;
             DockPanel.SetDock(h1, Dock.Top); sp.Children.Add(h1);
+            var tools1 = new WrapPanel { Margin = new Thickness(6, 0, 6, 4) };
+            foreach (var (label, tip, act) in new (string, string, Action)[] {
+                ("Add …", "A Git repository with skills, workflows, rules or lessons", () => EditSource(null)),
+                ("Edit …", "Change URL, branch/tag or level of the selected source", () => EditSource(sourceList.SelectedItem as Line)),
+                ("Remove", "Remove the selected source (installed items stay)", RemoveSource),
+                ("Browse && install …", "Show what the source offers and install items - license, files and scripts are shown first", BrowseSource) })
+            { var b = Text(label.Replace("&&", "&"), tip); b.Click += (s, e) => act(); tools1.Children.Add(b); }
+            DockPanel.SetDock(tools1, Dock.Top); sp.Children.Add(tools1);
             DockPanel.SetDock(sourceList, Dock.Top); sourceList.MaxHeight = 160; sp.Children.Add(sourceList);
             var h2 = installedHeading;
             DockPanel.SetDock(h2, Dock.Top); sp.Children.Add(h2);
+            var tools2 = new WrapPanel { Margin = new Thickness(6, 0, 6, 4) };
+            foreach (var (label, tip, act) in new (string, string, Action)[] {
+                ("Check for updates", "Fetch the sources and list what is newer there", () => RunAsync("sources pull --dry-run", true)),
+                ("Update all …", "Update every installed item that is newer in its source (not the ones changed locally)", UpdateAll),
+                ("Diff", "Changes of the selected item in its source since the install", DiffInstalled) })
+            { var b = Text(label, tip); b.Click += (s, e) => act(); tools2.Children.Add(b); }
+            DockPanel.SetDock(tools2, Dock.Top); sp.Children.Add(tools2);
+            DockPanel.SetDock(sourceDetail, Dock.Bottom); sp.Children.Add(sourceDetail);
             sp.Children.Add(installedList);
+            sourceList.MouseDoubleClick += (s, e) => EditSource(sourceList.SelectedItem as Line);
             return sourcesPage = sp;
         }
 
@@ -374,6 +410,8 @@ namespace TcAgentBridge
             FillEntries();
             FillGit();
             FillSources();
+            FillPlatforms();
+            FillFeedback();
             var names = Arr(data["workflows"]).Select(w => S(w, "name")).ToList();
             var keep = wfBox.SelectedItem as string;
             wfBox.ItemsSource = names;
@@ -727,7 +765,7 @@ namespace TcAgentBridge
         // ------------------------------------------------------------------ sources
         void FillSources()
         {
-            sourcesHeading.Text = $"Sources ({Arr(data["sources"]).Count()}) - add, search, install, pull: ask the agent, e.g. \"which skills does source X have?\"";
+            sourcesHeading.Text = $"Sources ({Arr(data["sources"]).Count()}) - Git repositories with skills, workflows, rules and lessons";
             installedHeading.Text = $"Installed from sources ({Arr(data["installed"]).Count()}) - pinned in skills.lock.json of their level";
             sourceList.ItemsSource = Arr(data["sources"]).Select(s => new Line { D = s, C1 = S(s, "name"), C2 = S(s, "level"), C3 = S(s, "url"), C4 = S(s, "ref"), Mark = Blue }).ToList();
             installedList.ItemsSource = Arr(data["installed"]).Select(i =>
@@ -739,6 +777,323 @@ namespace TcAgentBridge
                     C5 = S(i, "license"), C6 = S(i, "installed"), Mark = st == "ok" ? Green : st.Contains("changed") || st.Contains("missing") ? Red : Orange, Tip = S(i, "url")
                 };
             }).ToList();
+        }
+
+        // ------------------------------------------------------------------ sources: edit, browse and install, update, diff
+        void RunAsync(string args, bool toDetail, bool reload = false)
+        {
+            status.Text = "TcAgent.exe " + args.Split(' ')[0] + " " + args.Split(' ')[1] + " ...";
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var (_, output) = RunCli(args);
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (toDetail) sourceDetail.Text = output;
+                    status.Text = output.Split('\n')[0];
+                    if (reload) Load();
+                }));
+            });
+        }
+
+        // the levels sources can be defined at (sources.json): user and project
+        string[] SourceLevels() => string.IsNullOrEmpty(S(data, "solutionDir")) ? new[] { "personal" } : new[] { "personal", "project" };
+
+        void EditSource(Line l)
+        {
+            var d = l?.D;
+            var r = Prompt(d == null ? "Add a source" : "Edit source " + S(d, "name"),
+                           ("Name (lowercase, hyphens)", null, S(d, "name") ?? ""), ("Git URL or path", null, S(d, "url") ?? ""),
+                           ("Branch or tag (empty = default)", null, S(d, "ref") == "HEAD" ? "" : S(d, "ref") ?? ""),
+                           ("Defined for", SourceLevels(), S(d, "level") == "project" ? "project" : "personal"));
+            if (r == null || r[0].Trim().Length == 0 || r[1].Trim().Length == 0) return;
+            // a renamed or moved source: the old entry goes
+            if (d != null && (S(d, "name") != r[0].Trim() || (S(d, "level") == "project" ? "project" : "personal") != r[3]))
+                RunCli($"sources remove --name {Quote(S(d, "name"))} --level {(S(d, "level") == "project" ? "project" : "personal")}");
+            var (_, output) = RunCli($"sources add --name {Quote(r[0].Trim())} --url {Quote(r[1].Trim())} --level {r[3]}" + (r[2].Trim().Length > 0 ? " --ref " + Quote(r[2].Trim()) : ""));
+            status.Text = output;
+            Load();
+        }
+
+        void RemoveSource()
+        {
+            if (!(sourceList.SelectedItem is Line l)) { status.Text = "Select a source first."; return; }
+            if (MessageBox.Show($"Remove the source {S(l.D, "name")}?\n\nItems installed from it stay (and keep their pinned commit).", "TcAgent Knowledge",
+                                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            status.Text = RunCli($"sources remove --name {Quote(S(l.D, "name"))} --level {(S(l.D, "level") == "project" ? "project" : "personal")}").output;
+            Load();
+        }
+
+        void BrowseSource()
+        {
+            var name = S((sourceList.SelectedItem as Line)?.D, "name");
+            status.Text = "Reading " + (name ?? "all sources") + " (git fetch) ...";
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var (ok, output) = RunCli("sources search" + (name != null ? " --name " + Quote(name) : ""));
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!ok) { status.Text = output; return; }
+                    List<Dictionary<string, object>> items;
+                    try { items = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<ArrayList>(output).OfType<Dictionary<string, object>>().ToList(); }
+                    catch { status.Text = output; return; }
+                    status.Text = $"{items.Count} item(s) offered.";
+                    InstallDialog(items);
+                }));
+            });
+        }
+
+        void InstallDialog(List<Dictionary<string, object>> items)
+        {
+            var w = new Window { Title = "Install from a source", Width = 900, Height = 520, WindowStartupLocation = WindowStartupLocation.CenterOwner,
+                                 Owner = Application.Current?.MainWindow, ShowInTaskbar = false };
+            var list = new ListView { SelectionMode = SelectionMode.Single };
+            Columns(list, ("Name", 200, nameof(Line.C1)), ("Kind", 90, nameof(Line.C2)), ("Source", 110, nameof(Line.C3)), ("License", 110, nameof(Line.C4)),
+                    ("Scripts", 70, nameof(Line.C5)), ("Description", 300, nameof(Line.C6)));
+            list.ItemsSource = items.Select(i => new Line
+            {
+                D = i, C1 = S(i, "name"), C2 = S(i, "kind"), C3 = S(i, "source"), C4 = S(i, "license") + (S(i, "licenseClass") == "accepted" ? "" : " (" + S(i, "licenseClass") + ")"),
+                C5 = ((IEnumerable)i["scripts"]).Cast<object>().Any() ? "yes" : "",
+                C6 = S(i, "description"), Mark = S(i, "licenseClass") == "accepted" ? Green : S(i, "refusal") != null && S(i, "licenseClass") is "source-available" or "none" ? Red : Orange,
+                Tip = S(i, "refusal") ?? S(i, "path")
+            }).ToList();
+            var level = new ComboBox { ItemsSource = string.IsNullOrEmpty(S(data, "solutionDir")) ? new[] { "personal" } : new[] { "personal", "project" }, SelectedIndex = 0, MinWidth = 120, Margin = new Thickness(6, 0, 6, 0) };
+            var install = new Button { Content = "Install …", MinWidth = 90, IsDefault = true };
+            var close = new Button { Content = "Close", MinWidth = 80, IsCancel = true, Margin = new Thickness(6, 0, 0, 0) };
+            var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(8) };
+            bar.Children.Add(new TextBlock { Text = "Install to:", VerticalAlignment = VerticalAlignment.Center });
+            bar.Children.Add(level); bar.Children.Add(install); bar.Children.Add(close);
+            var dp = new DockPanel(); DockPanel.SetDock(bar, Dock.Bottom); dp.Children.Add(bar); dp.Children.Add(list);
+            w.Content = dp;
+            install.Click += (s, e) =>
+            {
+                if (!(list.SelectedItem is Line l)) return;
+                var i = l.D;
+                var cls = S(i, "licenseClass");
+                if (cls is "source-available" or "none") { MessageBox.Show(w, S(i, "refusal"), "Not installed", MessageBoxButton.OK, MessageBoxImage.Stop); return; }
+                var files = ((IEnumerable)i["files"]).Cast<object>().Select(x => x.ToString()).ToList();
+                var scripts = ((IEnumerable)i["scripts"]).Cast<object>().Select(x => x.ToString()).ToList();
+                var text = $"Install {S(i, "kind")} \"{S(i, "name")}\" from {S(i, "source")} @{(S(i, "commit") ?? "").Substring(0, Math.Min(8, (S(i, "commit") ?? "").Length))} to the {level.SelectedItem} level?\n\n" +
+                           $"License: {S(i, "license")}{(cls == "accepted" ? "" : $" - {cls}: check it before you accept it")}\n" +
+                           $"Files ({files.Count}): {string.Join(", ", files.Take(20))}{(files.Count > 20 ? " …" : "")}\n" +
+                           (scripts.Count > 0 ? $"\nContains scripts: {string.Join(", ", scripts)}\nTcAgent never runs them - read them before you use the skill.\n" : "");
+                if (MessageBox.Show(w, text, "Install", MessageBoxButton.YesNo, scripts.Count > 0 || cls != "accepted" ? MessageBoxImage.Warning : MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+                var (ok, output) = RunCli($"sources install --name {Quote(S(i, "source"))} --item {Quote(S(i, "name"))} --kind {S(i, "kind")} --level {level.SelectedItem}" + (cls == "accepted" ? "" : " --accept-license"));
+                MessageBox.Show(w, output, ok ? "Installed" : "Not installed", MessageBoxButton.OK, ok ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                if (ok) Load();
+            };
+            w.ShowDialog();
+        }
+
+        void UpdateAll()
+        {
+            status.Text = "Checking the sources ...";
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var (_, plan) = RunCli("sources pull --dry-run");
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    sourceDetail.Text = plan;
+                    if (plan.StartsWith("Everything is up to date")) { status.Text = plan; return; }
+                    if (MessageBox.Show("Update these items from their sources?\n\n" + plan, "TcAgent Knowledge", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+                    RunAsync("sources pull", true, reload: true);
+                }));
+            });
+        }
+
+        void DiffInstalled()
+        {
+            if (!(installedList.SelectedItem is Line l)) { status.Text = "Select an installed item first."; return; }
+            RunAsync("sources diff --item " + Quote((S(l.D, "key") ?? "").Split('/').Last()), true);
+        }
+
+        // ------------------------------------------------------------------ platforms
+        FrameworkElement PlatformsPage()
+        {
+            if (platformsPage != null) return platformsPage;
+            Columns(platformList, ("Platform", 180, nameof(Line.C1)), ("Applies here", 90, nameof(Line.C2)), ("Detected by libraries", 220, nameof(Line.C3)),
+                    ("Detected by terms", 180, nameof(Line.C4)), ("Defined in", 360, nameof(Line.C5)));
+            var tools = new WrapPanel { Margin = new Thickness(6, 4, 6, 4) };
+            foreach (var (label, tip, act) in new (string, string, Action)[] {
+                ("New …", "A platform of your own (user level): name, description, the libraries and terms that detect it", NewPlatform),
+                ("Open platform.md", "Edit the description and detection of the selected platform", OpenPlatform),
+                ("Open folder", "The folder of the platform (its coding rules, skills, lessons ...)", OpenPlatformFolder),
+                ("Set for this project …", "Choose the platforms of this solution (stored in .tcagent\\config.json)", SetPlatforms),
+                ("Detect automatically", "Remove the choice from .tcagent\\config.json - detection by libraries and terms again", () => { status.Text = RunCli("knowledge platform --action auto").output; Load(); }) })
+            { var b = Text(label, tip); b.Click += (s, e) => act(); tools.Children.Add(b); }
+            platformInfo.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            platformList.MouseDoubleClick += (s, e) => OpenPlatform();
+            var dp = new DockPanel();
+            DockPanel.SetDock(tools, Dock.Top); dp.Children.Add(tools);
+            DockPanel.SetDock(platformInfo, Dock.Top); dp.Children.Add(platformInfo);
+            dp.Children.Add(platformList);
+            return platformsPage = dp;
+        }
+
+        void FillPlatforms()
+        {
+            var pf = data.TryGetValue("platform", out var pv) ? pv as Dictionary<string, object> : null;
+            var libs = ((data.TryGetValue("libraries", out var lo) ? lo as IEnumerable : null) ?? new object[0]).Cast<object>().Select(x => x.ToString()).ToList();
+            platformInfo.Text = $"This project: {(Arr(data["platforms"]).Any(p => B(p, "active")) ? string.Join(", ", Arr(data["platforms"]).Where(p => B(p, "active")).Select(p => S(p, "name"))) : "no platform")} - " +
+                                $"{S(pf, "reason")}{(B(data, "platformConfigured") ? " (chosen by hand)" : "")}\nLibraries of the project: {(libs.Count > 0 ? string.Join(", ", libs) : "none found")}";
+            string J(Dictionary<string, object> p, string k) => string.Join(", ", ((p.TryGetValue(k, out var v) ? v as IEnumerable : null) ?? new object[0]).Cast<object>());
+            platformList.ItemsSource = Arr(data["platforms"]).Select(p => new Line
+            {
+                D = p, C1 = S(p, "name"), C2 = B(p, "active") ? "yes" : "", C3 = J(p, "libraries"), C4 = J(p, "terms"), C5 = S(p, "file") ?? J(p, "roots"),
+                Mark = B(p, "active") ? Green : Gray, Tip = S(p, "description")
+            }).ToList();
+        }
+
+        void NewPlatform()
+        {
+            var r = Prompt("New platform", ("Name (lowercase, hyphens)", null, ""), ("Description", null, ""),
+                           ("Detected by libraries (comma-separated, * allowed)", null, ""), ("Detected by terms in the project (comma-separated)", null, ""));
+            if (r == null || r[0].Trim().Length == 0) return;
+            var (ok, output) = RunCli($"knowledge platform --action new --name {Quote(r[0].Trim())} --message {Quote(r[1])} --libraries {Quote(r[2])} --terms {Quote(r[3])}");
+            status.Text = output;
+            if (ok && File.Exists(output.Trim())) try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(output.Trim()); } catch { }
+            Load();
+        }
+
+        void OpenPlatform()
+        {
+            var f = S((platformList.SelectedItem as Line)?.D, "file");
+            if (f == null || !File.Exists(f)) { status.Text = "This platform has no platform.md of its own (only a folder) - create one with New …"; return; }
+            try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(f); } catch (Exception ex) { status.Text = ex.Message; }
+        }
+
+        void OpenPlatformFolder()
+        {
+            var d = (platformList.SelectedItem as Line)?.D;
+            var folder = S(d, "file") is string f ? Path.GetDirectoryName(f) : ((d?["roots"] as IEnumerable)?.Cast<object>().FirstOrDefault()?.ToString());
+            if (folder != null && Directory.Exists(folder)) Process.Start(new ProcessStartInfo("explorer.exe", "\"" + folder + "\"") { UseShellExecute = false });
+        }
+
+        void SetPlatforms()
+        {
+            if (string.IsNullOrEmpty(S(data, "solutionDir"))) { status.Text = "No solution open."; return; }
+            var all = Arr(data["platforms"]).ToList();
+            var w = new Window { Title = "Platforms of this project", SizeToContent = SizeToContent.WidthAndHeight, MinWidth = 320, ResizeMode = ResizeMode.NoResize,
+                                 WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Application.Current?.MainWindow, ShowInTaskbar = false };
+            var sp = new StackPanel { Margin = new Thickness(12) };
+            sp.Children.Add(new TextBlock { Text = "The project is built on:", Margin = new Thickness(0, 0, 0, 6) });
+            var boxes = all.Select(p => new CheckBox { Content = S(p, "name") + (S(p, "description") is string de ? " – " + de : ""), Tag = S(p, "name"), IsChecked = B(p, "active"), Margin = new Thickness(0, 2, 0, 2) }).ToList();
+            foreach (var b in boxes) sp.Children.Add(b);
+            if (boxes.Count == 0) sp.Children.Add(new TextBlock { Text = "No platforms defined - create one with New … first.", Opacity = 0.7 });
+            var ok = new Button { Content = "OK", MinWidth = 80, IsDefault = true, Margin = new Thickness(0, 12, 6, 0) };
+            var cancel = new Button { Content = "Cancel", MinWidth = 80, IsCancel = true, Margin = new Thickness(0, 12, 0, 0) };
+            ok.Click += (s, e) => w.DialogResult = true;
+            var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            bar.Children.Add(ok); bar.Children.Add(cancel); sp.Children.Add(bar);
+            w.Content = sp;
+            if (w.ShowDialog() != true) return;
+            var names = boxes.Where(b => b.IsChecked == true).Select(b => (string)b.Tag).ToList();
+            status.Text = RunCli("knowledge platform --action set --name " + Quote(names.Count > 0 ? string.Join(",", names) : "none")).output;
+            Load();
+        }
+
+        // ------------------------------------------------------------------ feedback: see, anonymize, edit, share
+        FrameworkElement FeedbackPage()
+        {
+            if (feedbackPage != null) return feedbackPage;
+            Columns(feedbackList, ("Report", 110, nameof(Line.C1)), ("Status", 80, nameof(Line.C2)), ("Severity / type", 140, nameof(Line.C3)),
+                    ("Tool", 140, nameof(Line.C4)), ("Summary", 420, nameof(Line.C5)), ("Version · date", 150, nameof(Line.C6)));
+            feedbackList.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
+            feedbackList.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            var item = new Style(typeof(ListViewItem));
+            item.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension(EnvironmentColors.ToolWindowTextBrushKey)));
+            feedbackList.ItemContainerStyle = item;
+            feedbackStatus.SelectionChanged += (s, e) => FillFeedback();
+            feedbackList.SelectionChanged += (s, e) => PrepareIssue();
+            feedbackText.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
+            feedbackText.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            feedbackInfo.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            var tools = new WrapPanel { Margin = new Thickness(6, 4, 6, 4) };
+            tools.Children.Add(feedbackStatus);
+            foreach (var (label, tip, act) in new (string, string, Action)[] {
+                ("Anonymize again", "Build the text of the selected reports again (names, paths and addresses replaced)", PrepareIssue),
+                ("Copy", "Copy the text below", () => { try { Clipboard.SetText(feedbackText.Text); status.Text = "Copied."; } catch (Exception ex) { status.Text = ex.Message; } }),
+                ("Save as …", "Save the text below as a Markdown file", SaveIssue),
+                ("Share with the TcAgent developers …", "Opens a new issue in the browser with the text below - you check it there and send it yourself", ShareIssue),
+                ("Set status …", "resolved / wontfix / duplicate / open for the selected reports", SetFeedbackStatus) })
+            { var b = Text(label, tip); b.Click += (s, e) => act(); tools.Children.Add(b); }
+            var g = new Grid();
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(2, GridUnitType.Star) });
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+            g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(3, GridUnitType.Star), MinHeight = 80 });
+            var split = new GridSplitter { Height = 4, HorizontalAlignment = HorizontalAlignment.Stretch, ResizeDirection = GridResizeDirection.Rows };
+            split.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+            Grid.SetRow(tools, 0); Grid.SetRow(feedbackList, 1); Grid.SetRow(split, 2); Grid.SetRow(feedbackInfo, 3); Grid.SetRow(feedbackText, 4);
+            foreach (var e in new UIElement[] { tools, feedbackList, split, feedbackInfo, feedbackText }) g.Children.Add(e);
+            feedbackInfo.Text = "Select one or more reports. The text below is anonymized and can be edited before you share it - check it for names of customers, machines and projects.";
+            return feedbackPage = g;
+        }
+
+        void FillFeedback()
+        {
+            if (data == null) return;
+            var st = feedbackStatus.SelectedItem as string ?? "open";
+            feedbackList.ItemsSource = Arr(data.TryGetValue("feedback", out var fo) ? fo : null).Where(f => st == "all" || S(f, "status") == st).Select(f => new Line
+            {
+                D = f, C1 = S(f, "id"), C2 = S(f, "status"), C3 = $"{S(f, "severity") ?? "-"} / {S(f, "type") ?? "-"}", C4 = S(f, "tool"), C5 = S(f, "summary"),
+                C6 = $"{S(f, "version")} · {(S(f, "time") ?? "").Split('T')[0]}",
+                Mark = S(f, "status") == "open" ? (S(f, "severity") is "blocker" or "major" ? Red : Orange) : Green, Tip = S(f, "summary")
+            }).ToList();
+        }
+
+        void PrepareIssue()
+        {
+            var ids = feedbackList.SelectedItems.OfType<Line>().Select(l => S(l.D, "id")).ToList();
+            if (ids.Count == 0) { feedbackText.Text = ""; return; }
+            var (ok, output) = RunCli("knowledge feedback --action issue --key " + Quote(string.Join(",", ids)));
+            if (!ok) { feedbackText.Text = output; return; }
+            try
+            {
+                var r = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(output);
+                feedbackText.Text = S(r, "text");
+                feedbackUrl = S(r, "url");
+                var repl = ((r.TryGetValue("replaced", out var rv) ? rv as IEnumerable : null) ?? new object[0]).Cast<object>().Select(x => x.ToString()).ToList();
+                feedbackInfo.Text = (repl.Count > 0 ? $"Replaced automatically ({repl.Count}): {string.Join(", ", repl.Take(12))}{(repl.Count > 12 ? " …" : "")}. " : "Nothing found to replace automatically. ") +
+                                    "Check and edit the text below before you share it (abbreviations of customers or projects are not known to TcAgent - add them to privateTerms in settings.json).";
+            }
+            catch { feedbackText.Text = output; }
+        }
+
+        void SaveIssue()
+        {
+            if (feedbackText.Text.Trim().Length == 0) return;
+            var dlg = new Microsoft.Win32.SaveFileDialog { FileName = "tcagent-feedback.md", Filter = "Markdown|*.md" };
+            if (dlg.ShowDialog() != true) return;
+            File.WriteAllText(dlg.FileName, feedbackText.Text, new UTF8Encoding(false));
+            status.Text = "Saved: " + dlg.FileName;
+        }
+
+        void ShareIssue()
+        {
+            var text = feedbackText.Text.Trim();
+            if (text.Length == 0) { status.Text = "Select a report first."; return; }
+            var title = text.Split('\n')[0].Trim();
+            var body = text.Substring(text.IndexOf('\n') + 1).Trim();
+            var url = feedbackUrl ?? "https://github.com/ThorstenBrach/TcAgent/issues/new";
+            var full = url + (url.Contains("?") ? "&" : "?") + "title=" + Uri.EscapeDataString(title) + "&body=" + Uri.EscapeDataString(body);
+            var tooLong = full.Length > 7500;
+            if (tooLong) { try { Clipboard.SetText(body); } catch { } full = url + (url.Contains("?") ? "&" : "?") + "title=" + Uri.EscapeDataString(title); }
+            if (MessageBox.Show($"Open a new issue in the browser?\n\n{url}\n\nThe browser shows the text - check it there and send it yourself." +
+                                (tooLong ? "\n\nThe text is long: it is in the clipboard - paste it into the issue." : ""),
+                                "Share with the TcAgent developers", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
+            try { Process.Start(new ProcessStartInfo(full) { UseShellExecute = true }); status.Text = "Issue opened in the browser."; }
+            catch (Exception ex) { status.Text = ex.Message; }
+        }
+
+        void SetFeedbackStatus()
+        {
+            var ids = feedbackList.SelectedItems.OfType<Line>().Select(l => S(l.D, "id")).ToList();
+            if (ids.Count == 0) { status.Text = "Select one or more reports first."; return; }
+            var r = Prompt($"Status of {ids.Count} report(s)", ("Status", new[] { "resolved", "wontfix", "duplicate", "open" }, "resolved"));
+            if (r == null) return;
+            status.Text = RunCli($"knowledge feedback --action resolve --key {Quote(string.Join(",", ids))} --message {r[0]}").output.Split('\n')[0];
+            Load();
         }
 
         // ------------------------------------------------------------------ history

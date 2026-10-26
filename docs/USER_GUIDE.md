@@ -119,8 +119,20 @@ work without the extension. The extension runs **inside** the IDE process and ad
     For every level kept in Git a line shows local changes, commits to push and new commits in the repository (as of
     the last **Fetch**), with **Pull**, **Commit …** and **Push** – the push of a company or team level goes to a new
     branch for a pull request; the column **Git** marks changed and new files.
-  - **Sources:** the Git repositories skills, workflows and rules can be installed from (`tc_sources`) and the items
-    installed from them – pinned commit, license, changed locally, newer upstream.
+  - **Sources:** the Git repositories skills, workflows and rules can be installed from (`tc_sources`): **Add / Edit /
+    Remove**, **Browse & install …** (everything a source offers with kind and license; before installing you see the
+    license, the files and any scripts – source-available and unlicensed items are refused, others only after you
+    accept the license). Below the items installed from sources – pinned commit, license, changed locally, newer upstream
+    – with **Check for updates**, **Update all …** and **Diff**.
+  - **Platforms:** the platforms (automation frameworks) with the libraries and terms that detect them, which apply to
+    this project and why, the libraries of the project. **New …** (a platform of your own), **Open platform.md**,
+    **Open folder**, **Set for this project …**, **Detect automatically**.
+  - **Feedback:** the reports of `tc_feedback` (filter by status). For the selected reports the window builds the text of
+    an issue and **anonymizes** it: names of this computer, user, solution and projects, your `privateTerms`
+    (`settings.json`), user folders, solution paths, network paths and IP addresses are replaced. You edit the text as
+    needed and then **Copy**, **Save as …** or **Share with the TcAgent developers …** (opens a new issue in the browser
+    – you check and send it yourself; `feedbackUrl` in `settings.json` changes the target). **Set status …** marks
+    reports as resolved, wontfix or duplicate.
   - **History:** failed checks and corrections per run with a moving average, every adopted change as a marker, and the
     changes with their values before and after (helped / no effect / worse / reverted); **Export CSV**.
 

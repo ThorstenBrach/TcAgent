@@ -28,6 +28,54 @@ public static partial class Cli
             Console.WriteLine($"{(o.Sub == "disable" ? "Switched off" : "Switched on")}: {o.Key} ({KnowledgeLayers.SetDisabled(dir, level, o.Key, o.Sub == "disable")})");
             return Ok;
         }
+        if (o.Sub is "feedback")
+        {
+            try
+            {
+                var items = Feedback.Load();
+                switch (o.Action ?? "issue")
+                {
+                    case "issue":
+                    {
+                        // the selected reports as issue text, anonymized - the window shows it for editing before anything is shared
+                        var ids = (o.Key ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                        var sel = items.Where(i => ids.Contains(i.Id, StringComparer.OrdinalIgnoreCase)).ToList();
+                        if (sel.Count == 0) throw new ArgumentException("--key <id[,id...]> of the reports");
+                        var terms = Improver.PrivateTerms(dir);
+                        var texts = new List<string>(); var replaced = new List<string>();
+                        foreach (var i in sel) { var (t, r) = Feedback.Anonymize(Feedback.Issue(i), terms, i); texts.Add(t); replaced.AddRange(r); }
+                        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+                        Console.WriteLine(new JsonObject
+                        {
+                            ["text"] = string.Join("\n---\n\n", texts), ["url"] = Feedback.ShareUrl(),
+                            ["replaced"] = new JsonArray(replaced.Distinct().Select(x => (JsonNode)x).ToArray())
+                        }.ToJsonString());
+                        return Ok;
+                    }
+                    case "resolve":
+                        Console.WriteLine(Feedback.Resolve(o.Key, o.Message ?? "resolved", null, null));
+                        return Ok;
+                    default: throw new ArgumentException("feedback --action issue|resolve");
+                }
+            }
+            catch (Exception ex) when (ex is ArgumentException) { Console.Error.WriteLine(ex.Message); return Failed; }
+        }
+        if (o.Sub is "platform")
+        {
+            try
+            {
+                Console.WriteLine((o.Action ?? "") switch
+                {
+                    "new" => KnowledgeOps.NewPlatform(o.Name, o.Message, o.Libraries, o.Terms),
+                    "set" => "Stored in " + KnowledgeLayers.SetPlatforms(dir ?? throw new ArgumentException("no solution open"),
+                                 (o.Name ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(n => !n.Equals("none", StringComparison.OrdinalIgnoreCase))),
+                    "auto" => KnowledgeOps.AutoPlatform(dir ?? throw new ArgumentException("no solution open")),
+                    _ => throw new ArgumentException("platform --action new|set|auto")
+                });
+                return Ok;
+            }
+            catch (Exception ex) when (ex is ArgumentException) { Console.Error.WriteLine(ex.Message); return Failed; }
+        }
         if (o.Sub is "new" or "move" or "delete" or "git")
         {
             try
@@ -103,6 +151,28 @@ public static partial class Cli
             if (st != null) e["git"] = st;
         }
         o["layers"] = layers;
+
+        // platforms: the known ones with their detection, which apply to the project and why
+        o["platforms"] = new JsonArray(pi.Known.Select(d => (JsonNode)new JsonObject
+        {
+            ["name"] = d.Name, ["description"] = d.Description, ["active"] = pi.Active.Contains(d.Name, StringComparer.OrdinalIgnoreCase),
+            ["libraries"] = new JsonArray(d.Libraries.Select(x => (JsonNode)x).ToArray()), ["terms"] = new JsonArray(d.Terms.Select(x => (JsonNode)x).ToArray()),
+            ["roots"] = new JsonArray(d.Roots.Select(x => (JsonNode)x).ToArray()),
+            ["file"] = d.Roots.Select(r => Path.Combine(r, "platform.md")).Concat(new[] { Path.Combine(KnowledgeLayers.UserRoot, "platforms", d.Name, "platform.md") }).FirstOrDefault(File.Exists)
+        }).ToArray());
+        o["platformConfigured"] = pi.Configured;
+        o["libraries"] = new JsonArray(KnowledgeLayers.ReferencedLibraries(dir).Select(x => (JsonNode)x).ToArray());
+
+        // feedback reports (tc_feedback) - the window shows them, anonymizes and shares a report on request
+        try
+        {
+            o["feedback"] = new JsonArray(Feedback.Load().OrderByDescending(i => i.Time).Select(i => (JsonNode)new JsonObject
+            {
+                ["id"] = i.Id, ["time"] = i.Time, ["status"] = i.Status, ["type"] = i.Type, ["severity"] = i.Severity, ["tool"] = i.Tool,
+                ["summary"] = i.Summary, ["version"] = i.Version, ["client"] = i.Client
+            }).ToArray());
+        }
+        catch { o["feedback"] = new JsonArray(); }
         o["entries"] = entries;
         o["counts"] = counts;
 

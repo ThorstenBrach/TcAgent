@@ -265,6 +265,69 @@ public static class Feedback
 
     static string Md(string s) => (s ?? "").Replace("\r", " ").Replace("\n", " ").Replace("|", "\\|");
 
+    // ------------------------------------------------------------------ sharing with the TcAgent developers
+    /// <summary>Where a report is shared: settings.json "feedbackUrl" (an issue form of the repository), default the TcAgent repository.</summary>
+    public static string ShareUrl()
+    {
+        try
+        {
+            var f = System.IO.Path.Combine(KnowledgeLayers.UserRoot, "settings.json");
+            if (File.Exists(f) && JsonNode.Parse(File.ReadAllText(f))?["feedbackUrl"]?.ToString() is { Length: > 0 } u) return u;
+        }
+        catch { }
+        return "https://github.com/ThorstenBrach/TcAgent/issues/new";
+    }
+
+    /// <summary>One report as the text of an issue - the title in the first line.</summary>
+    public static string Issue(Item i)
+    {
+        var o = new StringBuilder($"[{i.Tool ?? "TcAgent"}] {i.Summary}\n\n");
+        o.AppendLine($"- **Type / severity:** {i.Type ?? "-"} / {i.Severity ?? "-"}");
+        o.AppendLine($"- **TcAgent:** {i.Version ?? "?"}, client {i.Client ?? "?"}");
+        if (!string.IsNullOrWhiteSpace(i.Tool)) o.AppendLine($"- **Tool:** `{i.Tool}`");
+        o.AppendLine($"- **Reported:** {Short(i.Time)} ({i.Id})");
+        void Block(string title, string text)
+        {
+            if (string.IsNullOrWhiteSpace(text)) return;
+            o.AppendLine().AppendLine($"**{title}**").AppendLine().AppendLine("```text").AppendLine(text.Replace("```", "'''").TrimEnd()).AppendLine("```");
+        }
+        Block("Details", i.Details);
+        Block("Expected", i.Expected);
+        Block("Workaround", i.Workaround);
+        return o.ToString();
+    }
+
+    /// <summary>Replaces what identifies the user, the computer, the company or the project: the private terms (names of this
+    /// computer, user, solution and projects, privateTerms of the settings), machine and solution of the entry, user folders,
+    /// paths of the solution, network paths and IP addresses / AmsNetIds. Returns the text and what was replaced.</summary>
+    public static (string Text, List<string> Replaced) Anonymize(string text, IEnumerable<string> terms, Item i = null)
+    {
+        var replaced = new List<string>();
+        string Sub(string t, string pattern, string with) =>
+            System.Text.RegularExpressions.Regex.Replace(t, pattern, m => { if (!replaced.Contains(m.Value)) replaced.Add(m.Value); return with; },
+                                                         System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        var t = text ?? "";
+        if (i?.Solution is { Length: > 0 } sol)
+        {
+            var path = sol.Contains('|') ? sol.Split('|').Select(x => x.Trim()).FirstOrDefault(x => x.Contains('\\')) ?? sol : sol;
+            foreach (var p in new[] { System.IO.Path.GetDirectoryName(path), path }.Where(p => !string.IsNullOrWhiteSpace(p) && p.Length > 3).OrderByDescending(p => p!.Length))
+                t = Sub(t, System.Text.RegularExpressions.Regex.Escape(p!), "<solution folder>");
+        }
+        t = Sub(t, @"[A-Za-z]:\\Users\\[^\\\s""']+", "%USERPROFILE%");
+        t = Sub(t, @"\\\\[A-Za-z0-9._-]+\\[^\s""']+", @"\\<server>\<share>");
+        const string oct = @"(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)";
+        t = Sub(t, $@"(?<![\d.]){oct}(?:\.{oct}){{3}}(?:\.{oct}\.{oct})?(?![\d.])", "<address>");          // IP / AmsNetId, not a version like 3.1.4026.19
+        var all = terms.Concat(new[] { i?.Machine }).Where(x => !string.IsNullOrWhiteSpace(x) && x!.Length >= 3)
+                       .Distinct(StringComparer.OrdinalIgnoreCase).OrderByDescending(x => x!.Length);
+        foreach (var term in all)
+        {
+            var with = term!.Equals(Environment.MachineName, StringComparison.OrdinalIgnoreCase) || term.Equals(i?.Machine, StringComparison.OrdinalIgnoreCase) ? "<computer>"
+                     : term.Equals(Environment.UserName, StringComparison.OrdinalIgnoreCase) ? "<user>" : "<name>";
+            t = Sub(t, @"(?<![\w])" + System.Text.RegularExpressions.Regex.Escape(term) + @"(?![\w])", with);
+        }
+        return (t, replaced);
+    }
+
     /// <summary>TcAgent.exe feedback [--open] [--markdown out.md] [--path file-or-folder] [--summary]</summary>
     public static int RunCli(string[] args)
     {

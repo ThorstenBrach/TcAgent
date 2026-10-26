@@ -49,6 +49,7 @@ public static partial class Cli
         public readonly List<string> Tests = new(); public bool TimeoutGiven, Download, BuiltIn;   // tcunit run/report (CliTcUnit.cs)
         public string Approve;                                                                      // tcunit report --approve <id>
         public string Key, Level, Action, Message;                                                  // knowledge ... --key <kind/name> --level <level> --action <git action> --message <text>
+        public string Name, Url, Ref, Item, Kind, Query, Libraries, Terms; public bool AcceptLicense;  // sources / knowledge platform (window)
 
     }
 
@@ -752,6 +753,15 @@ public static partial class Cli
                 case "--key": o.Key = Val().Trim(); break;
                 case "--level": o.Level = Val().Trim().ToLowerInvariant(); break;
                 case "--action": o.Action = Val().Trim().ToLowerInvariant(); break;
+                case "--name": o.Name = Val().Trim(); break;
+                case "--url": o.Url = Val().Trim(); break;
+                case "--ref": o.Ref = Val().Trim(); break;
+                case "--item": o.Item = Val().Trim(); break;
+                case "--kind": o.Kind = Val().Trim().ToLowerInvariant(); break;
+                case "--query": o.Query = Val(); break;
+                case "--libraries": o.Libraries = Val(); break;
+                case "--terms": o.Terms = Val(); break;
+                case "--accept-license": o.AcceptLicense = true; break;
                 case "--message": o.Message = Val(); break;
                 default:
                     // st: the sub-command (export, check, import) is the first argument that is not an option
@@ -768,18 +778,21 @@ public static partial class Cli
         if (o.Command is "tcunit") { ValidateTcUnit(o); return o; }
         if (o.Command is "install") return o;
         if (o.Command is "ci") return o;                  // the steps are checked by ci itself (CliCi.cs)
-        if ((o.Key != null || o.Level != null || o.Action != null || o.Message != null) && o.Command != "knowledge") throw new Exception("--key, --level, --action and --message are only for knowledge");
+        if ((o.Key != null || o.Level != null || o.Action != null || o.Message != null) && o.Command is not ("knowledge" or "sources")) throw new Exception("--key, --level, --action and --message are only for knowledge and sources");
+        if ((o.Name != null || o.Url != null || o.Ref != null || o.Item != null || o.Kind != null || o.Query != null || o.Libraries != null || o.Terms != null || o.AcceptLicense)
+            && o.Command is not ("knowledge" or "sources")) throw new Exception("--name, --url, --ref, --item, --kind, --query, --libraries, --terms and --accept-license are only for knowledge and sources");
         if (o.Command is "knowledge")                     // files only: the solution is optional (its platform and project level)
         {
-            if (o.Sub is not ("json" or "disable" or "enable" or "new" or "move" or "delete" or "git"))
-                throw new Exception("knowledge needs json, disable, enable, new, move, delete or git, e.g. TcAgent.exe knowledge json --solution M.sln");
+            if (o.Sub is not ("json" or "disable" or "enable" or "new" or "move" or "delete" or "git" or "feedback" or "platform"))
+                throw new Exception("knowledge needs json, disable, enable, new, move, delete, git, feedback or platform, e.g. TcAgent.exe knowledge json --solution M.sln");
             if (o.Sub is "disable" or "enable" && (o.Key == null || !o.Key.Contains('/'))) throw new Exception("knowledge " + o.Sub + " needs --key <kind>/<name>");
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
             return o;
         }
         if (o.Command is "sources")                       // files and git only: the solution is optional (its project level)
         {
-            if (o.Sub is not ("status" or "sync")) throw new Exception("sources needs status or sync, e.g. TcAgent.exe sources sync --solution M.sln");
+            if (o.Sub is not ("status" or "sync" or "add" or "remove" or "search" or "install" or "pull" or "diff"))
+                throw new Exception("sources needs status, sync, add, remove, search, install, pull or diff, e.g. TcAgent.exe sources sync --solution M.sln");
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
             return o;
         }
