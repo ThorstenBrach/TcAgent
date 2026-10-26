@@ -223,6 +223,33 @@ A run log contains only counts and names – no code, no customer data:
 5. The next run logs show whether the change helped (fewer failed attempts, fewer corrections). If not, TcAgent
    proposes to revert it.
 
+## Client neutrality (high priority)
+
+TcAgent must work the same with every agent CLI the chat offers (Claude Code, GitHub Copilot CLI, Gemini CLI, Codex
+CLI, …). The MCP server is already neutral; the chat window, the question tool, the guide files and the setup still
+favour one client. These points come **first**, before the other implementation steps:
+
+1. **Server texts:** hints that name one product ("quit Claude Desktop …") become neutral ("quit the AI client …").
+   Confirmations stay MCP elicitation or the dialog in the IDE – both client-neutral.
+2. **Chat window on the Agent Client Protocol (ACP):** today only one backend gets a persistent session, live tool
+   calls, permission and question cards and attachments; the others run one process per question with plain text.
+   [ACP](https://agentclientprotocol.com) is the open protocol for "editor talks to agent": persistent sessions,
+   streaming, tool calls, permission requests (`allow_once`, `allow_always`, `reject_once`, `reject_always`). Gemini CLI
+   and GitHub Copilot (preview) are listed as ACP agents; Claude Code and Codex CLI through adapters
+   (`claude-agent-acp`, `codex-acp`). The chat window becomes an ACP client; the current stream-json path stays as a
+   fallback until ACP works with every set-up CLI.
+3. **Questions through TcAgent:** a new tool `tc_ask_user` (options, multiple choice, free text) shows the question card
+   in the chat window and uses MCP elicitation outside it. Every client can call TcAgent tools, so questions work with
+   every CLI – no dependency on a client's own question tool.
+4. **One guide file:** `AGENTS.md` (cross-tool standard) is the single source of the TcAgent guide and the project
+   instructions. `CLAUDE.md` only imports it (`@AGENTS.md`), Gemini CLI is configured to read `AGENTS.md`, Copilot and
+   Codex read it anyway. Skills: Agent Skills format, mirrored into the folders of all set-up CLIs (see [Skills](#skills)).
+5. **Neutral settings:** `%LOCALAPPDATA%\TcAgent\settings.json` becomes the single source of TcAgent's settings
+   (allowed targets, confirmation, company root …). The setup writes every client's MCP configuration from it – no
+   client's own configuration is the source any more, and the registered TcAgent version is read from there.
+6. Smaller things: neutral defaults and texts in the chat (default backend, skill name in the prompt), documentation
+   examples for several CLIs.
+
 ## Deterministic first, agent second
 
 Wherever a result can be produced deterministically (templates, generators, checks, formatting, report and
@@ -232,6 +259,8 @@ part of the implementation plan.
 
 ## Implementation steps (proposal)
 
+0. **Client neutrality, points 1–5 (high priority, as soon as possible)**: `tc_ask_user` → one guide file and neutral
+   settings → ACP in the chat window (tried with Gemini CLI and Copilot first) → neutral texts.
 1. Levels × platforms for the existing kinds (coding rules, risk rules, lessons, knowledge, doc templates):
    `TCAGENT_COMPANY`, `platforms\`, `config.json`, detection and the question on ambiguity, file header, `locked`/`force`,
    one file per topic/lesson, split command.
