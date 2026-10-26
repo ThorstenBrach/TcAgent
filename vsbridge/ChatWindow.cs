@@ -220,6 +220,13 @@ namespace TcAgentBridge
         // window keeps working with the backends it read when it was created
         void ReloadSettingsIfChanged()
         {
+            // TcAgent was updated (new VSIX, Set up clients): a running session still talks to the old server - start it again
+            var server = Installer.RegisteredServerVersion();
+            if (sess != null && !sess.Exited && server != null && sess.Server != null && server != sess.Server && sess.Turn == null)
+            {
+                SystemLine($"TcAgent {server} is set up - the chat session starts again with it (it used {sess.Server}).");
+                KillSession();
+            }
             try { if (!File.Exists(SettingsFile) || File.GetLastWriteTimeUtc(SettingsFile) == settingsStamp) return; } catch { return; }
             var key = Current?.Key;
             var old = Current;
@@ -282,6 +289,7 @@ namespace TcAgentBridge
             public TaskCompletionSource<string> Turn; public Stopwatch TurnSw; public string Summary;
             public bool Exited, Greeted; public readonly Stopwatch Up = Stopwatch.StartNew();
             public AcpState Acp;                // ACP backends (ChatAcp.cs)
+            public string Server;               // TcAgent version registered when the session started
         }
         Session sess;
 
@@ -331,7 +339,7 @@ namespace TcAgentBridge
             if (sess != null && !sess.Exited && sess.Be == be) return sess;
             KillSession();
             var (file, args) = CommandLine(be, null);
-            var s = new Session { Be = be, Acp = IsAcp(be) ? new AcpState() : null };
+            var s = new Session { Be = be, Acp = IsAcp(be) ? new AcpState() : null, Server = Installer.RegisteredServerVersion() };
             s.P = Process.Start(Psi(file, args, be));
             s.In = s.P.StandardInput.BaseStream;
             Task.Run(() =>

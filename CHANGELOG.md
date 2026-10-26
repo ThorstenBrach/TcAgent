@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.39.7] – 2026-10-26
+
+### Fixed
+- **Chat after a TcAgent update:** a running chat session kept talking to the TcAgent server it started with (e.g. 0.39.2
+  after installing a newer version), so fixes of the new version did not apply. Before the next question the chat now
+  compares the registered server version with the one of the session and starts the session again with the new server
+  (with a note in the chat).
+
 ## [0.39.6] – 2026-10-26
 
 ### Changed
