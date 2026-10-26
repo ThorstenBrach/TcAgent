@@ -11,6 +11,7 @@ labels: ["feedback"]
 - **Type / severity:** bug | missing_feature | usability | docs / minor | major | blocker
 - **TcAgent:** version, client
 - **Tool:** `tc_...`
+- **Environment:** TwinCAT build, Visual Studio or XAE Shell (add it if it matters)
 
 **Details**
 

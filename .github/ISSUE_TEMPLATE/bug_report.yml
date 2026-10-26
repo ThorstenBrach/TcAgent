@@ -42,6 +42,16 @@ body:
       label: Workaround
       description: How you got the task done anyway, if at all.
   - type: dropdown
+    id: reproducible
+    attributes:
+      label: Reproducible
+      options:
+        - always
+        - sometimes
+        - happened once
+    validations:
+      required: true
+  - type: dropdown
     id: severity
     attributes:
       label: Severity

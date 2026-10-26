@@ -1,0 +1,47 @@
+name: Question
+description: How do I ...? Something in the setup or the behaviour of TcAgent is unclear.
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The user guide answers many questions (see the links on the previous page). Please leave out customer, machine and
+        project names - an issue is public.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What do you want to know or achieve?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried
+      description: Prompts, tools, settings, the part of the user guide you followed - and what happened.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installation and setup of the AI clients
+        - PLC code, build and activation
+        - Tests (TcUnit)
+        - I/O, motion, HMI, system
+        - Chat window
+        - Knowledge (rules, skills, workflows, lessons, sources)
+        - Pipeline and command line
+        - Other
+    validations:
+      required: true
+  - type: input
+    id: tcagent
+    attributes:
+      label: TcAgent version
+      placeholder: "0.42.3"
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: TwinCAT build, Visual Studio or XAE Shell, AI client
+      placeholder: "TwinCAT 3.1.4026.x, XAE Shell, Copilot CLI"

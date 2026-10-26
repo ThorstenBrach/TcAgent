@@ -25,6 +25,14 @@ body:
       label: How you do it today
       description: Workarounds, other tools, manual steps.
   - type: dropdown
+    id: importance
+    attributes:
+      label: Importance for you
+      options:
+        - nice to have
+        - saves a lot of time
+        - needed for my work
+  - type: dropdown
     id: area
     attributes:
       label: Area
@@ -39,3 +47,8 @@ body:
         - Other
     validations:
       required: true
+  - type: input
+    id: tcagent
+    attributes:
+      label: TcAgent version
+      placeholder: "0.42.3"

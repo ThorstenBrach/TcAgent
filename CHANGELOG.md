@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.42.4] – 2026-10-26
+
+### Added
+- Issue template **Question** (question, what you tried, area, version, environment; label `question`). Bug report: field
+  *Reproducible* (always / sometimes / once); feature request: *Importance for you* and the TcAgent version; feedback
+  template: environment line.
+
 ## [0.42.3] – 2026-10-26
 
 ### Added
