@@ -105,6 +105,7 @@ namespace TcAgentBridge
                 js["default"] = key;
                 Directory.CreateDirectory(Dir);
                 File.WriteAllText(SettingsFile, Indent(ser.Serialize(js)), new UTF8Encoding(false));
+                settingsStamp = File.GetLastWriteTimeUtc(SettingsFile);     // our own change - nothing to reload
             }
             catch (Exception ex) { status.Text = "Could not remember the backend: " + ex.Message; }
         }
@@ -161,8 +162,7 @@ namespace TcAgentBridge
         {
             Instance = this;
             LoadSettings();
-            foreach (var b in backends) backendBox.Items.Add(new ComboBoxItem { Content = b.Name, Tag = b });
-            if (backendBox.Items.Count > 0) backendBox.SelectedIndex = Math.Min(preferred, backendBox.Items.Count - 1);
+            FillBackends(null);
 
             Content = BuildView();
 
@@ -179,7 +179,12 @@ namespace TcAgentBridge
             setup.Click += (s, e) =>
             {
                 status.Text = "Setting up AI clients ...";
-                System.Threading.Tasks.Task.Run(() => { Installer.Run(true, _ => { }, m => BridgePackage.Instance?.Notify(m)); UpdateVersionLabel(); });
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    Installer.Run(true, _ => { }, m => BridgePackage.Instance?.Notify(m));
+                    UpdateVersionLabel();
+                    Dispatcher.BeginInvoke(new Action(ReloadSettingsIfChanged));   // the setup may have changed the backends
+                });
             };
             tests.Click += (s, e) =>
             {
@@ -201,8 +206,34 @@ namespace TcAgentBridge
         }
 
         // ------------------------------------------------------------------ Settings
+        DateTime settingsStamp;
+
+        void FillBackends(string keepKey)
+        {
+            backendBox.Items.Clear();
+            foreach (var b in backends) backendBox.Items.Add(new ComboBoxItem { Content = b.Name, Tag = b });
+            var keep = keepKey == null ? -1 : backends.FindIndex(x => x.Key == keepKey);
+            if (backendBox.Items.Count > 0) backendBox.SelectedIndex = keep >= 0 ? keep : Math.Min(preferred, backendBox.Items.Count - 1);
+        }
+
+        // chat-backends.json changed (client setup, edited by hand): read it again before the next question - otherwise the
+        // window keeps working with the backends it read when it was created
+        void ReloadSettingsIfChanged()
+        {
+            try { if (!File.Exists(SettingsFile) || File.GetLastWriteTimeUtc(SettingsFile) == settingsStamp) return; } catch { return; }
+            var key = Current?.Key;
+            var old = Current;
+            backends.Clear();
+            LoadSettings();
+            // a running session of a backend whose settings changed is started again with the new ones
+            var now = backends.FirstOrDefault(x => x.Key == key);
+            if (sess != null && (now == null || old == null || old.Args != now.Args || old.Format != now.Format || old.Exe != now.Exe)) KillSession();
+            FillBackends(key);
+        }
+
         void LoadSettings()
         {
+            try { settingsStamp = File.Exists(SettingsFile) ? File.GetLastWriteTimeUtc(SettingsFile) : default; } catch { }
             var defaults = new[]
             {
                 new Backend { Key = "claude", Name = "Claude (Claude Code)", Exe = "claude", Args = "-p --input-format stream-json --output-format stream-json --verbose --strict-mcp-config --mcp-config {mcpClaude} --allowedTools mcp__tcagent WebSearch", Stdin = true, Format = "claude-stream" },
@@ -477,6 +508,7 @@ namespace TcAgentBridge
         async void Send(string external = null, string externalCtx = null)
         {
             if (busy) return;
+            ReloadSettingsIfChanged();
             var text = (external ?? input.Text).Trim();
             if (text.Length == 0) return;
             var be = Current;

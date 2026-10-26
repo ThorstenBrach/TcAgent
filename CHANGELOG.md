@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.39.1] – 2026-10-26
+
+### Fixed
+- Chat window: changes of `chat-backends.json` (e.g. by **Set up clients**, which switches Copilot to ACP) took effect only
+  after restarting Visual Studio - the window kept the backends it read when it was created. It now reads the file again
+  after the setup and before every question, and restarts a running session whose backend settings changed.
+- The `new-feature` workflow description names check and build with 0 errors.
+
 ## [0.39.0] – 2026-10-26
 
 ### Changed
