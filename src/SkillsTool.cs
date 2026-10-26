@@ -12,14 +12,14 @@ public sealed partial class ToolRegistry
         Add("tc_skills", "Skills = how this team does a kind of task (e.g. requirements-interview before a new function, plc-debugging, " +
                          "plc-code-review), in the open Agent Skills format, from the levels built-in / company / user / platform / project. " +
                          "action=list (name + description - also shown by tc_coding_rules), show name=<name> (load it when the task fits and follow it), " +
-                         "add name description body scope=project|personal|platform:<name> (a new skill, after the user agreed; dryRun first), " +
+                         "add name description body scope=project|personal|team|platform:<name> (a new skill, after the user agreed; dryRun first), " +
                          "mirror (copy the skills that apply everywhere into the skill folders of the agent CLIs).",
             Schema(Req(P("action", "string", "list, show, add or mirror")),
                    P("name", "string", "show/add: skill name (lowercase, digits, hyphens, e.g. plc-code-review)"),
                    P("description", "string", "add: what the skill does and when to use it (one or two sentences)"),
                    P("body", "string", "add: the instructions (Markdown: steps, checks, examples)"),
                    P("inspiredBy", "string", "add: source of the method the skill adopts (link), if any"),
-                   P("scope", "string", "add: project (default), personal or platform:<name>"),
+                   P("scope", "string", "add: project (default), personal, team (a shared team folder - a team in Git: promote with tc_sources) or platform:<name>"),
                    P("dryRun", "boolean", "add/mirror: only show what would be written")),
             a =>
             {

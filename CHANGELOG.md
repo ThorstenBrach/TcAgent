@@ -5,6 +5,24 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.37.0] – 2026-10-26
+
+### Added
+- **Team level** between the user and the platform: `TCAGENT_TEAM` - a shared folder or Git repository per team
+  (several separated by `;`, shown as `team · <folder>`). Order: built-in → company → user → team → platform → project.
+  For coding rules, risk rules, skills, workflows, lessons, knowledge and templates; skills of the team level are also
+  mirrored into the agent CLIs.
+- `scope=team` for `tc_coding_rules_add`, `tc_skills add`, `tc_lessons add` and `tc_sources install` (a plain shared
+  folder directly; a team in Git only by promoting) and for promoting (`tc_sources promote`, `tc_improve apply`
+  promote-lesson): a team in Git gets a commit on a new branch for a pull request, never pushed.
+- A locked team file can be switched off by the team itself (its `disabled.json`) or the company, not by a user or a
+  project. Tests in `KnowledgeLayersTests`.
+
+### Changed
+- `TCAGENT_LESSONS` (the former team lessons file) keeps working; `TCAGENT_TEAM\lessons\` replaces it.
+- Concept: checkpoints belong to the step of a workflow (coding workflows end with 0 compiler errors, other workflows
+  define their own); only the gate before `tc_activate` is global.
+
 ## [0.36.0] – 2026-10-26
 
 ### Added

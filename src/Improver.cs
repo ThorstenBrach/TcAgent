@@ -190,6 +190,7 @@ public static class Improver
             return KnowledgeLayers.CompanyRoot is { Length: > 0 } c ? Path.Combine(c, "lessons") : throw new ArgumentException("no company level (TCAGENT_COMPANY not set)");
         if (s.StartsWith("platform:", StringComparison.OrdinalIgnoreCase)) return Path.Combine(KnowledgeLayers.UserRoot, "platforms", s[9..].Trim(), "lessons");
         if (s is "personal" or "user") return Path.Combine(KnowledgeLayers.UserRoot, "lessons");
-        throw new ArgumentException("scope: personal, platform:<name> or company");
+        if (s is "team") return KnowledgeLayers.TeamRoot is { } t ? Path.Combine(t, "lessons") : throw new ArgumentException("no team level (TCAGENT_TEAM not set)");
+        throw new ArgumentException("scope: personal, team, platform:<name> or company");
     }
 }

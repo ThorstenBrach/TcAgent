@@ -19,6 +19,7 @@ public static partial class Cli
         var roots = new List<(string Label, string Root)>();
         if (KnowledgeLayers.ProjectRoot(dir) is { } p) roots.Add(("project", p));
         roots.Add(("user", KnowledgeLayers.UserRoot));
+        roots.AddRange(KnowledgeLayers.TeamRoots.Select(t => ("team", t)));
         int differs = 0;
         foreach (var (label, root) in roots)
             foreach (var (key, state, e) in Sources.Status(root))

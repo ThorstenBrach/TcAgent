@@ -16,6 +16,7 @@ public sealed class KnowledgeLayersTests : IDisposable
     string User => Path.Combine(dir, "user");
     string Sln => Path.Combine(dir, "MachineX");
     readonly string oldCompany = Environment.GetEnvironmentVariable("TCAGENT_COMPANY");
+    readonly string oldTeam = Environment.GetEnvironmentVariable("TCAGENT_TEAM");
 
     public KnowledgeLayersTests()
     {
@@ -32,6 +33,7 @@ public sealed class KnowledgeLayersTests : IDisposable
     public void Dispose()
     {
         Environment.SetEnvironmentVariable("TCAGENT_COMPANY", oldCompany);
+        Environment.SetEnvironmentVariable("TCAGENT_TEAM", oldTeam);
         KnowledgeLayers.UserRootOverride = null;
         KnowledgeLayers.BuiltInRootOverride = null;
         try { Directory.Delete(dir, true); } catch { }
@@ -46,6 +48,39 @@ public sealed class KnowledgeLayersTests : IDisposable
 
     static string Locked(string body) => "---\nname: x\ndescription: d\nmetadata:\n  tcagent-locked: \"true\"\n---\n" + body;
     static string Forced(string body) => "---\nname: x\ndescription: d\nmetadata:\n  tcagent-force: \"true\"\n---\n" + body;
+
+    [Fact]
+    public void TeamLevelLiesBetweenUserAndPlatform()
+    {
+        Environment.SetEnvironmentVariable("TCAGENT_TEAM", Path.Combine(dir, "team"));
+        Write(@"user\coding-rules\naming.md", "user naming");
+        Write(@"team\coding-rules\naming.md", "team naming");
+        Write(@"team\coding-rules\layout.md", Locked("team layout"));
+        Write(@"company\platforms\framework-a\coding-rules\naming.md", "platform naming");
+        Write(@"user\coding-rules\layout.md", "my layout");
+        var e = KnowledgeLayers.Resolve("coding-rules", Sln, new[] { "framework-a" }, replaceByName: true);
+        Assert.Equal(new[] { "user", "team", "company · framework-a" }, e.Where(x => x.Name == "naming").Select(x => x.Layer.Label));
+        Assert.Equal("company · framework-a", e.Single(x => x.Name == "naming" && x.Active).Layer.Label);
+        Assert.Equal("team", e.Single(x => x.Name == "layout" && x.Active).Layer.Level);   // user file before the team: replaced
+        // a user cannot switch off a locked team file, the team itself can
+        KnowledgeLayers.SetDisabled(Sln, "user", "coding-rules/layout", true);
+        Assert.True(KnowledgeLayers.Resolve("coding-rules", Sln, Array.Empty<string>(), true).Single(x => x.Name == "layout" && x.Layer.Level == "team").Active);
+        Write(@"team\disabled.json", "{\"disabled\": [\"coding-rules/layout\"]}");
+        Assert.Equal("disabled", KnowledgeLayers.Resolve("coding-rules", Sln, Array.Empty<string>(), true).Single(x => x.Name == "layout" && x.Layer.Level == "team").Status);
+        // a plain team folder can be written directly, a team in Git only by promoting
+        Assert.Equal(Path.Combine(dir, "team"), KnowledgeLayers.TeamWriteRoot());
+        Directory.CreateDirectory(Path.Combine(dir, @"team\.git"));
+        Assert.Throws<ArgumentException>(() => KnowledgeLayers.TeamWriteRoot());
+    }
+
+    [Fact]
+    public void SeveralTeamsAreNamedByTheirFolder()
+    {
+        Environment.SetEnvironmentVariable("TCAGENT_TEAM", Path.Combine(dir, "team-a") + ";" + Path.Combine(dir, "team-b"));
+        var layers = KnowledgeLayers.Layers(Sln, Array.Empty<string>());
+        Assert.Equal(new[] { "team · team-a", "team · team-b" }, layers.Where(l => l.Level == "team").Select(l => l.Label));
+        Assert.True(layers.Single(l => l.Label == "team · team-b").Rank < layers.Single(l => l.Level == "project").Rank);
+    }
 
     [Fact]
     public void PlatformIsDetectedFromTheLibraries()

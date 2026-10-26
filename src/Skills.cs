@@ -73,13 +73,14 @@ public static class Skills
         return sb.ToString();
     }
 
-    /// <summary>Root folder of a scope: project (default), personal, platform:&lt;name&gt;.</summary>
+    /// <summary>Root folder of a scope: project (default), personal, team (a plain shared folder), platform:&lt;name&gt;.</summary>
     public static string RootOf(string solutionDir, string scope)
     {
         var s = (scope ?? "project").Trim();
         if (s.StartsWith("platform:", StringComparison.OrdinalIgnoreCase)) return Path.Combine(KnowledgeLayers.UserRoot, "platforms", s[9..].Trim());
         if (s.Equals("personal", StringComparison.OrdinalIgnoreCase) || s.Equals("user", StringComparison.OrdinalIgnoreCase)) return KnowledgeLayers.UserRoot;
         if (s.Equals("company", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("The company level is shared: create the skill with scope=personal or project and promote it.");
+        if (s.Equals("team", StringComparison.OrdinalIgnoreCase)) return KnowledgeLayers.TeamWriteRoot();
         return KnowledgeLayers.ProjectRoot(solutionDir) ?? KnowledgeLayers.UserRoot;
     }
 
@@ -119,12 +120,12 @@ public static class Skills
         return list;
     }
 
-    /// <summary>Copies the skills that apply everywhere (built-in, company, user - not platform or project) into the target
+    /// <summary>Copies the skills that apply everywhere (built-in, company, user, team - not platform or project) into the target
     /// folders; removes skills TcAgent mirrored earlier that no longer apply. Returns one line per action.</summary>
     public static List<string> Mirror(IEnumerable<KnowledgeLayers.Entry> entries, IEnumerable<string> targets, bool write = true)
     {
         var report = new List<string>();
-        var general = entries.Where(e => e.Active && e.Layer.Platform == null && e.Layer.Level is "built-in" or "company" or "user").ToList();
+        var general = entries.Where(e => e.Active && e.Layer.Platform == null && e.Layer.Level is "built-in" or "company" or "user" or "team").ToList();
         foreach (var target in targets)
         {
             // only mirror into a client that exists (its parent folder, e.g. .claude, is there)

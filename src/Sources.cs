@@ -84,8 +84,9 @@ public static class Sources
         var s = (scope ?? "personal").Trim().ToLowerInvariant();
         if (s is "project") return KnowledgeLayers.ProjectRoot(solutionDir) ?? throw new ArgumentException("scope=project needs an open solution");
         if (s is "personal" or "user") return KnowledgeLayers.UserRoot;
+        if (s is "team") return KnowledgeLayers.TeamWriteRoot();
         if (s.StartsWith("platform:")) return Path.Combine(KnowledgeLayers.UserRoot, "platforms", scope!.Trim()[9..].Trim());
-        throw new ArgumentException("scope: personal, project or platform:<name> (shared levels change by pull request: promote)");
+        throw new ArgumentException("scope: personal, project, team or platform:<name> (company and teams in Git change by pull request: promote)");
     }
 
     public static List<Source> Load(string root)

@@ -91,8 +91,9 @@ file `coding-rules.md` too; later levels appear further down and **take preceden
 |---|-------|--------|-----------------|
 | 1 | company | `TCAGENT_COMPANY\coding-rules\` (or `TCAGENT_RULES`) | company standard |
 | 2 | user | `%LOCALAPPDATA%\TcAgent\coding-rules\` | personal style, e.g. "`///` comments above the variable, in English" |
-| 3 | platform | `<company or user>\platforms\<name>\coding-rules\` | rules of the automation framework the project is built on |
-| 4 | project | `<Solution folder>\.tcagent\coding-rules\` | project / customer conventions for the team and the pipeline (Git) |
+| 3 | team | `TCAGENT_TEAM\coding-rules\` (shared folder or Git repository) | conventions of your team |
+| 4 | platform | `<company or user>\platforms\<name>\coding-rules\` | rules of the automation framework the project is built on |
+| 5 | project | `<Solution folder>\.tcagent\coding-rules\` | project / customer conventions for the team and the pipeline (Git) |
 
 - A later level replaces a file with the same name; `tcagent-locked` files cannot be replaced; a user file with
   `tcagent-force` stays against a platform file. Each file in `tc_coding_rules` shows its level.

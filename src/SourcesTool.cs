@@ -17,8 +17,8 @@ public sealed partial class ToolRegistry
                           "search [query] [source], install item=<source>/<name> [kind] scope=personal|project|platform:<name> (license check, shows files " +
                           "and scripts, asks the user; MIT/Apache/BSD/ISC accepted, source-available and unlicensed refused, others only with acceptLicense), " +
                           "status (ok / changed locally / newer upstream), pull [item] (updates after asking; skips locally changed items unless force), " +
-                          "diff item, promote item=<kind>/<name> scope=personal|platform:<name>|company (own item one level up; checked for specific names; " +
-                          "company as a commit on a new branch for a pull request). Installed items are pinned in skills.lock.json of their level.",
+                          "diff item, promote item=<kind>/<name> scope=personal|team|platform:<name>|company (own item one level up; checked for specific names; " +
+                          "company and a team in Git as a commit on a new branch for a pull request). Installed items are pinned in skills.lock.json of their level.",
             Schema(Req(P("action", "string", "list, add, remove, search, install, status, pull, diff or promote")),
                    P("name", "string", "add/remove: source name (lowercase, hyphens)"),
                    P("url", "string", "add: Git URL or path of the repository"),
@@ -26,7 +26,7 @@ public sealed partial class ToolRegistry
                    P("item", "string", "install/pull/diff: <source>/<name> or <name>; promote: <kind>/<name>, e.g. skills/driver-fb"),
                    P("kind", "string", "install: skills, workflows, coding-rules, risk-rules or lessons (when a name exists in several kinds)"),
                    P("query", "string", "search: words in name or description"),
-                   P("scope", "string", "add: personal (default) or project; install: personal (default), project or platform:<name>; promote: personal, platform:<name> or company"),
+                   P("scope", "string", "add: personal (default) or project; install: personal (default), project, team or platform:<name>; promote: personal, team, platform:<name> or company"),
                    P("acceptLicense", "boolean", "install/pull: take over an item whose license is neither accepted nor refused (e.g. copyleft) - after the user checked it"),
                    P("force", "boolean", "install: overwrite an own file of the same name; pull: also update locally changed items"),
                    P("dryRun", "boolean", "install/pull/promote: only show what would be done")),
@@ -63,6 +63,7 @@ public sealed partial class ToolRegistry
         var list = new List<(string, string)>();
         if (KnowledgeLayers.ProjectRoot(dir) is { } p) list.Add(("project", p));
         list.Add(("user", KnowledgeLayers.UserRoot));
+        foreach (var t in KnowledgeLayers.TeamRoots) list.Add(("team", t));
         var plat = Path.Combine(KnowledgeLayers.UserRoot, "platforms");
         if (Directory.Exists(plat)) foreach (var d in Directory.GetDirectories(plat)) list.Add(("user · " + Path.GetFileName(d), d));
         return list;
@@ -223,11 +224,14 @@ public sealed partial class ToolRegistry
         var found = Improver.Specifics(string.Join("\n", texts), Improver.PrivateTerms(dir));
         if (found.Count > 0) throw new InvalidOperationException($"{spec} names {string.Join(", ", found)} - make it general first, then promote again");
         var scope = (Str(a, "scope") ?? "personal").Trim();
-        bool company = scope.Equals("company", StringComparison.OrdinalIgnoreCase);
-        var targetRoot = company ? KnowledgeLayers.CompanyRoot ?? throw new ArgumentException("no company level (TCAGENT_COMPANY not set)") : Sources.RootOf(dir, scope);
+        // company, and a team kept in Git: as a commit on a new branch for a pull request; a plain team folder: copied
+        bool team = scope.Equals("team", StringComparison.OrdinalIgnoreCase);
+        bool company = scope.Equals("company", StringComparison.OrdinalIgnoreCase) || team && KnowledgeLayers.IsGitRepo(KnowledgeLayers.TeamRoot);
+        var targetRoot = scope.Equals("company", StringComparison.OrdinalIgnoreCase) ? KnowledgeLayers.CompanyRoot ?? throw new ArgumentException("no company level (TCAGENT_COMPANY not set)")
+                       : team ? KnowledgeLayers.TeamRoot ?? throw new ArgumentException("no team level (TCAGENT_TEAM not set)") : Sources.RootOf(dir, scope);
         var target = Path.Combine(targetRoot, kind, Path.GetFileName(source));
         if (target.Equals(source, StringComparison.OrdinalIgnoreCase)) throw new ArgumentException($"{spec} is already on that level");
-        var what = $"Promote {spec}: copy {source} to {target}" + (company ? " (company level: commit on a new branch for a pull request, not pushed)" : "");
+        var what = $"Promote {spec}: copy {source} to {target}" + (company ? " (shared repository: commit on a new branch for a pull request, not pushed)" : "");
         if (DryRun(a)) return "PROPOSAL (nothing changed): " + what;
         AskImprove(what);
         if (company) return Sources.CommitForPullRequest(targetRoot, source, target, $"Promote {spec}");

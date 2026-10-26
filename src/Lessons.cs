@@ -45,7 +45,7 @@ public static class Lessons
     // Levels and platforms (KnowledgeLayers.cs): every level has the folder lessons\ (one file per lesson - no merge conflicts
     // when several people or agents add lessons) and the former single file lessons.md. TCAGENT_LESSONS: a team file or folder.
     //   scope project → <Solution>\.tcagent\lessons\     personal → %LOCALAPPDATA%\TcAgent\lessons\
-    //   platform:<name> → %LOCALAPPDATA%\TcAgent\platforms\<name>\lessons\     team → TCAGENT_LESSONS
+    //   platform:<name> → %LOCALAPPDATA%\TcAgent\platforms\<name>\lessons\     team → TCAGENT_LESSONS or TCAGENT_TEAM\lessons\
     // Company and company platform levels are shared: lessons go there by promoting them (pull request), not directly.
     static string ScopeOf(KnowledgeLayers.Layer l) =>
         l.Platform != null ? "platform:" + l.Platform + (l.Level == "user" ? "" : " (company)") : l.Level == "user" ? "personal" : l.Level;
@@ -57,7 +57,11 @@ public static class Lessons
         switch (s.ToLowerInvariant())
         {
             case "personal": case "general": return Path.Combine(KnowledgeLayers.UserRoot, "lessons");
-            case "team": return Team ?? throw new Exception("scope=team needs the environment variable TCAGENT_LESSONS (team file or folder)");
+            case "team":
+                // the former team file/folder first, then the team level (TCAGENT_TEAM; a Git repository only by promoting)
+                if (Team != null) return Team;
+                try { return Path.Combine(KnowledgeLayers.TeamWriteRoot(), "lessons"); }
+                catch (ArgumentException ex) { throw new Exception("scope=team: " + ex.Message); }
             case "company": throw new Exception("The company level is shared: save the lesson with scope=personal or project and promote it (tc_knowledge).");
         }
         if (s.StartsWith("platform:", StringComparison.OrdinalIgnoreCase)) return Path.Combine(KnowledgeLayers.UserRoot, "platforms", s[9..].Trim(), "lessons");
@@ -369,7 +373,7 @@ public sealed partial class ToolRegistry
                    P("solution", "string", "add (required): exactly how it was solved - concrete steps, parameters, values, code before/after"),
                    P("avoid", "string", "add: what did NOT work / what to avoid (optional)"),
                    P("tags", "string", "add: comma-separated, e.g. 'sfc, plcopen' or 'ethercat, el7031, coe'"),
-                   P("scope", "string", "add: project (default; this project/hardware), personal (general TwinCAT knowledge), platform:<name> (knowledge about that automation framework) or team"),
+                   P("scope", "string", "add: project (default; this project/hardware), personal (general TwinCAT knowledge), platform:<name> (knowledge about that automation framework) or team (TCAGENT_TEAM\\lessons or the former TCAGENT_LESSONS)"),
                    P("id", "string", "add: update this lesson; remove: lesson to delete"),
                    P("max", "integer", "search: max. results (default 5)"),
                    P("dryRun", "boolean", "add: only show the entry")),

@@ -368,8 +368,9 @@ file `coding-rules.md` is read too) – and concatenates them. Later levels take
 |---|---|---|---|
 | 1 | company | `TCAGENT_COMPANY\coding-rules\` (a network share or Git repository; `TCAGENT_RULES` still works) | every project of the company |
 | 2 | user | `%LOCALAPPDATA%\TcAgent\coding-rules\` | you personally, every solution |
-| 3 | platform | `<company or user>\platforms\<name>\coding-rules\` | every project built on that automation framework |
-| 4 | project | `<solution>\.tcagent\coding-rules\` | this solution – shared via Git |
+| 3 | team | `TCAGENT_TEAM\coding-rules\` (a shared folder or Git repository of your team; several teams separated by `;`) | everybody in the team |
+| 4 | platform | `<company or user>\platforms\<name>\coding-rules\` | every project built on that automation framework |
+| 5 | project | `<solution>\.tcagent\coding-rules\` | this solution – shared via Git |
 
 - A later level **replaces** a file with the same name (`naming.md` of the project replaces `naming.md` of the
   platform); files with different names all apply.
@@ -382,7 +383,7 @@ file `coding-rules.md` is read too) – and concatenates them. Later levels take
   the project without changing it, and splits a former single file into one file per topic.
   Details: [KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md).
 
-Overall precedence: your explicit instruction in the chat > project rules > platform rules > personal rules > company
+Overall precedence: your explicit instruction in the chat > project rules > platform rules > team rules > personal rules > company
 standard. If a rule contradicts your request, the agent points it out briefly and follows you.
 
 Start from the template [coding-rules.example.md](coding-rules.example.md) (prefixes like `FB_`, `ST_`, `E_`, `b`/`n`/`f`
@@ -1384,7 +1385,7 @@ What happens:
 | `project` (default) | `<solution>\.tcagent\lessons\<date>-<title>.md` – versioned with Git |
 | `personal` | `%LOCALAPPDATA%\TcAgent\lessons\` – general TwinCAT knowledge |
 | `platform:<name>` | `%LOCALAPPDATA%\TcAgent\platforms\<name>\lessons\` – knowledge about a framework |
-| `team` | the file or folder in `TCAGENT_LESSONS`, for example on a network drive |
+| `team` | `TCAGENT_TEAM\lessons\` (a shared folder; a team in Git gets lessons by promoting them) or the former `TCAGENT_LESSONS` file or folder |
 
 One file per lesson (older `lessons.md` files are still read). The files are Markdown, readable and editable by hand.
 Only verified solutions belong there – no passwords or customer secrets. `add`/`remove` count as project changes
@@ -1661,7 +1662,7 @@ Set these in the `env` section of the client's MCP configuration (or via the par
 | `TCAGENT_RISK_RULES` | – | Additional risk rules (files/folders, `;`-separated) |
 | `TCAGENT_KNOWLEDGE` | – | Additional knowledge sources (URLs/folders, `;`-separated) |
 | `TCAGENT_SEARCH` | – | Search service for `tc_docs`: `searxng:<url>` or `google:<API key>:<search engine ID>` |
-| `TCAGENT_LESSONS` | – | Team lessons file (needed for `tc_lessons scope=team`) |
+| `TCAGENT_TEAM` | – | Team level(s) of the knowledge: shared folder or Git repository per team, `;`-separated – between your user level and the platform |
 | `TCAGENT_LESSONS_RECALL` | on | `0` turns off the automatic recall of lessons on errors |
 | `TCAGENT_DOC_TEMPLATES` | – | Additional example manuals for `tc_userdoc` (`;`-separated files/folders) |
 | `TCAGENT_FEEDBACK` | TcAgent folder | Feedback store: a `.jsonl` file or a (shared) folder/UNC path |

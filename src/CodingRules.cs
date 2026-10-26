@@ -55,6 +55,7 @@ public static class CodingRules
     {
         var s = (scope ?? "").Trim();
         var root = s.StartsWith("platform:", StringComparison.OrdinalIgnoreCase) ? Path.Combine(KnowledgeLayers.UserRoot, "platforms", s[9..].Trim())
+                 : s.Equals("team", StringComparison.OrdinalIgnoreCase) ? KnowledgeLayers.TeamWriteRoot()
                  : s.Equals("personal", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(solutionDir) ? KnowledgeLayers.UserRoot
                  : KnowledgeLayers.ProjectRoot(solutionDir);
         var single = Path.Combine(root, "coding-rules.md");

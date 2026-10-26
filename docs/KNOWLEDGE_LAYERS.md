@@ -7,7 +7,7 @@
 > hard gate "`tc_activate` only after a build with 0 errors". Since 0.33: run logs and `tc_improve` (proposals by fixed rules,
 > apply after asking, evaluation over 10 runs, revert, promote with name check). Since 0.34: sources (`tc_sources`, `skills.lock.json`, license check, overlay
 > `tcagent-extends`, `TcAgent.exe sources sync`). Since 0.35: the knowledge manager window (Overview, Effective, Sources, History) and
-> `TcAgent.exe knowledge json|disable|enable`. Since 0.36: first "deterministic first" conversions
+> `TcAgent.exe knowledge json|disable|enable`. Since 0.37: the team level between user and platform (`TCAGENT_TEAM`). Since 0.36: first "deterministic first" conversions
 > ([DETERMINISTIC_FIRST.md](DETERMINISTIC_FIRST.md)). The rest of this document is still a concept. It describes how TcAgent shall organise the knowledge it
 > gives to an agent – coding rules, risk rules, skills, lessons learned, knowledge sources, documentation templates and
 > engineering workflows – and how this knowledge improves over time. Today's behaviour is described in
@@ -37,10 +37,17 @@ company          \\server\twincat\          \\server\twincat\platforms\         
                                             framework-a\                        framework-b\
 user             %LOCALAPPDATA%\TcAgent\    %LOCALAPPDATA%\TcAgent\platforms\   …
                                             framework-a\
+team             \\server\teams\controls\   (platforms come from company or TCAGENT_PLATFORMS)
 project          <solution>\.tcagent\   – belongs to 0…n platforms, has no platform folders of its own
 ```
 
-- The company root is `TCAGENT_COMPANY` (a network share or a Git repository). The existing variables
+- The company root is `TCAGENT_COMPANY` (a network share or a Git repository).
+- The **team** level (since 0.37) sits between the user and the platform: `TCAGENT_TEAM`, a shared folder or a Git
+  repository per team (several separated by `;`, shown as `team · <folder>`). It holds the conventions a team agreed on
+  without making them company standard. A team kept in Git changes by pull request (promote) like the company level; a
+  plain shared folder can be written directly after asking. A locked team file can be switched off by the team itself or
+  by the company, not by a user or a project. The former `TCAGENT_LESSONS` keeps working; `TCAGENT_TEAM\lessons\`
+  replaces it. The existing variables
   (`TCAGENT_RULES`, `TCAGENT_RISK_RULES`, `TCAGENT_LESSONS`, `TCAGENT_KNOWLEDGE`, `TCAGENT_DOC_TEMPLATES`) keep working.
 - A platform can also be a repository of its own, kept by the team that owns the framework: `TCAGENT_PLATFORMS` lists
   such roots.
@@ -112,13 +119,15 @@ The later source wins on conflicts:
 1. built-in
 2. company · general
 3. user · general
-4. company · platform
-5. user · platform
-6. project
+4. team (one or more)
+5. company · platform
+6. user · platform
+7. project
 
-Framework rules therefore beat general preferences, and the project beats everything.
+Framework rules therefore beat general preferences, team conventions beat personal habits, and the project beats
+everything.
 
-- **locked** (company and platform files): a later level cannot replace the file. TcAgent reports the conflict.
+- **locked** (company, team and platform files): a later level cannot replace the file. TcAgent reports the conflict.
 - **force** (user files): an engineer can keep a personal rule although a platform file says otherwise. When the user
   defines a rule in the chat that contradicts the platform, the agent points this out and asks whether the user wants it
   anyway; only then the rule is saved with `tcagent-force: "true"`. `force` does not override `locked`.
@@ -241,6 +250,10 @@ description: Add a driver FB for a new device
     is never called and does not break the build.
   - Saving (`tc_save`) stays allowed with compiler errors, so intermediate states can be kept.
   - TcUnit tests are **not** a hard gate – not every task has tests. A workflow can recommend them.
+  - Checkpoints belong to the **step of a workflow**, not to TcAgent as a whole: a coding workflow (e.g. `new-feature`)
+    ends with compiled code with 0 errors (`check-ok`); a workflow for other work TcAgent does (documentation, I/O
+    configuration, analysis, commissioning) defines its own checkpoints or none. Only the gate before `tc_activate` is
+    global, because an activation always needs code that builds.
 
 ## Self-improvement
 

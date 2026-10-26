@@ -21,7 +21,7 @@ public sealed partial class ToolRegistry
                    P("workflow", "string", "runs: only this workflow"),
                    P("id", "string", "apply: proposal id from analyze; revert: change id from history"),
                    P("text", "string", "apply step-hint: the hint (one or two general sentences, no customer or machine names)"),
-                   P("scope", "string", "apply: step-hint project (default) / personal / platform:<name>; promote-lesson personal (default) / platform:<name> / company"),
+                   P("scope", "string", "apply: step-hint project (default) / personal / platform:<name>; promote-lesson personal (default) / team / platform:<name> / company"),
                    P("dryRun", "boolean", "apply/revert: only show the change")),
             a =>
             {
@@ -135,12 +135,15 @@ public sealed partial class ToolRegistry
                 string folder;
                 try { folder = Improver.PromoteFolder(Str(a, "scope")); } catch (ArgumentException ex) { throw new Exception("NOT promoted: " + ex.Message); }
                 var target = Path.Combine(folder, Path.GetFileName(p.Source));
-                bool company = string.Equals(Str(a, "scope"), "company", StringComparison.OrdinalIgnoreCase);
-                var what = $"Move the lesson {Path.GetFileName(p.Source)} up: copy to {target}" + (company ? " (company level: as a commit on a new branch for a pull request)" : "");
+                // company, and a team kept in Git: as a commit on a new branch for a pull request
+                var shared = string.Equals(Str(a, "scope"), "company", StringComparison.OrdinalIgnoreCase) ? KnowledgeLayers.CompanyRoot
+                           : string.Equals(Str(a, "scope"), "team", StringComparison.OrdinalIgnoreCase) && KnowledgeLayers.IsGitRepo(KnowledgeLayers.TeamRoot) ? KnowledgeLayers.TeamRoot : null;
+                bool company = shared != null;
+                var what = $"Move the lesson {Path.GetFileName(p.Source)} up: copy to {target}" + (company ? " (shared repository: as a commit on a new branch for a pull request)" : "");
                 if (DryRun(a)) return "PROPOSAL (nothing changed): " + what;
                 AskImprove(what);
                 if (company)
-                    try { return Sources.CommitForPullRequest(KnowledgeLayers.CompanyRoot, p.Source, target, "Promote lesson " + Improver.LessonSlug(p.Source)); }
+                    try { return Sources.CommitForPullRequest(shared, p.Source, target, "Promote lesson " + Improver.LessonSlug(p.Source)); }
                     catch (InvalidOperationException ex) { throw new Exception("NOT promoted: " + ex.Message); }
                 Directory.CreateDirectory(folder);
                 File.Copy(p.Source, target, false);

@@ -1,11 +1,12 @@
 // Knowledge layers: where the agent's knowledge comes from (docs/KNOWLEDGE_LAYERS.md) - one scheme for coding rules, risk
 // rules, lessons, knowledge sources and documentation templates (later skills and workflows).
 //
-//   levels      built-in · company (TCAGENT_COMPANY) · user (%LOCALAPPDATA%\TcAgent) · project (<solution>\.tcagent)
+//   levels      built-in · company (TCAGENT_COMPANY) · user (%LOCALAPPDATA%\TcAgent) · team (TCAGENT_TEAM, ";"-separated:
+//               a shared folder or Git repository per team) · project (<solution>\.tcagent)
 //   platforms   an automation framework a project is built on: <company>\platforms\<name>\, <user>\platforms\<name>\ and the
 //               roots in TCAGENT_PLATFORMS (a repository of its own). Which platform: .tcagent\config.json {"platforms": [...]},
 //               otherwise detected from the referenced libraries / terms listed in platform.md; ambiguous = ask the user.
-//   order       built-in → company → user → company·platform → user·platform → project (the later one wins)
+//   order       built-in → company → user → team → company·platform → user·platform → project (the later one wins)
 //   files       one topic / lesson per file: <root>\<kind>\<name>.md; the former single file <root>\<kind>.md is read too
 //   front matter (Agent Skills format): name, description at the top, TcAgent's own fields under metadata:
 //               tcagent-locked (later levels may not replace or disable the file), tcagent-force (a user file stays against
@@ -31,6 +32,19 @@ public static class KnowledgeLayers
     public static string UserRoot => UserRootOverride ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent");
     public static string BuiltInRoot => BuiltInRootOverride ?? Path.Combine(AppContext.BaseDirectory, "knowledge");
     public static string CompanyRoot => Expand(Environment.GetEnvironmentVariable("TCAGENT_COMPANY"));
+    /// <summary>The team levels (TCAGENT_TEAM, ";"-separated) - between the user and the platform; shared like the company level.</summary>
+    public static List<string> TeamRoots => ExpandList(Environment.GetEnvironmentVariable("TCAGENT_TEAM")).Take(5).ToList();
+    public static string TeamRoot => TeamRoots.FirstOrDefault();
+    /// <summary>The team root a new file may be written to directly: a plain shared folder. A team kept in Git changes by pull
+    /// request only (promote); without TCAGENT_TEAM there is no team level.</summary>
+    public static string TeamWriteRoot() =>
+        TeamRoot is not { } t ? throw new ArgumentException("no team level - set TCAGENT_TEAM (a shared folder or Git repository of the team)")
+        : IsGitRepo(t) ? throw new ArgumentException($"the team level {t} is a Git repository - create the file at scope=personal or project and promote it (pull request)")
+        : t;
+
+    /// <summary>A shared level kept in Git is changed by pull request only; a plain shared folder directly (after asking).</summary>
+    public static bool IsGitRepo(string root) =>
+        !string.IsNullOrEmpty(root) && Directory.Exists(root) && (Directory.Exists(Path.Combine(root, ".git")) || File.Exists(Path.Combine(root, ".git")));
     public static string ProjectRoot(string solutionDir) => string.IsNullOrEmpty(solutionDir) ? null : Path.Combine(solutionDir, ".tcagent");
 
     static string Expand(string p) => string.IsNullOrWhiteSpace(p) ? null : Environment.ExpandEnvironmentVariables(p.Trim().Trim('"'));
@@ -38,7 +52,9 @@ public static class KnowledgeLayers
 
     public sealed record Layer(string Level, string Platform, string Root, int Rank)
     {
-        public string Label => Platform == null ? Level : $"{Level} · {Platform}";
+        /// <summary>The name of the team when there are several team levels.</summary>
+        public string Team { get; init; }
+        public string Label => Platform != null ? $"{Level} · {Platform}" : Team != null ? $"{Level} · {Team}" : Level;
     }
 
     // ------------------------------------------------------------------ front matter
@@ -238,7 +254,7 @@ public static class KnowledgeLayers
 
     // ------------------------------------------------------------------ layers
     // fixed ranks: the order of the levels (later wins); platforms between user and project
-    const int RankBuiltIn = 0, RankCompany = 10, RankUser = 20, RankPlatform = 30, RankProject = 1000;
+    const int RankBuiltIn = 0, RankCompany = 10, RankUser = 20, RankTeam = 25, RankPlatform = 30, RankProject = 1000;
 
     public static List<Layer> Layers(string solutionDir, IEnumerable<string> platforms)
     {
@@ -247,6 +263,9 @@ public static class KnowledgeLayers
         Add("built-in", null, BuiltInRoot, RankBuiltIn);
         Add("company", null, CompanyRoot, RankCompany);
         Add("user", null, UserRoot, RankUser);
+        var teams = TeamRoots;
+        for (int t = 0; t < teams.Count; t++)
+            list.Add(new Layer("team", null, teams[t], RankTeam + t) { Team = teams.Count > 1 ? Path.GetFileName(teams[t].TrimEnd('\\', '/')) : null });
         var known = KnownPlatforms();
         int i = 0;
         foreach (var p in platforms ?? Enumerable.Empty<string>())
@@ -344,12 +363,13 @@ public static class KnowledgeLayers
                 current[e.Name] = e;
             }
         }
-        // switched off in a disabled.json - a locked file only by its owner (the company level), not by a user or a project
+        // switched off in a disabled.json - a locked file only by its owner (the company level, or the team for its own files),
+        // not by a user or a project
         var disabled = DisabledKeys(solutionDir);
         foreach (var e in all.Where(x => x.Active))
             if (disabled.TryGetValue(e.Key, out var by))
             {
-                if (e.Locked && by.Level != "company") e.Reason = "locked - cannot be switched off";
+                if (e.Locked && !(by.Level == "company" || by.Level == "team" && e.Layer.Level == "team")) e.Reason = "locked - cannot be switched off";
                 else { e.Status = "disabled"; e.Reason = "switched off in " + by.Label; }
             }
         return all;
@@ -362,7 +382,8 @@ public static class KnowledgeLayers
     public static Dictionary<string, Layer> DisabledKeys(string solutionDir)
     {
         var d = new Dictionary<string, Layer>(StringComparer.OrdinalIgnoreCase);
-        foreach (var (level, root, rank) in new[] { ("company", CompanyRoot, RankCompany), ("user", UserRoot, RankUser), ("project", ProjectRoot(solutionDir), RankProject) })
+        foreach (var (level, root, rank) in new[] { ("company", CompanyRoot, RankCompany), ("user", UserRoot, RankUser) }
+                                             .Concat(TeamRoots.Select((r, i) => ("team", r, RankTeam + i))).Append(("project", ProjectRoot(solutionDir), RankProject)))
         {
             var f = DisabledFile(root);
             if (f == null || !File.Exists(f)) continue;

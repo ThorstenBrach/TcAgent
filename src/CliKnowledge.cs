@@ -72,6 +72,7 @@ public static partial class Cli
         var roots = new List<(string, string)>();
         if (KnowledgeLayers.ProjectRoot(dir) is { } pr) roots.Add(("project", pr));
         roots.Add(("user", KnowledgeLayers.UserRoot));
+        roots.AddRange(KnowledgeLayers.TeamRoots.Select(t => ("team", t)));
         foreach (var (label, root) in roots)
             foreach (var (key, state, e) in Sources.Status(root))
                 installed.Add(new JsonObject { ["key"] = key, ["level"] = label, ["state"] = state, ["source"] = e.Source, ["url"] = e.Url,
