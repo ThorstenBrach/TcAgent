@@ -28,3 +28,7 @@ activate configurations, start and stop the PLC, write variables. Use it accordi
 
 Please do not open a public issue; use GitHub's private reporting feature
 ("Security → Report a vulnerability") in the repository.
+
+Please include what an attacker can do (and under which conditions), the steps to reproduce and the output of
+`TcAgent.exe diag` (versions, no names or paths). Fixes are made in the latest version only - please update first if
+you can.

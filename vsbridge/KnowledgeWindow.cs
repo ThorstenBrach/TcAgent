@@ -1128,7 +1128,8 @@ namespace TcAgentBridge
                 ("Copy", "Copy the text below", () => { try { Clipboard.SetText(feedbackText.Text); status.Text = "Copied."; } catch (Exception ex) { status.Text = ex.Message; } }),
                 ("Save as …", "Save the text below as a Markdown file", SaveIssue),
                 ("Share with the TcAgent developers …", "Opens a new issue in the browser with the text below - you check it there and send it yourself", ShareIssue),
-                ("Set status …", "resolved / wontfix / duplicate / open for the selected reports", SetFeedbackStatus) })
+                ("Set status …", "resolved / wontfix / duplicate / open for the selected reports", SetFeedbackStatus),
+                ("Copy diagnostics", "Versions of TcAgent, the extension, TwinCAT and the IDEs for the Diagnostics field of an issue", () => CopyDiagnostics(s => status.Text = s)) })
             { var b = Text(label, tip); b.Click += (s, e) => act(); tools.Children.Add(b); }
             var g = new Grid();
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -1174,17 +1175,10 @@ namespace TcAgentBridge
             catch { feedbackText.Text = output; }
         }
 
-        // the server does not know the IDE it runs beside - the bridge fills in its own version, TwinCAT and the IDE
-        static string WithEnvironment(string text)
+        // the server does not know the IDE it runs beside - the bridge adds its own version and the IDE to the diagnostics
+        internal static string BridgeLines()
         {
-            string tc = null, ide = null;
-            try
-            {
-                using (var k = Microsoft.Win32.RegistryKey.OpenBaseKey(Microsoft.Win32.RegistryHive.LocalMachine, Microsoft.Win32.RegistryView.Registry32)
-                                                          .OpenSubKey(@"SOFTWARE\Beckhoff\TwinCAT3\System"))
-                    tc = k?.GetValue("TcVersion") as string;
-            }
-            catch { }
+            string ide = "?";
             try
             {
                 var p = Process.GetCurrentProcess();
@@ -1195,12 +1189,35 @@ namespace TcAgentBridge
                 ide = $"{name} {fv.ProductVersion}";
             }
             catch { }
-            string Row(string label, string value) => $"- **{label}:** {value}";
-            var lines = text.Replace("\r\n", "\n").Split('\n').Select(l =>
-                l.StartsWith("- **TcAgent extension (bridge):**") ? Row("TcAgent extension (bridge)", BridgePackage.BridgeVersion) :
-                l.StartsWith("- **TwinCAT version:**") && tc != null ? Row("TwinCAT version", tc) :
-                l.StartsWith("- **IDE and version:**") && ide != null ? Row("IDE and version", ide) : l);
-            return string.Join("\n", lines);
+            return $"- **TcAgent extension (bridge):** {BridgePackage.BridgeVersion}\n- **IDE (this window):** {ide}\n";
+        }
+
+        static string WithEnvironment(string text)
+        {
+            const string head = "**Diagnostics**\n\n";
+            text = text.Replace("\r\n", "\n");
+            var at = text.LastIndexOf(head, StringComparison.Ordinal);
+            return at < 0 ? text : text.Insert(at + head.Length, BridgeLines());
+        }
+
+        // "Copy diagnostics": the bridge lines plus TcAgent.exe diag - for the Diagnostics field of an issue
+        internal static void CopyDiagnostics(Action<string> say)
+        {
+            var exe = TcUnitControl.TcAgentExe();
+            var sln = TcUnitControl.SolutionPath();
+            var ui = System.Windows.Threading.Dispatcher.CurrentDispatcher;
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                string text, err = null;
+                try { text = exe == null ? "- **TcAgent:** TcAgent.exe not found" : Run(exe, "diag" + (string.IsNullOrEmpty(sln) ? "" : " --solution " + Quote(sln)), out err).Trim(); }
+                catch (Exception ex) { text = "- **TcAgent diag:** " + ex.Message; }
+                if (text.Length == 0) text = "- **TcAgent diag:** " + err?.Trim();
+                ui.BeginInvoke(new Action(() =>
+                {
+                    try { Clipboard.SetText(BridgeLines() + text); say("Diagnostics copied - paste them into the Diagnostics field of the issue."); }
+                    catch (Exception ex) { say("Could not copy: " + ex.Message); }
+                }));
+            });
         }
 
         void SaveIssue()
@@ -1223,7 +1240,7 @@ namespace TcAgentBridge
             if (url.EndsWith("/issues/new", StringComparison.OrdinalIgnoreCase))
             {
                 var types = feedbackList.SelectedItems.OfType<Line>().Select(l => S(l.D, "type")).Distinct().ToList();
-                var labels = new List<string> { "feedback" };
+                var labels = new List<string> { "feedback", "needs-triage" };
                 foreach (var t in types)
                     labels.Add(t == "bug" ? "bug" : t == "missing_feature" ? "enhancement" : t == "docs" ? "documentation" : t ?? "feedback");
                 url += "?template=tcagent_feedback.md&labels=" + Uri.EscapeDataString(string.Join(",", labels.Distinct()));

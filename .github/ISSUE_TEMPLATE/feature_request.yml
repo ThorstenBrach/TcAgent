@@ -1,12 +1,19 @@
 name: Feature request
 description: A tool, an option or a workflow that is missing.
-labels: ["enhancement"]
+labels: ["enhancement", "needs-triage"]
 body:
   - type: markdown
     attributes:
       value: |
         Describe the task you want to do - not only the solution you have in mind. Please leave out customer, machine and
-        project names.
+        project names. Ideas that are not yet a concrete request fit well into the Discussions.
+  - type: checkboxes
+    id: searched
+    attributes:
+      label: Existing issues
+      options:
+        - label: I searched the open and closed issues and found none for this request.
+          required: true
   - type: textarea
     id: task
     attributes:
@@ -47,14 +54,16 @@ body:
         - Other
     validations:
       required: true
-  - type: input
-    id: tcagent
+  - type: dropdown
+    id: help
     attributes:
-      label: TcAgent version
-      placeholder: "0.42.6"
-  - type: input
-    id: twincat
+      label: Can you help
+      options:
+        - "No"
+        - I can test a preview version
+        - I would like to contribute a pull request
+  - type: textarea
+    id: diagnostics
     attributes:
-      label: TwinCAT version and IDE
-      description: If it matters for the feature - TwinCAT build and Visual Studio / XAE Shell version
-      placeholder: "3.1.4026.19, Visual Studio 2022 17.14"
+      label: Diagnostics
+      description: Only if it matters for the feature - chat window menu ⋯ > Copy diagnostics, or TcAgent.exe diag

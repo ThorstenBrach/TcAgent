@@ -9,6 +9,7 @@
 //   TcAgent.exe lock  --solution <sln> [--check]   library lock file .tcagent\libraries.lock.json / compare with it (CliSbom.cs)
 //   TcAgent.exe feedback [--open] [--markdown f]   report of the tc_feedback entries (Markdown for GitHub issues) - no IDE needed
 //   TcAgent.exe doctor [--solution <sln>]           is this machine/user ready for pipelines? (CliDoctor.cs)
+//   TcAgent.exe diag                                versions and environment for issue reports, as a Markdown list (CliDiag.cs)
 //   TcAgent.exe install --path <folder>             copy TcAgent to a fixed folder for pipelines, e.g. C:\Tools\TcAgent
 //   TcAgent.exe ci [--config <file>] [--dry-run]    run the steps of .tcagent\pipeline.json of the repository (CliCi.cs)
 //   TcAgent.exe st export|check|import --solution <sln>   PLC code as plain-text .st files and back - no IDE (CliPlainText.cs)
@@ -30,7 +31,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -64,6 +65,7 @@ public static partial class Cli
         catch (Exception ex) { Console.Error.WriteLine("Error: " + ex.Message); Console.Error.WriteLine("TcAgent.exe help shows the usage."); return Usage; }
         if (o.Command is "help") { Console.WriteLine(Help); return Ok; }
         if (o.Command is "version") { Console.WriteLine($"TcAgent {Program.ServerVersion}"); return Ok; }
+        if (o.Command is "diag") return Diag(o);                // CliDiag.cs - versions for issue reports, no IDE needed
         if (o.Command is "install") return Install(o);          // CliDoctor.cs - no IDE needed
         if (o.Command is "doctor") { Program.ClientName = "cli:doctor"; return Doctor(o); }
         if (o.Command is "ci") { Program.ClientName = "cli:ci"; return Ci(o); }   // CliCi.cs - every step is its own TcAgent.exe
@@ -802,7 +804,7 @@ public static partial class Cli
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
             return o;
         }
-        if (o.Command is "doctor")
+        if (o.Command is "doctor" or "diag")
         {
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
             return o;
@@ -859,6 +861,10 @@ public static partial class Cli
       Checks whether this machine and this user can run TcAgent pipelines: desktop session (not a service), Visual
       Studio / XAE Shell, TwinCAT XAE, interop, runtime via ADS, TcUnit, git - with a hint for every problem. With
       --solution it opens the solution hidden like a pipeline and closes it again. Exit 0 = ready, 3 = not ready.
+
+  TcAgent.exe diag [--solution <sln>]
+      Versions and environment for an issue report as a Markdown list: TcAgent, the registered extension, TwinCAT,
+      installed IDEs, runtime state, Windows, configured knowledge levels - no names, paths or addresses.
 
   TcAgent.exe install --path <folder>
       Copies this TcAgent including the interop of this TwinCAT installation to a fixed folder (e.g. C:\Tools\TcAgent)

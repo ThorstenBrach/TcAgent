@@ -44,6 +44,9 @@ public static partial class Cli
                         var terms = Improver.PrivateTerms(dir);
                         var texts = new List<string>(); var replaced = new List<string>();
                         foreach (var i in sel) { var (t, r) = Feedback.Anonymize(Feedback.Issue(i), terms, i); texts.Add(t); replaced.AddRange(r); }
+                        // the environment of this machine once at the end (CliDiag.cs) - the window adds the extension and the IDE it runs in
+                        var (diag, dr) = Feedback.Anonymize("**Diagnostics**\n\n" + Diagnostics(o.Solution), terms, sel[0]);
+                        texts[^1] = texts[^1].TrimEnd() + "\n\n" + diag; replaced.AddRange(dr);
                         Console.OutputEncoding = new System.Text.UTF8Encoding(false);
                         Console.WriteLine(new JsonObject
                         {

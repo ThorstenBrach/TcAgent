@@ -5,6 +5,23 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.43.0] – 2026-10-26
+
+### Added
+- `TcAgent.exe diag`: TcAgent, the extension registered by setup, TwinCAT, the installed IDEs, the runtime state of this
+  PC, Windows, .NET and the configured knowledge levels as a Markdown list for issue reports - no names, paths or
+  addresses. **Copy diagnostics** in the chat menu ⋯ and in the knowledge window (tab Feedback) adds the extension
+  version and the IDE the window runs in and copies the block.
+- Feedback reports of the knowledge window end with this Diagnostics block (anonymized like the rest).
+
+### Changed
+- Issue forms: one required Diagnostics field instead of the separate version fields; the bug report asks where the
+  problem is (tool, decision of the agent, IDE/TwinCAT) and how TcAgent ran (interactive, command line/pipeline);
+  bug report and feature request have a check for existing issues; the feature request asks whether you can help.
+  New issues get the label `needs-triage`.
+- Questions moved from the issues to the GitHub Discussions (category Q&A, with a form); the issue chooser links there
+  and to the private security report. `SECURITY.md` says what a report should contain.
+
 ## [0.42.6] – 2026-10-26
 
 ### Changed

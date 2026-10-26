@@ -2,7 +2,7 @@
 name: Feedback from TcAgent
 about: A report prepared by the knowledge window of TcAgent (tab Feedback) - anonymized, checked by you.
 title: "[tool] summary"
-labels: ["feedback"]
+labels: ["feedback", "needs-triage"]
 ---
 
 <!-- The knowledge window fills this in. Check it once more before you submit: no customer, machine or project names,
@@ -10,10 +10,7 @@ labels: ["feedback"]
 
 - **Type / severity:** bug | missing_feature | usability | docs / minor | major | blocker
 - **TcAgent:** version, client
-- **TcAgent extension (bridge):** version
 - **Tool:** `tc_...`
-- **TwinCAT version:** 3.1.4026.x
-- **IDE and version:** Visual Studio 2022 17.x / TwinCAT XAE Shell 4.0.x
 
 **Details**
 
@@ -32,3 +29,7 @@ What should have happened.
 ```text
 How the task was done anyway, if at all.
 ```
+
+**Diagnostics**
+
+<!-- Chat window menu ⋯ > Copy diagnostics, or TcAgent.exe diag -->

@@ -1,5 +1,11 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Question
+    url: https://github.com/ThorstenBrach/TcAgent/discussions/new?category=q-a
+    about: How do I ...? Ask in the Discussions - answers there help the next one with the same question.
+  - name: Security vulnerability
+    url: https://github.com/ThorstenBrach/TcAgent/security/advisories/new
+    about: Please report security problems privately, not as a public issue.
   - name: User guide
     url: https://github.com/ThorstenBrach/TcAgent/blob/main/docs/USER_GUIDE.md
     about: How to use TcAgent - most questions are answered there.

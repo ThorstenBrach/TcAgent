@@ -140,6 +140,8 @@ namespace TcAgentBridge
                                 "TcAgent Knowledge window: what the agent gets (rules, skills, workflows, lessons) and how the workflows develop"));
             if (Installer.IsVsixInstall) menu.Items.Add(Item("Set up clients", () => setup.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), setup.ToolTip as string));
             menu.Items.Add(new Separator());
+            menu.Items.Add(Item("Copy diagnostics", () => KnowledgeControl.CopyDiagnostics(s => System.Windows.MessageBox.Show(s, "TcAgent")),
+                                "Versions of TcAgent, the extension, TwinCAT and the IDEs for the Diagnostics field of an issue"));
             menu.Items.Add(new MenuItem { Header = versionLabel.Text?.Length > 0 && versionLabel.Visibility == Visibility.Visible ? versionLabel.Text : "TcAgent " + BridgePackage.BridgeVersion,
                                           IsEnabled = false });
             menu.IsOpen = true;

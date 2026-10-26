@@ -1,0 +1,48 @@
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The user guide answers many questions (docs/USER_GUIDE.md). Please leave out customer, machine and project names -
+        a discussion is public.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What do you want to know or achieve?
+    validations:
+      required: true
+  - type: textarea
+    id: tried
+    attributes:
+      label: What you tried
+      description: Prompts, tools, settings, the part of the user guide you followed - and what happened.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Installation and setup of the AI clients
+        - PLC code, build and activation
+        - Tests (TcUnit)
+        - I/O, motion, HMI, system
+        - Chat window
+        - Knowledge (rules, skills, workflows, lessons, sources)
+        - Pipeline and command line
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: |
+        Versions of TcAgent, the extension, TwinCAT and the IDEs. In the IDE: chat window menu ⋯ > Copy diagnostics.
+        Without the IDE: TcAgent.exe diag
+    validations:
+      required: true
+  - type: input
+    id: client
+    attributes:
+      label: AI client
+      placeholder: "Claude Code, Copilot CLI, Gemini CLI, Codex CLI, TcAgent Chat with ..."

@@ -349,6 +349,12 @@ Step-by-step guide with the expected output of every step, the repository prepar
 Then copy [github-actions.yml](pipeline/github-actions.yml) to `.github/workflows/` of the PLC repository. Its first step
 `TcAgent.exe doctor` stops a job at once with a clear message if the runner is not ready.
 
+### Versions for an issue report: `TcAgent.exe diag`
+
+Prints TcAgent, the extension registered by setup, TwinCAT, the installed IDEs, the runtime state of this PC, Windows,
+.NET and the configured knowledge levels as a Markdown list - paste it into the Diagnostics field of a bug report.
+No machine, user or project names, no paths or addresses.
+
 ### Checking a machine: `TcAgent.exe doctor`
 
 ```
