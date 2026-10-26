@@ -89,10 +89,10 @@ namespace TcAgentBridge
 
         // ------------------------------------------------------------------ permission card
         // Returns once, session or deny.
-        string AskPermission(string tool, string what, string why, Dictionary<string, object> input, string sessionRule) =>
+        string AskPermission(string tool, string what, string why, Dictionary<string, object> input, string sessionRule, string agent = "Claude") =>
             WaitForCard<string>((done, body) =>
             {
-                body.Children.Add(CardText($"Claude wants to use {tool}" + (what != null ? ":" : ".")));
+                body.Children.Add(CardText($"{agent} wants to use {tool}" + (what != null ? ":" : ".")));
                 if (what != null) body.Children.Add(CardText(what, 12, 1, true));
                 if (what == null && input != null)
                     foreach (var kv in input.Take(6)) body.Children.Add(CardText($"{kv.Key} = {Short(Convert.ToString(kv.Value), 200)}", 12, 1, true));

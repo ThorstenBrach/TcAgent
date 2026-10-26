@@ -120,7 +120,12 @@ work without the extension. The extension runs **inside** the IDE process and ad
   Decisions (apply a proposal, install, pull, promote) are made in the chat – the agent asks you.
 - **Documents in the chat** – paste (Ctrl+V), drop or attach (+) manuals, data sheets, screenshots and long texts. Text files
   and Word documents go into the prompt; PDFs and images are read by the agent from the attachments folder.
-- **Permission questions** (Claude backend) – if the agent needs something its rules do not allow, e.g. a file outside
+- **GitHub Copilot over ACP** – the Copilot backend runs as a persistent session over the open Agent Client Protocol
+  (`copilot --acp`): follow-up questions keep Copilot's own history, tool calls appear live as lines, **Stop** ends only the
+  answer (the session stays open), and permission questions come as cards. Sign in once with `copilot login` in a terminal.
+  Other ACP agents can be added in `chat-backends.json` with `"format": "acp"` (e.g. Gemini CLI with
+  `--experimental-acp`).
+- **Permission questions** (Claude and ACP backends) – if the agent needs something its rules do not allow, e.g. a file outside
   the solution folder, a card in the chat asks: **Allow once**, **Allow for this session** (e.g. reading in that folder until the
   chat session ends) or **Deny**. An open card counts as Deny when you start a new chat or stop the answer.
 - **Follow-up questions** (every backend) – when the agent needs a decision, it asks with `tc_ask_user`: a card in the chat

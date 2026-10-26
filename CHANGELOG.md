@@ -5,6 +5,21 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.38.0] – 2026-10-26
+
+### Added
+- **Chat window on the Agent Client Protocol (ACP)**: backend format `"acp"` (`vsbridge/ChatAcp.cs`) - a persistent
+  session per backend (`initialize`, `session/new` with the solution folder and the tcagent MCP server, `session/prompt`),
+  the answer streams live (text chunks, one line per tool call, failed tool calls), context usage in the status line,
+  permission requests of the agent as permission cards (allow once / always for this session / deny), **Stop** sends
+  `session/cancel` and keeps the session open. A missing sign-in is reported with the agent's own hint.
+- **GitHub Copilot** is the first ACP backend: `copilot --acp --no-ask-user --allow-tool tcagent` (questions to the user
+  go through `tc_ask_user`). `setup-clients.ps1` switches the former one-shot Copilot entry of `chat-backends.json` to ACP
+  (also in the indented layout; a backup is kept).
+
+### Changed
+- The permission card names the asking agent instead of always "Claude".
+
 ## [0.37.0] – 2026-10-26
 
 ### Added

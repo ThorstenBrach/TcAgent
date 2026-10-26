@@ -1,4 +1,4 @@
-// TcAgent Chat - tool window in Visual Studio/TwinCAT with a selectable AI backend.
+// TcAgent Chat - tool window in Visual Studio/TwinCAT with a selectable AI backend (ACP backends: ChatAcp.cs).
 // Each request starts the selected agent CLI (Claude Code, GitHub Copilot CLI, Gemini CLI, OpenAI Codex CLI)
 // headless, with TcAgent as its MCP toolbox. The editor context (object, part, line, selection)
 // and a truncated history are passed along automatically - so every CLI works the same, without its own sessions.
@@ -206,7 +206,7 @@ namespace TcAgentBridge
             var defaults = new[]
             {
                 new Backend { Key = "claude", Name = "Claude (Claude Code)", Exe = "claude", Args = "-p --input-format stream-json --output-format stream-json --verbose --strict-mcp-config --mcp-config {mcpClaude} --allowedTools mcp__tcagent WebSearch", Stdin = true, Format = "claude-stream" },
-                new Backend { Key = "copilot", Name = "GitHub Copilot (CLI)", Exe = "copilot", Args = "-p {prompt} --allow-tool tcagent --additional-mcp-config @{mcpCopilot}", Stdin = false },
+                new Backend { Key = "copilot", Name = "GitHub Copilot (CLI)", Exe = "copilot", Args = "--acp --no-ask-user --allow-tool tcagent", Format = "acp" },
                 new Backend { Key = "gemini", Name = "Gemini (Gemini CLI)", Exe = "gemini", Args = "--allowed-mcp-server-names tcagent", Stdin = true },
                 new Backend { Key = "codex", Name = "ChatGPT (Codex CLI)", Exe = "codex", Args = "exec --skip-git-repo-check -", Stdin = true },
             };
@@ -240,9 +240,9 @@ namespace TcAgentBridge
         // ------------------------------------------------------------------ Send
         // Two kinds of backends:
         //  * one-shot: one process per question (Copilot, Gemini, Codex) - the history is sent along in the prompt
-        //  * persistent: Claude Code with --input-format stream-json stays open in the background; follow-up questions
-        //    save the startup, MCP connection and history (Claude keeps the history itself)
-        static bool IsPersistent(Backend be) => be.Format == "claude-stream" && (be.Args ?? "").Contains("--input-format stream-json");
+        //  * persistent: Claude Code with --input-format stream-json and every ACP backend (ChatAcp.cs) stay open in the
+        //    background; follow-up questions save the startup, MCP connection and history (the agent keeps the history itself)
+        static bool IsPersistent(Backend be) => be.Format == "claude-stream" && (be.Args ?? "").Contains("--input-format stream-json") || IsAcp(be);
 
         sealed class Session
         {
@@ -250,6 +250,7 @@ namespace TcAgentBridge
             public readonly StringBuilder Answer = new StringBuilder(), Err = new StringBuilder();
             public TaskCompletionSource<string> Turn; public Stopwatch TurnSw; public string Summary;
             public bool Exited, Greeted; public readonly Stopwatch Up = Stopwatch.StartNew();
+            public AcpState Acp;                // ACP backends (ChatAcp.cs)
         }
         Session sess;
 
@@ -299,13 +300,13 @@ namespace TcAgentBridge
             if (sess != null && !sess.Exited && sess.Be == be) return sess;
             KillSession();
             var (file, args) = CommandLine(be, null);
-            var s = new Session { Be = be };
+            var s = new Session { Be = be, Acp = IsAcp(be) ? new AcpState() : null };
             s.P = Process.Start(Psi(file, args, be));
             s.In = s.P.StandardInput.BaseStream;
             Task.Run(() =>
             {
                 string line;
-                try { while ((line = s.P.StandardOutput.ReadLine()) != null) OnSessionLine(s, line); } catch { }
+                try { while ((line = s.P.StandardOutput.ReadLine()) != null) if (s.Acp != null) OnAcpLine(s, line); else OnSessionLine(s, line); } catch { }
                 s.Exited = true;
                 s.Turn?.TrySetResult(null);
             });
@@ -442,7 +443,12 @@ namespace TcAgentBridge
         {
             var be = Current;
             if (be == null || !IsPersistent(be) || (sess != null && !sess.Exited && sess.Be == be)) return;
-            try { EnsureSession(be); status.Text = $"{be.Name} is starting in the background ..."; }
+            try
+            {
+                var s = EnsureSession(be);
+                if (s.Acp != null) AcpOpen(s).ContinueWith(t => { var _ = t.Exception; });   // errors are shown with the first question
+                status.Text = $"{be.Name} is starting in the background ...";
+            }
             catch (Exception ex) { status.Text = $"{be.Name} could not be pre-started: {ex.Message}"; }
         }
 
@@ -500,6 +506,7 @@ namespace TcAgentBridge
 
         async Task SendPersistent(Backend be, string text, string ctx)
         {
+            if (IsAcp(be)) { await SendAcp(be, text, ctx); return; }
             var warm = sess != null && !sess.Exited && sess.Be == be;
             var s = EnsureSession(be);
             s.Answer.Clear(); s.Summary = null;
@@ -646,6 +653,11 @@ namespace TcAgentBridge
 
         void Stop()
         {
+            if (sess != null && sess.Turn != null && sess.Acp?.SessionId != null)
+            {
+                AcpCancel(sess);        // the agent ends the turn; the session stays open
+                return;
+            }
             if (sess != null && sess.Turn != null)
             {
                 KillSession();          // abort the running answer; the next question starts a new session

@@ -183,7 +183,7 @@ if (-not (Test-Path $chatCfg)) {
   "historyChars": 6000,
   "backends": {
     "claude":  { "name": "Claude (Claude Code)",  "exe": "claude",  "args": "-p --input-format stream-json --output-format stream-json --verbose --strict-mcp-config --mcp-config {mcpClaude} --allowedTools mcp__tcagent WebSearch", "stdin": true, "format": "claude-stream" },
-    "copilot": { "name": "GitHub Copilot (CLI)",  "exe": "copilot", "args": "-p {prompt} --allow-tool tcagent --additional-mcp-config @{mcpCopilot}", "stdin": false },
+    "copilot": { "name": "GitHub Copilot (CLI)",  "exe": "copilot", "args": "--acp --no-ask-user --allow-tool tcagent", "format": "acp" },
     "gemini":  { "name": "Gemini (Gemini CLI)",   "exe": "gemini",  "args": "--allowed-mcp-server-names tcagent", "stdin": true },
     "codex":   { "name": "ChatGPT (Codex CLI)",   "exe": "codex",   "args": "exec --skip-git-repo-check -", "stdin": true }
   }
@@ -197,10 +197,17 @@ else {
     $new = '"args": "-p --input-format stream-json --output-format stream-json --verbose --strict-mcp-config --mcp-config {mcpClaude} --allowedTools mcp__tcagent WebSearch", "stdin": true, "format": "claude-stream"'
     $olds = @('"args": "-p --input-format stream-json --output-format stream-json --verbose --strict-mcp-config --mcp-config {mcpClaude} --allowedTools mcp__tcagent", "stdin": true, "format": "claude-stream"', '"args": "-p --output-format stream-json --verbose --strict-mcp-config --mcp-config {mcpClaude} --allowedTools mcp__tcagent", "stdin": true, "format": "claude-stream"', '"args": "-p --allowedTools mcp__tcagent --mcp-config {mcpClaude}", "stdin": true')
     $hit = $olds | Where-Object { $t.Contains($_) } | Select-Object -First 1
-    if ($hit) {
+    # the former one-shot Copilot default -> the Agent Client Protocol (persistent session, live tool calls, permission cards)
+    # (also in the indented layout the chat window writes)
+    $oldCopilot = '"args":\s*"-p \{prompt\} --allow-tool tcagent --additional-mcp-config @\{mcpCopilot\}",(\s*)"stdin":\s*false'
+    $newCopilot = '"args": "--acp --no-ask-user --allow-tool tcagent",$1"format": "acp"'
+    $changed = @()
+    if ($hit) { $t = $t.Replace($hit, $new); $changed += 'Claude backend switched to a persistent session with live progress' }
+    if ($t -match $oldCopilot) { $t = [regex]::Replace($t, $oldCopilot, $newCopilot); $changed += 'Copilot backend switched to the Agent Client Protocol (ACP)' }
+    if ($changed.Count -gt 0) {
         Copy-Item $chatCfg "$chatCfg.bak-$(Get-Date -Format yyyyMMdd-HHmmss)"
-        Save-Text $chatCfg ($t.Replace($hit, $new))
-        $done.Add("Chat window: $chatCfg - Claude backend switched to a persistent session with live progress")
+        Save-Text $chatCfg $t
+        $done.Add("Chat window: $chatCfg - " + ($changed -join '; '))
     }
     else { $done.Add("Chat window: $chatCfg left unchanged (already exists)") }
 }

@@ -7,7 +7,7 @@
 > hard gate "`tc_activate` only after a build with 0 errors". Since 0.33: run logs and `tc_improve` (proposals by fixed rules,
 > apply after asking, evaluation over 10 runs, revert, promote with name check). Since 0.34: sources (`tc_sources`, `skills.lock.json`, license check, overlay
 > `tcagent-extends`, `TcAgent.exe sources sync`). Since 0.35: the knowledge manager window (Overview, Effective, Sources, History) and
-> `TcAgent.exe knowledge json|disable|enable`. Since 0.37: the team level between user and platform (`TCAGENT_TEAM`). Since 0.36: first "deterministic first" conversions
+> `TcAgent.exe knowledge json|disable|enable`. Since 0.37: the team level between user and platform (`TCAGENT_TEAM`). Since 0.38: the chat window speaks ACP (GitHub Copilot). Since 0.36: first "deterministic first" conversions
 > ([DETERMINISTIC_FIRST.md](DETERMINISTIC_FIRST.md)). The rest of this document is still a concept. It describes how TcAgent shall organise the knowledge it
 > gives to an agent – coding rules, risk rules, skills, lessons learned, knowledge sources, documentation templates and
 > engineering workflows – and how this knowledge improves over time. Today's behaviour is described in
@@ -326,7 +326,8 @@ favour one client. These points come **first**, before the other implementation 
 
 1. **Server texts:** hints that name one product ("quit Claude Desktop …") become neutral ("quit the AI client …").
    Confirmations stay MCP elicitation or the dialog in the IDE – both client-neutral.
-2. **Chat window on the Agent Client Protocol (ACP):** today only one backend gets a persistent session, live tool
+2. **Chat window on the Agent Client Protocol (ACP):** *(since 0.38: ACP client in the chat window, GitHub Copilot as the
+   first ACP backend; the stream-json path stays for Claude Code)* - before, only one backend got a persistent session, live tool
    calls, permission and question cards and attachments; the others run one process per question with plain text.
    [ACP](https://agentclientprotocol.com) is the open protocol for "editor talks to agent": persistent sessions,
    streaming, tool calls, permission requests (`allow_once`, `allow_always`, `reject_once`, `reject_always`). Gemini CLI
