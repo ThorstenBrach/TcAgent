@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.42.1] – 2026-10-26
+
+### Added
+- Knowledge window: the company definition of a platform (`<company>\platforms\<name>`) as a level of its own for New, Add
+  existing and Move ("platform · <name> (company)"); **New platform** can be defined at the company level. **Levels …**
+  moved to the top bar (visible in every tab).
+
 ## [0.42.0] – 2026-10-26
 
 ### Added

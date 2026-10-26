@@ -34,12 +34,15 @@ public static class KnowledgeOps
             return KnowledgeLayers.TeamRoots.FirstOrDefault(t => Path.GetFileName(t.TrimEnd('\\', '/')).Equals(l[5..].Trim(), StringComparison.OrdinalIgnoreCase))
                    ?? throw new ArgumentException("unknown team " + l[5..]);
         if (l.StartsWith("platform:", StringComparison.OrdinalIgnoreCase)) return Path.Combine(KnowledgeLayers.UserRoot, "platforms", l[9..].Trim());
+        // the company definition of a platform: <company>\platforms\<name> (shared like the company level)
+        if (l.StartsWith("company-platform:", StringComparison.OrdinalIgnoreCase))
+            return Path.Combine(KnowledgeLayers.CompanyRoot ?? throw new ArgumentException("no company level (TCAGENT_COMPANY) - set it with Levels …"), "platforms", l[17..].Trim());
         throw new ArgumentException("level: user, project, team, platform:<name> or company");
     }
 
     /// <summary>Shared levels change by pull request only: company, and a team kept in Git.</summary>
     public static bool ViaPullRequest(string level, string root) =>
-        level.Equals("company", StringComparison.OrdinalIgnoreCase) || level.StartsWith("team", StringComparison.OrdinalIgnoreCase) && KnowledgeLayers.IsGitRepo(RepoOf(root) ?? root);
+        level.Equals("company", StringComparison.OrdinalIgnoreCase) || level.StartsWith("company-platform:", StringComparison.OrdinalIgnoreCase) || level.StartsWith("team", StringComparison.OrdinalIgnoreCase) && KnowledgeLayers.IsGitRepo(RepoOf(root) ?? root);
 
     /// <summary>The level of a file: the layer whose root contains it (the most specific one).</summary>
     public static KnowledgeLayers.Layer LayerOf(string solutionDir, string path, IEnumerable<string> platforms) =>
@@ -131,11 +134,15 @@ public static class KnowledgeOps
 
     // ------------------------------------------------------------------ platforms
     /// <summary>A platform of the user: &lt;user&gt;\platforms\&lt;name&gt;\platform.md with the libraries and terms that detect it.</summary>
-    public static string NewPlatform(string name, string description, string libraries, string terms)
+    public static string NewPlatform(string name, string description, string libraries, string terms, string level = "user")
     {
         if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("a name is required");
         var n = Skills.ValidateName(KnowledgeLayers.Slug(name));          // "My Framework" -> my-framework
-        var file = Path.Combine(KnowledgeLayers.UserRoot, "platforms", n, "platform.md");
+        // user: only for you; company: the definition for everybody (in the company folder / working copy - Git bar for the pull request)
+        var baseRoot = (level ?? "user").Equals("company", StringComparison.OrdinalIgnoreCase)
+            ? KnowledgeLayers.CompanyRoot ?? throw new ArgumentException("no company level (TCAGENT_COMPANY) - set it with Levels …")
+            : KnowledgeLayers.UserRoot;
+        var file = Path.Combine(baseRoot, "platforms", n, "platform.md");
         if (File.Exists(file)) throw new ArgumentException(file + " exists already - open it to change it");
         static string List(string v) => string.Join(", ", (v ?? "").Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);

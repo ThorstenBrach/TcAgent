@@ -200,7 +200,7 @@ namespace TcAgentBridge
             SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             var bar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4, 4, 4, 2) };
-            foreach (var e in new UIElement[] { refresh, TcUnitControl.Separator(), tOverview, tEffective, tSources, tPlatforms, tFeedback, tHistory, platform }) bar.Children.Add(e);
+            foreach (var e in new UIElement[] { refresh, TcUnitControl.Separator(), tOverview, tEffective, tSources, tPlatforms, tFeedback, tHistory, TcUnitControl.Separator(), levelsBtn, platform }) bar.Children.Add(e);
             platform.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             status.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             facts.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
@@ -291,7 +291,7 @@ namespace TcAgentBridge
             if (effectivePage != null) return effectivePage;
             var tools = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 4, 6, 4) };
             foreach (var e in new UIElement[] { kindBox, levelBox, filter, onlyApplied, TcUnitControl.Separator(), newBtn, open, folderBtn, moveBtn, deleteBtn,
-                                                TcUnitControl.Separator(), offProject, offUser, on, TcUnitControl.Separator(), levelsBtn }) tools.Children.Add(e);
+                                                TcUnitControl.Separator(), offProject, offUser, on }) tools.Children.Add(e);
             var g = new Grid();
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -1014,10 +1014,13 @@ namespace TcAgentBridge
 
         void NewPlatform()
         {
+            var st = data?.TryGetValue("settings", out var so) == true ? so as Dictionary<string, object> : null;
+            var where = string.IsNullOrEmpty(S(st, "TCAGENT_COMPANY")) ? new[] { "user (only for you)" } : new[] { "user (only for you)", "company (for everybody - Git bar: pull request)" };
             var r = Prompt("New platform", ("Name (e.g. framework-a - other characters become hyphens)", null, ""), ("Description", null, ""),
-                           ("Detected by libraries (comma-separated, * allowed)", null, ""), ("Detected by terms in the project (comma-separated)", null, ""));
+                           ("Detected by libraries (comma-separated, * allowed)", null, ""), ("Detected by terms in the project (comma-separated)", null, ""),
+                           ("Defined at", where, where[0]));
             if (r == null || r[0].Trim().Length == 0) return;
-            var (ok, output) = RunCli($"knowledge platform --action new --name {Quote(r[0].Trim())} --message {Quote(r[1])} --libraries {Quote(r[2])} --terms {Quote(r[3])}");
+            var (ok, output) = RunCli($"knowledge platform --action new --name {Quote(r[0].Trim())} --message {Quote(r[1])} --libraries {Quote(r[2])} --terms {Quote(r[3])} --level {(r[4].StartsWith("company") ? "company" : "user")}");
             Report(ok, output, "New platform");
             if (ok && File.Exists(output.Trim())) try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(output.Trim()); } catch { }
             Load();

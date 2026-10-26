@@ -71,7 +71,7 @@ public static partial class Cli
             {
                 Console.WriteLine((o.Action ?? "") switch
                 {
-                    "new" => KnowledgeOps.NewPlatform(o.Name, o.Message, o.Libraries, o.Terms),
+                    "new" => KnowledgeOps.NewPlatform(o.Name, o.Message, o.Libraries, o.Terms, o.Level ?? "user"),
                     "set" => "Stored in " + KnowledgeLayers.SetPlatforms(dir ?? throw new ArgumentException("no solution open"),
                                  (o.Name ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Where(n => !n.Equals("none", StringComparison.OrdinalIgnoreCase))),
                     "auto" => KnowledgeOps.AutoPlatform(dir ?? throw new ArgumentException("no solution open")),
@@ -168,7 +168,11 @@ public static partial class Cli
         var teams = KnowledgeLayers.TeamRoots;
         foreach (var t in teams) Lv(teams.Count > 1 ? "team · " + Path.GetFileName(t.TrimEnd('\\', '/')) : "team", teams.Count > 1 ? "team:" + Path.GetFileName(t.TrimEnd('\\', '/')) : "team", t);
         if (KnowledgeLayers.CompanyRoot is { } co) Lv("company", "company", co);
-        foreach (var p in pi.Known) Lv("platform · " + p.Name, "platform:" + p.Name, Path.Combine(KnowledgeLayers.UserRoot, "platforms", p.Name));
+        foreach (var p in pi.Known)
+        {
+            Lv("platform · " + p.Name + " (user)", "platform:" + p.Name, Path.Combine(KnowledgeLayers.UserRoot, "platforms", p.Name));
+            if (KnowledgeLayers.CompanyRoot is { } cr) Lv("platform · " + p.Name + " (company)", "company-platform:" + p.Name, Path.Combine(cr, "platforms", p.Name));
+        }
         o["levels"] = levels;
         o["settings"] = new JsonObject
         {
