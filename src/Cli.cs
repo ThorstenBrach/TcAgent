@@ -914,6 +914,16 @@ public static partial class Cli
       ready to paste into GitHub issues - to stdout or into the file. --open: only open entries; --summary: counts only.
       No IDE needed.
 
+  TcAgent.exe sources status|sync|add|remove|search|install|pull|diff [--solution <sln>] [--dry-run]
+      The Git sources of skills, workflows and rules: sync restores every installed item at the commit of
+      skills.lock.json (--dry-run only compares, exit 1 on differences). No IDE needed.
+
+  TcAgent.exe skills list|mirror [--solution <sln>]
+      The skills that apply / copy them into the folders of the agent CLIs. No IDE needed.
+
+  TcAgent.exe knowledge json|new|move|delete|disable|enable|git|platform|feedback|settings [--solution <sln>] ...
+      The actions of the knowledge window (files of every level, Git, platforms, feedback reports) for scripts.
+
   TcAgent.exe test --solution <sln> [--target <AmsNetId>] [--plc <names>] [--timeout <s>] [--junit <file>]
       Builds, activates the configuration on the test target, starts the PLC via boot project with autostart,
       waits for TcUnit and writes the results. Only targets allowed by TCAGENT_ALLOW_TARGETS (default: this PC).

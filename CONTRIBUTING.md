@@ -3,16 +3,19 @@
 Contributions are welcome – bug reports, experience with other TwinCAT versions, new tools.
 Docs and issues are in English; issues and pull requests in German are welcome too.
 
-## Reporting bugs
+## Reporting bugs, requests and questions
 
-* TwinCAT version (e.g. 3.1.4026.19), Visual Studio version, AI client.
-* What was called (tool, arguments), what came back, what was expected.
+* **Bugs and feature requests:** the issue forms of the repository. They ask for a **Diagnostics** block – in the IDE
+  the chat window menu **⋯ > Copy diagnostics**, without the IDE `TcAgent.exe diag` (versions only, no names or paths).
+* **Questions:** the GitHub Discussions, category Q&A.
+* **Security problems:** privately, see [SECURITY.md](SECURITY.md) – not as a public issue.
 * Helpful: an excerpt from `%LOCALAPPDATA%\TcAgent\audit.jsonl` or `bridge\bridge.log` (without confidential content).
 
 ## Agent feedback
 
-Agents report problems themselves via `tc_feedback` to `feedback/feedback.jsonl`. If you like, submit
-anonymized entries as an issue – they show where tools or descriptions need improvement.
+Agents report problems themselves via `tc_feedback` to `feedback/feedback.jsonl`. The knowledge window (tab Feedback)
+shows them, anonymizes the text and opens a prepared issue – you check and send it yourself. They show where tools or
+descriptions need improvement.
 
 ## Development
 

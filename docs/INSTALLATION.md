@@ -90,7 +90,9 @@ The script
 
 * keeps the settings of TcAgent (`TCAGENT_*`) in **`%LOCALAPPDATA%\TcAgent\settings.json`** – the single source for
   all clients (on the first run they are taken over once from an existing client configuration). Change a setting there
-  and run the script again; every client gets the same values,
+  and run the script again; every client gets the same values. `TcAgent.exe` itself also reads the `env` section of
+  `settings.json` at every start (pipelines and the windows of the extension included); a variable that is already set
+  in the environment wins,
 * registers TcAgent as an MCP server in all clients it finds (Claude Desktop, Claude Code, Copilot in VS,
   Copilot CLI, Gemini CLI, Codex CLI),
 * installs the agent guide for each client (`AGENTS.md`, `GEMINI.md`, `copilot-instructions.md`, the Claude Code skill);

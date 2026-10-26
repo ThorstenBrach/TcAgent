@@ -201,8 +201,10 @@ folders and network shares per project (`<solution>\.tcagent\knowledge.md`, `.tc
 
 Agents report problems, missing features and unclear descriptions through `tc_feedback` (with version, client, machine and
 solution) – into a local file or a shared team folder (`TCAGENT_FEEDBACK`). `tc_feedback action=list|summary|resolve` and
-`TcAgent.exe feedback --open --markdown feedback.md` turn them into a triage list for GitHub issues. That is where the next
-improvements come from – see [CONTRIBUTING.md](CONTRIBUTING.md).
+`TcAgent.exe feedback --open --markdown feedback.md` turn them into a triage list for GitHub issues; the knowledge window
+anonymizes a report and opens it as a prepared issue. That is where the next improvements come from – see
+[CONTRIBUTING.md](CONTRIBUTING.md). Questions go to the GitHub Discussions; `TcAgent.exe diag` (or **⋯ > Copy
+diagnostics** in the chat) gives the versions an issue needs.
 
 ## Build from source
 

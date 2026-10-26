@@ -22,6 +22,8 @@ exit code, JUnit XML and inline annotations.
 | `TcAgent.exe hil --solution X.sln --target 5.1.2.3.1.1 --allow 5.1.2.3.1.1` | hardware in the loop: the same on a remote test PLC with real I/O – only with an explicit allowance | nightly, release candidates |
 | `TcAgent.exe ci` | runs the pipeline defined in the repository (`.tcagent/pipeline.json`): the steps above in order, each with a fresh IDE, with a summary – see [below](#pipeline-configuration-in-the-repository-tcagentpipelinejson-and-tcagentexe-ci) | every push / pull request – one line in the CI definition |
 | `TcAgent.exe feedback --open --markdown feedback.md` | Markdown report of the agents' `tc_feedback` entries (grouped by tool, ready for GitHub issues); `--summary` for counts, `--path` for another store; no IDE needed | weekly triage of a shared feedback folder |
+| `TcAgent.exe sources sync --solution X.sln` | restores the skills, workflows and rules installed from Git sources exactly at the commit in `skills.lock.json`; `--dry-run` only compares (exit 1 on differences); no IDE needed | before the build, so every runner works with the same knowledge |
+| `TcAgent.exe diag` | versions of TcAgent, extension, TwinCAT and IDEs, runtime state, Windows – as a Markdown list for an issue report; no IDE needed | when a pipeline fails and you report it |
 
 ```powershell
 TcAgent.exe check --solution .\MyMachine.sln --junit results\check.xml

@@ -7,7 +7,10 @@
 > hard gate "`tc_activate` only after a build with 0 errors". Since 0.33: run logs and `tc_improve` (proposals by fixed rules,
 > apply after asking, evaluation over 10 runs, revert, promote with name check). Since 0.34: sources (`tc_sources`, `skills.lock.json`, license check, overlay
 > `tcagent-extends`, `TcAgent.exe sources sync`). Since 0.35: the knowledge manager window (Overview, Effective, Sources, History) and
-> `TcAgent.exe knowledge json|disable|enable`. Since 0.37: the team level between user and platform (`TCAGENT_TEAM`). Since 0.38: the chat window speaks ACP (GitHub Copilot). Since 0.36: first "deterministic first" conversions
+> `TcAgent.exe knowledge json|disable|enable`. Since 0.37: the team level between user and platform (`TCAGENT_TEAM`). Since 0.38: the chat window speaks ACP (GitHub Copilot). Since 0.40–0.42: the
+> knowledge window manages the files (tab Files instead of Effective: new, move between levels, delete, switch off, Git),
+> sources (add, edit, browse and install, updates), platforms (new for you or the company, set, detect, delete), the levels
+> and the `tc_feedback` reports (anonymized, shared as a GitHub issue). Since 0.43: `TcAgent.exe diag`. Since 0.36: first "deterministic first" conversions
 > ([DETERMINISTIC_FIRST.md](DETERMINISTIC_FIRST.md)). The rest of this document is still a concept. It describes how TcAgent shall organise the knowledge it
 > gives to an agent – coding rules, risk rules, skills, lessons learned, knowledge sources, documentation templates and
 > engineering workflows – and how this knowledge improves over time. Today's behaviour is described in

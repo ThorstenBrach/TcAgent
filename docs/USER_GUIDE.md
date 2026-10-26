@@ -104,7 +104,8 @@ work without the extension. The extension runs **inside** the IDE process and ad
   on the right, the agent's answers on the left, tool calls as compact lines. Enter sends, Shift+Enter makes a new line,
   ↑/↓ brings back earlier prompts (kept across sessions). **New chat** clears the history, **Stop** cancels the running
   answer. The editor context is sent along automatically. The **⋯** menu holds the options (send editor context, check
-  after changes), **TcUnit Tests**, **Knowledge**, **Set up clients** and the version.
+  after changes), **TcUnit Tests**, **Knowledge**, **Set up clients**, **Copy diagnostics** (versions for an issue
+  report) and the version.
 - **TcAgent Knowledge** – a tool window (View > Other Windows, or **⋯ > Knowledge** in the chat) that shows what the agent
   gets and how the work develops:
   - **Overview:** tiles for runs, first-time-right, failed checks, corrections and minutes per run and gate stops – the
@@ -125,8 +126,13 @@ work without the extension. The extension runs **inside** the IDE process and ad
     accept the license). Below the items installed from sources – pinned commit, license, changed locally, newer upstream
     – with **Check for updates**, **Update all …** and **Diff**.
   - **Platforms:** the platforms (automation frameworks) with the libraries and terms that detect them, which apply to
-    this project and why, the libraries of the project. **New …** (a platform of your own), **Open platform.md**,
-    **Open folder**, **Set for this project …**, **Detect automatically**.
+    this project and why, the libraries of the project. **New …** (a platform of your own – for you or, with a company
+    level, for the whole company), **Open platform.md**, **Open folder**, **Set for this project …**, **Detect
+    automatically**, **Delete** (only platforms of your own); the same in the context menu. A click on the platform name
+    in the top bar opens this tab.
+  - **Levels …** (top bar): the folders or Git working copies of the company level (`TCAGENT_COMPANY`), the team levels
+    (`TCAGENT_TEAM`) and platform repositories (`TCAGENT_PLATFORMS`). They are saved in `settings.json` and used by the
+    window at once; **⋯ > Set up clients** in the chat passes them on to the AI clients.
   - **Feedback:** the reports of `tc_feedback` (filter by status). For the selected reports the window builds the text of
     an issue and **anonymizes** it: names of this computer, user, solution and projects, your `privateTerms`
     (`settings.json`), user folders, solution paths, network paths and IP addresses are replaced. You edit the text as
