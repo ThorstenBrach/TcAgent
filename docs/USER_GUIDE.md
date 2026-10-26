@@ -112,7 +112,7 @@ work without the extension. The extension runs **inside** the IDE process and ad
     frequent compiler errors. Double-click a workflow for its history.
   - **Files:** coding rules, risk rules, skills, workflows, lessons and templates of every level with their status
     (applies, replaced by a later level, locked, forced, switched off) and why; filter by kind, level and text. Toolbar
-    and context menu: **New …** (from a template, opened in the editor), **Open**, **Open folder**, **Move to level …**
+    and context menu: **New …** (a new file from a template, opened in the editor – or an existing file taken over to the level), **Open**, **Open folder**, **Move to level …**
     (moving up checks the text for project and machine names; company and a team in Git as a commit on a new branch for
     a pull request), **Delete** (also the Del key; only on your own levels – built-in and company files are switched off
     instead), **Switch off** for the project or for you, **Switch on** (`disabled.json` – the file itself stays unchanged).

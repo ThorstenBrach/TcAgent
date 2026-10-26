@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.41.4] – 2026-10-26
+
+### Added
+- Knowledge window, **New …**: create a new file from a template **or add an existing file** - a Markdown file (rule, risk
+  rule, lesson) is copied into the folder of its kind, a skill or workflow with its whole folder (pick its `SKILL.md` /
+  `WORKFLOW.md`; the name comes from its front matter). `TcAgent.exe knowledge new --key <kind>/x --path <file> --level <level>`.
+
 ## [0.41.3] – 2026-10-26
 
 ### Fixed

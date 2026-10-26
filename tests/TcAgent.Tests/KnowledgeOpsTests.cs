@@ -47,6 +47,21 @@ public sealed class KnowledgeOpsTests : IDisposable
     }
 
     [Fact]
+    public void ExistingFilesAreTakenOver()
+    {
+        var ext = Path.Combine(dir, "elsewhere");
+        Directory.CreateDirectory(Path.Combine(ext, "My Skill", "references"));
+        File.WriteAllText(Path.Combine(ext, "My Skill", "SKILL.md"), "---\nname: drive-commissioning\ndescription: d\n---\nx\n");
+        File.WriteAllText(Path.Combine(ext, "My Skill", "references", "a.md"), "a");
+        File.WriteAllText(Path.Combine(ext, "Team Naming.md"), "# naming");
+        var skill = KnowledgeOps.AddExisting(Sln, "skills", Path.Combine(ext, "My Skill", "SKILL.md"), "project");
+        Assert.EndsWith(@"skills\drive-commissioning\SKILL.md", skill);                         // name from the front matter
+        Assert.True(File.Exists(Path.Combine(Path.GetDirectoryName(skill)!, "references", "a.md")));   // the whole folder
+        Assert.EndsWith(@"coding-rules\team-naming.md", KnowledgeOps.AddExisting(Sln, "coding-rules", Path.Combine(ext, "Team Naming.md"), "user"));
+        Assert.Throws<ArgumentException>(() => KnowledgeOps.AddExisting(Sln, "skills", Path.Combine(ext, "Team Naming.md"), "user"));
+    }
+
+    [Fact]
     public void MoveChecksNamesAndDeleteOnlyOwnLevels()
     {
         var rule = KnowledgeOps.New(Sln, "coding-rules", "naming", "project");

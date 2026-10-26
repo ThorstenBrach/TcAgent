@@ -83,6 +83,7 @@ public static partial class Cli
                 var pi = KnowledgeLayers.Platforms(dir).Active;
                 Console.WriteLine(o.Sub switch
                 {
+                    "new" when o.Out != null => KnowledgeOps.AddExisting(dir, o.Key?.Split('/')[0], o.Out, o.Level ?? "user"),
                     "new" => KnowledgeOps.New(dir, o.Key?.Split('/')[0], o.Key?.Split('/').Last(), o.Level ?? "user"),
                     "move" => KnowledgeOps.Move(dir, o.Out ?? throw new ArgumentException("--path is required"), o.Level ?? throw new ArgumentException("--level is required"), pi),
                     "delete" => KnowledgeOps.Delete(dir, o.Out ?? throw new ArgumentException("--path is required"), pi),

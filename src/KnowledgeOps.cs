@@ -98,6 +98,36 @@ public static class KnowledgeOps
         return file;
     }
 
+    /// <summary>An existing file taken over to a level: a Markdown file (rule, risk rule, lesson) is copied into the folder of
+    /// its kind; a skill or workflow is its folder (pick its SKILL.md / WORKFLOW.md or the folder). Returns the new path.</summary>
+    public static string AddExisting(string solutionDir, string kind, string source, string level)
+    {
+        kind = (kind ?? "").Trim().ToLowerInvariant();
+        if (!NewKinds.Contains(kind)) throw new ArgumentException("kind: " + string.Join(", ", NewKinds));
+        var root = RootOf(solutionDir, level);
+        if (ViaPullRequest(level, root) || level.Equals("built-in", StringComparison.OrdinalIgnoreCase))
+            throw new ArgumentException($"the {level} level is shared - add the file at user or project level and move it up (pull request)");
+        source = Path.GetFullPath(source ?? throw new ArgumentException("--path is required"));
+        if (kind is "skills" or "workflows")
+        {
+            var main = kind == "skills" ? Skills.MainFile : Workflows.MainFile;
+            var folder = Directory.Exists(source) ? source : Path.GetFileName(source).Equals(main, StringComparison.OrdinalIgnoreCase) ? Path.GetDirectoryName(source)! : null;
+            if (folder == null || !File.Exists(Path.Combine(folder, main)))
+                throw new ArgumentException($"a {kind[..^1]} is a folder with {main} - pick its {main}");
+            var name = Skills.ValidateName(KnowledgeLayers.Slug(KnowledgeLayers.ParseFrontMatter(File.ReadAllText(Path.Combine(folder, main))).Top.TryGetValue("name", out var n) && n.Length > 0 ? n : Path.GetFileName(folder)));
+            var target = Path.Combine(root, kind, name);
+            if (Directory.Exists(target)) throw new ArgumentException(target + " exists already");
+            CopyDir(folder, target);
+            return Path.Combine(target, main);
+        }
+        if (!File.Exists(source) || !source.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("pick a Markdown file (.md)");
+        var file = Path.Combine(root, kind, KnowledgeLayers.Slug(Path.GetFileNameWithoutExtension(source)) + ".md");
+        if (File.Exists(file)) throw new ArgumentException(file + " exists already");
+        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
+        File.Copy(source, file);
+        return file;
+    }
+
     // ------------------------------------------------------------------ platforms
     /// <summary>A platform of the user: &lt;user&gt;\platforms\&lt;name&gt;\platform.md with the libraries and terms that detect it.</summary>
     public static string NewPlatform(string name, string description, string libraries, string terms)

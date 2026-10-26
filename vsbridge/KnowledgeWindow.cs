@@ -599,11 +599,31 @@ namespace TcAgentBridge
             var levels = Levels(true);
             if (levels.Count == 0) { status.Text = "No level to create files at."; return; }
             var kinds = new[] { "coding-rules", "risk-rules", "skills", "workflows", "lessons" };
+            const string fromTemplate = "Create a new file from a template", fromFile = "Add an existing file …";
             var r = Prompt("New knowledge file", ("Kind", kinds, kindBox.SelectedIndex > 0 && kinds.Contains(kindBox.SelectedItem as string) ? (string)kindBox.SelectedItem : "skills"),
-                           ("Name", null, ""), ("Level", levels.Select(x => x.Label).ToArray(), levels.Any(x => x.Level == "project") ? levels.First(x => x.Level == "project").Label : levels[0].Label));
-            if (r == null || r[1].Trim().Length == 0) return;
-            var level = levels.First(x => x.Label == r[2]).Level;
-            var (ok, output) = RunCli($"knowledge new --key {Quote(r[0] + "/" + r[1].Trim())} --level {Quote(level)}");
+                           ("How", new[] { fromTemplate, fromFile }, fromTemplate),
+                           ("Name (new file only - other characters become hyphens)", null, ""),
+                           ("Level", levels.Select(x => x.Label).ToArray(), levels.Any(x => x.Level == "project") ? levels.First(x => x.Level == "project").Label : levels[0].Label));
+            if (r == null) return;
+            var level = levels.First(x => x.Label == r[3]).Level;
+            string args;
+            if (r[1] == fromFile)
+            {
+                var skillLike = r[0] is "skills" or "workflows";
+                var dlg = new Microsoft.Win32.OpenFileDialog
+                {
+                    Title = skillLike ? $"Pick the {(r[0] == "skills" ? "SKILL.md" : "WORKFLOW.md")} of the {r[0].TrimEnd('s')} (its folder is taken over)" : "Pick the Markdown file",
+                    Filter = skillLike ? (r[0] == "skills" ? "SKILL.md|SKILL.md" : "WORKFLOW.md|WORKFLOW.md") : "Markdown|*.md"
+                };
+                if (dlg.ShowDialog() != true) return;
+                args = $"knowledge new --key {Quote(r[0] + "/x")} --path {Quote(dlg.FileName)} --level {Quote(level)}";
+            }
+            else
+            {
+                if (r[2].Trim().Length == 0) { status.Text = "A name is needed for a new file."; return; }
+                args = $"knowledge new --key {Quote(r[0] + "/" + r[2].Trim())} --level {Quote(level)}";
+            }
+            var (ok, output) = RunCli(args);
             Report(ok, output, "New");
             if (ok && File.Exists(output.Trim()))
                 try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(output.Trim()); } catch { }
