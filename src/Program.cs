@@ -8,7 +8,7 @@ namespace TcAgent;
 
 public static class Program
 {
-    public const string ServerVersion = "0.39.8";
+    public const string ServerVersion = "0.39.9";
     public static string ClientName = "unknown";
 
     public static int Main(string[] args)
@@ -18,6 +18,19 @@ public static class Program
         if (Cli.IsCommand(args)) { Console.OutputEncoding = new UTF8Encoding(false); return Cli.Run(args); }
         Mcp.Start();
         Log.Info($"TcAgent {ServerVersion} started (pid {Environment.ProcessId})");
+        // the skills that apply everywhere stay current in the skill folders of the agent CLIs (copies, see Skills.Mirror) -
+        // in the background, only what changed; TCAGENT_SKILL_MIRROR=0 switches it off
+        if (Environment.GetEnvironmentVariable("TCAGENT_SKILL_MIRROR") != "0")
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try
+                {
+                    var changed = Skills.Mirror(Skills.Entries(null, Array.Empty<string>()), Skills.DefaultMirrors())
+                                        .Where(l => !l.StartsWith("unchanged") && !l.StartsWith("skipped")).ToList();
+                    if (changed.Count > 0) Log.Info("Skills mirrored: " + string.Join("; ", changed));
+                }
+                catch (Exception ex) { Log.Info("Skill mirror: " + ex.Message); }
+            });
 
         var sta = new StaWorker();
         var tools = new ToolRegistry(new TwinCatSession(sta));

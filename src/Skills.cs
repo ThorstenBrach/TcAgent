@@ -137,11 +137,15 @@ public static class Skills
                 var dst = Path.Combine(target, e.Name);
                 names.Add(e.Name);
                 if (Directory.Exists(dst) && !File.Exists(Path.Combine(dst, Marker))) { report.Add($"kept {dst} (not created by TcAgent)"); continue; }
+                // unchanged source and copy (nobody edited the copy): nothing to do
+                var sum = DirSum(src);
+                var marker = Path.Combine(dst, Marker);
+                if (File.Exists(marker) && DirSum(dst) == sum) { report.Add($"unchanged {e.Name}"); continue; }
                 if (write)
                 {
                     if (Directory.Exists(dst)) Directory.Delete(dst, true);
                     CopyDir(src, dst);
-                    File.WriteAllText(Path.Combine(dst, Marker), $"Mirrored by TcAgent from {src} - changes here are overwritten. Edit the source instead.\r\n");
+                    File.WriteAllText(marker, $"Mirrored by TcAgent from {src} - changes here are overwritten. Edit the source instead.\r\n");
                 }
                 report.Add($"{e.Name} → {dst}");
             }
@@ -154,6 +158,16 @@ public static class Skills
                     }
         }
         return report;
+    }
+
+    // checksum of a skill folder (relative paths and contents) without the marker file
+    static string DirSum(string dir)
+    {
+        using var sha = System.Security.Cryptography.SHA256.Create();
+        var sb = new StringBuilder();
+        foreach (var f in Directory.GetFiles(dir, "*", SearchOption.AllDirectories).Where(f => Path.GetFileName(f) != Marker).OrderBy(f => Path.GetRelativePath(dir, f), StringComparer.Ordinal))
+            sb.Append(Path.GetRelativePath(dir, f)).Append('\n').Append(Convert.ToHexString(sha.ComputeHash(File.ReadAllBytes(f)))).Append('\n');
+        return Convert.ToHexString(sha.ComputeHash(Encoding.UTF8.GetBytes(sb.ToString())));
     }
 
     static void CopyDir(string src, string dst)

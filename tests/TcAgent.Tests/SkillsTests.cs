@@ -92,6 +92,11 @@ public sealed class SkillsTests : IDisposable
         Assert.False(Directory.Exists(Path.Combine(target, "driver-fb")));          // platform / project skills are not mirrored
         Assert.Equal("mine", File.ReadAllText(Path.Combine(target, "code-review", "SKILL.md")));
         Assert.Contains(report, r => r.StartsWith("skipped") && r.Contains(".none"));
+        // a second run copies nothing; an edited copy is restored from the source
+        Assert.Contains("unchanged plc-debugging", Skills.Mirror(Skills.Entries(Sln, new[] { "framework-a" }), new[] { target }));
+        File.WriteAllText(Path.Combine(target, "plc-debugging", "SKILL.md"), "edited in the copy");
+        Assert.Contains(Skills.Mirror(Skills.Entries(Sln, new[] { "framework-a" }), new[] { target }), r => r.StartsWith("plc-debugging →"));
+        Assert.StartsWith("---", File.ReadAllText(Path.Combine(target, "plc-debugging", "SKILL.md")));
         // a skill that no longer applies is removed from the mirror
         KnowledgeLayers.SetDisabled(Sln, "user", "skills/plc-debugging", true);
         Skills.Mirror(Skills.Entries(Sln, new[] { "framework-a" }), new[] { target });

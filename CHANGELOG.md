@@ -5,6 +5,15 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.39.9] – 2026-10-26
+
+### Changed
+- **Skill mirror stays current by itself:** whenever the TcAgent server starts it mirrors the skills that apply everywhere
+  (built-in, company, user, team) into the skill folders of the agent CLIs, in the background. Only changed skills are
+  copied (folder checksum); a copy that was edited by hand is restored from its source. `TCAGENT_SKILL_MIRROR=0` switches
+  it off. Copies, not links: shared levels on network drives, no writes into the source by an agent, no broken links
+  after an update.
+
 ## [0.39.8] – 2026-10-26
 
 ### Fixed
