@@ -8,12 +8,15 @@ namespace TcAgent;
 
 public static class Program
 {
-    public const string ServerVersion = "0.41.4";
+    public const string ServerVersion = "0.42.0";
     public static string ClientName = "unknown";
 
     public static int Main(string[] args)
     {
         Console.InputEncoding = new UTF8Encoding(false);
+        // the settings of settings.json (levels, targets, ...) apply to every start - MCP server, command line, the windows of the
+        // extension - unless the environment sets them already (a client configuration or a pipeline wins)
+        KnowledgeLayers.ApplySettingsEnv();
         // Command line for CI pipelines (check/build/test) - without arguments: MCP server
         if (Cli.IsCommand(args)) { Console.OutputEncoding = new UTF8Encoding(false); return Cli.Run(args); }
         Mcp.Start();

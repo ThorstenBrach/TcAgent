@@ -60,6 +60,11 @@ public static partial class Cli
             }
             catch (Exception ex) when (ex is ArgumentException) { Console.Error.WriteLine(ex.Message); return Failed; }
         }
+        if (o.Sub is "settings")
+        {
+            try { Console.WriteLine("Saved in " + KnowledgeLayers.SetSetting(o.Name, o.Url) + " - run \"Set up clients\" so the AI clients get it too."); return Ok; }
+            catch (ArgumentException ex) { Console.Error.WriteLine(ex.Message); return Failed; }
+        }
         if (o.Sub is "platform")
         {
             try
@@ -152,6 +157,24 @@ public static partial class Cli
             if (st != null) e["git"] = st;
         }
         o["layers"] = layers;
+        var levels = new JsonArray();
+        void Lv(string label, string level, string root) => levels.Add(new JsonObject
+        {
+            ["label"] = label, ["level"] = level, ["root"] = root, ["git"] = KnowledgeOps.RepoOf(root) != null,
+            ["viaPullRequest"] = level is "company" || level.StartsWith("team") && KnowledgeOps.ViaPullRequest(level, root)
+        });
+        Lv("user", "user", KnowledgeLayers.UserRoot);
+        if (KnowledgeLayers.ProjectRoot(dir) is { } prj) Lv("project", "project", prj);
+        var teams = KnowledgeLayers.TeamRoots;
+        foreach (var t in teams) Lv(teams.Count > 1 ? "team · " + Path.GetFileName(t.TrimEnd('\\', '/')) : "team", teams.Count > 1 ? "team:" + Path.GetFileName(t.TrimEnd('\\', '/')) : "team", t);
+        if (KnowledgeLayers.CompanyRoot is { } co) Lv("company", "company", co);
+        foreach (var p in pi.Known) Lv("platform · " + p.Name, "platform:" + p.Name, Path.Combine(KnowledgeLayers.UserRoot, "platforms", p.Name));
+        o["levels"] = levels;
+        o["settings"] = new JsonObject
+        {
+            ["TCAGENT_COMPANY"] = Environment.GetEnvironmentVariable("TCAGENT_COMPANY"), ["TCAGENT_TEAM"] = Environment.GetEnvironmentVariable("TCAGENT_TEAM"),
+            ["TCAGENT_PLATFORMS"] = Environment.GetEnvironmentVariable("TCAGENT_PLATFORMS")
+        };
 
         // platforms: the known ones with their detection, which apply to the project and why
         o["platforms"] = new JsonArray(pi.Known.Select(d => (JsonNode)new JsonObject

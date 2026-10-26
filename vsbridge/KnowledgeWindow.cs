@@ -98,7 +98,8 @@ namespace TcAgentBridge
         readonly Button newBtn = Text("New …", "A new rule, risk rule, skill, workflow or lesson from a template"),
                         folderBtn = Text("Open folder", "Show the file in the Explorer"),
                         moveBtn = Text("Move to level …", "Move the file to another level (shared levels in Git: as a pull request)"),
-                        deleteBtn = Text("Delete", "Delete the file (own levels only; Del)");
+                        deleteBtn = Text("Delete", "Delete the file (own levels only; Del)"),
+                        levelsBtn = Text("Levels …", "Company, team and platform folders or repositories (settings.json)");
         readonly StackPanel gitPanel = new StackPanel { Margin = new Thickness(6, 0, 6, 2) };
         readonly Button open = Text("Open", "Open the file in the editor (or double-click)"), offProject = Text("Switch off for the project", "disabled.json of the project - the file stays unchanged"),
                         offUser = Text("Switch off for me", "disabled.json of your user level"), on = Text("Switch on", "Remove the entry from disabled.json (project and user)");
@@ -231,6 +232,7 @@ namespace TcAgentBridge
             open.Click += (s, e) => OpenSelected();
             levelBox.SelectionChanged += (s, e) => FillEntries();
             newBtn.Click += (s, e) => NewItem();
+            levelsBtn.Click += (s, e) => EditLevels();
             folderBtn.Click += (s, e) => OpenFolder();
             moveBtn.Click += (s, e) => MoveItem();
             deleteBtn.Click += (s, e) => DeleteItem();
@@ -289,7 +291,7 @@ namespace TcAgentBridge
             if (effectivePage != null) return effectivePage;
             var tools = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 4, 6, 4) };
             foreach (var e in new UIElement[] { kindBox, levelBox, filter, onlyApplied, TcUnitControl.Separator(), newBtn, open, folderBtn, moveBtn, deleteBtn,
-                                                TcUnitControl.Separator(), offProject, offUser, on }) tools.Children.Add(e);
+                                                TcUnitControl.Separator(), offProject, offUser, on, TcUnitControl.Separator(), levelsBtn }) tools.Children.Add(e);
             var g = new Grid();
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -589,10 +591,11 @@ namespace TcAgentBridge
             return m;
         }
 
-        // the levels a file can be created at / moved to (built-in never; company only by moving - as a pull request)
+        // the levels a file can be created at / moved to: user, project, team(s), company, every platform (built-in never);
+        // a shared level in Git gets the file in its working copy - commit and push in the Git bar (pull request)
         List<(string Label, string Level, bool Pr)> Levels(bool forNew) =>
-            Arr(data?["layers"]).Where(l => S(l, "level") is string lv && lv != "built-in" && (!forNew || !B(l, "viaPullRequest") && lv != "company"))
-                                .Select(l => (S(l, "label"), S(l, "level"), B(l, "viaPullRequest") || S(l, "level") == "company")).ToList();
+            Arr(data?.TryGetValue("levels", out var lv) == true ? lv : null)
+                .Select(l => (S(l, "label") + (B(l, "viaPullRequest") ? "  (Git: commit & push in the Git bar - pull request)" : ""), S(l, "level"), B(l, "viaPullRequest"))).ToList();
 
         void NewItem()
         {
@@ -606,6 +609,8 @@ namespace TcAgentBridge
                            ("Level", levels.Select(x => x.Label).ToArray(), levels.Any(x => x.Level == "project") ? levels.First(x => x.Level == "project").Label : levels[0].Label));
             if (r == null) return;
             var level = levels.First(x => x.Label == r[3]).Level;
+            if (levels.First(x => x.Label == r[3]).Pr)
+                status.Text = "The file goes into the working copy of the shared repository - commit and push it in the Git bar.";
             string args;
             if (r[1] == fromFile)
             {
@@ -630,6 +635,30 @@ namespace TcAgentBridge
             Load();
         }
 
+        // company, team and platform roots: settings.json "env" (TcAgent.exe reads it on every start; Set up clients passes it on)
+        void EditLevels()
+        {
+            var st = data?.TryGetValue("settings", out var so) == true ? so as Dictionary<string, object> : null;
+            var r = Prompt("Levels of the knowledge",
+                           ("Company level (TCAGENT_COMPANY): a folder, network share or Git working copy", null, S(st, "TCAGENT_COMPANY") ?? ""),
+                           ("Team level(s) (TCAGENT_TEAM): folder or Git working copy, several separated by ;", null, S(st, "TCAGENT_TEAM") ?? ""),
+                           ("Platform repositories (TCAGENT_PLATFORMS), several separated by ; - optional", null, S(st, "TCAGENT_PLATFORMS") ?? ""));
+            if (r == null) return;
+            var names = new[] { "TCAGENT_COMPANY", "TCAGENT_TEAM", "TCAGENT_PLATFORMS" };
+            var outs = new List<string>(); bool all = true;
+            for (int i = 0; i < names.Length; i++)
+                if ((r[i] ?? "").Trim() != (S(st, names[i]) ?? ""))
+                {
+                    var (ok, output) = RunCli($"knowledge settings --name {names[i]} --url {Quote(r[i].Trim())}");
+                    all &= ok; outs.Add(output);
+                }
+            if (outs.Count == 0) return;
+            Report(all, string.Join("\n", outs.Distinct()), "Levels");
+            if (all) MessageBox.Show("Saved. The knowledge window uses the new levels at once.\n\nRun \"⋯ > Set up clients\" in the chat so the AI clients get them too (and start a new chat).",
+                                     "TcAgent Knowledge", MessageBoxButton.OK, MessageBoxImage.Information);
+            Load();
+        }
+
         void OpenFolder()
         {
             var p = (entries.SelectedItem as Line)?["path"];
@@ -641,11 +670,11 @@ namespace TcAgentBridge
         void MoveItem()
         {
             if (!(entries.SelectedItem is Line l)) return;
-            var levels = Levels(false).Where(x => x.Label != S(l.D, "label")).ToList();
+            var levels = Levels(false).Where(x => !x.Label.StartsWith(S(l.D, "label") + "  ") && x.Label != S(l.D, "label")).ToList();
             if (levels.Count == 0) { status.Text = "No other level to move to."; return; }
-            var r = Prompt($"Move {S(l.D, "key")} ({S(l.D, "label")})", ("To level", levels.Select(x => x.Label + (x.Pr ? "  (pull request)" : "")).ToArray(), null));
+            var r = Prompt($"Move {S(l.D, "key")} ({S(l.D, "label")})", ("To level", levels.Select(x => x.Label).ToArray(), null));
             if (r == null) return;
-            var target = levels.First(x => r[0].StartsWith(x.Label));
+            var target = levels.First(x => x.Label == r[0]);
             var (mok, output) = RunCli($"knowledge move --path {Quote(S(l.D, "path"))} --level {Quote(target.Level)}");
             Report(mok, output, "Move");
             Load();

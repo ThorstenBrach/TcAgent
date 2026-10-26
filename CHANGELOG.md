@@ -5,6 +5,20 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.42.0] – 2026-10-26
+
+### Added
+- **Knowledge window, Levels …:** set the company level, the team level(s) and platform repositories (`TCAGENT_COMPANY`,
+  `TCAGENT_TEAM`, `TCAGENT_PLATFORMS`) - stored in `settings.json`; Set up clients passes them on to the AI clients.
+- **New / Add existing / Move offer every level:** user, project, team(s), company and every known platform (also one that
+  does not apply to the open project). A company or team level kept in Git gets the file in its working copy - commit and
+  push it in the Git bar (the push goes to a new branch for a pull request); the original of a move stays until it is merged.
+
+### Changed
+- **TcAgent.exe reads `settings.json` \"env\" on every start** (MCP server, command line, the windows of the extension) - where
+  the environment does not set a variable already (a client configuration or a pipeline wins). Before, the knowledge
+  window did not see the company and team levels the AI clients got through their configuration.
+
 ## [0.41.4] – 2026-10-26
 
 ### Added

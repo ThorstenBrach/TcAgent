@@ -48,6 +48,34 @@ public static class KnowledgeLayers
     public static string ProjectRoot(string solutionDir) => string.IsNullOrEmpty(solutionDir) ? null : Path.Combine(solutionDir, ".tcagent");
 
     static string Expand(string p) => string.IsNullOrWhiteSpace(p) ? null : Environment.ExpandEnvironmentVariables(p.Trim().Trim('"'));
+
+    // ------------------------------------------------------------------ settings.json "env"
+    static string SettingsFile => Path.Combine(UserRoot, "settings.json");
+
+    /// <summary>Sets the variables of settings.json "env" in this process where the environment does not set them already.</summary>
+    public static void ApplySettingsEnv()
+    {
+        try
+        {
+            if (!File.Exists(SettingsFile) || JsonNode.Parse(File.ReadAllText(SettingsFile))?["env"] is not JsonObject env) return;
+            foreach (var (k, v) in env)
+                if (v != null && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(k))) Environment.SetEnvironmentVariable(k, v.ToString());
+        }
+        catch { }
+    }
+
+    /// <summary>A setting of settings.json "env" (empty value removes it); also applied to this process. Returns the file.</summary>
+    public static string SetSetting(string name, string value)
+    {
+        if (string.IsNullOrWhiteSpace(name) || !Regex.IsMatch(name, "^TCAGENT_[A-Z0-9_]+$")) throw new ArgumentException("name: a TCAGENT_ setting, e.g. TCAGENT_TEAM");
+        var root = File.Exists(SettingsFile) ? JsonNode.Parse(File.ReadAllText(SettingsFile)) as JsonObject ?? new JsonObject() : new JsonObject();
+        if (root["env"] is not JsonObject env) root["env"] = env = new JsonObject();
+        if (string.IsNullOrWhiteSpace(value)) env.Remove(name); else env[name] = value.Trim();
+        Directory.CreateDirectory(UserRoot);
+        File.WriteAllText(SettingsFile, root.ToJsonString(new JsonSerializerOptions { WriteIndented = true }), new UTF8Encoding(false));
+        Environment.SetEnvironmentVariable(name, string.IsNullOrWhiteSpace(value) ? null : value.Trim());
+        return SettingsFile;
+    }
     static IEnumerable<string> ExpandList(string v) => (v ?? "").Split(';').Select(Expand).Where(x => x != null);
 
     public sealed record Layer(string Level, string Platform, string Root, int Rank)

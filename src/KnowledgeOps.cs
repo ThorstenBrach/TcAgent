@@ -1,9 +1,11 @@
 // Changes to the knowledge files from the knowledge manager window (TcAgent.exe knowledge new|move|delete|git ...):
 //
-//   new     a rule, risk rule, skill, workflow or lesson from a template at a level (the window opens it in the editor)
-//   move    to another level: own levels directly (moving up checks the text for names of this computer, user, solution
-//           and projects and the privateTerms); a shared level kept in Git (company, a team in Git) as a commit on a new
-//           branch for a pull request - the original stays until the pull request is merged
+//   new     a rule, risk rule, skill, workflow or lesson from a template - or an existing file - at a level (the window
+//           opens it in the editor); company and team levels kept in Git get it in their working copy (Git bar: commit, push
+//           to a new branch for a pull request)
+//   move    to another level (moving up checks the text for names of this computer, user, solution and projects and the
+//           privateTerms); into a shared level kept in Git as a copy in its working copy - the original stays until the pull
+//           request is merged
 //   delete  only on own levels (user, project, the user's platform folders, a team folder without Git); built-in and
 //           company files are switched off instead (disabled.json)
 //   git     per level kept in a Git repository: branch, local changes, commits behind/ahead (as of the last fetch);
@@ -61,8 +63,8 @@ public static class KnowledgeOps
         kind = (kind ?? "").Trim().ToLowerInvariant();
         if (!NewKinds.Contains(kind)) throw new ArgumentException("kind: " + string.Join(", ", NewKinds));
         var root = RootOf(solutionDir, level);
-        if (ViaPullRequest(level, root) || level.Equals("built-in", StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException($"the {level} level is shared - create the file at user or project level and move it up (pull request)");
+        if (level.Equals("built-in", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("the built-in level comes with TcAgent - create the file at another level");
+        // company / team in Git: the file goes into the working copy - commit and push it in the Git bar (a new branch for a pull request)
         // "Valve Commissioning" -> valve-commissioning (the name rules of the Agent Skills standard)
         string slug = kind is "skills" or "workflows" ? Skills.ValidateName(KnowledgeLayers.Slug(name)) : KnowledgeLayers.Slug(name);
         string file, text;
@@ -105,8 +107,7 @@ public static class KnowledgeOps
         kind = (kind ?? "").Trim().ToLowerInvariant();
         if (!NewKinds.Contains(kind)) throw new ArgumentException("kind: " + string.Join(", ", NewKinds));
         var root = RootOf(solutionDir, level);
-        if (ViaPullRequest(level, root) || level.Equals("built-in", StringComparison.OrdinalIgnoreCase))
-            throw new ArgumentException($"the {level} level is shared - add the file at user or project level and move it up (pull request)");
+        if (level.Equals("built-in", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("the built-in level comes with TcAgent - add the file at another level");
         source = Path.GetFullPath(source ?? throw new ArgumentException("--path is required"));
         if (kind is "skills" or "workflows")
         {
@@ -172,12 +173,13 @@ public static class KnowledgeOps
             var found = Improver.Specifics(string.Join("\n", texts), Improver.PrivateTerms(solutionDir));
             if (found.Count > 0 && from.Level == "project") throw new ArgumentException($"it names {string.Join(", ", found)} - make it general first");
         }
-        if (ViaPullRequest(level, root))
-            return Sources.CommitForPullRequest(RepoOf(root) ?? root, item, target, $"Add {Path.GetRelativePath(root, target).Replace('\\', '/')}") +
-                   " The original stays where it is until the pull request is merged.";
         if (Directory.Exists(item)) CopyDir(item, target);
         else { Directory.CreateDirectory(Path.GetDirectoryName(target)!); File.Copy(item, target); }
         // built-in and shared files stay (the copy on the new level replaces them by name); own files are moved
+        // into a shared level kept in Git: a copy in its working copy - the user commits and pushes it (Git bar: a new branch for a
+        // pull request); the original stays until the pull request is merged
+        if (ViaPullRequest(level, root))
+            return $"Copied into the working copy of the {level} repository: {target} - commit and push it in the Git bar (the push goes to a new branch for a pull request). The original stays until the pull request is merged.";
         if (Deletable(from)) { if (Directory.Exists(item)) Directory.Delete(item, true); else File.Delete(item); return $"Moved to {target}"; }
         return $"Copied to {target} (the {from.Label} file stays; the copy replaces it by name)";
     }
