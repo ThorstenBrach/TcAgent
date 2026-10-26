@@ -26,3 +26,4 @@ vsbridge/tcagent/
 # Local working notes (overall plan)
 PLAN.md
 vsbridge/bin-xaeshell/
+.plan/
