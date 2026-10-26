@@ -286,6 +286,11 @@ gets and where it comes from:
   files from a source or a shared repository stay untouched and can still be updated.
 - Removing or changing files of a shared repository goes the same way as every change there: as a pull request.
   `locked` files can only be changed by their owner.
+- **Overview (start page):** KPI tiles with a sparkline and the change against the previous period – runs,
+  first-time-right (a run without a failed check and without a user correction), failed checks per run, corrections per
+  run, minutes per run, gate stops; a table of all workflows (runs, trend, current value, change, proposals); open
+  improvement proposals; the most frequent causes of failed checks; counts of rules, skills, workflows and lessons.
+  A click on a workflow opens its history.
 - **History view:** the metrics of the run logs over the runs (failed checks, user corrections, minutes per run,
   moving average) per workflow, every adopted change as a marker, a reverted change as a shaded range, and a list of the
   changes with before / after values over the following 10 runs. Open proposals can be reviewed from there; export as CSV.
