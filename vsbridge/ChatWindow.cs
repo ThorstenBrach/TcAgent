@@ -719,6 +719,9 @@ namespace TcAgentBridge
             sb.AppendLine("You are working in a TwinCAT 3 project (Visual Studio). Use the MCP tools of the \"tcagent\" server (tc_*, ads_*) " +
                           "and follow the TcAgent guide (AGENTS.md, or the twincat-tcagent skill). " +
                           "Answer concisely, in the language of the user's request; name changed objects with their tree path. Before writing code for the first time, call tc_coding_rules once and follow the rules. " + buildRule);
+            // the user decides about code changes: an error found on the way to something else is reported, not silently fixed
+            sb.AppendLine("Change code only when the user asked for a change. If the request is something else (activate, run tests, go online, explain, check) and you find " +
+                          "compiler errors or other problems on the way, report them and ask with tc_ask_user whether to fix them - do not fix them on your own.");
             // tc_ask_user shows a question card in this window - for every backend
             sb.AppendLine("If you need a decision or missing information from the user before you can go on, ask with the tcagent tool tc_ask_user " +
                           "(2-4 short options; the user can also type a free answer) instead of ending your answer with a question. Do not ask about things you can find out with the tools.");

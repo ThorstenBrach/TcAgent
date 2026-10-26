@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.39.6] – 2026-10-26
+
+### Changed
+- **Code changes only when asked:** asked to activate, an agent found the compiler error with its own `tc_check` and fixed
+  it without asking (the gate never came into play). The chat prompt and the TcAgent guide now say: change code only when
+  the user asked for a change; errors found on the way to something else are reported and the user is asked.
+
 ## [0.39.5] – 2026-10-26
 
 ### Changed

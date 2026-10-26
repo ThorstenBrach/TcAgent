@@ -50,6 +50,9 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
    generating code and is much faster, so fix the errors with checks and build once (several failed builds cost time).
    If `tc_activate` refuses because of build errors, show the errors and **ask before changing any code** - the user asked
    for an activation, not for a code change.
+   **Change code only when the user asked for a change.** If the request is something else (activate, run tests, go
+   online, explain, check) and you find compiler errors or other problems on the way, report them and ask
+   (`tc_ask_user`: fix them / leave them) - do not fix them on your own.
 6. **Save:** `tc_save`. Otherwise tool changes exist only in the IDE, not on disk/in Git.
 7. **Tests:** `tc_test_run` runs TcUnit tests: `action=list` shows the suites and tests of the code, `tests=` selects
    (instance `MAIN.fbMotor`, suite type, `MAIN.fbMotor@Test` or test name; empty = all) - build/activation only if the
