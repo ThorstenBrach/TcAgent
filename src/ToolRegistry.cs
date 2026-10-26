@@ -524,8 +524,23 @@ public sealed partial class ToolRegistry
         if (Str(a, "tests") is string tests) o.Tests.Add(tests);
         if (Int(a, "timeout", 0) is int sec && sec > 0) o.Timeout = TimeSpan.FromSeconds(Math.Max(10, sec));
         var steps = new List<string>();
-        var run = new TcUnitRun(tc, e => { if ((string)e["event"] == "step") steps.Add((string)e["text"]); });
-        var rc = run.Run(o);
+        // the TcUnit Tests window of this IDE shows the run live (progress, results) - as if it had started it itself
+        int pid = tc.AttachedPid;
+        var toWindow = new System.Collections.Concurrent.BlockingCollection<string>();
+        var forward = System.Threading.Tasks.Task.Run(() =>
+        {
+            bool ok = BridgeClient.Available(pid);
+            foreach (var ev in toWindow.GetConsumingEnumerable())
+                if (ok) try { BridgeClient.Call(pid, "tcunit_event", new JsonObject { ["ev"] = ev }, 5000); } catch { ok = false; }   // an older bridge: stop trying
+        });
+        var run = new TcUnitRun(tc, e =>
+        {
+            if ((string)e["event"] == "step") steps.Add((string)e["text"]);
+            toWindow.Add(e.ToJsonString());
+        });
+        int rc;
+        try { rc = run.Run(o); }
+        finally { toWindow.CompleteAdding(); forward.Wait(10_000); }
         var res = new StringBuilder(run.Summary).AppendLine();
         foreach (var g in run.Results.Where(r => r.Selected || r.Status != "skipped").GroupBy(r => r.Instance))
         {

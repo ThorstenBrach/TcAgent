@@ -466,6 +466,7 @@ namespace TcAgentBridge
                     discovering = false;
                     if (err != null) status.Text = "tcunit list failed: " + err;
                     else try { Load(json); } catch (Exception ex) { status.Text = "Test list not readable: " + ex.Message; }
+                    if (externalQueue.Count > 0 && suites.Count > 0) FlushExternal();   // a run from the chat that started meanwhile
                     if (rediscover) { rediscover = false; Discover(); }
                 }));
             });
@@ -1059,6 +1060,48 @@ namespace TcAgentBridge
                 Rebuild();
             }
             return t;
+        }
+
+        // ------------------------------------------------------------------ runs started elsewhere (tc_test_run in the chat)
+        readonly List<Dictionary<string, object>> externalQueue = new List<Dictionary<string, object>>();
+        bool externalRun;
+
+        /// <summary>An event of a run started by an AI client (TcAgentBridge command tcunit_event). Call on the UI thread.</summary>
+        internal void External(string json)
+        {
+            Dictionary<string, object> ev;
+            try { ev = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(json); } catch { return; }
+            if (ev == null || running != null) return;            // a run of this window itself has the runtime - nothing else runs
+            // the list is not read yet (window just opened): keep the events until it is
+            if (discovering || suites.Count == 0)
+            {
+                externalQueue.Add(ev);
+                if (!discovering) Discover();
+                return;
+            }
+            FlushExternal();
+            ExternalEvent(ev);
+        }
+
+        void FlushExternal()
+        {
+            var q = externalQueue.ToList();
+            externalQueue.Clear();
+            foreach (var e in q) ExternalEvent(e);
+        }
+
+        void ExternalEvent(Dictionary<string, object> ev)
+        {
+            if (!externalRun && S(ev, "event") != "done")
+            {
+                externalRun = true;
+                runStarted = DateTime.Now; expected = 0; runTotal = 0; runFinished.Clear();
+                SetRunning(true);
+                cancel.IsEnabled = false;                             // the run belongs to the AI client: it is stopped there
+                Progress("Run started from the chat ...", 0, 1);
+            }
+            OnEvent(ev);
+            if (S(ev, "event") == "done") { externalRun = false; SetRunning(false); gotDone = false; UpdateCounters(); }
         }
 
         void OnEvent(Dictionary<string, object> ev)

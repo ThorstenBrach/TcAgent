@@ -328,6 +328,8 @@ allows no external resources (Content-Security-Policy).
 
 ## 9. Without the window
 
+A run started by the AI agent in the chat (`tc_test_run`) is shown live in the window as well – progress, results and the final state, as if it had been started there (the window opens without taking the focus). Cancel it in the chat (Stop).
+
 - `TcAgent.exe tcunit list --solution <sln> [--plc <name>]` – the tests from the code as JSON: projects, suites,
   instances, tests with file, line, description, test case text (`details`) and the paths of the enable bools. No IDE
   needed.

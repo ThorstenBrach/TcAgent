@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.39.4] – 2026-10-26
+
+### Fixed
+- **TcUnit Tests window and runs from the chat:** a run started by an AI client (`tc_test_run`) was not shown in the
+  window. TcAgent now forwards every event of the run to the window of this IDE (TcAgentBridge command `tcunit_event`):
+  progress, running test, results and the final state appear live, as for a run started in the window; the window opens
+  without taking the focus if it was closed. Cancel stays with the AI client.
+
 ## [0.39.3] – 2026-10-26
 
 ### Added
