@@ -15,6 +15,7 @@
     <Compile Include="..\..\src\TcUnitDiscovery.cs" Link="src\TcUnitDiscovery.cs" />
     <Compile Include="..\..\src\Guards.cs" Link="src\Guards.cs" />
     <Compile Include="..\..\src\AskQuestions.cs" Link="src\AskQuestions.cs" />
+    <Compile Include="..\..\src\KnowledgeLayers.cs" Link="src\KnowledgeLayers.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

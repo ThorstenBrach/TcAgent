@@ -5,6 +5,34 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.30.0] – 2026-10-26
+
+Knowledge layers ([KNOWLEDGE_LAYERS.md](docs/KNOWLEDGE_LAYERS.md)): one scheme for coding rules, risk rules, lessons,
+knowledge sources and documentation templates.
+
+### Added
+- **Levels × platform**: company (`TCAGENT_COMPANY` – a network share or Git repository), user (`%LOCALAPPDATA%\TcAgent`),
+  **platform** (the automation framework a project is built on: `<company or user>\platforms\<name>\`, or a repository of
+  its own in `TCAGENT_PLATFORMS`) and project (`<solution>\.tcagent`). Order: company → user → company·platform →
+  user·platform → project, the later one wins.
+- **Platform of a project**: `.tcagent\config.json` `{"platforms": [...]}`, otherwise detected from the referenced
+  libraries or terms listed in the platform's `platform.md`. Ambiguous → `tc_coding_rules` tells the agent to ask the user
+  (`tc_ask_user`) and to store the answer (`tc_knowledge action=set_platform`).
+- **One file per topic / lesson**: `coding-rules\<topic>.md`, `risk-rules\<topic>.md`, `lessons\<date>-<title>.md` (new
+  lessons and new rules are written this way – no merge conflicts in Git); the former single files are still read.
+- **Front matter in the Agent Skills format** with TcAgent's fields under `metadata`: `tcagent-locked` (a later level can
+  neither replace nor switch off the file), `tcagent-force` (a user file stays against a platform file).
+  `tc_coding_rules_add force=true` writes it – after the agent pointed out the contradiction and the user confirmed.
+- **`disabled.json`** per level switches files off without changing them.
+- **`tc_knowledge`**: `platforms`, `set_platform`, `list`, `effective` (what applies here and why), `why`, `disable` /
+  `enable`, `split` (a former single file → one file per topic, after asking). Tests: `KnowledgeLayersTests`.
+- Lessons: new scope `platform:<name>`; `tc_coding_rules_add scope=platform:<name>`.
+
+### Changed
+- `tc_coding_rules` shows the level of every rule file (company, user, platform, project; locked, forced) and the
+  platform of the project.
+- Knowledge sources and documentation templates also come from the company and platform levels.
+
 ## [0.29.0] – 2026-10-26
 
 Client neutrality, part 1 – TcAgent works the same with every AI client (concept: `docs/KNOWLEDGE_LAYERS.md`).

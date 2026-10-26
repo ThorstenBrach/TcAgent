@@ -348,16 +348,29 @@ formatting).
 
 ### Where the rules come from
 
-TcAgent reads Markdown files in this order and concatenates them. Later sources take precedence on conflicts:
+TcAgent reads Markdown files from several levels – one file per topic in a folder `coding-rules\` (the former single
+file `coding-rules.md` is read too) – and concatenates them. Later levels take precedence on conflicts:
 
-| # | Source | Applies to |
-|---|---|---|
-| 1 | `TCAGENT_RULES` (files/folders, `;`-separated, for example on a network share) | company / department |
-| 2 | `%LOCALAPPDATA%\TcAgent\coding-rules.md` and `coding-rules\*.md` | you personally, every solution |
-| 3 | `<solution>\.tcagent\coding-rules.md` and `coding-rules\*.md` | this solution – shared via Git (the folder for further files, for example one per topic) |
+| # | Level | Folder | Applies to |
+|---|---|---|---|
+| 1 | company | `TCAGENT_COMPANY\coding-rules\` (a network share or Git repository; `TCAGENT_RULES` still works) | every project of the company |
+| 2 | user | `%LOCALAPPDATA%\TcAgent\coding-rules\` | you personally, every solution |
+| 3 | platform | `<company or user>\platforms\<name>\coding-rules\` | every project built on that automation framework |
+| 4 | project | `<solution>\.tcagent\coding-rules\` | this solution – shared via Git |
 
-Overall precedence: your explicit instruction in the chat > project rules > personal rules > company standard. If a
-rule contradicts your request, the agent points it out briefly and follows you.
+- A later level **replaces** a file with the same name (`naming.md` of the project replaces `naming.md` of the
+  platform); files with different names all apply.
+- The **platform** of a project comes from `.tcagent\config.json` or is detected from its libraries; if that is
+  ambiguous, the agent asks you and stores the answer.
+- A file marked `tcagent-locked` (for example the mandatory naming rules of a framework) cannot be replaced or switched
+  off by a later level. A personal file marked `tcagent-force` stays even against a platform file – the agent asks you
+  before it adds such a rule.
+- `tc_knowledge` shows which file applies and why (*"Which coding rules apply here?"*), switches a file off for you or
+  the project without changing it, and splits a former single file into one file per topic.
+  Details: [KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md).
+
+Overall precedence: your explicit instruction in the chat > project rules > platform rules > personal rules > company
+standard. If a rule contradicts your request, the agent points it out briefly and follows you.
 
 Start from the template [coding-rules.example.md](coding-rules.example.md) (prefixes like `FB_`, `ST_`, `E_`, `b`/`n`/`f`
 type prefixes, `///` header comments, `CASE` over an enum, TcUnit suite per FB …). Keep it short – every rule costs
@@ -1696,7 +1709,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 90 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 91 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|

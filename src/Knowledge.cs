@@ -58,7 +58,13 @@ public static class Knowledge
         if (Directory.Exists(Path.Combine(Root, "docs"))) folders.Add(Path.Combine(Root, "docs"));
         var entries = new List<string>();
         foreach (var e in (Environment.GetEnvironmentVariable("TCAGENT_KNOWLEDGE") ?? "").Split(';')) entries.Add(e);
-        foreach (var f in new[] { ListFile(null, "personal"), string.IsNullOrEmpty(solutionDir) ? null : ListFile(solutionDir, "project") })
+        // company and platform levels (KnowledgeLayers.cs): their knowledge\ folder and knowledge.md list; the platforms
+        // only of the project's platform (e.g. the manuals of the automation framework it is built on)
+        var shared = KnowledgeLayers.Layers(solutionDir, KnowledgeLayers.Platforms(solutionDir).Active)
+                                    .Where(l => l.Level == "company" || l.Platform != null).ToList();
+        foreach (var l in shared) if (Directory.Exists(Path.Combine(l.Root, "knowledge"))) folders.Add(Path.Combine(l.Root, "knowledge"));
+        foreach (var f in shared.Select(l => Path.Combine(l.Root, "knowledge.md"))
+                                .Concat(new[] { ListFile(null, "personal"), string.IsNullOrEmpty(solutionDir) ? null : ListFile(solutionDir, "project") }))
         {
             if (f == null || !File.Exists(f)) continue;
             lists.Add(f);

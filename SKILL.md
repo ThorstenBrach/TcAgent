@@ -87,14 +87,21 @@ Two different things - do not mix them up:
 - **Coding rules** describe what the PLC code itself must look like (names, comments, structure, formatting).
   They are Markdown files that TcAgent reads and returns with `tc_coding_rules`. `tc_refactor` and `tc_sfc` (step comments) follow them too.
 
-**Sources** - TcAgent reads them in this order and concatenates them; later sources appear further down and
-**take precedence** on conflicts:
+**Sources** - levels × platform (docs/KNOWLEDGE_LAYERS.md); one file per topic in `coding-rules\`, the former single
+file `coding-rules.md` too; later levels appear further down and **take precedence** on conflicts:
 
-| # | Source | Scope | Typical content |
-|---|--------|-------|-----------------|
-| 1 | `TCAGENT_RULES` (environment variable, files/folders separated by `;`, e.g. on a network drive) | company / department | company standard |
-| 2 | `%LOCALAPPDATA%\TcAgent\coding-rules.md` and `coding-rules\*.md` | this user, **every** solution | personal style, e.g. "`///` comments above the variable, in English" |
-| 3 | `<Solution folder>\.tcagent\coding-rules.md` and `coding-rules\*.md` (further files, e.g. one per topic) | this solution, versioned in Git | project / customer conventions for the whole team and the pipeline |
+| # | Level | Folder | Typical content |
+|---|-------|--------|-----------------|
+| 1 | company | `TCAGENT_COMPANY\coding-rules\` (or `TCAGENT_RULES`) | company standard |
+| 2 | user | `%LOCALAPPDATA%\TcAgent\coding-rules\` | personal style, e.g. "`///` comments above the variable, in English" |
+| 3 | platform | `<company or user>\platforms\<name>\coding-rules\` | rules of the automation framework the project is built on |
+| 4 | project | `<Solution folder>\.tcagent\coding-rules\` | project / customer conventions for the team and the pipeline (Git) |
+
+- A later level replaces a file with the same name; `tcagent-locked` files cannot be replaced; a user file with
+  `tcagent-force` stays against a platform file. Each file in `tc_coding_rules` shows its level.
+- **Platform unclear** (`tc_coding_rules` / `tc_knowledge action=platforms` say "PLATFORM UNCLEAR"): ask the user with
+  `tc_ask_user` which framework the project is built on, then `tc_knowledge action=set_platform platforms=<name>`.
+- "Which rules apply here / why does X apply?": `tc_knowledge action=effective` or `action=why name=<file>`.
 
 Why project rules live in the solution folder: they travel with the project (Git), every team member, agent and CI run
 gets the same rules without local setup, and different projects (customer A, own library) can have different
@@ -116,8 +123,11 @@ says otherwise. If a rule contradicts the user's request, point it out briefly a
 - When the user says "remember ...", "from now on always ...", "this is how I want it" or corrects the same thing twice.
 - Phrase it as ONE general, unambiguous sentence with an example if needed
   (e.g. `Internal variables start with _ (e.g. _nState).`), not as a note about the current object.
-- `scope=personal` = only this user, all solutions; `scope=project` (default) = this solution, for the team (Git).
-  If it is unclear whether the user means "always" or "in this project", ask briefly.
+- `scope=personal` = only this user, all solutions; `scope=project` (default) = this solution, for the team (Git);
+  `scope=platform:<name>` = this user's rules for that framework. If it is unclear whether the user means "always" or
+  "in this project", ask briefly.
+- If the new rule contradicts a company or platform rule: tell the user which one and ask with `tc_ask_user` whether
+  they want it anyway; only then add it with `scope=personal force=true` (a locked rule cannot be overridden).
 - `dryRun=true` shows the entry first; tell the user in one sentence what you added and to which file.
   Existing rules are never changed or removed by TcAgent - the user edits the file for that.
 - Never put passwords, customer secrets or temporary task notes into rule files.

@@ -148,6 +148,20 @@ Store (`TCAGENT_FEEDBACK`): not set = `<install>\..\..\feedback\feedback.jsonl` 
 | `version` | string |  | resolve: TcAgent version with the fix |
 | `max` | integer |  | list: max. entries (default 200) |
 
+### `tc_knowledge`
+
+The knowledge the agent gets and where it comes from – levels company (`TCAGENT_COMPANY`), user (`%LOCALAPPDATA%\TcAgent`), project (`<solution>\.tcagent`) and the **platform** (automation framework) of the project ([KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md)). The platform comes from `.tcagent\config.json` or is detected from the referenced libraries / terms listed in a platform's `platform.md`; if several match, the agent asks the user (`tc_ask_user`) and stores the answer. Per kind, one file per topic (`coding-rules\<name>.md`, `lessons\<file>.md` …) and the former single files; a later level replaces a rule file with the same name, `tcagent-locked` files cannot be replaced or switched off, a user file with `tcagent-force` stays against a platform file, `disabled.json` switches files off without changing them.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | `platforms`, `set_platform`, `list`, `effective`, `why`, `disable`, `enable` or `split` |
+| `kind` | string |  | list/split: `coding-rules`, `risk-rules`, `lessons` or `doc-templates` (list: default all) |
+| `platforms` | string |  | set_platform: comma-separated names or `none` |
+| `name` | string |  | why: file name, e.g. `naming` or `coding-rules/naming` |
+| `key` | string |  | disable/enable: `<kind>/<name>` |
+| `scope` | string |  | disable/enable/split: `project` (default) or `user` |
+| `dryRun` | boolean |  | split: only show the files |
+
 ### `tc_ask_user`
 
 Asks the user when a decision or missing information blocks the work: 1-4 questions, each with 2-4 options (recommended option first, with a short description); the user can always answer in free text. Works in every AI client: from the TcAgent Chat a question card in the chat window of the IDE; in other clients the client's own question dialog (MCP elicitation), with the card in the IDE as fallback. Without any channel the agent is told to ask in its reply instead. Returns the answers per question; a skipped question is reported as such - the agent must not invent an answer.

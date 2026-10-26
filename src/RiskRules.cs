@@ -56,29 +56,15 @@ public sealed class RiskConfig
     public static readonly string[] Kinds = { "PROGRAM", "FUNCTION_BLOCK", "FUNCTION", "METHOD", "PROPERTY", "ACTION", "TRANSITION", "INTERFACE", "DUT", "GVL" };
 
     // ------------------------------------------------------------------ files
-    public static List<string> Files(string solutionDir)
-    {
-        var files = new List<string>();
-        void AddPath(string p)
-        {
-            if (string.IsNullOrWhiteSpace(p)) return;
-            p = Environment.ExpandEnvironmentVariables(p.Trim());
-            if (Directory.Exists(p)) files.AddRange(Directory.GetFiles(p, "*.md").OrderBy(x => x, StringComparer.OrdinalIgnoreCase));
-            else if (File.Exists(p)) files.Add(p);
-        }
-        foreach (var p in (Environment.GetEnvironmentVariable("TCAGENT_RISK_RULES") ?? "").Split(';')) AddPath(p);
-        AddPath(PersonalFile);
-        AddPath(Path.Combine(Path.GetDirectoryName(PersonalFile)!, "risk-rules"));
-        if (!string.IsNullOrEmpty(solutionDir))
-        {
-            AddPath(Path.Combine(solutionDir, ".tcagent", "risk-rules.md"));
-            AddPath(Path.Combine(solutionDir, ".tcagent", "risk-rules"));
-        }
-        return files.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
-    }
+    // levels and platforms like the coding rules (KnowledgeLayers.cs): company (TCAGENT_COMPANY, TCAGENT_RISK_RULES), user,
+    // platform, project - risk-rules\<topic>.md and the former single file risk-rules.md; same name = the later level replaces it
+    public static List<KnowledgeLayers.Entry> Entries(string solutionDir) =>
+        KnowledgeLayers.Resolve("risk-rules", solutionDir, KnowledgeLayers.Platforms(solutionDir).Active, replaceByName: true,
+                                (Environment.GetEnvironmentVariable("TCAGENT_RISK_RULES") ?? "").Split(';'));
 
-    public static string PersonalFile =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "risk-rules.md");
+    public static List<string> Files(string solutionDir) => Entries(solutionDir).Where(e => e.Active).Select(e => e.Path).ToList();
+
+    public static string PersonalFile => Path.Combine(KnowledgeLayers.UserRoot, "risk-rules.md");
 
     public static string TargetFile(string solutionDir, string scope) =>
         string.Equals(scope, "personal", StringComparison.OrdinalIgnoreCase) || string.IsNullOrEmpty(solutionDir)
@@ -96,7 +82,7 @@ public sealed class RiskConfig
             string text;
             try { text = File.ReadAllText(f); } catch (Exception ex) { c.Errors.Add($"{f}: not readable ({ex.Message})"); continue; }
             c.Sources.Add(f);
-            c.Parse(text, f);
+            c.Parse(KnowledgeLayers.ParseFrontMatter(text).Body, f);
         }
         return c;
     }

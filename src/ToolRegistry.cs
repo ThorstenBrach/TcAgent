@@ -71,14 +71,17 @@ public sealed partial class ToolRegistry
 
         Add("tc_coding_rules_add", "Adds a rule to the coding guidelines - when the user says 'remember ...', 'from now on always ...', " +
                                    "'this is how I want it'. Phrase the rule itself concisely, unambiguously and generally (one sentence, with an example " +
-                                   "if needed), tell the user and add it. Applies immediately and to all future sessions/agents.",
+                                   "if needed), tell the user and add it. Applies immediately and to all future sessions/agents. Before adding: compare it " +
+                                   "with the current rules (tc_coding_rules) - if it contradicts a platform or company rule, tell the user which one and ask " +
+                                   "with tc_ask_user whether they want it anyway; only then add it with scope=personal and force=true (a locked rule cannot be overridden).",
             Schema(Req(P("rule", "string", "the rule as one sentence, e.g. 'Internal variables start with _ (e.g. _nState).'")),
-                   P("scope", "string", "project (default: Solution\\.tcagent\\coding-rules.md, in Git for the team) or personal (this user only)"),
-                   P("section", "string", "Heading under which the rule is placed, e.g. Names, Structure, Formatting (default: Additions)"),
+                   P("scope", "string", "project (default: Solution\\.tcagent\\coding-rules\\, in Git for the team), personal (this user only) or platform:<name> (this user's rules for that platform)"),
+                   P("section", "string", "Topic = file name, e.g. Names, Structure, Formatting (default: Additions)"),
+                   P("force", "boolean", "personal: keep this rule even against a platform rule (only after the user confirmed it)"),
                    P("dryRun", "boolean", "Only show what would be added")),
             a =>
             {
-                var (file, res) = CodingRules.Add(SolutionDir(), Str(a, "scope"), Str(a, "rule"), Str(a, "section"), DryRun(a));
+                var (file, res) = CodingRules.Add(SolutionDir(), Str(a, "scope"), Str(a, "rule"), Str(a, "section"), DryRun(a), Bool(a, "force", false));
                 rulesSeen = true;
                 return $"{res}\nFile: {file}";
             });
@@ -201,6 +204,7 @@ public sealed partial class ToolRegistry
         RegisterLibraryInventory();
         RegisterPlainText();
         RegisterAskUser();
+        RegisterKnowledge();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +

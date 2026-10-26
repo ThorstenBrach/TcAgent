@@ -40,16 +40,29 @@ public static class Lessons
         }
     }
 
-    static string Personal => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "lessons.md");
     static string Team => Environment.GetEnvironmentVariable("TCAGENT_LESSONS") is { Length: > 0 } t ? Environment.ExpandEnvironmentVariables(t.Trim().Trim('"')) : null;
-    static string ProjectFile(string solutionDir) => string.IsNullOrEmpty(solutionDir) ? null : Path.Combine(solutionDir, ".tcagent", "lessons.md");
 
-    public static string FileFor(string solutionDir, string scope) => (scope ?? "").ToLowerInvariant() switch
+    // Levels and platforms (KnowledgeLayers.cs): every level has the folder lessons\ (one file per lesson - no merge conflicts
+    // when several people or agents add lessons) and the former single file lessons.md. TCAGENT_LESSONS: a team file or folder.
+    //   scope project → <Solution>\.tcagent\lessons\     personal → %LOCALAPPDATA%\TcAgent\lessons\
+    //   platform:<name> → %LOCALAPPDATA%\TcAgent\platforms\<name>\lessons\     team → TCAGENT_LESSONS
+    // Company and company platform levels are shared: lessons go there by promoting them (pull request), not directly.
+    static string ScopeOf(KnowledgeLayers.Layer l) =>
+        l.Platform != null ? "platform:" + l.Platform + (l.Level == "user" ? "" : " (company)") : l.Level == "user" ? "personal" : l.Level;
+
+    /// <summary>The folder (one file per lesson) or - for a team file - the file a new lesson of this scope goes to.</summary>
+    public static string FileFor(string solutionDir, string scope)
     {
-        "personal" or "general" => Personal,
-        "team" => Team ?? throw new Exception("scope=team needs the environment variable TCAGENT_LESSONS (path of the team file)"),
-        _ => ProjectFile(solutionDir) ?? Personal
-    };
+        var s = (scope ?? "").Trim();
+        switch (s.ToLowerInvariant())
+        {
+            case "personal": case "general": return Path.Combine(KnowledgeLayers.UserRoot, "lessons");
+            case "team": return Team ?? throw new Exception("scope=team needs the environment variable TCAGENT_LESSONS (team file or folder)");
+            case "company": throw new Exception("The company level is shared: save the lesson with scope=personal or project and promote it (tc_knowledge).");
+        }
+        if (s.StartsWith("platform:", StringComparison.OrdinalIgnoreCase)) return Path.Combine(KnowledgeLayers.UserRoot, "platforms", s[9..].Trim(), "lessons");
+        return KnowledgeLayers.ProjectRoot(solutionDir) is { } p ? Path.Combine(p, "lessons") : Path.Combine(KnowledgeLayers.UserRoot, "lessons");
+    }
 
     // ------------------------------------------------------------------ read
     static readonly object gate = new();
@@ -58,8 +71,15 @@ public static class Lessons
     public static List<Lesson> All(string solutionDir)
     {
         var list = new List<Lesson>();
-        foreach (var (file, scope) in new[] { (ProjectFile(solutionDir), "project"), (Personal, "personal"), (Team, "team") })
-            if (file != null) list.AddRange(Load(file, scope));
+        // project first: its lessons are the most specific (search ranks equal scores in this order)
+        var entries = KnowledgeLayers.Resolve("lessons", solutionDir, KnowledgeLayers.Platforms(solutionDir).Active, replaceByName: false)
+                                     .Where(e => e.Active).OrderByDescending(e => e.Layer.Rank);
+        foreach (var e in entries) list.AddRange(Load(e.Path, ScopeOf(e.Layer)));
+        if (Team is { } t)
+        {
+            if (Directory.Exists(t)) foreach (var f in Directory.GetFiles(t, "*.md")) list.AddRange(Load(f, "team"));
+            else list.AddRange(Load(t, "team"));
+        }
         return list;
     }
 
@@ -224,19 +244,24 @@ public static class Lessons
                                 ". symptom = what exactly happened (error text/code, behaviour), cause = why it happens (explanation, background; " +
                                 "'unclear' if not known), solution = exactly what fixed it (steps, values, code).");
         var scope = S("scope").Length > 0 ? S("scope").ToLowerInvariant() : "project";
-        var file = FileFor(solutionDir, scope);
+        var target = FileFor(solutionDir, scope);
+        // a folder (lessons\): one file per lesson; a team file of an older setup: one section per lesson as before
+        bool folder = !target.EndsWith(".md", StringComparison.OrdinalIgnoreCase);
         var all = All(solutionDir);
         var replace = S("id");
         Lesson old = replace.Length > 0 ? all.FirstOrDefault(l => l.Id.Equals(replace, StringComparison.OrdinalIgnoreCase))
                                          : all.FirstOrDefault(l => l.Title.Equals(title, StringComparison.OrdinalIgnoreCase));
         if (replace.Length > 0 && old == null) throw new Exception($"Lesson {replace} not found");
-        if (old != null && old.File != file)
-        {
-            if (replace.Length > 0) file = old.File;       // update in its own file
-            else old = null;                               // same title in another scope: a new lesson in this file (own id)
-        }
+        bool sameLevel(Lesson l) => folder ? Path.GetDirectoryName(l.File)!.Equals(target.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) : l.File == target;
+        if (old != null && !sameLevel(old) && replace.Length == 0) old = null;   // same title in another scope: a new lesson here (own id)
         var id = old?.Id ?? $"L{DateTime.Now:yyyyMMdd-HHmmss}";
         for (int n = 2; old == null && all.Any(l => l.Id.Equals(id, StringComparison.OrdinalIgnoreCase)); n++) id = $"L{DateTime.Now:yyyyMMdd-HHmmss}-{n}";
+        // the file: an updated lesson keeps its file; a new one gets lessons\<date>-<title>.md
+        string file = old != null ? old.File
+                    : folder ? Path.Combine(target, $"{DateTime.Now:yyyy-MM-dd}-{KnowledgeLayers.Slug(title)}.md")
+                    : target;
+        for (int n = 2; old == null && folder && File.Exists(file); n++) file = Path.Combine(target, $"{DateTime.Now:yyyy-MM-dd}-{KnowledgeLayers.Slug(title)}-{n}.md");
+        bool single = old != null ? IsSingle(old.File) : folder;
         var sb = new StringBuilder($"## {OneLine(title)}\n");
         var meta = $"- id: {id} · date: {DateTime.Now:yyyy-MM-dd}";
         if (S("tags").Length > 0) meta += " · tags: " + OneLine(S("tags"));
@@ -250,10 +275,15 @@ public static class Lessons
         lock (gate)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-            var text = File.Exists(file) ? File.ReadAllText(file).Replace("\r\n", "\n") : Header;
-            if (old != null && old.File == file) text = RemoveSection(text, old.Title);
-            if (!text.EndsWith("\n")) text += "\n";
-            text += "\n" + entry;
+            string text;
+            if (single) text = entry;                       // one lesson per file: the file is the lesson
+            else
+            {
+                text = File.Exists(file) ? File.ReadAllText(file).Replace("\r\n", "\n") : Header;
+                if (old != null && old.File == file) text = RemoveSection(text, old.Title);
+                if (!text.EndsWith("\n")) text += "\n";
+                text += "\n" + entry;
+            }
             File.WriteAllText(file, text.Replace("\n", "\r\n"), new UTF8Encoding(false));
             cache.Remove(file);
         }
@@ -268,12 +298,19 @@ public static class Lessons
         var l = All(solutionDir).FirstOrDefault(x => x.Id.Equals(id ?? "", StringComparison.OrdinalIgnoreCase)) ?? throw new Exception($"Lesson {id} not found");
         lock (gate)
         {
-            var text = File.ReadAllText(l.File).Replace("\r\n", "\n");
-            File.WriteAllText(l.File, RemoveSection(text, l.Title).Replace("\n", "\r\n"), new UTF8Encoding(false));
+            if (IsSingle(l.File)) File.Delete(l.File);     // one lesson per file
+            else
+            {
+                var text = File.ReadAllText(l.File).Replace("\r\n", "\n");
+                File.WriteAllText(l.File, RemoveSection(text, l.Title).Replace("\n", "\r\n"), new UTF8Encoding(false));
+            }
             cache.Remove(l.File);
         }
         return $"Removed: [{l.Id}] {l.Title} ({l.File})";
     }
+
+    /// <summary>A file in a lessons\ folder holds exactly one lesson.</summary>
+    static bool IsSingle(string file) => Path.GetFileName(Path.GetDirectoryName(file) ?? "").Equals("lessons", StringComparison.OrdinalIgnoreCase);
 
     static string RemoveSection(string text, string title)
     {
@@ -320,7 +357,7 @@ public sealed partial class ToolRegistry
                           "a workaround, a non-obvious parameter or setting, or the user's help. Record exactly WHAT the problem was (symptom: error text/code, " +
                           "behaviour), WHY (cause: the explanation/background) and HOW it was solved (solution: concrete steps, values, code), " +
                           "plus what did not work (avoid), tags, tool; scope project = only this project/" +
-                          "hardware, personal = general TwinCAT knowledge, team = shared file). Save only what is verified to work, generally " +
+                          "hardware, personal = general TwinCAT knowledge, platform:<name> = knowledge about the automation framework the project uses, team = shared). Save only what is verified to work, generally " +
                           "phrased, no passwords or customer secrets. Tell the user in one sentence what you saved. action=remove id=... " +
                           "deletes a wrong or outdated lesson; add with id=... updates one.",
             Schema(Req(P("action", "string", "search, list, add or remove")),
@@ -332,7 +369,7 @@ public sealed partial class ToolRegistry
                    P("solution", "string", "add (required): exactly how it was solved - concrete steps, parameters, values, code before/after"),
                    P("avoid", "string", "add: what did NOT work / what to avoid (optional)"),
                    P("tags", "string", "add: comma-separated, e.g. 'sfc, plcopen' or 'ethercat, el7031, coe'"),
-                   P("scope", "string", "add: project (default), personal or team"),
+                   P("scope", "string", "add: project (default; this project/hardware), personal (general TwinCAT knowledge), platform:<name> (knowledge about that automation framework) or team"),
                    P("id", "string", "add: update this lesson; remove: lesson to delete"),
                    P("max", "integer", "search: max. results (default 5)"),
                    P("dryRun", "boolean", "add: only show the entry")),

@@ -1,6 +1,8 @@
 # Knowledge layers, platforms, skills and self-improving workflows
 
-> **Status: concept.** Nothing in this document is built yet. It describes how TcAgent shall organise the knowledge it
+> **Status:** built step by step. Since 0.29: `tc_ask_user`, `settings.json`, `AGENTS.md` as the single guide.
+> Since 0.30: levels × platform, one file per topic, front matter, locked/force, `disabled.json`, `tc_knowledge` – for
+> coding rules, risk rules, lessons, knowledge sources and templates. The rest of this document is still a concept. It describes how TcAgent shall organise the knowledge it
 > gives to an agent – coding rules, risk rules, skills, lessons learned, knowledge sources, documentation templates and
 > engineering workflows – and how this knowledge improves over time. Today's behaviour is described in
 > [USER_GUIDE.md](USER_GUIDE.md).

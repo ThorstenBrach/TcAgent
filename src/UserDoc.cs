@@ -36,8 +36,9 @@ public static class UserDoc
                                        .Where(f => TemplateExt.Contains(Path.GetExtension(f).ToLowerInvariant())).OrderBy(f => f, StringComparer.OrdinalIgnoreCase));
             else if (File.Exists(p)) list.Add(p);
         }
-        if (!string.IsNullOrEmpty(solutionDir)) AddPath(Path.Combine(solutionDir, ".tcagent", "doc-templates"));
-        AddPath(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "doc-templates"));
+        // most specific first: project, platform (user, company), user, company - the agent picks the best fitting example
+        foreach (var l in KnowledgeLayers.Layers(solutionDir, KnowledgeLayers.Platforms(solutionDir).Active).OrderByDescending(l => l.Rank))
+            AddPath(Path.Combine(l.Root, "doc-templates"));
         foreach (var p in (Environment.GetEnvironmentVariable("TCAGENT_DOC_TEMPLATES") ?? "").Split(';')) AddPath(p);
         return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
     }
