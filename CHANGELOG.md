@@ -5,6 +5,22 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.34.0] – 2026-10-26
+
+### Added
+- **Knowledge sources** (`tc_sources`): Git repositories as sources of skills, workflows, coding rules, risk rules and
+  lessons - `add`/`remove` (in `<level>\sources.json`), `search`, `install` (personal, project, platform), `status`,
+  `pull`, `diff`, `promote` (own item one level up after the name check; company as a commit on a new branch for a pull
+  request, never pushed). A clone per source in `%LOCALAPPDATA%\TcAgent\sources\`.
+- **Lock file** `<level>\skills.lock.json`: source, URL, path, commit, checksum and license per installed item; updates
+  only by `pull`. **`TcAgent.exe sources status|sync [--solution] [--dry-run]`** restores the pinned items in a pipeline
+  (`--dry-run` only checks, exit code 1 on a difference).
+- **License check** on install and pull: MIT, Apache 2.0, BSD, ISC, public domain accepted (notice copied along);
+  source-available and unlicensed refused; others only with `acceptLicense`. Scripts of a skill are listed, never run.
+- **Overlay skills**: `metadata.tcagent-extends: <skill>` - `tc_skills show` returns the extended skill first, then the
+  additions. `tc_skills show` names source and license of an installed skill.
+- Tests: `SourcesTests` (local Git repositories, no network).
+
 ## [0.33.0] – 2026-10-26
 
 ### Added

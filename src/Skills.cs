@@ -48,15 +48,26 @@ public static class Skills
         return sb.ToString();
     }
 
-    /// <summary>The skill text for the agent: body plus the list of its further files (read them with the file tools when needed).</summary>
-    public static string Show(KnowledgeLayers.Entry e)
+    /// <summary>The skill text for the agent: body plus the list of its further files (read them with the file tools when needed).
+    /// An overlay (metadata tcagent-extends: <skill> or <source>/<skill>) shows the skill it extends first, then its own additions -
+    /// a TwinCAT part for a general skill without changing the original.</summary>
+    public static string Show(KnowledgeLayers.Entry e, IEnumerable<KnowledgeLayers.Entry> all = null)
     {
+        if (e.Meta.Get("extends") is { Length: > 0 } ext && all != null)
+        {
+            var baseName = ext.Trim().Split('/').Last();
+            var b = all.Where(x => x != e && x.Name.Equals(baseName, StringComparison.OrdinalIgnoreCase) && x.Layer.Rank <= e.Layer.Rank && x.Status != "disabled")
+                       .OrderBy(x => x.Layer.Rank).LastOrDefault();
+            if (b != null)
+                return Show(b, all.Where(x => x != e)) + $"\n## Additions of {e.Name} ({e.Layer.Label})\n\n" + e.Meta.Body.Trim() + "\n";
+        }
         var dir = Path.GetDirectoryName(e.Path)!;
         var files = Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
                              .Where(f => !f.Equals(e.Path, StringComparison.OrdinalIgnoreCase) && Path.GetFileName(f) != Marker)
                              .Select(f => Path.GetRelativePath(dir, f)).ToList();
         var sb = new StringBuilder($"Skill {e.Name} ({e.Layer.Label}{(e.Locked ? ", locked" : "")}) – {Description(e)}\n");
         if (e.Meta.Get("inspired-by") is { } src) sb.AppendLine("Inspired by: " + src);
+        if (e.Meta.Get("source") is { } from) sb.AppendLine($"Source: {from} ({e.Meta.Get("license") ?? "license unknown"})");
         sb.AppendLine("Folder: " + dir).AppendLine().AppendLine(e.Meta.Body.Trim());
         if (files.Count > 0) sb.AppendLine().AppendLine("Further files of the skill: " + string.Join(", ", files));
         return sb.ToString();

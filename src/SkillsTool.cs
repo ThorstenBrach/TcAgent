@@ -35,7 +35,7 @@ public sealed partial class ToolRegistry
                         var name = Str(a, "name") ?? throw new Exception("name is required");
                         var e = entries.FirstOrDefault(x => x.Active && x.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
                                 ?? throw new Exception($"Skill '{name}' not found or switched off. Available: {string.Join(", ", entries.Where(x => x.Active).Select(x => x.Name))}");
-                        return Skills.Show(e);
+                        return Skills.Show(e, entries);
                     case "add":
                     {
                         string file;

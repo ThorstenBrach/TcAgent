@@ -20,6 +20,7 @@
     <Compile Include="..\..\src\Workflows.cs" Link="src\Workflows.cs" />
     <Compile Include="..\..\src\RunLogs.cs" Link="src\RunLogs.cs" />
     <Compile Include="..\..\src\Improver.cs" Link="src\Improver.cs" />
+    <Compile Include="..\..\src\Sources.cs" Link="src\Sources.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

@@ -229,6 +229,38 @@ Hints and promoted lessons are refused while they name this computer, user, solu
 | `scope` | string |  | apply: step-hint `project` / `personal` / `platform:<name>`; promote-lesson `personal` / `platform:<name>` / `company` |
 | `dryRun` | boolean |  | apply/revert: only show the change |
 
+### `tc_sources`
+
+Git repositories as sources of skills, workflows, coding rules, risk rules and lessons – an external skill collection
+or a team, platform or company repository. Layout as usual in the Agent Skills ecosystem: folders with `SKILL.md` or
+`WORKFLOW.md`, Markdown files in folders named `coding-rules`, `risk-rules` or `lessons`. The sources of a level are in
+`<level>\sources.json`; TcAgent keeps a clone per source in `%LOCALAPPDATA%\TcAgent\sources\`. Installed items are pinned
+in `<level>\skills.lock.json` (source, URL, path, commit, checksum, license) – `TcAgent.exe sources sync` restores exactly
+these in a pipeline.
+
+- **License** (the item's LICENSE file, its `license` field, the repository's LICENSE): MIT, Apache 2.0, BSD, ISC and
+  public-domain style are accepted, the notice is copied along; source-available licenses and items without a license
+  are refused; others (e.g. copyleft) only with `acceptLicense=true`. Recorded as `metadata.tcagent-license`, the origin
+  as `tcagent-source` / `tcagent-commit`.
+- **Scripts** in a skill are listed before the install – TcAgent never runs them.
+- `install`, `pull` and `promote` show what they do and ask the user (with `TCAGENT_CONFIRM=off` without a question).
+- **Overlay:** an own skill with `metadata.tcagent-extends: <skill>` shows the extended skill first and its own text as
+  additions – TwinCAT parts for a general skill without changing the original.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | `list`, `add`, `remove`, `search`, `install`, `status`, `pull`, `diff` or `promote` |
+| `name` | string |  | add/remove: source name |
+| `url` | string |  | add: Git URL or path of the repository |
+| `ref` | string |  | add: branch or tag (default `HEAD`) |
+| `item` | string |  | install/pull/diff: `<source>/<name>`; promote: `<kind>/<name>`, e.g. `skills/driver-fb` |
+| `kind` | string |  | install: `skills`, `workflows`, `coding-rules`, `risk-rules` or `lessons` (if a name exists in several kinds) |
+| `query` | string |  | search: words in name or description |
+| `scope` | string |  | add: `personal` / `project`; install: `personal` / `project` / `platform:<name>`; promote: `personal` / `platform:<name>` / `company` (commit on a new branch, not pushed) |
+| `acceptLicense` | boolean |  | install/pull: take over a license that is neither accepted nor refused |
+| `force` | boolean |  | install: overwrite an own file; pull: also update locally changed items |
+| `dryRun` | boolean |  | install/pull/promote: only show |
+
 ### `tc_ask_user`
 
 Asks the user when a decision or missing information blocks the work: 1-4 questions, each with 2-4 options (recommended option first, with a short description); the user can always answer in free text. Works in every AI client: from the TcAgent Chat a question card in the chat window of the IDE; in other clients the client's own question dialog (MCP elicitation), with the card in the IDE as fallback. Without any channel the agent is told to ask in its reply instead. Returns the answers per question; a skipped question is reported as such - the agent must not invent an answer.

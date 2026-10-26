@@ -36,7 +36,7 @@ public sealed class Policy
         ["tc_realtime"] = ToolClass.ProjectWrite, ["tc_sfc"] = ToolClass.ProjectWrite, ["tc_doc"] = ToolClass.ProjectWrite, ["tc_userdoc"] = ToolClass.ProjectWrite, ["tc_refactor"] = ToolClass.ProjectWrite, ["tc_lessons"] = ToolClass.ProjectWrite, ["tc_coe"] = ToolClass.ProjectWrite, ["tc_route_add"] = ToolClass.RuntimeWrite,
         ["tc_activate"] = ToolClass.RuntimeWrite, ["tc_plc_online"] = ToolClass.RuntimeWrite,
         ["ads_write"] = ToolClass.RuntimeWrite, ["tc_test_run"] = ToolClass.RuntimeWrite,
-        ["tc_knowledge"] = ToolClass.ProjectWrite, ["tc_improve"] = ToolClass.ProjectWrite,
+        ["tc_knowledge"] = ToolClass.ProjectWrite, ["tc_improve"] = ToolClass.ProjectWrite, ["tc_sources"] = ToolClass.ProjectWrite,
     };
 
     readonly HashSet<string> allowedTargets;
@@ -95,7 +95,7 @@ public sealed class Policy
     public static ToolClass ClassOf(string tool) => Classes.TryGetValue(tool, out var c) ? c : ToolClass.Read;
 
     // read-only actions of otherwise changing tools (tc_task list, tc_realtime show, tc_coe list, tc_scope list ...)
-    static readonly HashSet<string> ReadActions = new(StringComparer.OrdinalIgnoreCase) { "list", "show", "info", "read", "runtimes", "controls", "xml", "outline", "memory", "pending", "risks", "analyze", "data", "templates", "template", "result", "search", "platforms", "effective", "why", "runs", "history" };
+    static readonly HashSet<string> ReadActions = new(StringComparer.OrdinalIgnoreCase) { "list", "show", "info", "read", "runtimes", "controls", "xml", "outline", "memory", "pending", "risks", "analyze", "data", "templates", "template", "result", "search", "platforms", "effective", "why", "runs", "history", "status", "diff" };
 
     /// <summary>Class of a concrete call: read-only actions count as Read (no confirmation, allowed in ask/propose mode).</summary>
     public static ToolClass ClassOf(string tool, JsonObject args)

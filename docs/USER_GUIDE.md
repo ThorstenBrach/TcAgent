@@ -401,6 +401,26 @@ format (a folder with `SKILL.md`), so every agent CLI understands them, and come
   `plc-code-review`). `tc_skills action=list` shows them; the client setup also copies the general ones into the skill
   folders of the agent CLIs.
 
+### Skills and rules from Git repositories
+
+Skills, workflows, coding rules, risk rules and lessons can come from Git repositories – an open skill collection, your
+own repository, or a shared team, platform or company repository:
+
+- *"Add the repository https://… as a skill source"* → `tc_sources action=add`. *"Which skills does it have for tests?"*
+  → `action=search query=test`.
+- *"Install the skill tcunit-tdd for me"* → `action=install item=<source>/tcunit-tdd` (`scope=project` for the whole
+  team via the project repository). TcAgent shows the license, the files and any scripts and asks you. MIT, Apache,
+  BSD and ISC are taken over with their notice; source-available or unlicensed items are refused.
+- What was installed is pinned in `skills.lock.json` of the level (commit and checksum). `action=status` shows what is
+  changed locally or newer in the source, `action=pull` updates after asking, `action=diff` shows the changes.
+- **Adapt without copying:** an own skill with `metadata.tcagent-extends: <skill>` adds TwinCAT parts to a general skill;
+  the agent sees the original first, then your additions. Updates of the original keep working.
+- *"Move the skill driver-fb up to the platform"* → `action=promote item=skills/driver-fb scope=platform:<name>` – after
+  the check for project and machine names; `scope=company` makes a commit on a new branch of the company repository
+  for a pull request (never pushed).
+- **Pipeline:** `TcAgent.exe sources sync --solution M.sln` restores every pinned item exactly at its commit;
+  `--dry-run` only checks (exit code 1 if something differs). `TcAgent.exe sources status` lists them.
+
 ### Workflows: how a kind of task is always done
 
 A **workflow** is a fixed sequence of steps with checkpoints, e.g. the built-in `new-feature`: clarify the requirement
@@ -1760,7 +1780,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 94 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 95 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
@@ -1789,5 +1809,5 @@ All 94 tools and the section of this guide that covers them. Parameters: [TOOLS.
 | `tc_docs`, `tc_docs_add`, `tc_lessons` | [Knowledge: documentation and lessons learned](#knowledge-documentation-and-lessons-learned) |
 | `tc_dialogs` | [IDE dialogs](#ide-dialogs) |
 | `tc_feedback`, `tc_policy` | [Feedback and audit](#feedback-and-audit) |
-| `tc_knowledge`, `tc_skills`, `tc_workflow`, `tc_improve` | [Coding rules](#coding-rules) (levels, platform, skills) |
+| `tc_knowledge`, `tc_skills`, `tc_workflow`, `tc_improve`, `tc_sources` | [Coding rules](#coding-rules) (levels, platform, skills) |
 | `tc_ask_user` | [What the VS extension adds](#what-the-vs-extension-tcagentbridge-adds) (questions to the user, every client) |

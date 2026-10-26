@@ -3,7 +3,6 @@
 // effect over the next 10 runs, and the revert.
 //
 // SPDX-License-Identifier: MIT
-using System.Diagnostics;
 using System.Text.Json.Nodes;
 
 namespace TcAgent;
@@ -137,7 +136,9 @@ public sealed partial class ToolRegistry
                 var what = $"Move the lesson {Path.GetFileName(p.Source)} up: copy to {target}" + (company ? " (company level: as a commit on a new branch for a pull request)" : "");
                 if (DryRun(a)) return "PROPOSAL (nothing changed): " + what;
                 AskImprove(what);
-                if (company) return CommitForPullRequest(KnowledgeLayers.CompanyRoot, p.Source, target, "Promote lesson " + Improver.LessonSlug(p.Source));
+                if (company)
+                    try { return Sources.CommitForPullRequest(KnowledgeLayers.CompanyRoot, p.Source, target, "Promote lesson " + Improver.LessonSlug(p.Source)); }
+                    catch (InvalidOperationException ex) { throw new Exception("NOT promoted: " + ex.Message); }
                 Directory.CreateDirectory(folder);
                 File.Copy(p.Source, target, false);
                 var c = RunLogs.Adopt(project, "promote-lesson", null, null, target, "lesson " + Improver.LessonSlug(p.Source), null);
@@ -145,36 +146,5 @@ public sealed partial class ToolRegistry
             }
         }
         throw new Exception("unknown proposal kind " + p.Kind);
-    }
-
-    // A shared level (company) is changed by pull request only: new branch, commit, back to the previous branch. Never pushed.
-    static string CommitForPullRequest(string repo, string source, string target, string message)
-    {
-        string Git(string args)
-        {
-            var psi = new ProcessStartInfo("git", args) { WorkingDirectory = repo, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
-            using var pr = Process.Start(psi)!;
-            var o = pr.StandardOutput.ReadToEnd() + pr.StandardError.ReadToEnd();
-            pr.WaitForExit(30_000);
-            if (pr.ExitCode != 0) throw new Exception($"git {args}: {o.Trim()}");
-            return o.Trim();
-        }
-        if (string.IsNullOrEmpty(repo) || !Directory.Exists(repo)) throw new Exception("NOT promoted: the company level does not exist.");
-        try { Git("rev-parse --is-inside-work-tree"); }
-        catch { throw new Exception("NOT promoted: the company level is not a Git repository - ask its owner to add the lesson."); }
-        if (Git("status --porcelain").Length > 0) throw new Exception("NOT promoted: the company repository has uncommitted changes - commit or stash them first.");
-        var previous = Git("rev-parse --abbrev-ref HEAD");
-        var branch = "tcagent/" + Improver.LessonSlug(source) + "-" + DateTime.Now.ToString("yyyyMMddHHmm");
-        Git($"switch -c {branch}");
-        try
-        {
-            Directory.CreateDirectory(Path.GetDirectoryName(target)!);
-            File.Copy(source, target, false);
-            Git($"add -- \"{Path.GetRelativePath(repo, target)}\"");
-            Git($"commit -q -m \"{message.Replace("\"", "'")}\"");
-        }
-        catch { try { Git("reset -q"); File.Delete(target); } catch { } throw; }
-        finally { Git($"switch {previous}"); }
-        return $"Committed on branch {branch} in {repo} (not pushed). Push the branch and open a pull request - the owners of the company level decide.";
     }
 }
