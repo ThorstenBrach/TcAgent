@@ -1,6 +1,6 @@
 ---
 name: new-feature
-description: Add a new machine function or extend an existing one in the PLC project - from the clarified requirement over a change plan to code that compiles and is reviewed. Use it when the user asks for a new function, a new FB or a larger extension.
+description: Add a new machine function or extend an existing one in the PLC project - from the clarified requirement over a change plan to code that passes tc_check and then builds with 0 errors, and is reviewed. Use it when the user asks for a new function, a new FB or a larger extension.
 metadata:
   tcagent-gates: build-ok (after a clean tc_check) before review; tc_activate only after a build with 0 errors (always)
 ---
