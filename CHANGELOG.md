@@ -5,6 +5,12 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.41.1] – 2026-10-26
+
+### Fixed
+- Knowledge window: the platform line next to the tabs opens the Platforms tab; an error while showing a page or filling
+  the data is shown in the status bar and written to `bridge.log` instead of leaving the page unchanged.
+
 ## [0.41.0] – 2026-10-26
 
 ### Added

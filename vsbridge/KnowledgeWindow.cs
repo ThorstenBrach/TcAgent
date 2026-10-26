@@ -245,6 +245,10 @@ namespace TcAgentBridge
             export.Click += (s, e) => ExportCsv();
             refresh.Click += (s, e) => Load();
             foreach (var t in new[] { tOverview, tEffective, tSources, tPlatforms, tFeedback, tHistory }) t.Click += (s, e) => Show((ToggleButton)s);
+            // the platform line next to the tabs leads to the Platforms tab
+            platform.Cursor = Cursors.Hand;
+            platform.ToolTip = "Platforms of this project - click to show and change them";
+            platform.MouseLeftButtonUp += (s, e) => Show(tPlatforms);
             IsVisibleChanged += (s, e) => { if (IsVisible && data == null && !loading) Load(); };
             Show(tOverview);
             status.Text = "Reading the knowledge ...";
@@ -253,8 +257,16 @@ namespace TcAgentBridge
         void Show(ToggleButton tab)
         {
             foreach (var t in new[] { tOverview, tEffective, tSources, tPlatforms, tFeedback, tHistory }) t.IsChecked = t == tab;
-            page.Content = tab == tOverview ? OverviewPage() : tab == tEffective ? EffectivePage() : tab == tSources ? SourcesPage()
-                         : tab == tPlatforms ? PlatformsPage() : tab == tFeedback ? FeedbackPage() : (object)HistoryPage();
+            try
+            {
+                page.Content = tab == tOverview ? OverviewPage() : tab == tEffective ? EffectivePage() : tab == tSources ? SourcesPage()
+                             : tab == tPlatforms ? PlatformsPage() : tab == tFeedback ? FeedbackPage() : (object)HistoryPage();
+            }
+            catch (Exception ex)
+            {
+                status.Text = "This page could not be shown: " + ex.Message;
+                BridgePackage.Instance?.LogLine("Knowledge window: " + ex);
+            }
         }
 
         FrameworkElement overviewPage, effectivePage, sourcesPage, historyPage, platformsPage, feedbackPage;
@@ -368,7 +380,8 @@ namespace TcAgentBridge
                     try
                     {
                         data = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(json ?? "");
-                        Fill();
+                        try { Fill(); }
+                        catch (Exception fx) { BridgePackage.Instance?.LogLine("Knowledge window, fill: " + fx); throw; }
                         status.Text = $"{(string.IsNullOrEmpty(sln) ? "No solution open - only the general levels" : Path.GetFileName(sln))} · TcAgent {S(data, "version")} · {DateTime.Now:HH:mm:ss}";
                     }
                     catch (Exception ex) { status.Text = "Could not read the knowledge: " + (string.IsNullOrWhiteSpace(err) ? ex.Message : err.Trim()); }
