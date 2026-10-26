@@ -25,7 +25,7 @@ namespace TcAgentBridge
     [Guid("86c8609c-4aac-4e7e-95e6-6b96179a3c4f")]
     public sealed class BridgePackage : AsyncPackage
     {
-        public const string BridgeVersion = "0.41.1";
+        public const string BridgeVersion = "0.41.2";
         internal static BridgePackage Instance;
         static readonly Guid ExportTypeGuid = new Guid("75161BEE-FB5F-434C-A3C6-86B7CEE2B8FC");
 
@@ -139,6 +139,22 @@ namespace TcAgentBridge
                 r = new Dictionary<string, object> { ["version"] = BridgeVersion, ["pid"] = System.Diagnostics.Process.GetCurrentProcess().Id, ["is64bit"] = Environment.Is64BitProcess };
             // tc_ask_user: waits for the user's answer in the chat - not on the UI thread (the card is shown there)
             else if (cmd == "ask") r = AskUser(req);
+            // a test run started elsewhere (tc_test_run from an AI client): its events are handed to the TcUnit Tests window
+            // without waiting for the UI - the run never slows the IDE down and the window catches up when it is idle
+            else if (cmd == "tcunit_event")
+            {
+                var ev = Str(req, "ev");
+                ui.BeginInvoke(new Action(() =>
+                {
+                    try
+                    {
+                        if (TcUnitControl.Instance == null) ShowTcUnit(false);
+                        TcUnitControl.Instance?.External(ev);
+                    }
+                    catch (Exception ex) { Log("tcunit_event: " + Inner(ex)); }
+                }), System.Windows.Threading.DispatcherPriority.Background);
+                r = new Dictionary<string, object> { ["queued"] = true };
+            }
             else
                 r = (Dictionary<string, object>)ui.Invoke(new Func<Dictionary<string, object>>(() =>
                 {
@@ -147,11 +163,6 @@ namespace TcAgentBridge
                         case "context": return Context();
                         case "chat_show": ShowChat(); return new Dictionary<string, object> { ["shown"] = true };
                         case "tcunit_show": ShowTcUnit(true); return new Dictionary<string, object> { ["shown"] = true };
-                        // a run started elsewhere (tc_test_run from an AI client): its events, shown live in the TcUnit Tests window
-                        case "tcunit_event":
-                            if (TcUnitControl.Instance == null) ShowTcUnit(false);
-                            TcUnitControl.Instance?.External(Str(req, "ev"));
-                            return new Dictionary<string, object> { ["ok"] = true };
                         case "confirm": return ConfirmAction(Str(req, "title"), Str(req, "text"));
                         case "choice": return ChoiceAction(Str(req, "title"), Str(req, "text"));
                         case "probe": return Probe();

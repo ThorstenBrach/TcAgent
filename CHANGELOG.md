@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.41.2] – 2026-10-26
+
+### Fixed
+- A test run started from the chat blocked the IDE for about 250 ms per event: the bridge handled every event of the run
+  synchronously on the UI thread. The events are now handed over without waiting (background priority) - the run does not
+  slow the IDE down, the TcUnit Tests window catches up when the UI is idle.
+
 ## [0.41.1] – 2026-10-26
 
 ### Fixed
