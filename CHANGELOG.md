@@ -5,6 +5,12 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.39.3] – 2026-10-26
+
+### Added
+- `tc_test_skeleton instanceName`: the name of the instance under test (default `fbUnderTest`), so the generated tests
+  follow the naming of the coding rules.
+
 ## [0.39.2] – 2026-10-26
 
 ### Fixed

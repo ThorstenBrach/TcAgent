@@ -73,6 +73,15 @@ public sealed class TestSkeletonTests
         Assert.Contains("_Calc: private", Assert.Single(s.Notes));
     }
 
+    [Fact]
+    public void InstanceNameCanFollowTheCodingRules()
+    {
+        var s = TestSkeleton.Generate("FB_Conveyor", Fb, Methods, null, "UnderTest");
+        Assert.Contains("UnderTest : FB_Conveyor;", s.Methods[0].Declaration);
+        Assert.Contains("UnderTest(stIo := stIo_);", s.Methods[0].Implementation);
+        Assert.DoesNotContain("fbUnderTest", string.Concat(s.Methods.Select(m => m.Declaration + m.Implementation)));
+    }
+
     [Theory]
     [InlineData("MC_ReadActualPositionFB", new[] { "TelegramTestSuiteFB", "AxisTestSuiteFB" }, "MC_ReadActualPositionTestSuiteFB")]
     [InlineData("FB_Motor", new[] { "FB_Valve_Test" }, "FB_Motor_Test")]

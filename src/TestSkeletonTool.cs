@@ -20,6 +20,7 @@ public sealed partial class ToolRegistry
                                 "(TcUnit.RUN() must be called). dryRun=true shows the code (plain-text ST) without creating anything.",
             Schema(Req(P("name", "string", "the function block (name or tree path)")),
                    P("suiteName", "string", "name of the suite (default: in the style of the existing suites, e.g. <FB>TestSuiteFB, otherwise <FB>_Test)"),
+                   P("instanceName", "string", "name of the instance under test in the tests (default fbUnderTest - follow the naming of the coding rules)"),
                    P("parentPath", "string", "folder for the suite (default: the folder of the existing suites, a folder Tests/Test, otherwise the folder of the function block)"),
                    P("dryRun", "boolean", "only show the generated code")),
             a => tc.Sta.Run(() => TestSkeletonCall(a)));
@@ -59,7 +60,7 @@ public sealed partial class ToolRegistry
             foreach (var p in TcUnitDiscovery.Discover(sln).Projects) existing.AddRange(p.Suites.Select(s => s.Type));
         }
         catch { }
-        var suite = TestSkeleton.Generate(item.Name, decl, methods, Str(a, "suiteName") ?? TestSkeleton.SuiteName(item.Name, existing));
+        var suite = TestSkeleton.Generate(item.Name, decl, methods, Str(a, "suiteName") ?? TestSkeleton.SuiteName(item.Name, existing), Str(a, "instanceName"));
         var parentPath = Str(a, "parentPath") ?? TestFolder(path, existing) ?? path[..path.LastIndexOf('^')];
         var text = TestSkeleton.ToPlainText(suite);
         var notes = suite.Notes.Count > 0 ? "\nNotes: " + string.Join("; ", suite.Notes) : "";

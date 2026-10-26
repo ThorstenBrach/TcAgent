@@ -278,6 +278,7 @@ declares an instance of the suite in the test program.
 |---|---|---|---|
 | `name` | string | yes | the function block (name or tree path) |
 | `suiteName` | string |  | name of the suite (default: in the style of the existing suites, otherwise `<FB>_Test`) |
+| `instanceName` | string |  | name of the instance under test (default `fbUnderTest` – follow the coding rules) |
 | `parentPath` | string |  | folder for the suite (default: the folder of the existing suites, a folder `Tests`/`Test`, otherwise the folder of the function block) |
 | `dryRun` | boolean |  | only show the generated code (plain-text ST) |
 

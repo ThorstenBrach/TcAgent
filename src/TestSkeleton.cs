@@ -114,10 +114,11 @@ public static class TestSkeleton
         return bas + suffix;
     }
 
-    public static Suite Generate(string fbName, string fbDecl, IEnumerable<(string Name, string Decl)> methods, string suiteName = null)
+    public static Suite Generate(string fbName, string fbDecl, IEnumerable<(string Name, string Decl)> methods, string suiteName = null, string instance = null)
     {
         var s = new Suite();
         suiteName ??= fbName + "_Test";
+        var inst = string.IsNullOrWhiteSpace(instance) ? "fbUnderTest" : instance.Trim();    // the instance name of the coding rules, if any
         var vars = ParseVars(fbDecl);
         var inOuts = vars.Where(v => v.Section == "VAR_IN_OUT").ToList();
         var tests = new List<string>();
@@ -125,12 +126,12 @@ public static class TestSkeleton
         // locals of a test: the instance and one variable per VAR_IN_OUT of the block
         string Locals(IEnumerable<Var> extra = null)
         {
-            var sb = new StringBuilder("VAR\n").Append($"    fbUnderTest : {fbName};\n");
+            var sb = new StringBuilder("VAR\n").Append($"    {inst} : {fbName};\n");
             foreach (var v in inOuts) sb.Append($"    {v.Name}_ : {v.Type};\n");
             foreach (var v in extra ?? Enumerable.Empty<Var>()) sb.Append($"    {v.Name} : {v.Type};\n");
             return sb.Append("END_VAR").ToString();
         }
-        string Call() => "fbUnderTest(" + string.Join(", ", inOuts.Select(v => $"{v.Name} := {v.Name}_")) + ");";
+        string Call() => inst + "(" + string.Join(", ", inOuts.Select(v => $"{v.Name} := {v.Name}_")) + ");";
 
         // InitialOutputs: complete
         var outputs = vars.Where(v => v.Section == "VAR_OUTPUT").ToList();
@@ -141,7 +142,7 @@ public static class TestSkeleton
             foreach (var o in outputs)
             {
                 var exp = Default(o.Type, o.Init);
-                var a = exp == null ? null : Assert(o.Type, exp, "fbUnderTest." + o.Name, o.Name + " after the first call");
+                var a = exp == null ? null : Assert(o.Type, exp, inst + "." + o.Name, o.Name + " after the first call");
                 if (a != null) { impl.Append(a).Append('\n'); n++; }
                 else impl.Append($"// {o.Name} : {o.Type} - compare by hand\n");
             }
@@ -165,11 +166,11 @@ public static class TestSkeleton
             var mArgs = m.Vars.Where(v => v.Section is "VAR_INPUT" or "VAR_IN_OUT").ToList();
             extra.AddRange(mArgs.Select(v => new Var("VAR", v.Name + "_", v.Type, null)));
             var impl = new StringBuilder($"TEST('{test}');\n\n// Arrange\n");
-            foreach (var v in vars.Where(v => v.Section == "VAR_INPUT")) impl.Append($"// fbUnderTest.{v.Name} := ;   ({v.Type})\n");
+            foreach (var v in vars.Where(v => v.Section == "VAR_INPUT")) impl.Append($"// {inst}.{v.Name} := ;   ({v.Type})\n");
             foreach (var v in mArgs.Where(v => v.Section == "VAR_INPUT")) impl.Append($"// {v.Name}_ := ;   (parameter {v.Name} : {v.Type})\n");
             impl.Append("\n// Act\n");
             var args = string.Join(", ", mArgs.Select(v => $"{v.Name} := {v.Name}_"));
-            impl.Append(m.ReturnType != null ? $"result := fbUnderTest.{m.Name}({args});\n" : $"fbUnderTest.{m.Name}({args});\n");
+            impl.Append(m.ReturnType != null ? $"result := {inst}.{m.Name}({args});\n" : $"{inst}.{m.Name}({args});\n");
             impl.Append("\n// Assert - TODO: replace with the expected behaviour (fails until then)\n")
                 .Append($"AssertTrue(Condition := FALSE, Message := 'TODO: assert the result of {m.Name}');\n\nTEST_FINISHED();");
             s.Methods.Add(new Block(test, $"METHOD {test}\n" + Locals(extra), impl.ToString(), $"/// {m.Name} - TODO: describe the expected behaviour"));
