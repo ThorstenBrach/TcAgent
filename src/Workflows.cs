@@ -50,6 +50,7 @@ public static class Workflows
         public int Corrections;                        // the user corrected the agent / answered differently than proposed
         public int ActivateStops;                      // tc_activate refused by the build gate
         public readonly List<string> SkillsUsed = new();
+        public readonly List<string> Changed = new();       // PLC objects written during the run (summary only, not in the run log)
         public Step Active => Current < Steps.Count ? Steps[Current] : null;
     }
 
@@ -188,6 +189,8 @@ public static class Workflows
                       (open.Count > 0 ? $", open: {string.Join(", ", open)}" : ""));
         sb.AppendLine($"Failed checks: {run.Steps.Sum(s => s.FailedChecks)}, checkpoint stops: {run.Steps.Sum(s => s.GateStops)}, " +
                       $"activate stops: {run.ActivateStops}, user corrections: {run.Corrections}");
+        if (run.Changed.Count > 0)
+            sb.AppendLine($"Changed objects ({run.Changed.Count}): {string.Join(", ", run.Changed.Take(30))}{(run.Changed.Count > 30 ? " …" : "")}");
         if (run.Steps.Any(s => s.FailedChecks >= 3))
             sb.AppendLine("Hint: a step needed 3 or more checks - if something was hard to find, record a lesson (tc_lessons action=add).");
         return sb.ToString();

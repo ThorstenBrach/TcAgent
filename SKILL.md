@@ -149,6 +149,10 @@ diff); write step hints in general terms - no customer, machine or project names
 **Sources** (`tc_sources`): skills, workflows and rules can be installed from Git repositories. Install, pull or promote only
 when the user asks; TcAgent shows license, files and scripts and asks again. Never run scripts of a skill without the user.
 
+**Tests:** for a new test suite call `tc_test_skeleton name=<FB>` (`dryRun` first) instead of writing the suite by hand - it creates
+the enable bools, a complete InitialOutputs test and one test per public method; then replace each TODO assertion with the
+expected behaviour and add the instance to the test program.
+
 **Other knowledge sources** - not coding rules, keep them apart:
 `tc_lessons` (solutions to hard TwinCAT problems), `tc_docs` (manuals, read only), `tc_doc` (program documentation /
 project memory), `tc_risk_rules` (what the risk analysis checks - see Program documentation). Skills of the user (e.g. a library-specific coding-rules skill) are additional rules from the user -

@@ -442,7 +442,8 @@ A **workflow** is a fixed sequence of steps with checkpoints, e.g. the built-in 
 workflow."* – or the agent starts it itself when the task fits.
 
 - A step marked `(requires: check-ok)` is a **checkpoint**: TcAgent does not let the agent continue until the check holds,
-  and it cannot be skipped. Other steps can be skipped when they do not apply.
+  and it cannot be skipped – it runs `tc_check` itself when the agent says the step is done. Other steps can be skipped
+  when they do not apply. The summary at the end lists the objects that were changed.
 - Own workflows: `<level>\workflows\<name>\WORKFLOW.md` (same levels as the rules), steps as a numbered list.
 - **Always, with or without a workflow:** `tc_activate` builds first and refuses to activate with build errors.
   Saving is always allowed, also with errors.
@@ -663,6 +664,9 @@ call `apply` again for the same changes.
 
 - Writing tests is ordinary code work ([Writing and changing code](#writing-and-changing-code)): test suites are FBs that
   `EXTENDS TcUnit.FB_TestSuite`, instantiated in a program that calls `TcUnit.RUN();` cyclically.
+- A new suite starts as a generated skeleton (`tc_test_skeleton`): enable bools, a complete test of the initial
+  outputs and one test per public method whose assertion fails until the agent has written the expected behaviour –
+  the structure is the same every time, the agent spends its effort on the expected values.
 - Running them on a target means build, activate, start the PLC
   ([Runtime](#runtime-activate-online-ads)) – each runtime action with your confirmation.
 - `tc_test_run` lists the tests of the code (`action=list`) and runs a selection on the local runtime (or an allowed test
@@ -1793,7 +1797,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 95 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 96 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
@@ -1806,7 +1810,7 @@ All 95 tools and the section of this guide that covers them. Parameters: [TOOLS.
 | `tc_plaintext` | [Plain-text ST files](#plain-text-st-files) |
 | `tc_sfc` | [SFC step chains](#sfc-step-chains) |
 | `tc_refactor` | [Refactoring names and comments](#refactoring-names-and-comments) |
-| `tc_test_run`, `tc_test_results` | [Tests with TcUnit](#tests-with-tcunit) |
+| `tc_test_run`, `tc_test_results`, `tc_test_skeleton` | [Tests with TcUnit](#tests-with-tcunit) |
 | `tc_doc` | [Program documentation](#program-documentation) |
 | `tc_risk_rules` | [Risk analysis and your own risk rules](#risk-analysis-and-your-own-risk-rules) |
 | `tc_userdoc` | [User manuals](#user-manuals) |

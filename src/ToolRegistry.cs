@@ -213,6 +213,7 @@ public sealed partial class ToolRegistry
         RegisterWorkflows();
         RegisterImprove();
         RegisterSources();
+        RegisterTestSkeleton();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +
@@ -1512,7 +1513,7 @@ public sealed partial class ToolRegistry
         var t = tools.FirstOrDefault(x => x.Name == name) ?? throw new Exception("Unknown tool: " + name);
         // Safety net: if there are coding guidelines and the agent has not read them yet, the first writing
         // code call is not executed; the guidelines are returned instead (once per session).
-        if (!rulesSeen && (name is "tc_plc_write" or "tc_plc_create" || name == "tc_refactor" && string.Equals(Str(args, "action"), "apply", StringComparison.OrdinalIgnoreCase)
+        if (!rulesSeen && (name is "tc_plc_write" or "tc_plc_create" or "tc_test_skeleton" || name == "tc_refactor" && string.Equals(Str(args, "action"), "apply", StringComparison.OrdinalIgnoreCase)
                            || name == "tc_plaintext" && string.Equals(Str(args, "action"), "import", StringComparison.OrdinalIgnoreCase)) && !DryRun(args)
             && Environment.GetEnvironmentVariable("TCAGENT_RULES_GATE") != "0")
         {

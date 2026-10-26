@@ -7,7 +7,8 @@
 > hard gate "`tc_activate` only after a build with 0 errors". Since 0.33: run logs and `tc_improve` (proposals by fixed rules,
 > apply after asking, evaluation over 10 runs, revert, promote with name check). Since 0.34: sources (`tc_sources`, `skills.lock.json`, license check, overlay
 > `tcagent-extends`, `TcAgent.exe sources sync`). Since 0.35: the knowledge manager window (Overview, Effective, Sources, History) and
-> `TcAgent.exe knowledge json|disable|enable`. The rest of this document is still a concept. It describes how TcAgent shall organise the knowledge it
+> `TcAgent.exe knowledge json|disable|enable`. Since 0.36: first "deterministic first" conversions
+> ([DETERMINISTIC_FIRST.md](DETERMINISTIC_FIRST.md)). The rest of this document is still a concept. It describes how TcAgent shall organise the knowledge it
 > gives to an agent – coding rules, risk rules, skills, lessons learned, knowledge sources, documentation templates and
 > engineering workflows – and how this knowledge improves over time. Today's behaviour is described in
 > [USER_GUIDE.md](USER_GUIDE.md).
@@ -335,8 +336,8 @@ favour one client. These points come **first**, before the other implementation 
 
 Wherever a result can be produced deterministically (templates, generators, checks, formatting, report and
 documentation skeletons), TcAgent shall do that first and let the agent only review and refine it. The output becomes
-reproducible and fewer tokens are spent. A list of candidates (what the agent does today that a program could do) is
-part of the implementation plan.
+reproducible and fewer tokens are spent. The list of candidates (what the agent does today that a program could do), the
+first conversions and the next steps: [DETERMINISTIC_FIRST.md](DETERMINISTIC_FIRST.md).
 
 ## Implementation steps (proposal)
 

@@ -5,6 +5,22 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.36.0] – 2026-10-26
+
+### Added
+- **Deterministic first** ([docs/DETERMINISTIC_FIRST.md](docs/DETERMINISTIC_FIRST.md)): what TcAgent already does
+  without the agent, the conversions of this version and a list of candidates with effort and benefit.
+- **`tc_test_skeleton`**: the TcUnit test suite of a function block, generated the same way every time - enable bools of
+  the TcUnit Tests window, a complete `InitialOutputs` test (every output against its initial value) and one test per
+  public method with an assertion that fails until the TODO is replaced; `VAR_IN_OUT` parameters get local variables.
+  Tests: `TestSkeletonTests`.
+
+### Changed
+- **`tc_workflow action=step` on a checkpoint** whose check is missing or failed: TcAgent runs `tc_check` / `tc_build`
+  itself and completes the step if it passes (before: refused, the agent had to check and call again).
+- **`tc_workflow action=finish`** lists the PLC objects written during the run (`tc_plc_write`, `tc_plc_create`,
+  `tc_test_skeleton`) - only in the summary, not in the run log.
+
 ## [0.35.0] – 2026-10-26
 
 ### Added

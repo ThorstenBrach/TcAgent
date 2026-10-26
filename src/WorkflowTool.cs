@@ -33,7 +33,21 @@ public sealed partial class ToolRegistry
                     try
                     {
                         if (action == "status") return Workflows.Status(run);
-                        if (action == "step") return Workflows.Advance(run, Str(a, "step"), Bool(a, "skip", false), Str(a, "note"));
+                        if (action == "step")
+                        {
+                            // deterministic first: a checkpoint whose check is missing or failed - TcAgent runs the check itself instead of refusing
+                            var pre = "";
+                            if (!Bool(a, "skip", false) && run.Active is { Requires: "check-ok" or "build-ok" } act && Workflows.Missing(act) != null
+                                && (string.IsNullOrEmpty(Str(a, "step")) || Str(a, "step")!.Equals(act.Id, StringComparison.OrdinalIgnoreCase)))
+                            {
+                                var tool = act.Requires == "build-ok" ? "tc_build" : "tc_check";
+                                var res = Call(tool, new JsonObject());
+                                var txt = (res["content"] as JsonArray)?[0]?["text"]?.ToString() ?? "";
+                                pre = $"{tool} (run by TcAgent for the checkpoint): {txt.Split('\n')[0]}\n\n";
+                                if (Workflows.Missing(act) != null && ++act.GateStops > 0) throw new InvalidOperationException($"step '{act.Id}' needs {act.Requires} - {txt.Split('\n')[0]}\n{string.Join("\n", txt.Split('\n').Skip(1).Take(25))}");
+                            }
+                            return pre + Workflows.Advance(run, Str(a, "step"), Bool(a, "skip", false), Str(a, "note"));
+                        }
                     }
                     catch (InvalidOperationException ex) { throw new Exception("NOT done: " + ex.Message); }
                     bool abort = Bool(a, "abort", false);
@@ -88,6 +102,13 @@ public sealed partial class ToolRegistry
         if (run == null) return;
         if (name == "tc_skills" && !isError && string.Equals(Str(args, "action"), "show", StringComparison.OrdinalIgnoreCase) && Str(args, "name") is { } skill)
             run.SkillsUsed.Add(skill.Trim().ToLowerInvariant());
+        // the changed objects for the summary (deterministic - the agent does not have to remember them)
+        if (!isError && !DryRun(args) && (name is "tc_plc_write" ? Str(args, "path") : name is "tc_plc_create" ? Str(args, "parentPath") + "^" + Str(args, "name")
+                                          : name is "tc_test_skeleton" ? Str(args, "suiteName") ?? Str(args, "name") + "_Test" : null) is { } obj)
+        {
+            var shortName = obj.Contains(" Project^") ? obj[(obj.IndexOf(" Project^") + 9)..] : obj;
+            if (!run.Changed.Contains(shortName)) run.Changed.Add(shortName);
+        }
         if (name is not ("tc_check" or "tc_build" or "tc_test_run" or "tc_test_results")) return;
         bool ok = !isError && (name is "tc_test_run" or "tc_test_results" ? !TestsFailed(text) : !Lessons.HasCompileErrors(text));
         var codes = System.Text.RegularExpressions.Regex.Matches(text ?? "", @"\bC\d{4}\b").Select(m => m.Value).Distinct();

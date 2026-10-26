@@ -190,7 +190,9 @@ checks per step and refuses to mark a checkpoint step done until its check holds
 | `build-ok` | the last `tc_build` during the step succeeded |
 | `tests-ok` | the last `tc_test_run` / `tc_test_results` during the step had no failed test |
 
-Checkpoint steps cannot be skipped. The gate before `tc_activate` holds with and without a workflow.
+Checkpoint steps cannot be skipped. When the agent marks a `check-ok` / `build-ok` step done while its check is missing
+or failed, TcAgent runs `tc_check` / `tc_build` itself (since 0.36) and completes the step if it passes. `finish` lists
+the PLC objects written during the run. The gate before `tc_activate` holds with and without a workflow.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -260,6 +262,23 @@ these in a pipeline.
 | `acceptLicense` | boolean |  | install/pull: take over a license that is neither accepted nor refused |
 | `force` | boolean |  | install: overwrite an own file; pull: also update locally changed items |
 | `dryRun` | boolean |  | install/pull/promote: only show |
+
+### `tc_test_skeleton`
+
+Generates the TcUnit test suite of a function block deterministically (docs/DETERMINISTIC_FIRST.md): `<FB>_Test EXTENDS
+TcUnit.FB_TestSuite` with the enable bools of the TcUnit Tests window (`bRunSuite`, `bRun_<Test>`), a complete test
+`InitialOutputs` (a fresh instance, one call, every output with a comparable type against its declared initial value or
+the default of its type) and one test `Test_<Method>` per public method – arrange (the inputs as comments), act (the
+call), and an assertion that **fails until the TODO is replaced**. `VAR_IN_OUT` parameters get local variables. Private
+and protected methods and `FB_init`/`FB_exit`/`FB_reinit` are skipped. The agent then writes the expected behaviour and
+declares an instance of the suite in the test program.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `name` | string | yes | the function block (name or tree path) |
+| `suiteName` | string |  | name of the suite (default `<FB>_Test`) |
+| `parentPath` | string |  | folder for the suite (default: the folder of the function block) |
+| `dryRun` | boolean |  | only show the generated code (plain-text ST) |
 
 ### `tc_ask_user`
 

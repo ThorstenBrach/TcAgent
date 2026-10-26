@@ -37,7 +37,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Navigation** | Go to definition and find references (read/write) – resolved like TwinCAT itself, across inheritance; opens the object in the editor at the right line | `tc_goto_definition`, `tc_editor_open`, `tc_find_references`, `tc_plc_search` |
 | **Library APIs** | Full interfaces of referenced libraries – also compiled libraries – so the agent never invents an API | `tc_lib_signatures`, `tc_plc_references` |
 | **Check & build** | "Check all objects" without generating code; real build before activation; compiler vs. runtime messages separated | `tc_check`, `tc_build`, `tc_errors` |
-| **Tests** | TcUnit tests read from the code and run like in the Test Explorer: window **TcUnit Tests** (also in the XAE Shell) with run all / selected / failed, live progress and red/green per test; the same run for agents and on the command line; evaluate TcUnit results | `tc_test_run`, `tc_test_results` |
+| **Tests** | TcUnit tests read from the code and run like in the Test Explorer: window **TcUnit Tests** (also in the XAE Shell) with run all / selected / failed, live progress and red/green per test; the same run for agents and on the command line; evaluate TcUnit results; test suites of an FB generated as a skeleton | `tc_test_run`, `tc_test_results`, `tc_test_skeleton` |
 | **I/O & system** | Scan EtherCAT and assign adapters, add masters, couplers and terminals offline, link variables in bulk (structs to PDO groups element by element), tasks and PLC task assignment, boot project, config/run mode, licenses (read) | `tc_io_scan`, `tc_io_add`, `tc_link`, `tc_task`, `tc_runtime_mode` |
 | **Projects & files** | New solutions and PLC projects, PLCopen/XTI export and import, libraries (references, placeholders, repositories, save as library), mapping export/import, archive, TwinCAT version, target platform, variants | `tc_new_solution`, `tc_plc_project_add`, `tc_export`, `tc_import`, `tc_library`, `tc_library_save` |
 | **Library supply chain** | SBOM of the PLC project as CycloneDX 1.6 (libraries with version, vendor, purl, SHA-256, git commit) and a library lock file whose check fails the pipeline when a library version changes | `tc_sbom`, `tc_library_lock` |
@@ -57,7 +57,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Skill sources** | Skills, workflows and rules from Git repositories with lock file, license check and overlay; `TcAgent.exe sources sync` restores the pinned set in a pipeline | `tc_sources` |
 | **Documentation** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 
-All 95 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 96 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 What you can do, explained step by step with example prompts: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 

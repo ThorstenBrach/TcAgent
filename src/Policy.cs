@@ -36,7 +36,7 @@ public sealed class Policy
         ["tc_realtime"] = ToolClass.ProjectWrite, ["tc_sfc"] = ToolClass.ProjectWrite, ["tc_doc"] = ToolClass.ProjectWrite, ["tc_userdoc"] = ToolClass.ProjectWrite, ["tc_refactor"] = ToolClass.ProjectWrite, ["tc_lessons"] = ToolClass.ProjectWrite, ["tc_coe"] = ToolClass.ProjectWrite, ["tc_route_add"] = ToolClass.RuntimeWrite,
         ["tc_activate"] = ToolClass.RuntimeWrite, ["tc_plc_online"] = ToolClass.RuntimeWrite,
         ["ads_write"] = ToolClass.RuntimeWrite, ["tc_test_run"] = ToolClass.RuntimeWrite,
-        ["tc_knowledge"] = ToolClass.ProjectWrite, ["tc_improve"] = ToolClass.ProjectWrite, ["tc_sources"] = ToolClass.ProjectWrite,
+        ["tc_knowledge"] = ToolClass.ProjectWrite, ["tc_improve"] = ToolClass.ProjectWrite, ["tc_sources"] = ToolClass.ProjectWrite, ["tc_test_skeleton"] = ToolClass.ProjectWrite,
     };
 
     readonly HashSet<string> allowedTargets;

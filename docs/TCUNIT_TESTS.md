@@ -114,6 +114,10 @@ FB_Motor_Test selectable"* for an existing suite. By hand:
 
 ### 4.2 One test per method (recommended)
 
+The quickest way to such a suite: *"Create the test suite for FB_Motor"* – `tc_test_skeleton` generates it with the
+enable bools, a complete `InitialOutputs` test and one test per public method whose assertion fails until the expected
+behaviour is written in.
+
 ```
 /// Motor block: start, stop and fault handling
 FUNCTION_BLOCK FB_Motor_Test EXTENDS TcUnit.FB_TestSuite
