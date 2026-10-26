@@ -162,6 +162,20 @@ The knowledge the agent gets and where it comes from – levels company (`TCAGEN
 | `scope` | string |  | disable/enable/split: `project` (default) or `user` |
 | `dryRun` | boolean |  | split: only show the files |
 
+### `tc_skills`
+
+Skills = how this team does a kind of task, in the open [Agent Skills](https://agentskills.io/specification) format (`<level>\skills\<name>\SKILL.md` with `name`, `description`, TcAgent's fields under `metadata`, optional further files). From the levels built-in (shipped: `requirements-interview`, `plc-debugging`, `plc-code-review`), company, user, platform and project – a later level replaces a skill with the same name. `tc_coding_rules` also returns the list (name and description); the agent loads a skill only when the task fits. `mirror` (also `TcAgent.exe skills mirror`, run by the client setup) copies the skills that apply everywhere into the skill folders of the agent CLIs (`%USERPROFILE%\.claude\skills`, `%USERPROFILE%\.agents\skills`, or `skillMirrors` in `settings.json`); only folders TcAgent created there (marker `.tcagent-mirror`) are updated or removed.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | `list`, `show`, `add` or `mirror` |
+| `name` | string |  | show/add: skill name (lowercase letters, digits, hyphens) |
+| `description` | string |  | add: what the skill does and when to use it |
+| `body` | string |  | add: the instructions (Markdown) |
+| `inspiredBy` | string |  | add: source of the method the skill adopts |
+| `scope` | string |  | add: `project` (default), `personal` or `platform:<name>` |
+| `dryRun` | boolean |  | add/mirror: only show what would be written |
+
 ### `tc_ask_user`
 
 Asks the user when a decision or missing information blocks the work: 1-4 questions, each with 2-4 options (recommended option first, with a short description); the user can always answer in free text. Works in every AI client: from the TcAgent Chat a question card in the chat window of the IDE; in other clients the client's own question dialog (MCP elicitation), with the card in the IDE as fallback. Without any channel the agent is told to ask in its reply instead. Returns the answers per question; a skipped question is reported as such - the agent must not invent an answer.

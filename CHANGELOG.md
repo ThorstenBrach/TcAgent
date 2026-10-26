@@ -5,6 +5,21 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.31.0] – 2026-10-26
+
+### Added
+- **Skills** in the open Agent Skills format (`<level>\skills\<name>\SKILL.md`), from the levels built-in, company, user,
+  platform and project – a later level replaces a skill with the same name, `locked` / `disabled.json` as for the rules.
+- **`tc_skills`**: `list`, `show`, `add` (name rules of the standard checked), `mirror`. `tc_coding_rules` ends with the
+  list of skills (name + description); the agent loads a skill only when the task fits.
+- **Built-in TwinCAT skills** (shipped in `knowledge\skills` next to `TcAgent.exe`; the methods of well-known open-source
+  skills adopted, the content written for TwinCAT and the TcAgent tools): `requirements-interview`, `plc-debugging`,
+  `plc-code-review`.
+- **Mirror into the agent CLIs**: `TcAgent.exe skills mirror` (run by `setup-clients.ps1`) copies the skills that apply
+  everywhere into `%USERPROFILE%\.claude\skills` and `%USERPROFILE%\.agents\skills` (or `skillMirrors` in
+  `settings.json`). Only folders TcAgent created there (`.tcagent-mirror`) are updated or removed.
+- `TcAgent.exe skills list|mirror [--solution <sln>] [--dry-run]`. Tests: `SkillsTests`.
+
 ## [0.30.0] – 2026-10-26
 
 Knowledge layers ([KNOWLEDGE_LAYERS.md](docs/KNOWLEDGE_LAYERS.md)): one scheme for coding rules, risk rules, lessons,

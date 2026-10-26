@@ -220,7 +220,14 @@ if (Test-Path $guidePath) {
     if (Test-Path $geminiDir) { Merge-Guide (Join-Path $geminiDir 'GEMINI.md'); $done.Add("Guide: $geminiDir\GEMINI.md") }
     if (Test-Path $codexDir) { Merge-Guide (Join-Path $codexDir 'AGENTS.md'); $done.Add("Guide: $codexDir\AGENTS.md") }
     if (Test-Path $copilotDir) { Merge-Guide (Join-Path $copilotDir 'copilot-instructions.md'); $done.Add("Guide: $copilotDir\copilot-instructions.md") }
-    # Claude Code: as a user skill (loaded on demand, also in the chat window)
+    # the skills that apply everywhere (built-in, company, user) into the skill folders of the agent CLIs (Agent Skills format)
+    $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+        $out = & $TcAgentExe skills mirror 2>&1
+        if ($LASTEXITCODE -eq 0) { $out | Where-Object { "$_" -match '→' } | ForEach-Object { $done.Add("Skill: " + "$_".Trim()) } }
+        else { Write-Warning "Skills not mirrored: $out" }
+    } catch { Write-Warning "Skills not mirrored: $($_.Exception.Message)" } finally { $ErrorActionPreference = $eap }
+    # Claude Code: the TcAgent guide as a user skill (loaded on demand, also in the chat window)
     $skillSrc = Join-Path $PSScriptRoot 'SKILL.md'
     if ((Has-Cmd 'claude') -and (Test-Path $skillSrc)) {
         $skillDst = Join-Path $env:USERPROFILE '.claude\skills\twincat-tcagent\SKILL.md'

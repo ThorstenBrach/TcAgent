@@ -1709,7 +1709,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 91 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 92 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
@@ -1738,4 +1738,5 @@ All 91 tools and the section of this guide that covers them. Parameters: [TOOLS.
 | `tc_docs`, `tc_docs_add`, `tc_lessons` | [Knowledge: documentation and lessons learned](#knowledge-documentation-and-lessons-learned) |
 | `tc_dialogs` | [IDE dialogs](#ide-dialogs) |
 | `tc_feedback`, `tc_policy` | [Feedback and audit](#feedback-and-audit) |
+| `tc_knowledge`, `tc_skills` | [Coding rules](#coding-rules) (levels, platform, skills) |
 | `tc_ask_user` | [What the VS extension adds](#what-the-vs-extension-tcagentbridge-adds) (questions to the user, every client) |

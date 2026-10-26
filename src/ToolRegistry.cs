@@ -64,9 +64,12 @@ public sealed partial class ToolRegistry
             {
                 var dir = SolutionDir();
                 rulesSeen = true;
+                // the skill catalog comes with the rules: name + description only, the agent loads a skill when the task fits
+                var skills = Skills.Catalog(Skills.Entries(dir, KnowledgeLayers.Platforms(dir).Active));
+                var tail = skills != null ? "\n\n" + skills : "";
                 return CodingRules.Text(dir) is { } t
-                    ? "Coding guidelines (later sections take precedence in case of conflict):\n\n" + t
-                    : "No coding guidelines defined - use common TwinCAT conventions and the style of the existing code.\n" + CodingRules.Where(dir);
+                    ? "Coding guidelines (later sections take precedence in case of conflict):\n\n" + t + tail
+                    : "No coding guidelines defined - use common TwinCAT conventions and the style of the existing code.\n" + CodingRules.Where(dir) + tail;
             });
 
         Add("tc_coding_rules_add", "Adds a rule to the coding guidelines - when the user says 'remember ...', 'from now on always ...', " +
@@ -205,6 +208,7 @@ public sealed partial class ToolRegistry
         RegisterPlainText();
         RegisterAskUser();
         RegisterKnowledge();
+        RegisterSkills();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +

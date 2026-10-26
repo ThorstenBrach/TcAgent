@@ -276,8 +276,28 @@ public static class KnowledgeLayers
     /// replaces the earlier one); otherwise all are collected (lessons, knowledge). extraCompany / extraProject: the paths of
     /// the former environment variables and folder names (files or folders).</summary>
     public static List<Entry> Resolve(string kind, string solutionDir, IEnumerable<string> platforms, bool replaceByName,
-                                      IEnumerable<string> extraCompany = null, IEnumerable<string> extraProject = null, string pattern = "*.md")
+                                      IEnumerable<string> extraCompany = null, IEnumerable<string> extraProject = null, string pattern = "*.md",
+                                      string folderFile = null)
     {
+        // folder kinds (skills, workflows): one folder per entry with its main file (SKILL.md / WORKFLOW.md), name = folder name
+        if (folderFile != null)
+        {
+            var found = new List<Entry>();
+            foreach (var layer in Layers(solutionDir, platforms))
+            {
+                var root = Path.Combine(layer.Root, kind);
+                if (!Directory.Exists(root)) continue;
+                foreach (var d in Directory.GetDirectories(root).OrderBy(x => x, StringComparer.OrdinalIgnoreCase))
+                {
+                    var main = Path.Combine(d, folderFile);
+                    if (!File.Exists(main)) continue;
+                    FrontMatter fm;
+                    try { fm = ParseFrontMatter(File.ReadAllText(main)); } catch { fm = new FrontMatter(); }
+                    found.Add(new Entry { Kind = kind, Name = Path.GetFileName(d), Path = main, Layer = layer, Meta = fm });
+                }
+            }
+            return ApplyRules(found.OrderBy(e => e.Layer.Rank).ToList(), solutionDir, replaceByName);
+        }
         var layers = Layers(solutionDir, platforms);
         var all = new List<Entry>();
         void AddFile(Layer layer, string file, string name)
@@ -304,7 +324,12 @@ public static class KnowledgeLayers
             if (layer.Level == "project") foreach (var p in extraProject ?? Enumerable.Empty<string>()) AddPath(layer, p);
         }
         all = all.OrderBy(e => e.Layer.Rank).ToList();     // stable: the order within a level stays
+        return ApplyRules(all, solutionDir, replaceByName);
+    }
 
+    /// <summary>Replace / locked / force (replaceByName) and disabled.json on entries sorted by rank.</summary>
+    static List<Entry> ApplyRules(List<Entry> all, string solutionDir, bool replaceByName)
+    {
         if (replaceByName)
         {
             var current = new Dictionary<string, Entry>(StringComparer.OrdinalIgnoreCase);

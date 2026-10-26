@@ -129,6 +129,11 @@ says otherwise. If a rule contradicts the user's request, point it out briefly a
   Existing rules are never changed or removed by TcAgent - the user edits the file for that.
 - Never put passwords, customer secrets or temporary task notes into rule files.
 
+**Skills** (`tc_skills`): `tc_coding_rules` ends with the list of skills (name + description) – how this team does a kind
+of task. When the task fits one (new function → `requirements-interview`, malfunction → `plc-debugging`, review →
+`plc-code-review`, or the team's own skills), load it with `tc_skills action=show name=<name>` and follow it. Save a
+procedure as a new skill only when the user asks (`tc_skills action=add`, `dryRun` first).
+
 **Other knowledge sources** - not coding rules, keep them apart:
 `tc_lessons` (solutions to hard TwinCAT problems), `tc_docs` (manuals, read only), `tc_doc` (program documentation /
 project memory), `tc_risk_rules` (what the risk analysis checks - see Program documentation). Skills of the user (e.g. a library-specific coding-rules skill) are additional rules from the user -

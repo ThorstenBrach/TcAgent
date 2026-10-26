@@ -36,6 +36,8 @@ Copy-Item $rtNotices "$stage\tcagent\THIRD-PARTY-NOTICES-DOTNET.TXT"
 Get-ChildItem "$stage\tcagent" -Include 'envdte*.dll','Microsoft.VisualStudio.Interop.dll' -Recurse | Remove-Item -Force
 New-Item -ItemType Directory -Force "$stage\tcagent\agents" | Out-Null
 Copy-Item "$here\agents\TCAGENT_GUIDE.md" "$stage\tcagent\agents\"
+# built-in knowledge (skills ...) next to TcAgent.exe - the single-file publish does not take content folders along
+if (-not (Test-Path "$stage\tcagent\knowledge")) { Copy-Item "$here\knowledge" "$stage\tcagent\knowledge" -Recurse }
 
 # 3) Visual Studio extension + VSIX, built with the Visual Studio SDK build tools (Visual Studio's MSBuild)
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"

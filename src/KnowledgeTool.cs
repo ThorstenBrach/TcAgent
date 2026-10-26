@@ -16,7 +16,7 @@ namespace TcAgent;
 
 public sealed partial class ToolRegistry
 {
-    static readonly string[] KnowledgeKinds = { "coding-rules", "risk-rules", "lessons", "doc-templates" };
+    static readonly string[] KnowledgeKinds = { "coding-rules", "risk-rules", "skills", "lessons", "doc-templates" };
 
     void RegisterKnowledge()
     {
@@ -27,7 +27,7 @@ public sealed partial class ToolRegistry
                             "disable/enable key=<kind/name> scope=user|project (switch a file off without changing it), " +
                             "split kind=... scope=project|personal (one file per topic instead of a former single file; dryRun first).",
             Schema(Req(P("action", "string", "platforms, set_platform, list, effective, why, disable, enable or split")),
-                   P("kind", "string", "list/split: coding-rules, risk-rules, lessons or doc-templates (list: default all)"),
+                   P("kind", "string", "list/split: coding-rules, risk-rules, skills, lessons or doc-templates (list: default all)"),
                    P("platforms", "string", "set_platform: comma-separated platform names, or 'none'"),
                    P("name", "string", "why: name of a file (e.g. naming or coding-rules/naming)"),
                    P("key", "string", "disable/enable: <kind>/<name>, e.g. coding-rules/naming"),
@@ -134,6 +134,7 @@ public sealed partial class ToolRegistry
     {
         "coding-rules" => CodingRules.Entries(dir, pi),
         "risk-rules" => KnowledgeLayers.Resolve("risk-rules", dir, pi.Active, true, (Environment.GetEnvironmentVariable("TCAGENT_RISK_RULES") ?? "").Split(';')),
+        "skills" => Skills.Entries(dir, pi.Active),
         "lessons" => KnowledgeLayers.Resolve("lessons", dir, pi.Active, false),
         "doc-templates" => KnowledgeLayers.Resolve("doc-templates", dir, pi.Active, false, pattern: "*.*"),
         _ => throw new Exception("kind: " + string.Join(", ", KnowledgeKinds))

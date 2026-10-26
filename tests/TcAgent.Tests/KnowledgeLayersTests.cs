@@ -7,6 +7,8 @@ using Xunit;
 
 namespace TcAgent.Tests;
 
+// shares the global user root / TCAGENT_COMPANY with the other knowledge tests: not in parallel
+[Collection("knowledge-layers")]
 public sealed class KnowledgeLayersTests : IDisposable
 {
     readonly string dir = Path.Combine(Path.GetTempPath(), "tcagent-kl-" + Guid.NewGuid().ToString("N"));

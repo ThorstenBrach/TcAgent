@@ -30,7 +30,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -68,6 +68,7 @@ public static partial class Cli
         if (o.Command is "st") { Program.ClientName = "cli:st"; return PlainTextCli(o); }   // CliPlainText.cs - project files only, no IDE
         if (o.Command is "tcunit" && o.Sub == "list") { Program.ClientName = "cli:tcunit"; return TcUnitList(o); }   // CliTcUnit.cs - project files only
         if (o.Command is "tcunit" && o.Sub == "report") { Program.ClientName = "cli:tcunit"; return TcUnitReportCli(o); }
+        if (o.Command is "skills") { Program.ClientName = "cli:skills"; return SkillsCli(o); }   // files only, no IDE
 
         Program.ClientName = "cli:" + o.Command;
 
@@ -747,12 +748,12 @@ public static partial class Cli
                 case "--approve": o.Approve = Val().Trim().ToLowerInvariant(); break;
                 default:
                     // st: the sub-command (export, check, import) is the first argument that is not an option
-                    if (o.Command is "st" or "tcunit" && o.Sub == null && !a.StartsWith("-")) { o.Sub = a.ToLowerInvariant(); break; }
+                    if (o.Command is "st" or "tcunit" or "skills" && o.Sub == null && !a.StartsWith("-")) { o.Sub = a.ToLowerInvariant(); break; }
                     throw new Exception("Unknown option " + a);
             }
         }
-        if (o.Command != "ci" && (o.Config != null || o.Only != null || o.Init || (o.Command != "st" && (o.From != null || o.DryRun))))
-            throw new Exception("--config, --only, --from, --dry-run and --init are only for ci (--from and --dry-run also for st import)");
+        if (o.Command != "ci" && (o.Config != null || o.Only != null || o.Init || (o.Command is not ("st" or "skills") && (o.From != null || o.DryRun))))
+            throw new Exception("--config, --only, --from, --dry-run and --init are only for ci (--from and --dry-run also for st import, --dry-run for skills mirror)");
         if ((o.Clean || o.Force) && o.Command != "st") throw new Exception("--clean and --force are only for st");
         if (o.Command is "help" or "version") return o;
         if (o.Command is "st") { ValidateSt(o); return o; }
@@ -760,6 +761,12 @@ public static partial class Cli
         if (o.Command is "tcunit") { ValidateTcUnit(o); return o; }
         if (o.Command is "install") return o;
         if (o.Command is "ci") return o;                  // the steps are checked by ci itself (CliCi.cs)
+        if (o.Command is "skills")                        // files only: the solution is optional (its platform and project skills)
+        {
+            if (o.Sub is not ("list" or "mirror")) throw new Exception("skills needs list or mirror, e.g. TcAgent.exe skills mirror");
+            if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
+            return o;
+        }
         if (o.Command is "doctor")
         {
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
