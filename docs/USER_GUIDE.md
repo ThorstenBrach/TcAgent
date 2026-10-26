@@ -387,6 +387,20 @@ context in every session.
 - Without any rules ("No coding guidelines defined") the agent uses common TwinCAT conventions and the style of the
   existing code, and asks before introducing a convention of its own.
 
+### Skills: how a kind of task is done
+
+Coding rules say what the code must look like; **skills** say how a kind of task is done. They use the open Agent Skills
+format (a folder with `SKILL.md`), so every agent CLI understands them, and come from the same levels as the rules:
+
+- **Built-in:** `requirements-interview` (clarify a machine function before code – one question at a time, with a
+  recommended answer, ends with a short specification), `plc-debugging` (cause before fix, measured online),
+  `plc-code-review` (static risks, rules and a TwinCAT checklist, findings with location).
+- **Your own:** `<level>\skills\<name>\SKILL.md` on the company, user, platform or project level – or by talking:
+  *"Save this procedure as a skill for the project."* (`tc_skills action=add`, after you agreed).
+- The agent sees the list with the coding rules and loads a skill when the task fits (*"Review the changes of today"* →
+  `plc-code-review`). `tc_skills action=list` shows them; the client setup also copies the general ones into the skill
+  folders of the agent CLIs.
+
 ### Adding a rule by talking
 
 - *"Remember: step sequences always as CASE over an enum."*
