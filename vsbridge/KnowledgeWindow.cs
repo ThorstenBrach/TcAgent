@@ -3,14 +3,16 @@
 //
 //   Overview    KPI tiles (runs, first-time-right, failed checks, corrections, minutes per run, gate stops - the last 10
 //               runs against the 10 before, with a sparkline), the workflows, open improvement proposals, frequent errors
-//   Effective   coding rules, risk rules, skills, workflows, lessons and templates of every level with their status
-//               (applies, replaced, locked, forced, switched off) - open, switch off / on
+//   Files       coding rules, risk rules, skills, workflows, lessons and templates of every level with their status
+//               (applies, replaced, locked, forced, switched off) - filter by kind and level; new (from a template), open,
+//               open the folder, move to another level, delete (own levels), switch off / on - toolbar, context menu, Del;
+//               per level kept in Git: local changes, commits behind/ahead, Fetch / Pull / Commit / Push
 //   Sources     the Git sources and the items installed from them (pinned commit, license, changed locally, newer upstream)
 //   History     per workflow failed checks and corrections over the runs, moving average, the adopted changes as markers;
 //               the changes with their values before and after; export as CSV
 //
-// The window does no work itself - it starts TcAgent.exe knowledge json / disable / enable (CliKnowledge.cs). Changes
-// that need a decision (apply a proposal, install, pull, promote) go through the chat: the agent asks the user.
+// The window does no work itself - it starts TcAgent.exe knowledge json / disable / enable / new / move / delete / git
+// (CliKnowledge.cs, KnowledgeOps.cs). Proposals, installing from sources and pulling sources go through the chat.
 //
 // SPDX-License-Identifier: MIT
 using System;
@@ -62,7 +64,7 @@ namespace TcAgentBridge
             public Dictionary<string, object> D;
             public string this[string k] => S(D, k);
             public string C1 { get; set; } public string C2 { get; set; } public string C3 { get; set; }
-            public string C4 { get; set; } public string C5 { get; set; } public string C6 { get; set; }
+            public string C4 { get; set; } public string C5 { get; set; } public string C6 { get; set; } public string C7 { get; set; }
             public Brush Mark { get; set; }
             public string Tip { get; set; }
         }
@@ -73,7 +75,7 @@ namespace TcAgentBridge
                               Gray = TcUnitControl.Frozen(Color.FromArgb(0xB0, 0x80, 0x80, 0x80)), TileBack = TcUnitControl.Frozen(Color.FromArgb(0x18, 0x80, 0x80, 0x80));
 
         readonly Button refresh = TcUnitControl.Tool("⟳", null, "Refresh (read the knowledge and the run logs again)");
-        readonly ToggleButton tOverview = Tab("Overview"), tEffective = Tab("Effective"), tSources = Tab("Sources"), tHistory = Tab("History");
+        readonly ToggleButton tOverview = Tab("Overview"), tEffective = Tab("Files"), tSources = Tab("Sources"), tHistory = Tab("History");
         readonly ContentControl page = new ContentControl();
         readonly TextBlock status = new TextBlock { Margin = new Thickness(6, 2, 6, 4), Opacity = 0.75, TextTrimming = TextTrimming.CharacterEllipsis };
         readonly TextBlock platform = new TextBlock { Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Opacity = 0.8 };
@@ -88,6 +90,12 @@ namespace TcAgentBridge
         readonly CheckBox onlyApplied = new CheckBox { Content = "Only what applies", Margin = new Thickness(0, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center, IsChecked = false };
         readonly TextBox filter = new TextBox { MinWidth = 160, Margin = new Thickness(0, 0, 6, 0), VerticalContentAlignment = VerticalAlignment.Center, ToolTip = "Filter by name, level or reason" };
         readonly ListView entries = NewList();
+        readonly ComboBox levelBox = new ComboBox { MinWidth = 120, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, ToolTip = "Filter by level" };
+        readonly Button newBtn = Text("New …", "A new rule, risk rule, skill, workflow or lesson from a template"),
+                        folderBtn = Text("Open folder", "Show the file in the Explorer"),
+                        moveBtn = Text("Move to level …", "Move the file to another level (shared levels in Git: as a pull request)"),
+                        deleteBtn = Text("Delete", "Delete the file (own levels only; Del)");
+        readonly StackPanel gitPanel = new StackPanel { Margin = new Thickness(6, 0, 6, 2) };
         readonly Button open = Text("Open", "Open the file in the editor (or double-click)"), offProject = Text("Switch off for the project", "disabled.json of the project - the file stays unchanged"),
                         offUser = Text("Switch off for me", "disabled.json of your user level"), on = Text("Switch on", "Remove the entry from disabled.json (project and user)");
         readonly TextBox detail = new TextBox { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, BorderThickness = new Thickness(0), Padding = new Thickness(6),
@@ -187,7 +195,7 @@ namespace TcAgentBridge
             Columns(workflows, ("Workflow", 200, nameof(Line.C1)), ("Runs", 60, nameof(Line.C2)), ("First-time-right", 110, nameof(Line.C3)),
                     ("Failed checks / run", 150, nameof(Line.C4)), ("Corrections / run", 140, nameof(Line.C5)), ("Proposals", 80, nameof(Line.C6)));
             Columns(entries, ("Name", 220, nameof(Line.C1)), ("Kind", 100, nameof(Line.C2)), ("Level", 150, nameof(Line.C3)),
-                    ("Status", 110, nameof(Line.C4)), ("Why", 300, nameof(Line.C5)), ("Source / license", 220, nameof(Line.C6)));
+                    ("Status", 110, nameof(Line.C4)), ("Git", 80, nameof(Line.C7)), ("Why", 280, nameof(Line.C5)), ("Source / license", 200, nameof(Line.C6)));
             Columns(sourceList, ("Source", 180, nameof(Line.C1)), ("Level", 80, nameof(Line.C2)), ("Repository", 420, nameof(Line.C3)), ("Ref", 100, nameof(Line.C4)));
             Columns(installedList, ("Item", 240, nameof(Line.C1)), ("Level", 80, nameof(Line.C2)), ("State", 220, nameof(Line.C3)),
                     ("Source @ commit", 200, nameof(Line.C4)), ("License", 100, nameof(Line.C5)), ("Installed", 100, nameof(Line.C6)));
@@ -203,6 +211,13 @@ namespace TcAgentBridge
             entries.SelectionChanged += (s, e) => ShowEntry();
             entries.MouseDoubleClick += (s, e) => OpenSelected();
             open.Click += (s, e) => OpenSelected();
+            levelBox.SelectionChanged += (s, e) => FillEntries();
+            newBtn.Click += (s, e) => NewItem();
+            folderBtn.Click += (s, e) => OpenFolder();
+            moveBtn.Click += (s, e) => MoveItem();
+            deleteBtn.Click += (s, e) => DeleteItem();
+            entries.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { DeleteItem(); e.Handled = true; } else if (e.Key == Key.Enter) { OpenSelected(); e.Handled = true; } };
+            entries.ContextMenu = EntryMenu();
             offProject.Click += (s, e) => Switch("disable", "project");
             offUser.Click += (s, e) => Switch("disable", "user");
             on.Click += (s, e) => { Switch("enable", "project"); Switch("enable", "user"); };
@@ -241,17 +256,19 @@ namespace TcAgentBridge
         FrameworkElement EffectivePage()
         {
             if (effectivePage != null) return effectivePage;
-            var tools = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 4, 6, 4) };
-            foreach (var e in new UIElement[] { kindBox, filter, onlyApplied, TcUnitControl.Separator(), open, offProject, offUser, on }) tools.Children.Add(e);
+            var tools = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 4, 6, 4) };
+            foreach (var e in new UIElement[] { kindBox, levelBox, filter, onlyApplied, TcUnitControl.Separator(), newBtn, open, folderBtn, moveBtn, deleteBtn,
+                                                TcUnitControl.Separator(), offProject, offUser, on }) tools.Children.Add(e);
             var g = new Grid();
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(3, GridUnitType.Star) });
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             g.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 60 });
             var split = new GridSplitter { Height = 4, HorizontalAlignment = HorizontalAlignment.Stretch, ResizeDirection = GridResizeDirection.Rows };
             split.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBorderBrushKey);
-            Grid.SetRow(tools, 0); Grid.SetRow(entries, 1); Grid.SetRow(split, 2); Grid.SetRow(detail, 3);
-            foreach (var e in new UIElement[] { tools, entries, split, detail }) g.Children.Add(e);
+            Grid.SetRow(tools, 0); Grid.SetRow(gitPanel, 1); Grid.SetRow(entries, 2); Grid.SetRow(split, 3); Grid.SetRow(detail, 4);
+            foreach (var e in new UIElement[] { tools, gitPanel, entries, split, detail }) g.Children.Add(e);
             return effectivePage = g;
         }
 
@@ -349,7 +366,13 @@ namespace TcAgentBridge
             var active = (pf?["active"] as IEnumerable)?.Cast<object>().Select(x => x.ToString()).ToList() ?? new List<string>();
             platform.Text = "Platform: " + (active.Count > 0 ? string.Join(", ", active) : "none") + (S(pf, "reason") is string r ? $" ({r})" : "");
             FillOverview();
+            var keepLevel = levelBox.SelectedItem as string;
+            var labels = new List<string> { "All levels" };
+            labels.AddRange(Arr(data["entries"]).Select(e => S(e, "label")).Where(x => x != null).Distinct());
+            levelBox.ItemsSource = labels;
+            levelBox.SelectedItem = keepLevel != null && labels.Contains(keepLevel) ? keepLevel : "All levels";
             FillEntries();
+            FillGit();
             FillSources();
             var names = Arr(data["workflows"]).Select(w => S(w, "name")).ToList();
             var keep = wfBox.SelectedItem as string;
@@ -450,15 +473,17 @@ namespace TcAgentBridge
         {
             if (data == null) return;
             var kind = kindBox.SelectedIndex > 0 ? kindBox.SelectedItem as string : null;
+            var level = levelBox.SelectedIndex > 0 ? levelBox.SelectedItem as string : null;
             var q = filter.Text.Trim();
             var lines = new List<Line>();
             foreach (var e in Arr(data["entries"]))
             {
                 if (kind != null && S(e, "kind") != kind) continue;
+                if (level != null && S(e, "label") != level) continue;
                 if (onlyApplied.IsChecked == true && !B(e, "active")) continue;
                 var st = S(e, "status") + (B(e, "locked") ? ", locked" : "");
                 var src = S(e, "source") is string so ? so + (S(e, "license") is string li ? " · " + li : "") : "";
-                var l = new Line { D = e, C1 = S(e, "name"), C2 = S(e, "kind"), C3 = S(e, "label"), C4 = st, C5 = S(e, "reason") ?? "", C6 = src,
+                var l = new Line { D = e, C1 = S(e, "name"), C2 = S(e, "kind"), C3 = S(e, "label"), C4 = st, C5 = S(e, "reason") ?? "", C6 = src, C7 = S(e, "git") ?? "",
                                    Mark = B(e, "active") ? Green : S(e, "status") == "disabled" ? Orange : Gray, Tip = S(e, "path") };
                 if (q.Length > 0 && !$"{l.C1} {l.C2} {l.C3} {l.C4} {l.C5} {l.C6}".ToLowerInvariant().Contains(q.ToLowerInvariant())) continue;
                 lines.Add(l);
@@ -470,7 +495,7 @@ namespace TcAgentBridge
         void ShowEntry()
         {
             var l = entries.SelectedItem as Line;
-            foreach (var b in new[] { open, offProject, offUser, on }) b.IsEnabled = l != null;
+            foreach (var b in new[] { open, offProject, offUser, on, folderBtn, moveBtn, deleteBtn }) b.IsEnabled = l != null;
             if (l == null) { detail.Text = "Select an entry. A later level replaces an entry with the same name; locked entries can only be switched off by the company level."; return; }
             var d = l.D;
             var sb = new StringBuilder($"{S(d, "key")} – {S(d, "label")} – {S(d, "status")}{(B(d, "locked") ? " (locked)" : "")}{(B(d, "force") ? " (force)" : "")}\n");
@@ -482,6 +507,194 @@ namespace TcAgentBridge
             detail.Text = sb.ToString();
             offProject.IsEnabled = l != null && !B(d, "locked") && !string.IsNullOrEmpty(S(data, "solutionDir"));
             offUser.IsEnabled = l != null && !B(d, "locked");
+            deleteBtn.IsEnabled = LayerOf(d) is Dictionary<string, object> ly && B(ly, "deletable");
+            if (S(d, "git") is string gs) detail.Text = detail.Text.Insert(detail.Text.IndexOf('\n') + 1, $"Git: {gs} - not committed yet\n");
+        }
+
+        // ------------------------------------------------------------------ new / open folder / move / delete
+        Dictionary<string, object> LayerOf(Dictionary<string, object> e) => Arr(data?["layers"]).FirstOrDefault(l => S(l, "label") == S(e, "label"));
+
+        ContextMenu EntryMenu()
+        {
+            var m = new ContextMenu();
+            MenuItem Item(string header, Action act, Func<bool> enabled = null, string key = null)
+            {
+                var i = new MenuItem { Header = header, InputGestureText = key ?? "" };
+                i.Click += (s, e) => act();
+                if (enabled != null) m.Opened += (s, e) => i.IsEnabled = enabled();
+                return i;
+            }
+            bool Sel() => entries.SelectedItem is Line;
+            m.Items.Add(Item("Open", OpenSelected, Sel, "Enter"));
+            m.Items.Add(Item("Open folder", OpenFolder, Sel));
+            m.Items.Add(new Separator());
+            m.Items.Add(Item("New …", NewItem));
+            m.Items.Add(Item("Move to level …", MoveItem, Sel));
+            m.Items.Add(Item("Delete", DeleteItem, () => entries.SelectedItem is Line l && LayerOf(l.D) is Dictionary<string, object> ly && B(ly, "deletable"), "Del"));
+            m.Items.Add(new Separator());
+            m.Items.Add(Item("Switch off for the project", () => Switch("disable", "project"), () => offProject.IsEnabled));
+            m.Items.Add(Item("Switch off for me", () => Switch("disable", "user"), () => offUser.IsEnabled));
+            m.Items.Add(Item("Switch on", () => { Switch("enable", "project"); Switch("enable", "user"); }, Sel));
+            return m;
+        }
+
+        // the levels a file can be created at / moved to (built-in never; company only by moving - as a pull request)
+        List<(string Label, string Level, bool Pr)> Levels(bool forNew) =>
+            Arr(data?["layers"]).Where(l => S(l, "level") is string lv && lv != "built-in" && (!forNew || !B(l, "viaPullRequest") && lv != "company"))
+                                .Select(l => (S(l, "label"), S(l, "level"), B(l, "viaPullRequest") || S(l, "level") == "company")).ToList();
+
+        void NewItem()
+        {
+            var levels = Levels(true);
+            if (levels.Count == 0) { status.Text = "No level to create files at."; return; }
+            var kinds = new[] { "coding-rules", "risk-rules", "skills", "workflows", "lessons" };
+            var r = Prompt("New knowledge file", ("Kind", kinds, kindBox.SelectedIndex > 0 && kinds.Contains(kindBox.SelectedItem as string) ? (string)kindBox.SelectedItem : "skills"),
+                           ("Name", null, ""), ("Level", levels.Select(x => x.Label).ToArray(), levels.Any(x => x.Level == "project") ? levels.First(x => x.Level == "project").Label : levels[0].Label));
+            if (r == null || r[1].Trim().Length == 0) return;
+            var level = levels.First(x => x.Label == r[2]).Level;
+            var (ok, output) = RunCli($"knowledge new --key {Quote(r[0] + "/" + r[1].Trim())} --level {Quote(level)}");
+            status.Text = output;
+            if (ok && File.Exists(output.Trim()))
+                try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(output.Trim()); } catch { }
+            Load();
+        }
+
+        void OpenFolder()
+        {
+            var p = (entries.SelectedItem as Line)?["path"];
+            if (p == null) return;
+            try { Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + p + "\"") { UseShellExecute = false }); }
+            catch (Exception ex) { status.Text = ex.Message; }
+        }
+
+        void MoveItem()
+        {
+            if (!(entries.SelectedItem is Line l)) return;
+            var levels = Levels(false).Where(x => x.Label != S(l.D, "label")).ToList();
+            if (levels.Count == 0) { status.Text = "No other level to move to."; return; }
+            var r = Prompt($"Move {S(l.D, "key")} ({S(l.D, "label")})", ("To level", levels.Select(x => x.Label + (x.Pr ? "  (pull request)" : "")).ToArray(), null));
+            if (r == null) return;
+            var target = levels.First(x => r[0].StartsWith(x.Label));
+            var (_, output) = RunCli($"knowledge move --path {Quote(S(l.D, "path"))} --level {Quote(target.Level)}");
+            status.Text = output;
+            Load();
+        }
+
+        void DeleteItem()
+        {
+            if (!(entries.SelectedItem is Line l)) return;
+            if (!(LayerOf(l.D) is Dictionary<string, object> ly && B(ly, "deletable")))
+            { status.Text = $"Files of the {S(l.D, "label")} level are not deleted here - switch it off instead."; return; }
+            var what = S(l.D, "kind") is "skills" or "workflows" ? "the folder of " + S(l.D, "key") : S(l.D, "path");
+            if (MessageBox.Show($"Delete {what}?\n\nThis cannot be undone (unless the level is kept in Git).", "TcAgent Knowledge",
+                                MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            var (_, output) = RunCli($"knowledge delete --path {Quote(S(l.D, "path"))}");
+            status.Text = output;
+            Load();
+        }
+
+        // ------------------------------------------------------------------ git
+        void FillGit()
+        {
+            gitPanel.Children.Clear();
+            foreach (var l in Arr(data["layers"]))
+            {
+                if (!(l.TryGetValue("git", out var go) && go is Dictionary<string, object> g) || B(g, "same") || S(l, "level") == null) continue;
+                var ch = (g.TryGetValue("changes", out var c) ? c as Dictionary<string, object> : null)?.Count ?? 0;
+                int behind = (int)(N(g, "behind") ?? 0), ahead = (int)(N(g, "ahead") ?? 0);
+                var row = new WrapPanel { Margin = new Thickness(0, 1, 0, 1) };
+                var t = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+                t.Inlines.Add(new System.Windows.Documents.Run($"{S(l, "label")} · {Path.GetFileName(S(g, "repo"))} ({S(g, "branch")}): ") { FontWeight = FontWeights.SemiBold });
+                var parts = new List<string>();
+                if (ch > 0) parts.Add($"{ch} local change(s) to commit");
+                if (ahead > 0) parts.Add($"{ahead} commit(s) to push");
+                if (behind > 0) parts.Add($"{behind} new commit(s) in the repository - pull");
+                if (!B(g, "upstream")) parts.Add("no remote branch");
+                t.Inlines.Add(new System.Windows.Documents.Run(parts.Count > 0 ? string.Join(" · ", parts) : "up to date (as of the last fetch)")
+                                  { Foreground = behind > 0 || ch > 0 || ahead > 0 ? Orange : Green });
+                t.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+                row.Children.Add(t);
+                var level = S(l, "level"); bool pr = B(l, "viaPullRequest");
+                foreach (var (label, action, tip) in new[] { ("Fetch", "fetch", "Look for new commits in the repository"), ("Pull", "pull", "Take over the new commits (fast-forward)"),
+                                                            ("Commit …", "commit", "Commit the local changes of this level"),
+                                                            ("Push", "push", pr ? "Push to a new branch - then open a pull request (shared level)" : "Push the current branch") })
+                {
+                    var b = Text(label, tip);
+                    b.Click += (s, e) => GitAction(level, action);
+                    b.IsEnabled = action switch { "pull" => B(g, "upstream"), "commit" => ch > 0, "push" => ahead > 0 || pr && ch == 0 && ahead > 0, _ => true };
+                    row.Children.Add(b);
+                }
+                gitPanel.Children.Add(row);
+            }
+        }
+
+        void GitAction(string level, string action)
+        {
+            string message = null;
+            if (action == "commit")
+            {
+                var r = Prompt($"Commit the changes of {level}", ("Message", null, "Update knowledge"));
+                if (r == null || r[0].Trim().Length == 0) return;
+                message = r[0].Trim();
+            }
+            status.Text = $"git {action} ({level}) ...";
+            var args = $"knowledge git --action {action} --level {Quote(level)}" + (message != null ? " --message " + Quote(message) : "");
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var (_, output) = RunCli(args);
+                Dispatcher.BeginInvoke(new Action(() => { status.Text = output; Load(); }));
+            });
+        }
+
+        (bool ok, string output) RunCli(string args)
+        {
+            var exe = TcUnitControl.TcAgentExe();
+            if (exe == null) return (false, "TcAgent.exe not found.");
+            var sln = TcUnitControl.SolutionPath();
+            try
+            {
+                var psi = new ProcessStartInfo(exe, args + (string.IsNullOrEmpty(sln) ? "" : " --solution " + Quote(sln)))
+                {
+                    UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
+                    StandardOutputEncoding = new UTF8Encoding(false), StandardErrorEncoding = new UTF8Encoding(false)
+                };
+                psi.EnvironmentVariables["TCAGENT_CLIENT"] = "window:knowledge";
+                using (var p = Process.Start(psi))
+                {
+                    var err = p.StandardError.ReadToEndAsync();
+                    var o = p.StandardOutput.ReadToEnd();
+                    p.WaitForExit(120_000);
+                    return (p.ExitCode == 0, (o + " " + err.Result).Trim());
+                }
+            }
+            catch (Exception ex) { return (false, ex.Message); }
+        }
+
+        /// <summary>A small dialog: one field per entry (choices = combo box, null = text box). Returns the values or null.</summary>
+        string[] Prompt(string title, params (string Label, string[] Choices, string Value)[] fields)
+        {
+            var w = new Window { Title = title, SizeToContent = SizeToContent.WidthAndHeight, MinWidth = 380, ResizeMode = ResizeMode.NoResize,
+                                 WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Application.Current?.MainWindow, ShowInTaskbar = false };
+            var sp = new StackPanel { Margin = new Thickness(12) };
+            var getters = new List<Func<string>>();
+            foreach (var f in fields)
+            {
+                sp.Children.Add(new TextBlock { Text = f.Label, Margin = new Thickness(0, 6, 0, 2) });
+                if (f.Choices != null)
+                {
+                    var cb = new ComboBox { ItemsSource = f.Choices, SelectedItem = f.Value ?? f.Choices.FirstOrDefault(), MinWidth = 340 };
+                    sp.Children.Add(cb); getters.Add(() => cb.SelectedItem as string);
+                }
+                else { var tb = new TextBox { Text = f.Value ?? "", MinWidth = 340 }; sp.Children.Add(tb); getters.Add(() => tb.Text); }
+            }
+            var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
+            var okB = new Button { Content = "OK", MinWidth = 80, IsDefault = true, Margin = new Thickness(0, 0, 6, 0) };
+            var cancelB = new Button { Content = "Cancel", MinWidth = 80, IsCancel = true };
+            okB.Click += (s, e) => w.DialogResult = true;
+            buttons.Children.Add(okB); buttons.Children.Add(cancelB);
+            sp.Children.Add(buttons);
+            w.Content = sp;
+            return w.ShowDialog() == true ? getters.Select(g => g()).ToArray() : null;
         }
 
         void OpenSelected()

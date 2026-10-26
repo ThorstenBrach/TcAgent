@@ -110,10 +110,17 @@ work without the extension. The extension runs **inside** the IDE process and ad
   - **Overview:** tiles for runs, first-time-right, failed checks, corrections and minutes per run and gate stops – the
     last 10 workflow runs against the 10 before, with a sparkline; the workflows; open improvement proposals; the most
     frequent compiler errors. Double-click a workflow for its history.
-  - **Effective:** coding rules, risk rules, skills, workflows, lessons and templates of every level with their status
-    (applies, replaced by a later level, locked, forced, switched off) and why. Open the file, switch it off for the
-    project or for you, switch it on (`disabled.json` – the file itself stays unchanged).
-  - **Sources:** the Git sources and the items installed from them – pinned commit, license, changed locally, newer upstream.
+  - **Files:** coding rules, risk rules, skills, workflows, lessons and templates of every level with their status
+    (applies, replaced by a later level, locked, forced, switched off) and why; filter by kind, level and text. Toolbar
+    and context menu: **New …** (from a template, opened in the editor), **Open**, **Open folder**, **Move to level …**
+    (moving up checks the text for project and machine names; company and a team in Git as a commit on a new branch for
+    a pull request), **Delete** (also the Del key; only on your own levels – built-in and company files are switched off
+    instead), **Switch off** for the project or for you, **Switch on** (`disabled.json` – the file itself stays unchanged).
+    For every level kept in Git a line shows local changes, commits to push and new commits in the repository (as of
+    the last **Fetch**), with **Pull**, **Commit …** and **Push** – the push of a company or team level goes to a new
+    branch for a pull request; the column **Git** marks changed and new files.
+  - **Sources:** the Git repositories skills, workflows and rules can be installed from (`tc_sources`) and the items
+    installed from them – pinned commit, license, changed locally, newer upstream.
   - **History:** failed checks and corrections per run with a moving average, every adopted change as a marker, and the
     changes with their values before and after (helped / no effect / worse / reverted); **Export CSV**.
 

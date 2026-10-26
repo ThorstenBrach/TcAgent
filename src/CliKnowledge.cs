@@ -28,6 +28,22 @@ public static partial class Cli
             Console.WriteLine($"{(o.Sub == "disable" ? "Switched off" : "Switched on")}: {o.Key} ({KnowledgeLayers.SetDisabled(dir, level, o.Key, o.Sub == "disable")})");
             return Ok;
         }
+        if (o.Sub is "new" or "move" or "delete" or "git")
+        {
+            try
+            {
+                var pi = KnowledgeLayers.Platforms(dir).Active;
+                Console.WriteLine(o.Sub switch
+                {
+                    "new" => KnowledgeOps.New(dir, o.Key?.Split('/')[0], o.Key?.Split('/').Last(), o.Level ?? "user"),
+                    "move" => KnowledgeOps.Move(dir, o.Out ?? throw new ArgumentException("--path is required"), o.Level ?? throw new ArgumentException("--level is required"), pi),
+                    "delete" => KnowledgeOps.Delete(dir, o.Out ?? throw new ArgumentException("--path is required"), pi),
+                    _ => KnowledgeOps.GitAction(dir, o.Action ?? "fetch", o.Level ?? throw new ArgumentException("--level is required"), o.Message)
+                });
+                return Ok;
+            }
+            catch (Exception ex) when (ex is ArgumentException or InvalidOperationException) { Console.Error.WriteLine(ex.Message); return Failed; }
+        }
         Console.OutputEncoding = new System.Text.UTF8Encoding(false);
         Console.WriteLine(KnowledgeJson(dir).ToJsonString(new JsonSerializerOptions { WriteIndented = false }));
         return Ok;
@@ -63,6 +79,30 @@ public static partial class Cli
                     ["source"] = e.Meta?.Get("source"), ["license"] = e.Meta?.Get("license")
                 });
         }
+        // the levels with their Git state (behind/ahead as of the last fetch, local changes) and what the window may do there
+        var layers = new JsonArray();
+        var changes = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var seenRepos = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var l in KnowledgeLayers.Layers(dir, pi.Active).Where(l => Directory.Exists(l.Root)))
+        {
+            var git = l.Level == "built-in" ? null : KnowledgeOps.GitState(l.Root);
+            if (git?["changes"] is JsonObject ch) foreach (var kv in ch) changes[kv.Key] = kv.Value!.ToString();
+            var levelName = l.Platform != null ? (l.Level == "user" ? "platform:" + l.Platform : null) : l.Team != null ? "team:" + l.Team : l.Level;
+            layers.Add(new JsonObject
+            {
+                ["label"] = l.Label, ["level"] = levelName, ["root"] = l.Root, ["deletable"] = KnowledgeOps.Deletable(l),
+                ["viaPullRequest"] = levelName != null && l.Level is "company" or "team" && KnowledgeOps.ViaPullRequest(levelName, l.Root),
+                ["git"] = git != null && seenRepos.Add((string)git["repo"]!) ? git : git != null ? new JsonObject { ["repo"] = (string)git["repo"]!, ["same"] = true } : null
+            });
+        }
+        foreach (var e in entries.OfType<JsonObject>())
+        {
+            var p = (string)e["path"]!;
+            var item = KnowledgeOps.ItemOf(p);
+            var st = changes.TryGetValue(p, out var s1) ? s1 : changes.Where(kv => kv.Key.StartsWith(item + "\\", StringComparison.OrdinalIgnoreCase)).Select(kv => kv.Value).FirstOrDefault();
+            if (st != null) e["git"] = st;
+        }
+        o["layers"] = layers;
         o["entries"] = entries;
         o["counts"] = counts;
 

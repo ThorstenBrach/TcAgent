@@ -5,6 +5,19 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.40.0] – 2026-10-26
+
+### Added
+- **Knowledge window, tab Files** (formerly Effective): filter by level; **New …** (rule, risk rule, skill, workflow or lesson
+  from a template, opened in the editor), **Open folder**, **Move to level …** (name check when moving up; company and a
+  team in Git as a commit on a new branch for a pull request), **Delete** (Del key; own levels only), all of it also in the
+  context menu.
+- **Git in the knowledge window:** per level kept in a Git repository the local changes, commits to push and new commits
+  in the repository (as of the last fetch), with Fetch, Pull (fast-forward), Commit and Push - a company or team level
+  pushes to a new branch for a pull request; column Git per file.
+- `TcAgent.exe knowledge new|move|delete|git` (`--key`, `--path`, `--level`, `--action`, `--message`) -
+  `KnowledgeOps.cs`, tests `KnowledgeOpsTests`.
+
 ## [0.39.9] – 2026-10-26
 
 ### Changed

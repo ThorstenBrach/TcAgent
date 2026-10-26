@@ -48,7 +48,7 @@ public static partial class Cli
         public string Sub; public bool Clean, Force;                      // st export|check|import (CliPlainText.cs)
         public readonly List<string> Tests = new(); public bool TimeoutGiven, Download, BuiltIn;   // tcunit run/report (CliTcUnit.cs)
         public string Approve;                                                                      // tcunit report --approve <id>
-        public string Key, Level;                                                                   // knowledge disable/enable --key <kind/name> --level user|project
+        public string Key, Level, Action, Message;                                                  // knowledge ... --key <kind/name> --level <level> --action <git action> --message <text>
 
     }
 
@@ -751,6 +751,8 @@ public static partial class Cli
                 case "--approve": o.Approve = Val().Trim().ToLowerInvariant(); break;
                 case "--key": o.Key = Val().Trim(); break;
                 case "--level": o.Level = Val().Trim().ToLowerInvariant(); break;
+                case "--action": o.Action = Val().Trim().ToLowerInvariant(); break;
+                case "--message": o.Message = Val(); break;
                 default:
                     // st: the sub-command (export, check, import) is the first argument that is not an option
                     if (o.Command is "st" or "tcunit" or "skills" or "sources" or "knowledge" && o.Sub == null && !a.StartsWith("-")) { o.Sub = a.ToLowerInvariant(); break; }
@@ -766,10 +768,11 @@ public static partial class Cli
         if (o.Command is "tcunit") { ValidateTcUnit(o); return o; }
         if (o.Command is "install") return o;
         if (o.Command is "ci") return o;                  // the steps are checked by ci itself (CliCi.cs)
-        if ((o.Key != null || o.Level != null) && o.Command != "knowledge") throw new Exception("--key and --level are only for knowledge disable/enable");
+        if ((o.Key != null || o.Level != null || o.Action != null || o.Message != null) && o.Command != "knowledge") throw new Exception("--key, --level, --action and --message are only for knowledge");
         if (o.Command is "knowledge")                     // files only: the solution is optional (its platform and project level)
         {
-            if (o.Sub is not ("json" or "disable" or "enable")) throw new Exception("knowledge needs json, disable or enable, e.g. TcAgent.exe knowledge json --solution M.sln");
+            if (o.Sub is not ("json" or "disable" or "enable" or "new" or "move" or "delete" or "git"))
+                throw new Exception("knowledge needs json, disable, enable, new, move, delete or git, e.g. TcAgent.exe knowledge json --solution M.sln");
             if (o.Sub is "disable" or "enable" && (o.Key == null || !o.Key.Contains('/'))) throw new Exception("knowledge " + o.Sub + " needs --key <kind>/<name>");
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
             return o;
