@@ -160,6 +160,52 @@ metadata:
   tool call. The list of mirror folders is configurable.
 - The TcAgent guide stays the built-in base skill and is itself an Agent Skill.
 
+### Built-in TwinCAT skills: method adopted, content written for TwinCAT
+
+Good general skills (e.g. the open-source collections obra/superpowers and mattpocock/skills, both MIT) consist of a
+method and a text with examples from web development. TcAgent adopts the **method** and writes its own TwinCAT skills
+that work with the TcAgent tools; `metadata.tcagent-inspired-by` names the original. First skills:
+
+- `requirements-interview` – clarify a machine function before code: look things up in the project first, then one
+  question at a time with a recommended answer (`tc_ask_user`): states/sequence, interlocks, I/Os, error cases and
+  acknowledgement, operating modes, safety (noted, never designed), HMI, timing, tests; ends with a short specification
+- `plc-debugging` – pin down the symptom, reproduce and measure (`ads_read`, scope, runtime messages), cause before
+  fix, record a lesson
+- `plc-code-review` – risk analysis, coding and risk rules, TwinCAT checklist (task assignment and cycle time, access from
+  several tasks, persistence, I/O links, online change, safety interfaces read-only)
+
+Later: `plc-verify` (partly hard gates), `tcunit-tdd`, `plc-change-plan`. Built-in skills are not locked – company,
+platform or project can extend or replace them.
+
+### Skill sources (Git repositories)
+
+Every level can be a Git repository, and external collections can be added as sources:
+
+- external: e.g. `github.com/obra/superpowers`, `github.com/mattpocock/skills`
+- user: an own repository (local, optionally with a private remote)
+- team, platform, company: shared repositories
+- project: `.tcagent\skills` in the project repository
+
+`tc_skills` / `TcAgent.exe skills`: `source add|remove`, `search`, `list`, `pull` (shows diff and license, asks),
+`install <source>/<skill> --to user|team|platform:<name>|company|project`, `promote <skill> --to …` (a pull request
+for shared repositories, after the check for customer/project names), `status` (outdated, changed locally, source,
+license), `diff`.
+
+- **Lock file** `.tcagent\skills.lock.json`: source, commit and checksum per skill – the team and the pipeline get
+  exactly the same skills; updates only by `pull`.
+- **Adapt without changing the original:** an overlay skill with `tcagent-extends: <source>/<skill>` adds only the
+  TwinCAT parts; or a fork with origin and license in its header – `pull` reports changes of the original and offers a
+  comparison.
+- **Licenses:** detected on `pull` and recorded (`tcagent-source`, `tcagent-license`). MIT and Apache 2.0 are accepted,
+  their notices travel with the skill. "Source-available" or unknown licenses are reported and not taken over by
+  default.
+- **Security:** skills may contain scripts – TcAgent shows the content before taking a skill over, never runs anything
+  automatically, and pins sources to a commit.
+- The repository layout is the common one of the Agent Skills ecosystem, so skills stay interchangeable with other skill
+  installers.
+- The same mechanism distributes **coding rules, risk rules, workflows and lessons** – every kind can come from a source
+  repository.
+
 The same applies to project instructions: `AGENTS.md` is the cross-tool standard for instruction files (Linux
 Foundation, read by Codex, Copilot, Gemini CLI and others); TcAgent keeps writing it next to `CLAUDE.md`.
 
@@ -222,6 +268,26 @@ A run log contains only counts and names – no code, no customer data:
    customer, project and machine names and removes them – nothing specific travels upwards.
 5. The next run logs show whether the change helped (fewer failed attempts, fewer corrections). If not, TcAgent
    proposes to revert it.
+
+## Knowledge manager (window)
+
+A window in Visual Studio / XAE Shell ("TcAgent Knowledge", next to the TcUnit Tests window) shows everything the agent
+gets and where it comes from:
+
+- **Tree:** kind (coding rules, risk rules, skills, workflows, lessons, knowledge, templates) → level / platform →
+  file. A second view shows the **effective** set for the open project: what applies, from which file, and why
+  (replaced by a later level, locked, forced, disabled, platform not active).
+- **Status per file:** active · replaced · locked · forced · disabled · changed locally · newer version in the source ·
+  source and license.
+- **Actions:** new (from a template, at the chosen level), edit (opens the file in the IDE editor), disable / enable,
+  remove, move to another level, promote (pull request for shared repositories), pull updates, diff, validate (front
+  matter, name rules).
+- **Disabling** does not change the file: a small per-level list (`disabled.json`) records what is switched off, so
+  files from a source or a shared repository stay untouched and can still be updated.
+- Removing or changing files of a shared repository goes the same way as every change there: as a pull request.
+  `locked` files can only be changed by their owner.
+- The same actions exist for agents and the command line (`tc_knowledge`, `TcAgent.exe knowledge`), so the agent can
+  answer "which rules apply here and why?".
 
 ## Client neutrality (high priority)
 
