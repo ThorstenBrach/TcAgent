@@ -361,8 +361,9 @@ public sealed partial class ToolRegistry
                         "so it produces no executable code and no files. The default after code changes. Returns errors/warnings with file and line.",
             Schema(), a => tc.Sta.Run(() => tc.Check()));
 
-        Add("tc_build", "Builds the solution (produces executable code and files) and returns compiler errors/warnings. Only needed before " +
-                        "activating/downloading or when the user asks for it - to check for compiler errors use tc_check.",
+        Add("tc_build", "Builds the solution (produces executable code and files - slower than a check) and returns compiler errors/warnings. " +
+                        "Needed before activating/downloading, for a build checkpoint of a workflow, or when the user asks for it. Always run tc_check " +
+                        "first and fix its errors - it pre-compiles without generating code, so several fix rounds cost checks, not builds.",
             Schema(P("rebuild", "boolean", "Clean first"), P("checkAll", "boolean", "Additionally check all objects (default false)")),
             a => tc.Sta.Run(() => tc.Build(null, Bool(a, "rebuild", false), Bool(a, "checkAll", false))));
 

@@ -288,11 +288,16 @@ change is blocked. See [Safety and guardrails](#safety-and-guardrails).
 | What it is | "Check all objects" | Real build of the solution |
 | Finds errors in unused POUs | yes | no – unused POUs are not compiled (use `checkAll=true`) |
 | Produces code and files | no | yes |
-| When the agent uses it | after code changes – the default | before activation/download, for I/O linking (process image), or when you ask |
+| When the agent uses it | after code changes – the default; always **before** a build | before activation/download, for I/O linking (process image), for the build checkpoint of a coding workflow, or when you ask – after a clean `tc_check` |
 
 Results come with file and TwinCAT error code (`Cxxxx`). `tc_check` lists compiler messages only; messages without a
 source position (imports, device descriptions) are shown separately and do not count. `tc_build` sums up the repeated
 "device … already exists in file …" INFO messages in one line. `tc_build rebuild=true` cleans first.
+
+**Check first, then build:** `tc_check` pre-compiles without generating code and is much faster than a build. The agent
+therefore fixes compiler errors with checks and builds only when the check is clean – several build attempts until
+0 errors would cost far more time. Coding workflows end with a **build with 0 errors**; when the agent marks that step
+done, TcAgent itself runs `tc_check` first and builds only if the check is clean.
 
 `tc_errors` reads the IDE error list, split into compiler/project messages and PLC runtime/TcUnit messages
 (`kind=compile|runtime|all`).
@@ -443,12 +448,14 @@ own repository, or a shared team, platform or company repository:
 ### Workflows: how a kind of task is always done
 
 A **workflow** is a fixed sequence of steps with checkpoints, e.g. the built-in `new-feature`: clarify the requirement
-(skill `requirements-interview`) → change plan (you agree) → code → `tc_check` until 0 errors → tests (if there are any)
+(skill `requirements-interview`) → change plan (you agree) → code → `tc_check` until clean → **build with 0 errors**
+(checkpoint) → tests (if there are any)
 → review (skill `plc-code-review`) → save and summary. *"Add a start delay to the conveyor, use the new-feature
 workflow."* – or the agent starts it itself when the task fits.
 
-- A step marked `(requires: check-ok)` is a **checkpoint**: TcAgent does not let the agent continue until the check holds,
-  and it cannot be skipped – it runs `tc_check` itself when the agent says the step is done. Other steps can be skipped
+- A step marked `(requires: build-ok)` or `(requires: check-ok)` is a **checkpoint**: TcAgent does not let the agent
+  continue until it holds, and it cannot be skipped – when the agent says the step is done, TcAgent runs `tc_check` itself
+  and, for a build checkpoint, `tc_build` only after a clean check. Other steps can be skipped
   when they do not apply. The summary at the end lists the objects that were changed.
 - Own workflows: `<level>\workflows\<name>\WORKFLOW.md` (same levels as the rules), steps as a numbered list.
 - **Always, with or without a workflow:** `tc_activate` builds first and refuses to activate with build errors.

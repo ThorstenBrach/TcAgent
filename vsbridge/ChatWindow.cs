@@ -674,7 +674,7 @@ namespace TcAgentBridge
         {
             var sb = new StringBuilder();
             var buildRule = buildBox.IsChecked == true
-                ? "After code changes, check for compiler errors once at the end with tc_check (not after every intermediate step); do not check for pure questions. Use tc_build only if the user asks for it or the project is to be activated."
+                ? "After code changes, check for compiler errors once at the end with tc_check (not after every intermediate step); do not check for pure questions. Use tc_build only if the user asks for it, the project is to be activated or a workflow step needs a build - and only after a clean tc_check (the check is much faster and generates no code)."
                 : "Do NOT check/build (no tc_check, no tc_build) - the user does that. Only write changes and save them with tc_save.";
             if (followUp)
             {

@@ -101,7 +101,8 @@ public sealed class WorkflowsTests : IDisposable
         var fm = KnowledgeLayers.ParseFrontMatter(File.ReadAllText(file));
         Assert.Equal("new-feature", fm.Top["name"]);
         var steps = Workflows.ParseSteps(fm.Body);
-        Assert.Equal(new[] { "requirements", "change-plan", "code", "check", "tests", "review", "save" }, steps.Select(s => s.Id));
-        Assert.Equal("check-ok", steps.Single(s => s.Id == "check").Requires);
+        Assert.Equal(new[] { "requirements", "change-plan", "code", "check", "build", "tests", "review", "save" }, steps.Select(s => s.Id));
+        Assert.Equal("build-ok", steps.Single(s => s.Id == "build").Requires);
+        Assert.Null(steps.Single(s => s.Id == "check").Requires);              // the check is the fast pre-compile before the build
     }
 }

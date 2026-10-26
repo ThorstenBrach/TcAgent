@@ -251,7 +251,8 @@ description: Add a driver FB for a new device
   - Saving (`tc_save`) stays allowed with compiler errors, so intermediate states can be kept.
   - TcUnit tests are **not** a hard gate – not every task has tests. A workflow can recommend them.
   - Checkpoints belong to the **step of a workflow**, not to TcAgent as a whole: a coding workflow (e.g. `new-feature`)
-    ends with compiled code with 0 errors (`check-ok`); a workflow for other work TcAgent does (documentation, I/O
+    ends with a **build with 0 errors** (`build-ok`), always preceded by `tc_check` (a pre-compile without code generation,
+    much faster - errors are fixed with checks, the build runs once); a workflow for other work TcAgent does (documentation, I/O
     configuration, analysis, commissioning) defines its own checkpoints or none. Only the gate before `tc_activate` is
     global, because an activation always needs code that builds.
 

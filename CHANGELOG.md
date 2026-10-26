@@ -5,6 +5,17 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.39.0] – 2026-10-26
+
+### Changed
+- **Coding workflows end with a build with 0 errors, always preceded by a check.** The built-in `new-feature` workflow has
+  a `check` step (`tc_check` until clean - a pre-compile without code generation, much faster) and then the checkpoint
+  `build` (`requires: build-ok`). When the agent marks the build step done, TcAgent runs `tc_check` first and `tc_build`
+  only if the check is clean; with check errors it reports them without building - several failed builds cost far more
+  time than several checks.
+- Guidance for every agent (tool description of `tc_build`, TcAgent guide, chat prompt, user guide): run `tc_check`
+  before every `tc_build`.
+
 ## [0.38.0] – 2026-10-26
 
 ### Added

@@ -40,11 +40,17 @@ public sealed partial class ToolRegistry
                             if (!Bool(a, "skip", false) && run.Active is { Requires: "check-ok" or "build-ok" } act && Workflows.Missing(act) != null
                                 && (string.IsNullOrEmpty(Str(a, "step")) || Str(a, "step")!.Equals(act.Id, StringComparison.OrdinalIgnoreCase)))
                             {
-                                var tool = act.Requires == "build-ok" ? "tc_build" : "tc_check";
-                                var res = Call(tool, new JsonObject());
-                                var txt = (res["content"] as JsonArray)?[0]?["text"]?.ToString() ?? "";
-                                pre = $"{tool} (run by TcAgent for the checkpoint): {txt.Split('\n')[0]}\n\n";
-                                if (Workflows.Missing(act) != null && ++act.GateStops > 0) throw new InvalidOperationException($"step '{act.Id}' needs {act.Requires} - {txt.Split('\n')[0]}\n{string.Join("\n", txt.Split('\n').Skip(1).Take(25))}");
+                                string Run(string tool) => (Call(tool, new JsonObject())["content"] as JsonArray)?[0]?["text"]?.ToString() ?? "";
+                                // check first, build second: tc_check pre-compiles without generating code - much faster than a build,
+                                // so the errors are fixed with checks and the build runs once, when the check is clean
+                                var check = Run("tc_check");
+                                var tool = "tc_check"; var txt = check;
+                                if (act.Requires == "build-ok" && !Lessons.HasCompileErrors(check)) { tool = "tc_build"; txt = Run("tc_build"); }
+                                pre = (tool == "tc_build" ? $"tc_check (run by TcAgent): {check.Split('\n')[0]}\n" : "") + $"{tool} (run by TcAgent for the checkpoint): {txt.Split('\n')[0]}\n\n";
+                                if (Workflows.Missing(act) != null && ++act.GateStops > 0)
+                                    throw new InvalidOperationException($"step '{act.Id}' needs {act.Requires} - {tool}: {txt.Split('\n')[0]}" +
+                                                                        (tool == "tc_check" && act.Requires == "build-ok" ? " (no build started - fix these first; tc_build directly only if the errors are in code that is never called)" : "") +
+                                                                        $"\n{string.Join("\n", txt.Split('\n').Skip(1).Take(25))}");
                             }
                             return pre + Workflows.Advance(run, Str(a, "step"), Bool(a, "skip", false), Str(a, "note"));
                         }
@@ -86,6 +92,7 @@ public sealed partial class ToolRegistry
 
     // Hard gate: activating a configuration that does not build would put a broken program on the target. A build
     // (without "check all objects" - that also checks code that is never called) must have 0 errors. Saving stays allowed.
+    // The build decides; the agent is told to run tc_check before (faster, no code generated) - see tc_build.
     void ActivateGate()
     {
         if (Environment.GetEnvironmentVariable("TCAGENT_ACTIVATE_GATE") == "0") return;

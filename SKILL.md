@@ -45,7 +45,9 @@ Tools are named `tc_*` and `ads_*` (in cloud sessions with the prefix `mcp__remo
    (no executable code, no files). Errors come with file and TwinCAT error code (Cxxxx); fix and check again
    until 0 compiler errors. Check **once after all changes**, not after every step, and not at all for pure
    questions (reading, searching, explaining). If the user says "don't check/build", don't.
-   `tc_build` (real build, produces code and files) only before `tc_activate`/download or when the user asks for it.
+   `tc_build` (real build, produces code and files) only before `tc_activate`/download, for a build checkpoint of a
+   workflow, or when the user asks for it - and **always after a clean `tc_check`**: the check pre-compiles without
+   generating code and is much faster, so fix the errors with checks and build once (several failed builds cost time).
 6. **Save:** `tc_save`. Otherwise tool changes exist only in the IDE, not on disk/in Git.
 7. **Tests:** `tc_test_run` runs TcUnit tests: `action=list` shows the suites and tests of the code, `tests=` selects
    (instance `MAIN.fbMotor`, suite type, `MAIN.fbMotor@Test` or test name; empty = all) - build/activation only if the

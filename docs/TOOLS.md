@@ -180,7 +180,7 @@ Skills = how this team does a kind of task, in the open [Agent Skills](https://a
 
 Engineering workflows = how this team **always** does a kind of task, with checkpoints. `<level>\workflows\<name>\WORKFLOW.md`
 (front matter like a skill); the steps are the numbered list of the body: `1. **id** (requires: check-ok) – text`. From
-the levels built-in (shipped: `new-feature` – requirements → change plan → code → check → tests → review → save), company,
+the levels built-in (shipped: `new-feature` – requirements → change plan → code → check → build (0 errors) → tests → review → save), company,
 user, platform and project; `tc_coding_rules` also returns the list. A run is done step by step; TcAgent counts failed
 checks per step and refuses to mark a checkpoint step done until its check holds:
 
@@ -191,7 +191,8 @@ checks per step and refuses to mark a checkpoint step done until its check holds
 | `tests-ok` | the last `tc_test_run` / `tc_test_results` during the step had no failed test |
 
 Checkpoint steps cannot be skipped. When the agent marks a `check-ok` / `build-ok` step done while its check is missing
-or failed, TcAgent runs `tc_check` / `tc_build` itself (since 0.36) and completes the step if it passes. `finish` lists
+or failed, TcAgent runs `tc_check` itself (since 0.36) and completes the step if it passes; for `build-ok` (since 0.39) it runs
+`tc_check` first and `tc_build` only when the check is clean – otherwise it reports the check errors without building. `finish` lists
 the PLC objects written during the run. The gate before `tc_activate` holds with and without a workflow.
 
 | Parameter | Type | Required | Description |
@@ -1114,7 +1115,7 @@ No parameters.
 
 ### `tc_build`
 
-Builds the solution (produces executable code and files) and returns compiler errors/warnings. Only needed before activating/downloading or when the user asks for it - to check for compiler errors use `tc_check`.
+Builds the solution (produces executable code and files – slower than a check) and returns compiler errors/warnings. Needed before activating/downloading, for the build checkpoint of a workflow, or when the user asks for it. Always run `tc_check` first and fix its errors – it pre-compiles without generating code, so several fix rounds cost checks, not builds.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
