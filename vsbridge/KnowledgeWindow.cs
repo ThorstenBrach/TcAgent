@@ -1190,9 +1190,18 @@ namespace TcAgentBridge
             var title = text.Split('\n')[0].Trim();
             var body = text.Substring(text.IndexOf('\n') + 1).Trim();
             var url = feedbackUrl ?? "https://github.com/ThorstenBrach/TcAgent/issues/new";
+            // a GitHub issue form of the repository: its template for TcAgent reports and a label by the type of the report
+            if (url.EndsWith("/issues/new", StringComparison.OrdinalIgnoreCase))
+            {
+                var types = feedbackList.SelectedItems.OfType<Line>().Select(l => S(l.D, "type")).Distinct().ToList();
+                var labels = new List<string> { "feedback" };
+                foreach (var t in types)
+                    labels.Add(t == "bug" ? "bug" : t == "missing_feature" ? "enhancement" : t == "docs" ? "documentation" : t ?? "feedback");
+                url += "?template=tcagent_feedback.md&labels=" + Uri.EscapeDataString(string.Join(",", labels.Distinct()));
+            }
             var full = url + (url.Contains("?") ? "&" : "?") + "title=" + Uri.EscapeDataString(title) + "&body=" + Uri.EscapeDataString(body);
             var tooLong = full.Length > 7500;
-            if (tooLong) { try { Clipboard.SetText(body); } catch { } full = url + (url.Contains("?") ? "&" : "?") + "title=" + Uri.EscapeDataString(title); }
+            if (tooLong) { try { Clipboard.SetText(body); } catch { } full = url + (url.Contains("?") ? "&" : "?") + "title=" + Uri.EscapeDataString(title); }   // the template stays, the text comes from the clipboard
             if (MessageBox.Show($"Open a new issue in the browser?\n\n{url}\n\nThe browser shows the text - check it there and send it yourself." +
                                 (tooLong ? "\n\nThe text is long: it is in the clipboard - paste it into the issue." : ""),
                                 "Share with the TcAgent developers", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;

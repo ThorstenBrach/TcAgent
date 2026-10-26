@@ -1,0 +1,80 @@
+name: Bug report
+description: A tool fails, crashes the IDE or does something unexpected.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please leave out customer, machine and project names, IP addresses and paths that identify
+        your company - an issue is public. The knowledge window of TcAgent (tab Feedback) prepares an anonymized report.
+  - type: input
+    id: tool
+    attributes:
+      label: Tool
+      description: The affected tool or window, e.g. tc_plc_write, tc_test_run, TcUnit Tests window, chat window
+      placeholder: tc_plc_write
+    validations:
+      required: true
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: The call and its arguments, the error message, what you saw in the IDE.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What should have happened
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: As small as possible - a new solution with one POU is ideal.
+      placeholder: |
+        1. ...
+        2. ...
+  - type: textarea
+    id: workaround
+    attributes:
+      label: Workaround
+      description: How you got the task done anyway, if at all.
+  - type: dropdown
+    id: severity
+    attributes:
+      label: Severity
+      options:
+        - minor - annoying, there is a way around it
+        - major - a task cannot be done
+        - blocker - the IDE crashes or data is lost
+    validations:
+      required: true
+  - type: input
+    id: tcagent
+    attributes:
+      label: TcAgent version
+      description: Shown in the chat window (⋯) or by TcAgent.exe version
+      placeholder: "0.42.2"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: TwinCAT build, Visual Studio or XAE Shell, AI client (Claude Code, Copilot CLI, Gemini CLI, Codex CLI)
+      placeholder: "TwinCAT 3.1.4026.x, Visual Studio 2022, Claude Code"
+  - type: textarea
+    id: log
+    attributes:
+      label: Log
+      description: The relevant lines of %LOCALAPPDATA%\TcAgent\logs or bridge\bridge.log (anonymized).
+      render: text
+  - type: checkboxes
+    id: anonymized
+    attributes:
+      label: Check
+      options:
+        - label: The report contains no customer, machine or project names and no internal addresses or paths.
+          required: true

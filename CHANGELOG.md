@@ -5,6 +5,14 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.42.3] – 2026-10-26
+
+### Added
+- **GitHub issue templates** (`.github/ISSUE_TEMPLATE`): bug report and feature request as issue forms (tool, what happened,
+  expected, steps, workaround, severity, version, environment, log, a check that the report is anonymized), a template
+  for reports from TcAgent (`tcagent_feedback.md`, label `feedback`) and a chooser without blank issues.
+- The knowledge window shares a report with that template and a label by its type (bug, enhancement, documentation).
+
 ## [0.42.2] – 2026-10-26
 
 ### Added

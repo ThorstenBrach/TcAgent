@@ -1,0 +1,41 @@
+name: Feature request
+description: A tool, an option or a workflow that is missing.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the task you want to do - not only the solution you have in mind. Please leave out customer, machine and
+        project names.
+  - type: textarea
+    id: task
+    attributes:
+      label: The task
+      description: What do you want to do with TcAgent, and why does it not work today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How it could work - a tool, a parameter, a window, a workflow step.
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: How you do it today
+      description: Workarounds, other tools, manual steps.
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - PLC code and refactoring
+        - Build, check and activation
+        - Tests (TcUnit)
+        - I/O, motion, HMI, system
+        - Chat window and AI clients
+        - Knowledge (rules, skills, workflows, lessons, sources)
+        - Pipeline and command line
+        - Other
+    validations:
+      required: true

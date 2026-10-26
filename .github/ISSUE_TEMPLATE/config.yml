@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: User guide
+    url: https://github.com/ThorstenBrach/TcAgent/blob/main/docs/USER_GUIDE.md
+    about: How to use TcAgent - most questions are answered there.
+  - name: Tool reference
+    url: https://github.com/ThorstenBrach/TcAgent/blob/main/docs/TOOLS.md
+    about: Every tool with its parameters.
