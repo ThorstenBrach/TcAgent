@@ -142,6 +142,10 @@ function → `new-feature`), start it (`tc_workflow action=start name=<name> tas
 mark it done with `action=step` (`skip=true` if it does not apply). Checkpoint steps need their check first (e.g.
 `tc_check` with 0 errors). `tc_activate` builds first and refuses with build errors - fix them, do not work around it.
 
+After a finished workflow, when the user asks how the work is going or what could be improved: `tc_improve action=runs` /
+`action=analyze`. Apply a proposal only after the user agreed (`tc_improve action=apply id=<id>`, TcAgent asks again with the
+diff); write step hints in general terms - no customer, machine or project names.
+
 **Other knowledge sources** - not coding rules, keep them apart:
 `tc_lessons` (solutions to hard TwinCAT problems), `tc_docs` (manuals, read only), `tc_doc` (program documentation /
 project memory), `tc_risk_rules` (what the risk analysis checks - see Program documentation). Skills of the user (e.g. a library-specific coding-rules skill) are additional rules from the user -

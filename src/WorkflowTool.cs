@@ -36,7 +36,16 @@ public sealed partial class ToolRegistry
                         if (action == "step") return Workflows.Advance(run, Str(a, "step"), Bool(a, "skip", false), Str(a, "note"));
                     }
                     catch (InvalidOperationException ex) { throw new Exception("NOT done: " + ex.Message); }
-                    var summary = Workflows.Finish(run, Bool(a, "abort", false));
+                    bool abort = Bool(a, "abort", false);
+                    var summary = Workflows.Finish(run, abort);
+                    // the run log: local, counts and names only (RunLogs.cs) - the base for tc_improve
+                    try
+                    {
+                        var sln = SolutionDir();
+                        RunLogs.Save(RunLogs.ProjectOf(sln), sln, RunLogs.ToRecord(run, abort));
+                        summary += "Run log saved (local). tc_improve action=runs shows the trend, action=analyze the proposals.\n";
+                    }
+                    catch (Exception ex) { Log.Error("Run log: " + ex.Message); }
                     run = null;
                     return summary;
                 }
@@ -73,12 +82,16 @@ public sealed partial class ToolRegistry
         throw new Exception("NOT activated: the build has errors - fix them (tc_check / tc_build) and activate again.\n\n" + report);
     }
 
-    // What a tool call means for the running workflow (failed checks, checkpoints)
-    void ObserveWorkflow(string name, bool isError, string text)
+    // What a tool call means for the running workflow (failed checks with their error codes, checkpoints, skills used)
+    void ObserveWorkflow(string name, JsonObject args, bool isError, string text)
     {
-        if (run == null || name is not ("tc_check" or "tc_build" or "tc_test_run" or "tc_test_results")) return;
+        if (run == null) return;
+        if (name == "tc_skills" && !isError && string.Equals(Str(args, "action"), "show", StringComparison.OrdinalIgnoreCase) && Str(args, "name") is { } skill)
+            run.SkillsUsed.Add(skill.Trim().ToLowerInvariant());
+        if (name is not ("tc_check" or "tc_build" or "tc_test_run" or "tc_test_results")) return;
         bool ok = !isError && (name is "tc_test_run" or "tc_test_results" ? !TestsFailed(text) : !Lessons.HasCompileErrors(text));
-        Workflows.Observe(run, name, ok);
+        var codes = System.Text.RegularExpressions.Regex.Matches(text ?? "", @"\bC\d{4}\b").Select(m => m.Value).Distinct();
+        Workflows.Observe(run, name, ok, codes);
     }
 
     static bool TestsFailed(string text) =>

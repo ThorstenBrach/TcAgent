@@ -93,6 +93,9 @@ public sealed partial class ToolRegistry
             return "The user closed the question without answering. Do not ask the same again; continue without it if you can, " +
                    "otherwise say in your reply what you need.";
         Log.Info("tc_ask_user answered: " + string.Join("; ", answers.Values));
+        // for the run log: an answer other than the recommended (first) option is a correction of the agent
+        if (run != null) run.Corrections += qs.Count(q => q.Options.Count > 0 && answers.TryGetValue(q.Text, out var v) && !string.IsNullOrWhiteSpace(v)
+                                                          && !v.Trim().Equals(q.Options[0].Label, StringComparison.OrdinalIgnoreCase));
         return AskQuestions.Format(qs, answers);
     }
 }

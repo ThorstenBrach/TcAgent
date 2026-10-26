@@ -5,6 +5,26 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.33.0] – 2026-10-26
+
+### Added
+- **Run logs** of the workflows, locally in `%LOCALAPPDATA%\TcAgent\runs\<solution>\` (never in Git): workflow,
+  duration, failed checks per step with the compiler error codes, checkpoint and activate stops, user corrections (a "no"
+  to a confirmation, an answer other than the recommended option of `tc_ask_user`), skills used - counts and names only.
+  The last 100 runs are kept, older ones are added up in `summary.json`.
+- **`tc_improve`**: `runs` (KPIs per workflow: first-time-right, failed checks, corrections, minutes, trend of the last
+  10 runs, most frequent compiler errors), `analyze` (proposals by fixed rules: `step-hint`, `revert`,
+  `promote-lesson`, `frequent-error`, `duplicate-lesson`, `stale-tool`), `apply` (shows the change and asks the user;
+  step hints go into a copy of the workflow, lessons move up to personal / platform / company - company as a commit on a
+  new branch for a pull request, never pushed), `history` (every adopted change with the values before and over the
+  next 10 runs), `revert`.
+- **Name check** before anything moves up or into a hint: names of the computer, user, solution and projects plus
+  `privateTerms` (`settings.json`, `.tcagent\config.json`).
+- Tests: `ImproverTests`.
+
+### Fixed
+- User guide: the lesson scopes show the folders (one file per lesson) of 0.30.
+
 ## [0.32.0] – 2026-10-26
 
 ### Added

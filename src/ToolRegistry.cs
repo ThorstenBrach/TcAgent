@@ -211,6 +211,7 @@ public sealed partial class ToolRegistry
         RegisterKnowledge();
         RegisterSkills();
         RegisterWorkflows();
+        RegisterImprove();
 
         // ---------------------------------------------------------- I/O links
         Add("tc_link", "Links variables (PLC variable with I/O channel). Individually with source/target or many at once with pairs. " +
@@ -1548,6 +1549,7 @@ public sealed partial class ToolRegistry
                 // no answer and nobody to ask are refusals too (Guards.cs) - without a question only with TCAGENT_CONFIRM=off
                 if (Guards.ConfirmRefusal(ok, Confirm.LastNotShown, what) is { } refused)
                 {
+                    if (ok == false && !Confirm.LastNotShown && run != null) run.Corrections++;   // the user said no: a correction
                     if (ok == null) Log.Info("No confirmation possible (no channel), refused - " + what);
                     throw new OperationCanceledException(refused);
                 }
@@ -1559,7 +1561,7 @@ public sealed partial class ToolRegistry
         }
         catch (Exception ex) { text = "Error: " + ErrorText(ex); isError = true; Log.Error($"{name}: {ex}"); }
         finally { try { File.Delete(busy); } catch { } }
-        try { ObserveWorkflow(name, isError, text); } catch (Exception ex) { Log.Error("Workflow: " + ex.Message); }
+        try { ObserveWorkflow(name, args, isError, text); } catch (Exception ex) { Log.Error("Workflow: " + ex.Message); }
         // lessons learned: recall known solutions for this error, remind to save one after a hard-won success
         if (name != "tc_lessons" && Environment.GetEnvironmentVariable("TCAGENT_LESSONS_RECALL") != "0")
         {

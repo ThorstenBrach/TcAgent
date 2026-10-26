@@ -4,7 +4,8 @@
 > Since 0.30: levels × platform, one file per topic, front matter, locked/force, `disabled.json`, `tc_knowledge` – for
 > coding rules, risk rules, lessons, knowledge sources and templates. Since 0.31: skills (`tc_skills`, built-in skills,
 > mirror into the agent CLIs). Since 0.32: workflows with checkpoints (`tc_workflow`, built-in `new-feature`) and the
-> hard gate "`tc_activate` only after a build with 0 errors". The rest of this document is still a concept. It describes how TcAgent shall organise the knowledge it
+> hard gate "`tc_activate` only after a build with 0 errors". Since 0.33: run logs and `tc_improve` (proposals by fixed rules,
+> apply after asking, evaluation over 10 runs, revert, promote with name check). The rest of this document is still a concept. It describes how TcAgent shall organise the knowledge it
 > gives to an agent – coding rules, risk rules, skills, lessons learned, knowledge sources, documentation templates and
 > engineering workflows – and how this knowledge improves over time. Today's behaviour is described in
 > [USER_GUIDE.md](USER_GUIDE.md).

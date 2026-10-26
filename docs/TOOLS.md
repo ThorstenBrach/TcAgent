@@ -202,6 +202,33 @@ Checkpoint steps cannot be skipped. The gate before `tc_activate` holds with and
 | `note` | string |  | step: short note |
 | `abort` | boolean |  | finish: stop the run before all steps are done |
 
+### `tc_improve`
+
+Self-improvement from the local run logs of the workflows (`%LOCALAPPDATA%\TcAgent\runs\<solution>\`, last 100 runs,
+counts and names only). Proposals are found by fixed rules; the agent writes only the text of a step hint, and every
+change is shown to the user and asked for (with `TCAGENT_CONFIRM=off` without a question).
+
+| Proposal | Found when | `apply` |
+|---|---|---|
+| `step-hint` | a step needed ≥ 1.5 failed checks per run over the last runs (at least 5) | adds `Hint: <text>` to the step – in a copy of the workflow at `scope` (default project) |
+| `revert` | an adopted change did not help over the next 10 runs | restores the file |
+| `promote-lesson` | the same lesson exists in two or more projects | copies it to `personal`, `platform:<name>` or `company` (commit on a new branch, not pushed) |
+| `frequent-error` | a compiler error code in 3 or more of the last 10 runs, no lesson mentions it | – (record a lesson with `tc_lessons`) |
+| `duplicate-lesson` | two lesson files with the same title in one folder | – (merge them) |
+| `stale-tool` | a skill or workflow names a tool that does not exist | – (correct the text) |
+
+Hints and promoted lessons are refused while they name this computer, user, solution, a project, or a term of
+`privateTerms` (`settings.json`, `.tcagent\config.json`).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | `runs`, `analyze`, `apply`, `history` or `revert` |
+| `workflow` | string |  | runs: only this workflow |
+| `id` | string |  | apply: proposal id from `analyze`; revert: change id from `history` |
+| `text` | string |  | apply `step-hint`: the hint (general, no customer or machine names) |
+| `scope` | string |  | apply: step-hint `project` / `personal` / `platform:<name>`; promote-lesson `personal` / `platform:<name>` / `company` |
+| `dryRun` | boolean |  | apply/revert: only show the change |
+
 ### `tc_ask_user`
 
 Asks the user when a decision or missing information blocks the work: 1-4 questions, each with 2-4 options (recommended option first, with a short description); the user can always answer in free text. Works in every AI client: from the TcAgent Chat a question card in the chat window of the IDE; in other clients the client's own question dialog (MCP elicitation), with the card in the IDE as fallback. Without any channel the agent is told to ask in its reply instead. Returns the answers per question; a skipped question is reported as such - the agent must not invent an answer.

@@ -1344,12 +1344,36 @@ What happens:
 
 | Scope | File |
 |---|---|
-| `project` (default) | `<solution>\.tcagent\lessons.md` – versioned with Git |
-| `personal` | `%LOCALAPPDATA%\TcAgent\lessons.md` – general TwinCAT knowledge |
-| `team` | the file in `TCAGENT_LESSONS`, for example on a network drive |
+| `project` (default) | `<solution>\.tcagent\lessons\<date>-<title>.md` – versioned with Git |
+| `personal` | `%LOCALAPPDATA%\TcAgent\lessons\` – general TwinCAT knowledge |
+| `platform:<name>` | `%LOCALAPPDATA%\TcAgent\platforms\<name>\lessons\` – knowledge about a framework |
+| `team` | the file or folder in `TCAGENT_LESSONS`, for example on a network drive |
 
-The files are Markdown, readable and editable by hand. Only verified solutions belong there – no passwords or customer
-secrets. `add`/`remove` count as project changes (audited, blocked in `ask` mode).
+One file per lesson (older `lessons.md` files are still read). The files are Markdown, readable and editable by hand.
+Only verified solutions belong there – no passwords or customer secrets. `add`/`remove` count as project changes
+(audited, blocked in `ask` mode).
+
+### Self-improvement: run logs and proposals
+
+Every finished workflow run (`tc_workflow action=finish`) leaves a short **run log** – locally in
+`%LOCALAPPDATA%\TcAgent\runs\<solution>\`, never in Git. It holds only counts and names: workflow, duration, failed
+checks per step with the compiler error codes, checkpoint and activate stops, your corrections (a "no" to a confirmation,
+an answer other than the recommended option), skills used. No task text, no code. The last 100 runs are kept; older ones
+are added up in `summary.json`.
+
+- *"How are our workflows doing?"* → `tc_improve action=runs`: per workflow first-time-right, failed checks, corrections
+  and minutes per run, the trend of the last 10 runs against the 10 before, the most frequent compiler errors.
+- *"What could we improve?"* → `tc_improve action=analyze`. TcAgent finds the proposals itself by fixed rules: a hint
+  for a step that often fails, the revert of a change that did not help, moving a lesson up that several projects have,
+  a lesson for a compiler error that keeps coming back, duplicate lessons, tool names in skills or workflows that no
+  longer exist.
+- **Nothing changes silently:** `apply` shows the change and asks you (card in the chat or the client's dialog). A step
+  hint goes into a project copy of the workflow (or `scope=personal`); moving a lesson up goes to `personal`,
+  `platform:<name>` or – as a commit on a new branch for a pull request, never pushed – the company repository.
+- **Nothing specific travels up:** hints and promoted lessons are checked for the names of this computer, user, solution
+  and projects plus your own list `privateTerms` (in `settings.json` or `.tcagent\config.json`).
+- `tc_improve action=history` shows every adopted change with the values before and over the next 10 runs; if it did
+  not help, `analyze` proposes to revert it (`action=revert id=...`).
 
 ---
 
@@ -1736,7 +1760,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 93 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 94 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
@@ -1765,5 +1789,5 @@ All 93 tools and the section of this guide that covers them. Parameters: [TOOLS.
 | `tc_docs`, `tc_docs_add`, `tc_lessons` | [Knowledge: documentation and lessons learned](#knowledge-documentation-and-lessons-learned) |
 | `tc_dialogs` | [IDE dialogs](#ide-dialogs) |
 | `tc_feedback`, `tc_policy` | [Feedback and audit](#feedback-and-audit) |
-| `tc_knowledge`, `tc_skills`, `tc_workflow` | [Coding rules](#coding-rules) (levels, platform, skills) |
+| `tc_knowledge`, `tc_skills`, `tc_workflow`, `tc_improve` | [Coding rules](#coding-rules) (levels, platform, skills) |
 | `tc_ask_user` | [What the VS extension adds](#what-the-vs-extension-tcagentbridge-adds) (questions to the user, every client) |

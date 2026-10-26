@@ -37,6 +37,7 @@ public static class Workflows
         public DateTime? Started, Finished;
         public bool? LastCheckOk, LastBuildOk, LastTestsOk; // observed during the step
         public string Note;
+        public readonly List<string> ErrorCodes = new();  // compiler error codes of the failed checks (e.g. C0032) - names, no code
     }
 
     public sealed class Run
@@ -117,10 +118,11 @@ public static class Workflows
     }
 
     /// <summary>Records what a tool call means for the active step (failed checks, observed checkpoints).</summary>
-    public static void Observe(Run run, string tool, bool ok)
+    public static void Observe(Run run, string tool, bool ok, IEnumerable<string> errorCodes = null)
     {
         var s = run?.Active;
         if (s == null) return;
+        if (!ok && errorCodes != null) s.ErrorCodes.AddRange(errorCodes);
         switch (tool)
         {
             case "tc_check": s.LastCheckOk = ok; if (!ok) s.FailedChecks++; break;

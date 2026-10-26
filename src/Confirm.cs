@@ -33,6 +33,7 @@ public static class Confirm
         if (tool == "tc_runtime_startup" && string.IsNullOrEmpty(args?["mode"]?.ToString())) return false;   // only shows the mode
         if (tool == "tc_motion" && args?["dryRun"] == null) return false;   // action=link is a dry run unless dryRun=false
         if (tool == "tc_refactor") return false;     // asks per change itself (Apply / Apply all / Reject / Cancel)
+        if (tool == "tc_improve") return false;      // asks itself, with the diff of the change
         return Configured switch
         {
             Level.Off => false,
