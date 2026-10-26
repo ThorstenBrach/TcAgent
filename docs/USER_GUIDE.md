@@ -422,8 +422,9 @@ format (a folder with `SKILL.md`), so every agent CLI understands them, and come
 - **Your own:** `<level>\skills\<name>\SKILL.md` on the company, user, platform or project level – or by talking:
   *"Save this procedure as a skill for the project."* (`tc_skills action=add`, after you agreed).
 - The agent sees the list with the coding rules and loads a skill when the task fits (*"Review the changes of today"* →
-  `plc-code-review`). `tc_skills action=list` shows them; the client setup also copies the general ones into the skill
-  folders of the agent CLIs.
+  `plc-code-review`). `tc_skills action=list` shows them; the general ones (built-in, company, user,
+  team) are also copied into the skill folders of the agent CLIs – by the client setup and whenever the TcAgent server
+  starts (only what changed; an edited copy is restored – change the source instead).
 
 ### Skills and rules from Git repositories
 
