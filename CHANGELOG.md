@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.41.3] – 2026-10-26
+
+### Fixed
+- Knowledge window: a new platform, skill, workflow or source with capitals or spaces in its name ("My Framework") was
+  refused with a message in the status line only. Names are now made valid (`my-framework`), and a failed action
+  (new, move, delete, add source) is shown as a dialog.
+
 ## [0.41.2] – 2026-10-26
 
 ### Fixed

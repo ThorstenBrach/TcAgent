@@ -42,7 +42,7 @@ public sealed class KnowledgeOpsTests : IDisposable
         var wf = KnowledgeOps.New(Sln, "workflows", "bug-fix", "user");
         Assert.Contains(Workflows.ParseSteps(KnowledgeLayers.ParseFrontMatter(File.ReadAllText(wf)).Body), s => s.Requires == "build-ok");
         Assert.EndsWith(@"coding-rules\step-sequences.md", KnowledgeOps.New(Sln, "coding-rules", "Step sequences", "user"));
-        Assert.Throws<ArgumentException>(() => KnowledgeOps.New(Sln, "skills", "Bad Name", "user"));
+        Assert.EndsWith(@"skills\valve-test\SKILL.md", KnowledgeOps.New(Sln, "skills", "Valve Test", "user"));   // the name is made valid
         Assert.Throws<ArgumentException>(() => KnowledgeOps.New(Sln, "skills", "x", "company"));        // shared: create below and move up
     }
 

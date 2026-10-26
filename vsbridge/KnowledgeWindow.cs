@@ -604,7 +604,7 @@ namespace TcAgentBridge
             if (r == null || r[1].Trim().Length == 0) return;
             var level = levels.First(x => x.Label == r[2]).Level;
             var (ok, output) = RunCli($"knowledge new --key {Quote(r[0] + "/" + r[1].Trim())} --level {Quote(level)}");
-            status.Text = output;
+            Report(ok, output, "New");
             if (ok && File.Exists(output.Trim()))
                 try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(output.Trim()); } catch { }
             Load();
@@ -626,8 +626,8 @@ namespace TcAgentBridge
             var r = Prompt($"Move {S(l.D, "key")} ({S(l.D, "label")})", ("To level", levels.Select(x => x.Label + (x.Pr ? "  (pull request)" : "")).ToArray(), null));
             if (r == null) return;
             var target = levels.First(x => r[0].StartsWith(x.Label));
-            var (_, output) = RunCli($"knowledge move --path {Quote(S(l.D, "path"))} --level {Quote(target.Level)}");
-            status.Text = output;
+            var (mok, output) = RunCli($"knowledge move --path {Quote(S(l.D, "path"))} --level {Quote(target.Level)}");
+            Report(mok, output, "Move");
             Load();
         }
 
@@ -639,8 +639,8 @@ namespace TcAgentBridge
             var what = S(l.D, "kind") is "skills" or "workflows" ? "the folder of " + S(l.D, "key") : S(l.D, "path");
             if (MessageBox.Show($"Delete {what}?\n\nThis cannot be undone (unless the level is kept in Git).", "TcAgent Knowledge",
                                 MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-            var (_, output) = RunCli($"knowledge delete --path {Quote(S(l.D, "path"))}");
-            status.Text = output;
+            var (dok, output) = RunCli($"knowledge delete --path {Quote(S(l.D, "path"))}");
+            Report(dok, output, "Delete");
             Load();
         }
 
@@ -695,6 +695,13 @@ namespace TcAgentBridge
                 var (_, output) = RunCli(args);
                 Dispatcher.BeginInvoke(new Action(() => { status.Text = output; Load(); }));
             });
+        }
+
+        /// <summary>The result of an action: success in the status line, a failure also as a dialog (it must not go unnoticed).</summary>
+        void Report(bool ok, string output, string what)
+        {
+            status.Text = output.Split('\n')[0];
+            if (!ok) MessageBox.Show(output, "TcAgent Knowledge - " + what, MessageBoxButton.OK, MessageBoxImage.Warning);
         }
 
         (bool ok, string output) RunCli(string args)
@@ -822,8 +829,8 @@ namespace TcAgentBridge
             // a renamed or moved source: the old entry goes
             if (d != null && (S(d, "name") != r[0].Trim() || (S(d, "level") == "project" ? "project" : "personal") != r[3]))
                 RunCli($"sources remove --name {Quote(S(d, "name"))} --level {(S(d, "level") == "project" ? "project" : "personal")}");
-            var (_, output) = RunCli($"sources add --name {Quote(r[0].Trim())} --url {Quote(r[1].Trim())} --level {r[3]}" + (r[2].Trim().Length > 0 ? " --ref " + Quote(r[2].Trim()) : ""));
-            status.Text = output;
+            var (aok, output) = RunCli($"sources add --name {Quote(r[0].Trim())} --url {Quote(r[1].Trim())} --level {r[3]}" + (r[2].Trim().Length > 0 ? " --ref " + Quote(r[2].Trim()) : ""));
+            Report(aok, output, "Source");
             Load();
         }
 
@@ -958,11 +965,11 @@ namespace TcAgentBridge
 
         void NewPlatform()
         {
-            var r = Prompt("New platform", ("Name (lowercase, hyphens)", null, ""), ("Description", null, ""),
+            var r = Prompt("New platform", ("Name (e.g. framework-a - other characters become hyphens)", null, ""), ("Description", null, ""),
                            ("Detected by libraries (comma-separated, * allowed)", null, ""), ("Detected by terms in the project (comma-separated)", null, ""));
             if (r == null || r[0].Trim().Length == 0) return;
             var (ok, output) = RunCli($"knowledge platform --action new --name {Quote(r[0].Trim())} --message {Quote(r[1])} --libraries {Quote(r[2])} --terms {Quote(r[3])}");
-            status.Text = output;
+            Report(ok, output, "New platform");
             if (ok && File.Exists(output.Trim())) try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(output.Trim()); } catch { }
             Load();
         }

@@ -63,7 +63,8 @@ public static class KnowledgeOps
         var root = RootOf(solutionDir, level);
         if (ViaPullRequest(level, root) || level.Equals("built-in", StringComparison.OrdinalIgnoreCase))
             throw new ArgumentException($"the {level} level is shared - create the file at user or project level and move it up (pull request)");
-        string slug = kind is "skills" or "workflows" ? Skills.ValidateName(name) : KnowledgeLayers.Slug(name);
+        // "Valve Commissioning" -> valve-commissioning (the name rules of the Agent Skills standard)
+        string slug = kind is "skills" or "workflows" ? Skills.ValidateName(KnowledgeLayers.Slug(name)) : KnowledgeLayers.Slug(name);
         string file, text;
         var title = (name ?? "").Trim();
         switch (kind)
@@ -101,7 +102,8 @@ public static class KnowledgeOps
     /// <summary>A platform of the user: &lt;user&gt;\platforms\&lt;name&gt;\platform.md with the libraries and terms that detect it.</summary>
     public static string NewPlatform(string name, string description, string libraries, string terms)
     {
-        var n = Skills.ValidateName(name);
+        if (string.IsNullOrWhiteSpace(name)) throw new ArgumentException("a name is required");
+        var n = Skills.ValidateName(KnowledgeLayers.Slug(name));          // "My Framework" -> my-framework
         var file = Path.Combine(KnowledgeLayers.UserRoot, "platforms", n, "platform.md");
         if (File.Exists(file)) throw new ArgumentException(file + " exists already - open it to change it");
         static string List(string v) => string.Join(", ", (v ?? "").Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries));

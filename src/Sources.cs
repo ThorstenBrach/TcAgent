@@ -111,7 +111,7 @@ public static class Sources
 
     public static string AddSource(string root, string name, string url, string gitRef)
     {
-        name = Skills.ValidateName(name);
+        name = Skills.ValidateName(KnowledgeLayers.Slug(name ?? ""));      // "Team Skills" -> team-skills
         if (string.IsNullOrWhiteSpace(url)) throw new ArgumentException("url: the Git repository (https://..., a path or a file:// URL)");
         var list = Load(root);
         list.RemoveAll(s => s.Name.Equals(name, StringComparison.OrdinalIgnoreCase));
