@@ -1,6 +1,7 @@
 ﻿# Registers TcAgent as an MCP server in all installed AI clients and distributes the agent guide.
 #   Claude Desktop, Claude Code, GitHub Copilot (Visual Studio + Copilot CLI), Gemini CLI, OpenAI Codex CLI (ChatGPT)
-# Changes only the "tcagent" entry or the marked section; a backup *.bak-<time> is created before every change.
+# Changes only the "tcagent" entry or the marked section. A file is written only if its content changes; then a backup
+# *.bak-<time> is created first. Per file the very first backup (the state before TcAgent) and the last 3 are kept.
 #
 #   powershell -ExecutionPolicy Bypass -File .\setup-clients.ps1
 #   powershell -ExecutionPolicy Bypass -File .\setup-clients.ps1 -SolutionDir C:\Projects\MyMachine
@@ -22,10 +23,19 @@ if (-not (Test-Path $TcAgentExe)) { throw "TcAgent.exe not found: $TcAgentExe (r
 $TcAgentExe = (Resolve-Path $TcAgentExe).Path
 $done = New-Object System.Collections.Generic.List[string]
 
-function Backup($path) { if (Test-Path $path) { Copy-Item $path "$path.bak-$stamp" -Force } }
+# backup before a change: the very first backup of a file (its state before TcAgent) and the last 3 are kept
+function Backup($path) {
+    if (-not (Test-Path $path)) { return }
+    Copy-Item $path "$path.bak-$stamp" -Force
+    $all = @(Get-ChildItem -LiteralPath (Split-Path $path -Parent) -File -Filter ((Split-Path $path -Leaf) + '.bak-*') -ErrorAction SilentlyContinue |
+             Where-Object { $_.Name -match '\.bak-\d{8}-\d{6}$' } | Sort-Object Name)
+    if ($all.Count -gt 4) { $all[1..($all.Count - 4)] | Remove-Item -Force -ErrorAction SilentlyContinue }
+}
 function Save-Text($path, [string]$text) {
     $dir = Split-Path $path -Parent
     if (-not (Test-Path $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
+    # unchanged content: neither a write nor a backup
+    if ((Test-Path $path) -and [IO.File]::ReadAllText($path) -ceq $text) { return }
     Backup $path
     [IO.File]::WriteAllText($path, $text, $utf8)
 }
@@ -205,7 +215,6 @@ else {
     if ($hit) { $t = $t.Replace($hit, $new); $changed += 'Claude backend switched to a persistent session with live progress' }
     if ($t -match $oldCopilot) { $t = [regex]::Replace($t, $oldCopilot, $newCopilot); $changed += 'Copilot backend switched to the Agent Client Protocol (ACP)' }
     if ($changed.Count -gt 0) {
-        Copy-Item $chatCfg "$chatCfg.bak-$(Get-Date -Format yyyyMMdd-HHmmss)"
         Save-Text $chatCfg $t
         $done.Add("Chat window: $chatCfg - " + ($changed -join '; '))
     }

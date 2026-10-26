@@ -1643,7 +1643,7 @@ real machines without agreement.** The agent cannot widen the list – only you 
 
 - `tc_delete`: `<solution>\.tcagent\backup\delete` (restore with `tc_import kind=plcopen`).
 - HMI and Scope changes: `%LOCALAPPDATA%\TcAgent\backup\hmi` and `...\backup\scope`.
-- Client configuration changes during setup: `*.bak-<date>` next to each config file.
+- Client configuration changes during setup: `*.bak-<date>` next to each config file – only when the file really changes; per file the first backup (the state before TcAgent) and the last 3 are kept.
 
 ### Stay local, mind your data
 

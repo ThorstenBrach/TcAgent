@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.39.8] – 2026-10-26
+
+### Fixed
+- **Set up clients** created a backup of every touched configuration file on every run (hundreds of identical
+  `*.bak-*` files). A file is now written only when its content changes, a backup only then, and per file the very first
+  backup (the state before TcAgent) and the last 3 are kept.
+
 ## [0.39.7] – 2026-10-26
 
 ### Fixed

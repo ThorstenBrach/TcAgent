@@ -98,7 +98,7 @@ The script
   `CLAUDE.md` and `GEMINI.md` only import it, `.github\copilot-instructions.md` points to it,
 * creates the chat window configuration (`%LOCALAPPDATA%\TcAgent\chat-backends.json`).
 
-Before each change a backup `*.bak-<date>` is created; only the `tcagent` entry is modified.
+A file is only written when its content changes; then a backup `*.bak-<date>` is created first (per file the very first backup – the state before TcAgent – and the last 3 are kept). Only the `tcagent` entry is modified.
 Clients that are not installed are skipped – after installing one later, simply run the script again.
 
 Optional parameters: `-Solution <part of the solution path>` (which VS instance), `-AllowTargets <AmsNetIds>`
