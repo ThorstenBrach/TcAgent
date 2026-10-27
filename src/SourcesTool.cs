@@ -17,9 +17,11 @@ public sealed partial class ToolRegistry
                           "search [query] [source], install item=<source>/<name> [kind] scope=personal|project|platform:<name> (license check, shows files " +
                           "and scripts, asks the user; MIT/Apache/BSD/ISC accepted, source-available and unlicensed refused, others only with acceptLicense), " +
                           "status (ok / changed locally / newer upstream), pull [item] (updates after asking; skips locally changed items unless force), " +
-                          "diff item, promote item=<kind>/<name> scope=personal|team|platform:<name>|company (own item one level up; checked for specific names; " +
+                          "diff item, changes item (what the user changed in an installed item), merge item (a newer version of the source into the locally changed " +
+                          "item, three-way; dryRun first, then only after the user agreed - conflicts are marked in the file), propose item message (the local " +
+                          "changes as a commit on a new branch of the source plus a patch - never pushed; the user pushes in the knowledge window), promote item=<kind>/<name> scope=personal|team|platform:<name>|company (own item one level up; checked for specific names; " +
                           "company and a team in Git as a commit on a new branch for a pull request). Installed items are pinned in skills.lock.json of their level.",
-            Schema(Req(P("action", "string", "list, add, remove, search, install, status, pull, diff or promote")),
+            Schema(Req(P("action", "string", "list, add, remove, search, install, status, pull, diff, changes, merge, propose or promote")),
                    P("name", "string", "add/remove: source name (lowercase, hyphens)"),
                    P("url", "string", "add: Git URL or path of the repository"),
                    P("ref", "string", "add: branch or tag (default HEAD)"),
@@ -29,7 +31,8 @@ public sealed partial class ToolRegistry
                    P("scope", "string", "add: personal (default) or project; install: personal (default), project, team or platform:<name>; promote: personal, team, platform:<name> or company"),
                    P("acceptLicense", "boolean", "install/pull: take over an item whose license is neither accepted nor refused (e.g. copyleft) - after the user checked it"),
                    P("force", "boolean", "install: overwrite an own file of the same name; pull: also update locally changed items"),
-                   P("dryRun", "boolean", "install/pull/promote: only show what would be done")),
+                   P("message", "string", "propose: what the change improves (the commit message)"),
+                   P("dryRun", "boolean", "install/pull/promote/merge: only show what would be done")),
             a =>
             {
                 var dir = SolutionDir();
@@ -47,12 +50,46 @@ public sealed partial class ToolRegistry
                         "pull" => SourcesPull(a, dir),
                         "diff" => SourcesDiff(dir, Str(a, "item") ?? throw new ArgumentException("item is required")),
                         "promote" => SourcesPromote(a, dir),
-                        _ => throw new ArgumentException("action: list, add, remove, search, install, status, pull, diff or promote")
+                        "changes" or "merge" or "propose" => SourcesLocal(a, dir),
+                        _ => throw new ArgumentException("action: list, add, remove, search, install, status, pull, diff, changes, merge, propose or promote")
                     };
                 }
                 catch (ArgumentException ex) { throw new Exception("NOT done: " + ex.Message); }
                 catch (InvalidOperationException ex) { throw new Exception("NOT done: " + ex.Message); }
             });
+    }
+
+    // local changes of an installed item (SourcesMerge.cs)
+    static string SourcesLocal(JsonObject a, string dir)
+    {
+        var name = (Str(a, "item") ?? throw new ArgumentException("item is required")).Split('/').Last();
+        var hits = InstallRoots(dir).SelectMany(r => Sources.LoadLock(r.Root).Where(x => x.Key.Split('/')[1].Equals(name, StringComparison.OrdinalIgnoreCase))
+                                                                            .Select(x => (r.Label, r.Root, x.Key, x.Value)))
+                                    .Where(h => Str(a, "scope") is not { } sc || h.Label.Equals(sc, StringComparison.OrdinalIgnoreCase)).ToList();
+        if (hits.Count != 1) throw new ArgumentException(hits.Count == 0 ? $"'{name}' is not installed from a source" : $"'{name}' is installed on several levels - give scope");
+        var (label, root, key, e) = hits[0];
+        var src = Sources.All(dir).FirstOrDefault(x => x.Name == e.Source) ?? new Sources.Source { Name = e.Source, Url = e.Url };
+        switch (Str(a, "action")!.ToLowerInvariant())
+        {
+            case "changes": return $"{key} ({label}) - the user's changes since the install @{e.Commit[..8]}:\n\n{SourcesMerge.LocalDiff(root, key, e, src)}";
+            case "merge":
+            {
+                var up = Sources.Fetch(src);
+                if (up == e.Commit) return $"{key}: the source has no newer version.";
+                var from = e.Commit[..8];
+                var r = SourcesMerge.Merge(root, key, e, src, up, Bool(a, "acceptLicense", false), Bool(a, "dryRun", false));
+                return $"{key} ({label}): {(Bool(a, "dryRun", false) ? "merge preview (nothing changed) - ask the user before merging" : "merged")} {from} -> {up[..8]}. " +
+                       $"Conflicts: {(r.Conflicts.Count == 0 ? "none" : string.Join(", ", r.Conflicts) + " - marked with <<<<<<< in the file; let the user decide")}. " +
+                       $"Merged: {r.Merged.Count}, taken from the source: {r.Taken.Count}, deleted: {r.Deleted.Count}." + (r.Backup != null ? $" Backup: {r.Backup}" : "");
+            }
+            default:
+            {
+                var r = SourcesMerge.Propose(root, key, e, src, Str(a, "message"), Improver.PrivateTerms(dir));
+                return $"Prepared (not pushed): branch {r.Branch} in {r.Folder}, patch {r.Patch}." +
+                       (r.Specifics.Count > 0 ? $" WARNING - private terms in the proposal: {string.Join(", ", r.Specifics)} - remove them before anything is shared." : "") +
+                       " The user pushes it in the knowledge window (Sources > Propose) or sends the patch.";
+            }
+        }
     }
 
     static string SourceOfItem(string item) => item != null && item.Contains('/') ? item.Split('/')[0] : null;

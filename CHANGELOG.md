@@ -5,6 +5,20 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.45.0] – 2026-10-27
+
+### Added
+- Items installed from sources that you changed: **My changes** (diff against the installed version), **Merge new
+  version …** (preview first, then a three-way merge per file of the newer version of the source into your item - your
+  version is backed up, conflicts are marked with `<<<<<<<`) and **Propose (pull request) …** (your changes as a commit on
+  a new branch of the source without TcAgent's metadata, checked for private terms, plus a patch file; pushed only when
+  you confirm - to the source or your fork - and the pull request page opens). In the Sources tab and in the context menu
+  of the Files tab.
+- `tc_sources action=changes|merge|propose` and `TcAgent.exe sources changes|merge|propose|push` (`SourcesMerge.cs`).
+
+### Changed
+- Tab Files: an item from a source shows **✎ changed** or **↑ newer** in the column Source (orange mark when changed).
+
 ## [0.44.0] – 2026-10-27
 
 ### Added

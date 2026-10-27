@@ -172,6 +172,12 @@ public static partial class Cli
                                             ["ambiguous"] = new JsonArray(pi.Ambiguous.Select(x => (JsonNode)x).ToArray()) }
         };
 
+        // items installed from sources: changed locally / newer in the source (as of the last fetch) - shown with the file
+        var sourceState = new List<(string Path, string State)>();
+        foreach (var root in new[] { KnowledgeLayers.ProjectRoot(dir), KnowledgeLayers.UserRoot }.Concat(KnowledgeLayers.TeamRoots).Where(r => r != null))
+            try { foreach (var (key, state, le) in Sources.Status(root)) sourceState.Add((Path.GetFullPath(Sources.InstalledPath(root, key, le)), state)); } catch { }
+        string StateOf(string path) => path == null ? null : sourceState.FirstOrDefault(s => Path.GetFullPath(path).Equals(s.Path, StringComparison.OrdinalIgnoreCase) ||
+                                                                                          Path.GetFullPath(path).StartsWith(s.Path + "\\", StringComparison.OrdinalIgnoreCase)).State;
         // entries of every kind and level
         var entries = new JsonArray();
         var counts = new JsonObject();
@@ -186,7 +192,7 @@ public static partial class Cli
                     ["kind"] = kind, ["name"] = e.Name, ["key"] = e.Key, ["level"] = e.Layer.Level, ["label"] = e.Layer.Label, ["platform"] = e.Layer.Platform,
                     ["status"] = e.Status, ["active"] = e.Active, ["reason"] = e.Reason, ["path"] = e.Path, ["locked"] = e.Locked, ["force"] = e.Force,
                     ["description"] = e.Meta?.Top.TryGetValue("description", out var d) == true ? d : null,
-                    ["source"] = e.Meta?.Get("source"), ["license"] = e.Meta?.Get("license")
+                    ["source"] = e.Meta?.Get("source"), ["license"] = e.Meta?.Get("license"), ["sourceState"] = StateOf(e.Path)
                 });
         }
         // the levels with their Git state (behind/ahead as of the last fetch, local changes) and what the window may do there

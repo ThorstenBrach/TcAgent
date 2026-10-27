@@ -124,7 +124,13 @@ work without the extension. The extension runs **inside** the IDE process and ad
     Remove**, **Browse & install …** (everything a source offers with kind and license; before installing you see the
     license, the files and any scripts – source-available and unlicensed items are refused, others only after you
     accept the license). Below the items installed from sources – pinned commit, license, changed locally, newer upstream
-    – with **Check for updates**, **Update all …** and **Diff**.
+    – with **Check for updates**, **Update all …**, **Diff** (what changed in the source), **My changes** (what you
+    changed since the install), **Merge new version …** (a preview first; then the newer version of the source is merged
+    into your changed item, three-way – your version is backed up, conflicts are marked with `<<<<<<<`) and **Propose
+    (pull request) …** (your changes as a commit on a new branch of the source, without TcAgent's metadata and checked
+    for your private terms; you decide whether and where it is pushed – the source or your fork – and the pull request
+    page opens in the browser; a patch file is always written as well). In the tab **Files** an item from a source shows
+    **✎ changed** or **↑ newer** in the column Source, with the same three actions in the context menu.
   - **Platforms:** the platforms (automation frameworks) with the libraries and terms that detect them, which apply to
     this project and why, the libraries of the project. **New …** (a platform of your own – for you or, with a company
     level, for the whole company), **Open platform.md**, **Open folder**, **Set for this project …**, **Detect
@@ -472,6 +478,9 @@ own repository, or a shared team, platform or company repository:
   BSD and ISC are taken over with their notice; source-available or unlicensed items are refused.
 - What was installed is pinned in `skills.lock.json` of the level (commit and checksum). `action=status` shows what is
   changed locally or newer in the source, `action=pull` updates after asking, `action=diff` shows the changes.
+- **Changed it yourself?** *"What did I change in tcunit-tdd?"* → `action=changes`. *"Take the new version of the source
+  but keep my changes"* → `action=merge` (preview first, then after asking; conflicts are marked). *"Propose my change to
+  the source"* → `action=propose` prepares a branch and a patch; you push it in the knowledge window (Sources > Propose).
 - **Adapt without copying:** an own skill with `metadata.tcagent-extends: <skill>` adds TwinCAT parts to a general skill;
   the agent sees the original first, then your additions. Updates of the original keep working.
 - *"Move the skill driver-fb up to the platform"* → `action=promote item=skills/driver-fb scope=platform:<name>` – after

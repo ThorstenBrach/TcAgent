@@ -246,6 +246,12 @@ these in a pipeline.
   are refused; others (e.g. copyleft) only with `acceptLicense=true`. Recorded as `metadata.tcagent-license`, the origin
   as `tcagent-source` / `tcagent-commit`.
 - **Scripts** in a skill are listed before the install – TcAgent never runs them.
+- **Your changes** of an installed item: `changes` shows them (diff against the installed version); `merge` takes a newer
+  version of the source into the changed item (three-way per file, `dryRun` first; conflicts are marked with `<<<<<<<`, the
+  item is backed up to `%LOCALAPPDATA%\TcAgent\backups\sources\` first); `propose message=…` prepares them for the source
+  as a commit on a new branch `tcagent/<user>-<item>-<date>` in `%LOCALAPPDATA%\TcAgent\contrib\<source>` plus a patch file –
+  without TcAgent's own metadata, checked for private terms, never pushed by the agent (the user pushes in the knowledge
+  window, to the source or a fork, and the pull request page opens).
 - `install`, `pull` and `promote` show what they do and ask the user (with `TCAGENT_CONFIRM=off` without a question).
 - **Overlay:** an own skill with `metadata.tcagent-extends: <skill>` shows the extended skill first and its own text as
   additions – TwinCAT parts for a general skill without changing the original.

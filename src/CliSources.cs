@@ -6,6 +6,11 @@
 //                                                             commit - the pipeline gets the same skills as the team;
 //                                                             --dry-run only checks (exit 1 if something differs)
 //
+//   TcAgent.exe sources changes|merge|propose --item <name> [--level <label>]   your changes of an installed item, merge a
+//                                                             newer version of the source into them (three-way), or
+//                                                             prepare them as a pull request (SourcesMerge.cs)
+//   TcAgent.exe sources push --name <source> --ref <branch> [--url <fork>]    push a prepared proposal
+//
 // sync never updates to a newer commit (that is tc_sources action=pull, with the user's agreement) and never runs scripts.
 //
 // SPDX-License-Identifier: MIT
@@ -16,7 +21,7 @@ public static partial class Cli
     static int SourcesCli(Options o)
     {
         var dir = o.Solution != null ? Path.GetDirectoryName(Path.GetFullPath(o.Solution)) : null;
-        if (o.Sub is "add" or "remove" or "search" or "install" or "pull" or "diff")
+        if (o.Sub is "add" or "remove" or "search" or "install" or "pull" or "diff" or "changes" or "merge" or "propose" or "push")
             try { return SourcesEdit(o, dir); }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or TimeoutException) { Console.Error.WriteLine(ex.Message); return Failed; }
         var roots = new List<(string Label, string Root)>();
@@ -56,8 +61,58 @@ public static partial class Cli
         if (KnowledgeLayers.ProjectRoot(dir) is { } pr) roots.Add(("project", pr));
         roots.Add(("user", KnowledgeLayers.UserRoot));
         roots.AddRange(KnowledgeLayers.TeamRoots.Select(t => ("team", t)));
+        // an installed item by name (and level label, if it is installed on several levels)
+        (string Label, string Root, string Key, Sources.LockEntry E, Sources.Source Src) Locate()
+        {
+            var hits = roots.SelectMany(r => Sources.LoadLock(r.Root).Where(x => x.Key.Split('/')[1].Equals(o.Item ?? "", StringComparison.OrdinalIgnoreCase))
+                                                                      .Select(x => (r.Label, r.Root, x.Key, x.Value)))
+                            .Where(h => o.Level == null || h.Label.Equals(o.Level, StringComparison.OrdinalIgnoreCase)).ToList();
+            if (hits.Count == 0) throw new ArgumentException($"'{o.Item}' is not installed from a source");
+            if (hits.Count > 1) throw new ArgumentException($"'{o.Item}' is installed on several levels ({string.Join(", ", hits.Select(h => h.Label))}) - give --level");
+            var h = hits[0];
+            return (h.Label, h.Root, h.Key, h.Value, Sources.All(dir).FirstOrDefault(x => x.Name == h.Value.Source) ?? new Sources.Source { Name = h.Value.Source, Url = h.Value.Url });
+        }
+        string Lines(string title, List<string> l) => l.Count == 0 ? "" : $"{title} ({l.Count}): {string.Join(", ", l)}\n";
         switch (o.Sub)
         {
+            case "changes":
+            {
+                var (label, root, key, e, src) = Locate();
+                Console.WriteLine($"{key} ({label}) from {src.Name} @{e.Commit[..8]} - your changes since the install:\n\n{SourcesMerge.LocalDiff(root, key, e, src)}");
+                return Ok;
+            }
+            case "merge":
+            {
+                var (label, root, key, e, src) = Locate();
+                var up = Sources.Fetch(src);
+                if (up == e.Commit) { Console.WriteLine($"{key}: the source has no newer version (@{up[..8]})."); return Ok; }
+                var from = e.Commit[..8];
+                var r = SourcesMerge.Merge(root, key, e, src, up, o.AcceptLicense, o.DryRun);
+                Console.WriteLine($"{key} ({label}): {(o.DryRun ? "merge preview" : "merged")} {from} -> {up[..8]}\n" +
+                                  Lines("Conflicts - marked with <<<<<<< in the file", r.Conflicts) + Lines("Merged (yours and the source's changes)", r.Merged) +
+                                  Lines("Taken from the source", r.Taken) + Lines("Deleted in the source", r.Deleted) +
+                                  (r.Backup != null ? $"Backup of your version: {r.Backup}\n" : ""));
+                return r.Conflicts.Count > 0 ? Failed : Ok;
+            }
+            case "propose":
+            {
+                var (label, root, key, e, src) = Locate();
+                var r = SourcesMerge.Propose(root, key, e, src, o.Message, Improver.PrivateTerms(dir));
+                Console.WriteLine(new System.Text.Json.Nodes.JsonObject
+                {
+                    ["key"] = key, ["source"] = src.Name, ["url"] = src.Url, ["branch"] = r.Branch, ["folder"] = r.Folder, ["patch"] = r.Patch, ["compareUrl"] = r.CompareUrl,
+                    ["files"] = new System.Text.Json.Nodes.JsonArray(r.Merged.Concat(r.Taken).Concat(r.Deleted).Select(f => (System.Text.Json.Nodes.JsonNode)f).ToArray()),
+                    ["specifics"] = new System.Text.Json.Nodes.JsonArray(r.Specifics.Select(f => (System.Text.Json.Nodes.JsonNode)f).ToArray())
+                }.ToJsonString());
+                return Ok;
+            }
+            case "push":
+            {
+                var src = Find(o.Name);
+                var (output, compare) = SourcesMerge.Push(src, o.Ref ?? throw new ArgumentException("--ref <branch>"), o.Url);
+                Console.WriteLine(new System.Text.Json.Nodes.JsonObject { ["output"] = output, ["compareUrl"] = compare }.ToJsonString());
+                return Ok;
+            }
             case "add":
                 Console.WriteLine("Source saved in " + Sources.AddSource(Sources.RootOf(dir, o.Level ?? "personal"), o.Name, o.Url, o.Ref));
                 return Ok;

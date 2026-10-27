@@ -332,7 +332,10 @@ namespace TcAgentBridge
             foreach (var (label, tip, act) in new (string, string, Action)[] {
                 ("Check for updates", "Fetch the sources and list what is newer there", () => RunAsync("sources pull --dry-run", true)),
                 ("Update all …", "Update every installed item that is newer in its source (not the ones changed locally)", UpdateAll),
-                ("Diff", "Changes of the selected item in its source since the install", DiffInstalled) })
+                ("Diff", "Changes of the selected item in its source since the install", DiffInstalled),
+                ("My changes", "What you changed in the selected item since the install", () => { var (n, lv) = Installed(); SourceChanges(n, lv, sourceDetail); }),
+                ("Merge new version …", "Merge the newer version of the source into your changed item (three-way; conflicts are marked)", () => { var (n, lv) = Installed(); MergeSource(n, lv, sourceDetail); }),
+                ("Propose (pull request) …", "Your changes as a branch for the source - push it and open the pull request", () => { var (n, lv) = Installed(); ProposeSource(n, lv, sourceDetail); }) })
             { var b = Text(label, tip); b.Click += (s, e) => act(); tools2.Children.Add(b); }
             DockPanel.SetDock(tools2, Dock.Top); sp.Children.Add(tools2);
             DockPanel.SetDock(sourceDetail, Dock.Bottom); sp.Children.Add(sourceDetail);
@@ -342,8 +345,11 @@ namespace TcAgentBridge
             sourceList.ContextMenu = Menu(("Browse && install …".Replace("&&", "&"), BrowseSource, null), ("Edit …", () => EditSource(sourceList.SelectedItem as Line), SSel),
                                           ("Remove", RemoveSource, SSel), (null, null, null), ("Add …", () => EditSource(null), null));
             sourceList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { RemoveSource(); e.Handled = true; } };
-            installedList.ContextMenu = Menu(("Diff", DiffInstalled, () => installedList.SelectedItem is Line), ("Check for updates", () => RunAsync("sources pull --dry-run", true), null),
-                                             ("Update all …", UpdateAll, null));
+            bool ISel() => installedList.SelectedItem is Line;
+            installedList.ContextMenu = Menu(("Diff", DiffInstalled, ISel), ("My changes", () => { var (n, lv) = Installed(); SourceChanges(n, lv, sourceDetail); }, ISel),
+                                             ("Merge new version …", () => { var (n, lv) = Installed(); MergeSource(n, lv, sourceDetail); }, ISel),
+                                             ("Propose (pull request) …", () => { var (n, lv) = Installed(); ProposeSource(n, lv, sourceDetail); }, ISel), (null, null, null),
+                                             ("Check for updates", () => RunAsync("sources pull --dry-run", true), null), ("Update all …", UpdateAll, null));
             return sourcesPage = sp;
         }
 
@@ -548,8 +554,11 @@ namespace TcAgentBridge
                 if (onlyApplied.IsChecked == true && !B(e, "active")) continue;
                 var st = S(e, "status") + (B(e, "locked") ? ", locked" : "");
                 var src = S(e, "source") is string so ? so + (S(e, "license") is string li ? " · " + li : "") : "";
+                var ss = S(e, "sourceState") ?? "";
+                if (ss.Contains("changed locally")) src = "✎ changed · " + src;
+                if (ss.Contains("newer upstream")) src = "↑ newer · " + src;
                 var l = new Line { D = e, C1 = S(e, "name"), C2 = S(e, "kind"), C3 = S(e, "label"), C4 = st, C5 = S(e, "reason") ?? "", C6 = src, C7 = S(e, "git") ?? "",
-                                   Mark = B(e, "active") ? Green : S(e, "status") == "disabled" ? Orange : Gray, Tip = S(e, "path") };
+                                   Mark = B(e, "active") ? (ss.Contains("changed locally") ? Orange : Green) : S(e, "status") == "disabled" ? Orange : Gray, Tip = S(e, "path") };
                 if (q.Length > 0 && !$"{l.C1} {l.C2} {l.C3} {l.C4} {l.C5} {l.C6}".ToLowerInvariant().Contains(q.ToLowerInvariant())) continue;
                 lines.Add(l);
             }
@@ -566,7 +575,9 @@ namespace TcAgentBridge
             var sb = new StringBuilder($"{S(d, "key")} – {S(d, "label")} – {S(d, "status")}{(B(d, "locked") ? " (locked)" : "")}{(B(d, "force") ? " (force)" : "")}\n");
             if (S(d, "reason") is string r) sb.AppendLine("Why: " + r);
             if (S(d, "description") is string de) sb.AppendLine("Description: " + de);
-            if (S(d, "source") is string so) sb.AppendLine($"Source: {so} · license {S(d, "license") ?? "unknown"}");
+            if (S(d, "source") is string so) sb.AppendLine($"Source: {so} · license {S(d, "license") ?? "unknown"}" + (S(d, "sourceState") is string ss ? " · " + ss : ""));
+            if ((S(d, "sourceState") ?? "").Contains("changed locally"))
+                sb.AppendLine("Changed by you since the install - context menu: Show my changes, Merge the new version, Propose to the source (pull request).");
             sb.AppendLine("File: " + S(d, "path"));
             try { var p = S(d, "path"); if (File.Exists(p)) sb.AppendLine().Append(string.Join("\n", File.ReadLines(p).Take(40))); } catch { }
             detail.Text = sb.ToString();
@@ -615,6 +626,13 @@ namespace TcAgentBridge
             m.Items.Add(Item("Switch off for the project", () => Switch("disable", "project"), () => offProject.IsEnabled));
             m.Items.Add(Item("Switch off for me", () => Switch("disable", "user"), () => offUser.IsEnabled));
             m.Items.Add(Item("Switch on", () => { Switch("enable", "project"); Switch("enable", "user"); }, Sel));
+            // items installed from a source: your changes, a newer version, back to the source
+            bool FromSource() => S((entries.SelectedItem as Line)?.D, "sourceState") != null;
+            (string, string) Item0() { var d = (entries.SelectedItem as Line)?.D; return (S(d, "name"), (S(d, "label") ?? "").Split(' ')[0]); }
+            m.Items.Add(new Separator());
+            m.Items.Add(Item("Show my changes (source)", () => { var (n, lv) = Item0(); SourceChanges(n, lv, detail); }, FromSource));
+            m.Items.Add(Item("Merge the new version of the source …", () => { var (n, lv) = Item0(); MergeSource(n, lv, detail); }, FromSource));
+            m.Items.Add(Item("Propose to the source (pull request) …", () => { var (n, lv) = Item0(); ProposeSource(n, lv, detail); }, FromSource));
             return m;
         }
 
@@ -994,6 +1012,73 @@ namespace TcAgentBridge
                     RunAsync("sources pull", true, reload: true);
                 }));
             });
+        }
+
+        (string Name, string Level) Installed()
+        {
+            if (!(installedList.SelectedItem is Line l)) { status.Text = "Select an installed item first."; return (null, null); }
+            return ((S(l.D, "key") ?? "").Split('/').Last(), S(l.D, "level"));
+        }
+
+        void SourceChanges(string name, string level, TextBox output)
+        {
+            if (name == null) return;
+            output.Text = "Comparing with the installed version ...";
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var (_, o) = RunCli($"sources changes --item {Quote(name)} --level {Quote(level)}");
+                Dispatcher.BeginInvoke(new Action(() => output.Text = o.Trim()));
+            });
+        }
+
+        // a preview first (nothing changed), then the merge after asking; conflicts stay marked in the file
+        void MergeSource(string name, string level, TextBox output)
+        {
+            if (name == null) return;
+            status.Text = $"Fetching the source of {name} ...";
+            var (pok, preview) = RunCli($"sources merge --dry-run --item {Quote(name)} --level {Quote(level)}");
+            output.Text = preview.Trim();
+            if (preview.Contains("has no newer version")) { status.Text = preview.Trim(); return; }
+            var conflicts = preview.Contains("Conflicts");
+            if (!pok && !conflicts) { Report(false, preview, "Merge"); return; }
+            if (MessageBox.Show($"Merge the new version of the source into your {name}?\n\n{preview.Trim()}\n\n" +
+                                (conflicts ? "Conflicts are marked with <<<<<<< in the file - edit them afterwards. " : "") +
+                                "Your version is backed up first.", "TcAgent Knowledge", MessageBoxButton.YesNo,
+                                conflicts ? MessageBoxImage.Warning : MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            var (ok, o) = RunCli($"sources merge --item {Quote(name)} --level {Quote(level)}");
+            output.Text = o.Trim();
+            status.Text = o.Trim().Split('\n')[0];
+            if (!ok && !o.Contains("Conflicts")) Report(false, o, "Merge");
+            Load();
+        }
+
+        // a commit on a new branch of a working copy of the source, then - only if the user wants - the push and the PR page
+        void ProposeSource(string name, string level, TextBox output)
+        {
+            if (name == null) return;
+            var r = Prompt($"Propose your changes of {name} to the source", ("What does your change improve? (the commit message, in the language of the source)", null, name + ": "));
+            if (r == null || r[0].Trim().Length == 0) return;
+            var (ok, o) = RunCli($"sources propose --item {Quote(name)} --level {Quote(level)} --message {Quote(r[0].Trim())}");
+            if (!ok) { output.Text = o.Trim(); Report(false, o, "Propose"); return; }
+            Dictionary<string, object> p;
+            try { p = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(o); } catch { output.Text = o; return; }
+            var sp = ((p.TryGetValue("specifics", out var so) ? so as IEnumerable : null) ?? new object[0]).Cast<object>().Select(x => x.ToString()).ToList();
+            output.Text = $"Prepared: branch {S(p, "branch")} in {S(p, "folder")}\nFiles: {string.Join(", ", ((p.TryGetValue("files", out var fo) ? fo as IEnumerable : null) ?? new object[0]).Cast<object>())}\n" +
+                          $"Patch (to send by hand): {S(p, "patch")}" + (sp.Count > 0 ? $"\n\nWARNING - private terms found: {string.Join(", ", sp)}" : "");
+            if (sp.Count > 0 && MessageBox.Show($"The proposal contains terms from your private list: {string.Join(", ", sp)}\n\nThe source is public or shared - remove them first " +
+                                                "(edit the item, propose again). Push anyway?", "TcAgent Knowledge", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            var push = Prompt("Push the proposal",
+                              ("Push the branch to (the source, or the URL of your fork if you may not write to the source) - nothing is sent before OK, empty = do not push", null, S(p, "url")));
+            if (push == null || push[0].Trim().Length == 0) { status.Text = "Not pushed - the branch and the patch are prepared."; return; }
+            var (pushOk, po) = RunCli($"sources push --name {Quote(S(p, "source"))} --ref {Quote(S(p, "branch"))} --url {Quote(push[0].Trim())}");
+            if (!pushOk) { Report(false, po, "Push"); return; }
+            try
+            {
+                var pr = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(po);
+                if (S(pr, "compareUrl") is string url) { Process.Start(new ProcessStartInfo(url) { UseShellExecute = true }); status.Text = "Pushed - the pull request page is open in the browser."; }
+                else status.Text = "Pushed: " + S(p, "branch") + " - open the pull request / merge request on the server of the source.";
+            }
+            catch { status.Text = "Pushed."; }
         }
 
         void DiffInstalled()

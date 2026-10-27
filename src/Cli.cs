@@ -793,8 +793,8 @@ public static partial class Cli
         }
         if (o.Command is "sources")                       // files and git only: the solution is optional (its project level)
         {
-            if (o.Sub is not ("status" or "sync" or "add" or "remove" or "search" or "install" or "pull" or "diff"))
-                throw new Exception("sources needs status, sync, add, remove, search, install, pull or diff, e.g. TcAgent.exe sources sync --solution M.sln");
+            if (o.Sub is not ("status" or "sync" or "add" or "remove" or "search" or "install" or "pull" or "diff" or "changes" or "merge" or "propose" or "push"))
+                throw new Exception("sources needs status, sync, add, remove, search, install, pull, diff, changes, merge, propose or push, e.g. TcAgent.exe sources sync --solution M.sln");
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
             return o;
         }
@@ -914,7 +914,7 @@ public static partial class Cli
       ready to paste into GitHub issues - to stdout or into the file. --open: only open entries; --summary: counts only.
       No IDE needed.
 
-  TcAgent.exe sources status|sync|add|remove|search|install|pull|diff [--solution <sln>] [--dry-run]
+  TcAgent.exe sources status|sync|add|remove|search|install|pull|diff|changes|merge|propose|push [--solution <sln>] [--dry-run]
       The Git sources of skills, workflows and rules: sync restores every installed item at the commit of
       skills.lock.json (--dry-run only compares, exit 1 on differences). No IDE needed.
 

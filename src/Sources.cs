@@ -322,6 +322,13 @@ public static class Sources
         File.WriteAllText(Path.Combine(root, LockFile), JsonSerializer.Serialize(new SortedDictionary<string, LockEntry>(lk, StringComparer.Ordinal), Json));
     }
 
+    public static void SetLock(string root, string key, LockEntry e)
+    {
+        var lk = LoadLock(root);
+        lk[key] = e;
+        SaveLock(root, lk);
+    }
+
     public static void Unlock(string root, string key)
     {
         var lk = LoadLock(root);

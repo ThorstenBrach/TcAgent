@@ -156,6 +156,8 @@ diff); write step hints in general terms - no customer, machine or project names
 
 **Sources** (`tc_sources`): skills, workflows and rules can be installed from Git repositories. Install, pull or promote only
 when the user asks; TcAgent shows license, files and scripts and asks again. Never run scripts of a skill without the user.
+An installed item the user changed: `action=changes` shows the changes, `merge` (dryRun first, then only after asking) takes a
+newer version of the source in, `propose` prepares the changes as a pull request - the user pushes it.
 
 **Tests:** for a new test suite call `tc_test_skeleton name=<FB>` (`dryRun` first) instead of writing the suite by hand - it creates
 the enable bools, a complete InitialOutputs test and one test per public method; then replace each TODO assertion with the
