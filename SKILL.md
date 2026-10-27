@@ -274,6 +274,8 @@ treat them like project rules for that library.
 - `tc_plc_online` with login / stop / start / logout - commands run in sequence; the response includes the
   PLC state via ADS (Run/Stop). After `tc_activate`, first `login`, then `start`. `tc_plc_state` reads the state alone.
 - `ads_symbols` (with `filter`), `ads_read`, `ads_write` - symbol paths like `MAIN.nCounter` or `GVL_X.y`.
+- `tc_backup` - runtime data (persistent, retain, recipes via `include`): `backup`, `list`, `diff`; `restore` only when the
+  user asks, after `diff`, with the PLC stopped - never on a machine target without the user's agreement.
 - `tc_policy` shows the mode (agent / propose / ask) and enabled target systems. If a tool blocks a target, do NOT work around it;
   ask the user. Targets are enabled via TCAGENT_ALLOW_TARGETS in their MCP configuration.
   `tc_policy action=audit_check date=12.10.` (read-only) lists changing calls of that day that are missing in the audit log.

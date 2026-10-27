@@ -19,9 +19,9 @@ public sealed partial class ToolRegistry
                           "status (ok / changed locally / newer upstream), pull [item] (updates after asking; skips locally changed items unless force), " +
                           "diff item, changes item (what the user changed in an installed item), merge item (a newer version of the source into the locally changed " +
                           "item, three-way; dryRun first, then only after the user agreed - conflicts are marked in the file), propose item message (the local " +
-                          "changes as a commit on a new branch of the source plus a patch - never pushed; the user pushes in the knowledge window), promote item=<kind>/<name> scope=personal|team|platform:<name>|company (own item one level up; checked for specific names; " +
+                          "changes as a commit on a new branch of the source plus a patch - never pushed; the user pushes in the knowledge window), uninstall item (only when the user asks; a copy goes to the backups), promote item=<kind>/<name> scope=personal|team|platform:<name>|company (own item one level up; checked for specific names; " +
                           "company and a team in Git as a commit on a new branch for a pull request). Installed items are pinned in skills.lock.json of their level.",
-            Schema(Req(P("action", "string", "list, add, remove, search, install, status, pull, diff, changes, merge, propose or promote")),
+            Schema(Req(P("action", "string", "list, add, remove, search, install, status, pull, diff, changes, merge, propose, uninstall or promote")),
                    P("name", "string", "add/remove: source name (lowercase, hyphens)"),
                    P("url", "string", "add: Git URL or path of the repository"),
                    P("ref", "string", "add: branch or tag (default HEAD)"),
@@ -50,8 +50,8 @@ public sealed partial class ToolRegistry
                         "pull" => SourcesPull(a, dir),
                         "diff" => SourcesDiff(dir, Str(a, "item") ?? throw new ArgumentException("item is required")),
                         "promote" => SourcesPromote(a, dir),
-                        "changes" or "merge" or "propose" => SourcesLocal(a, dir),
-                        _ => throw new ArgumentException("action: list, add, remove, search, install, status, pull, diff, changes, merge, propose or promote")
+                        "changes" or "merge" or "propose" or "uninstall" => SourcesLocal(a, dir),
+                        _ => throw new ArgumentException("action: list, add, remove, search, install, status, pull, diff, changes, merge, propose, uninstall or promote")
                     };
                 }
                 catch (ArgumentException ex) { throw new Exception("NOT done: " + ex.Message); }
@@ -71,6 +71,7 @@ public sealed partial class ToolRegistry
         var src = Sources.All(dir).FirstOrDefault(x => x.Name == e.Source) ?? new Sources.Source { Name = e.Source, Url = e.Url };
         switch (Str(a, "action")!.ToLowerInvariant())
         {
+            case "uninstall": return SourcesMerge.Uninstall(root, key, e);
             case "changes": return $"{key} ({label}) - the user's changes since the install @{e.Commit[..8]}:\n\n{SourcesMerge.LocalDiff(root, key, e, src)}";
             case "merge":
             {

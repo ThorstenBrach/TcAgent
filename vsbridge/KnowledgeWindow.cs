@@ -335,7 +335,8 @@ namespace TcAgentBridge
                 ("Diff", "Changes of the selected item in its source since the install", DiffInstalled),
                 ("My changes", "What you changed in the selected item since the install", () => { var (n, lv) = Installed(); SourceChanges(n, lv, sourceDetail); }),
                 ("Merge new version …", "Merge the newer version of the source into your changed item (three-way; conflicts are marked)", () => { var (n, lv) = Installed(); MergeSource(n, lv, sourceDetail); }),
-                ("Propose (pull request) …", "Your changes as a branch for the source - push it and open the pull request", () => { var (n, lv) = Installed(); ProposeSource(n, lv, sourceDetail); }) })
+                ("Propose (pull request) …", "Your changes as a branch for the source - push it and open the pull request", () => { var (n, lv) = Installed(); ProposeSource(n, lv, sourceDetail); }),
+                ("Uninstall …", "Remove the selected item from its level (a copy goes to the backups; the source stays)", UninstallSource) })
             { var b = Text(label, tip); b.Click += (s, e) => act(); tools2.Children.Add(b); }
             DockPanel.SetDock(tools2, Dock.Top); sp.Children.Add(tools2);
             DockPanel.SetDock(sourceDetail, Dock.Bottom); sp.Children.Add(sourceDetail);
@@ -345,10 +346,12 @@ namespace TcAgentBridge
             sourceList.ContextMenu = Menu(("Browse && install …".Replace("&&", "&"), BrowseSource, null), ("Edit …", () => EditSource(sourceList.SelectedItem as Line), SSel),
                                           ("Remove", RemoveSource, SSel), (null, null, null), ("Add …", () => EditSource(null), null));
             sourceList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { RemoveSource(); e.Handled = true; } };
+            installedList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { UninstallSource(); e.Handled = true; } };
             bool ISel() => installedList.SelectedItem is Line;
             installedList.ContextMenu = Menu(("Diff", DiffInstalled, ISel), ("My changes", () => { var (n, lv) = Installed(); SourceChanges(n, lv, sourceDetail); }, ISel),
                                              ("Merge new version …", () => { var (n, lv) = Installed(); MergeSource(n, lv, sourceDetail); }, ISel),
                                              ("Propose (pull request) …", () => { var (n, lv) = Installed(); ProposeSource(n, lv, sourceDetail); }, ISel), (null, null, null),
+                                             ("Uninstall …", UninstallSource, ISel), (null, null, null),
                                              ("Check for updates", () => RunAsync("sources pull --dry-run", true), null), ("Update all …", UpdateAll, null));
             return sourcesPage = sp;
         }
@@ -1079,6 +1082,19 @@ namespace TcAgentBridge
                 else status.Text = "Pushed: " + S(p, "branch") + " - open the pull request / merge request on the server of the source.";
             }
             catch { status.Text = "Pushed."; }
+        }
+
+        void UninstallSource()
+        {
+            if (!(installedList.SelectedItem is Line l)) { status.Text = "Select an installed item first."; return; }
+            var (name, level) = Installed();
+            var changed = (S(l.D, "state") ?? "").Contains("changed locally");
+            if (MessageBox.Show($"Uninstall {S(l.D, "key")} from the {level} level?\n\nIts files are removed and the entry leaves skills.lock.json; a copy goes to " +
+                                "%LOCALAPPDATA%\\TcAgent\\backups\\sources. The source itself stays." + (changed ? "\n\nYou changed this item - your changes are only in that copy afterwards." : ""),
+                                "TcAgent Knowledge", MessageBoxButton.YesNo, changed ? MessageBoxImage.Warning : MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            var (ok, output) = RunCli($"sources uninstall --item {Quote(name)} --level {Quote(level)}");
+            Report(ok, output, "Uninstall");
+            Load();
         }
 
         void DiffInstalled()

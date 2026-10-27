@@ -10,6 +10,7 @@
 //                                                             newer version of the source into them (three-way), or
 //                                                             prepare them as a pull request (SourcesMerge.cs)
 //   TcAgent.exe sources push --name <source> --ref <branch> [--url <fork>]    push a prepared proposal
+//   TcAgent.exe sources uninstall --item <name> [--level <label>]             remove an installed item (a copy goes to the backups)
 //
 // sync never updates to a newer commit (that is tc_sources action=pull, with the user's agreement) and never runs scripts.
 //
@@ -21,7 +22,7 @@ public static partial class Cli
     static int SourcesCli(Options o)
     {
         var dir = o.Solution != null ? Path.GetDirectoryName(Path.GetFullPath(o.Solution)) : null;
-        if (o.Sub is "add" or "remove" or "search" or "install" or "pull" or "diff" or "changes" or "merge" or "propose" or "push")
+        if (o.Sub is "add" or "remove" or "search" or "install" or "pull" or "diff" or "changes" or "merge" or "propose" or "push" or "uninstall")
             try { return SourcesEdit(o, dir); }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or TimeoutException) { Console.Error.WriteLine(ex.Message); return Failed; }
         var roots = new List<(string Label, string Root)>();
@@ -75,6 +76,12 @@ public static partial class Cli
         string Lines(string title, List<string> l) => l.Count == 0 ? "" : $"{title} ({l.Count}): {string.Join(", ", l)}\n";
         switch (o.Sub)
         {
+            case "uninstall":
+            {
+                var (_, root, key, e, _) = Locate();
+                Console.WriteLine(SourcesMerge.Uninstall(root, key, e));
+                return Ok;
+            }
             case "changes":
             {
                 var (label, root, key, e, src) = Locate();

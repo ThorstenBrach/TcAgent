@@ -22,6 +22,7 @@
     <Compile Include="..\..\src\Improver.cs" Link="src\Improver.cs" />
     <Compile Include="..\..\src\Sources.cs" Link="src\Sources.cs" />
     <Compile Include="..\..\src\SourcesMerge.cs" Link="src\SourcesMerge.cs" />
+    <Compile Include="..\..\src\RuntimeBackup.cs" Link="src\RuntimeBackup.cs" />
     <Compile Include="..\..\src\TestSkeleton.cs" Link="src\TestSkeleton.cs" />
     <Compile Include="..\..\src\KnowledgeOps.cs" Link="src\KnowledgeOps.cs" />
   </ItemGroup>

@@ -147,6 +147,9 @@ public static class Confirm
             case "tc_plc_online":
                 var cmds = new[] { "login", "stop", "start", "logout" }.Where(B).ToList();
                 return $"PLC {S("plcProjectPath")}: {string.Join(", ", cmds)}{on}.";
+            case "tc_backup":
+                return $"Restore runtime data from {Path.GetFileName(S("file") ?? "?")}{(string.IsNullOrEmpty(target) ? " to the local PLC" : on)}, port {S("port") ?? "851"}: " +
+                       "every stored value that differs is written" + (B("whileRunning") ? " - while the PLC is running" : "") + ".";
             case "ads_write":
                 return $"Write variable {S("symbol")} := {S("value")}{(string.IsNullOrEmpty(target) ? " (local PLC)" : on)}, port {S("port") ?? "851"}.";
             case "tc_runtime_mode":

@@ -31,7 +31,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -51,6 +51,7 @@ public static partial class Cli
         public string Approve;                                                                      // tcunit report --approve <id>
         public string Key, Level, Action, Message;                                                  // knowledge ... --key <kind/name> --level <level> --action <git action> --message <text>
         public string Name, Url, Ref, Item, Kind, Query, Libraries, Terms; public bool AcceptLicense;  // sources / knowledge platform (window)
+        public string Include, Exclude; public int Port = 851; public bool WhileRunning;               // backup / restore (CliBackup.cs)
 
     }
 
@@ -65,7 +66,8 @@ public static partial class Cli
         catch (Exception ex) { Console.Error.WriteLine("Error: " + ex.Message); Console.Error.WriteLine("TcAgent.exe help shows the usage."); return Usage; }
         if (o.Command is "help") { Console.WriteLine(Help); return Ok; }
         if (o.Command is "version") { Console.WriteLine($"TcAgent {Program.ServerVersion}"); return Ok; }
-        if (o.Command is "diag") return Diag(o);                // CliDiag.cs - versions for issue reports, no IDE needed
+        if (o.Command is "diag") return Diag(o);
+        if (o.Command is "backup" or "restore") { Program.ClientName = "cli:" + o.Command; return BackupCli(o); }   // CliBackup.cs - ADS only, no IDE                // CliDiag.cs - versions for issue reports, no IDE needed
         if (o.Command is "install") return Install(o);          // CliDoctor.cs - no IDE needed
         if (o.Command is "doctor") { Program.ClientName = "cli:doctor"; return Doctor(o); }
         if (o.Command is "ci") { Program.ClientName = "cli:ci"; return Ci(o); }   // CliCi.cs - every step is its own TcAgent.exe
@@ -765,14 +767,18 @@ public static partial class Cli
                 case "--terms": o.Terms = Val(); break;
                 case "--accept-license": o.AcceptLicense = true; break;
                 case "--message": o.Message = Val(); break;
+                case "--include": o.Include = Val(); break;
+                case "--exclude": o.Exclude = Val(); break;
+                case "--port": o.Port = int.Parse(Val()); break;
+                case "--while-running": o.WhileRunning = true; break;
                 default:
                     // st: the sub-command (export, check, import) is the first argument that is not an option
                     if (o.Command is "st" or "tcunit" or "skills" or "sources" or "knowledge" && o.Sub == null && !a.StartsWith("-")) { o.Sub = a.ToLowerInvariant(); break; }
                     throw new Exception("Unknown option " + a);
             }
         }
-        if (o.Command != "ci" && (o.Config != null || o.Only != null || o.Init || (o.Command is not ("st" or "skills" or "sources") && (o.From != null || o.DryRun))))
-            throw new Exception("--config, --only, --from, --dry-run and --init are only for ci (--from and --dry-run also for st import, --dry-run for skills mirror and sources sync)");
+        if (o.Command != "ci" && (o.Config != null || o.Only != null || o.Init || (o.Command is not ("st" or "skills" or "sources" or "restore") && (o.From != null || o.DryRun))))
+            throw new Exception("--config, --only, --from, --dry-run and --init are only for ci (--from and --dry-run also for st import and restore, --dry-run for skills mirror and sources sync)");
         if ((o.Clean || o.Force) && o.Command != "st") throw new Exception("--clean and --force are only for st");
         if (o.Command is "help" or "version") return o;
         if (o.Command is "st") { ValidateSt(o); return o; }
@@ -793,8 +799,8 @@ public static partial class Cli
         }
         if (o.Command is "sources")                       // files and git only: the solution is optional (its project level)
         {
-            if (o.Sub is not ("status" or "sync" or "add" or "remove" or "search" or "install" or "pull" or "diff" or "changes" or "merge" or "propose" or "push"))
-                throw new Exception("sources needs status, sync, add, remove, search, install, pull, diff, changes, merge, propose or push, e.g. TcAgent.exe sources sync --solution M.sln");
+            if (o.Sub is not ("status" or "sync" or "add" or "remove" or "search" or "install" or "pull" or "diff" or "changes" or "merge" or "propose" or "push" or "uninstall"))
+                throw new Exception("sources needs status, sync, add, remove, search, install, pull, diff, changes, merge, propose, push or uninstall, e.g. TcAgent.exe sources sync --solution M.sln");
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
             return o;
         }
@@ -802,6 +808,12 @@ public static partial class Cli
         {
             if (o.Sub is not ("list" or "mirror")) throw new Exception("skills needs list or mirror, e.g. TcAgent.exe skills mirror");
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
+            return o;
+        }
+        if (o.Command is "backup" or "restore")
+        {
+            if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
+            if (o.Command == "restore" && o.From == null) throw new Exception("restore needs --from <backup file>");
             return o;
         }
         if (o.Command is "doctor" or "diag")
@@ -866,6 +878,14 @@ public static partial class Cli
       Versions and environment for an issue report as a Markdown list: TcAgent, the registered extension, TwinCAT,
       installed IDEs, runtime state, Windows, configured knowledge levels - no names, paths or addresses.
 
+  TcAgent.exe backup [--target <AmsNetId[,AmsNetId...]>] [--port 851] [--include <patterns>] [--exclude <patterns>] [--out <folder>] [--solution <sln>]
+      Runtime data via ADS: persistent variables, the RETAIN/PERSISTENT variables of the code (with --solution) and the
+      include patterns (';'-separated, also .tcagent\backup.json) - one JSON file per PLC. Reading only; no IDE needed.
+
+  TcAgent.exe restore --from <file> [--target <AmsNetId>] [--allow <AmsNetId>] [--include <patterns>] [--dry-run] [--while-running]
+      Writes the values of a backup that differ - only symbols that exist with the same type. Only allowed targets
+      (TCAGENT_ALLOW_TARGETS or --allow), the PLC must be stopped unless --while-running. --dry-run shows the difference.
+
   TcAgent.exe install --path <folder>
       Copies this TcAgent including the interop of this TwinCAT installation to a fixed folder (e.g. C:\Tools\TcAgent)
       for pipelines - the VSIX installs per user and per version.
@@ -914,7 +934,7 @@ public static partial class Cli
       ready to paste into GitHub issues - to stdout or into the file. --open: only open entries; --summary: counts only.
       No IDE needed.
 
-  TcAgent.exe sources status|sync|add|remove|search|install|pull|diff|changes|merge|propose|push [--solution <sln>] [--dry-run]
+  TcAgent.exe sources status|sync|add|remove|search|install|pull|diff|changes|merge|propose|push|uninstall [--solution <sln>] [--dry-run]
       The Git sources of skills, workflows and rules: sync restores every installed item at the commit of
       skills.lock.json (--dry-run only compares, exit 1 on differences). No IDE needed.
 

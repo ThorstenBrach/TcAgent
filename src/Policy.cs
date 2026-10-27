@@ -35,7 +35,7 @@ public sealed class Policy
         ["tc_hmi_page"] = ToolClass.ProjectWrite, ["tc_hmi_control"] = ToolClass.ProjectWrite, ["tc_hmi_symbol"] = ToolClass.ProjectWrite, ["tc_packages_change"] = ToolClass.RuntimeWrite,
         ["tc_realtime"] = ToolClass.ProjectWrite, ["tc_sfc"] = ToolClass.ProjectWrite, ["tc_doc"] = ToolClass.ProjectWrite, ["tc_userdoc"] = ToolClass.ProjectWrite, ["tc_refactor"] = ToolClass.ProjectWrite, ["tc_lessons"] = ToolClass.ProjectWrite, ["tc_coe"] = ToolClass.ProjectWrite, ["tc_route_add"] = ToolClass.RuntimeWrite,
         ["tc_activate"] = ToolClass.RuntimeWrite, ["tc_plc_online"] = ToolClass.RuntimeWrite,
-        ["ads_write"] = ToolClass.RuntimeWrite, ["tc_test_run"] = ToolClass.RuntimeWrite,
+        ["ads_write"] = ToolClass.RuntimeWrite, ["tc_test_run"] = ToolClass.RuntimeWrite, ["tc_backup"] = ToolClass.RuntimeWrite,
         ["tc_knowledge"] = ToolClass.ProjectWrite, ["tc_improve"] = ToolClass.ProjectWrite, ["tc_sources"] = ToolClass.ProjectWrite, ["tc_test_skeleton"] = ToolClass.ProjectWrite,
     };
 
@@ -102,6 +102,10 @@ public sealed class Policy
     {
         var cls = ClassOf(tool);
         if (cls == ToolClass.ProjectWrite && args?["action"] is JsonValue v && ReadActions.Contains(v.ToString())) return ToolClass.Read;
+        // tc_backup: only restore writes to the PLC (backup writes a file on this PC, list and diff only read)
+        if (tool == "tc_backup" && !(args?["action"] is JsonValue ba && ba.ToString().Trim().Equals("restore", StringComparison.OrdinalIgnoreCase)
+                                     && !(args?["dryRun"] is JsonValue bd && bd.ToString().Equals("true", StringComparison.OrdinalIgnoreCase))))
+            return ToolClass.Read;
         // tc_test_run action=list only reads the code
         if (tool == "tc_test_run" && args?["action"] is JsonValue ta && ta.ToString().Trim().Equals("list", StringComparison.OrdinalIgnoreCase)) return ToolClass.Read;
         if (cls == ToolClass.ProjectWrite && args?["action"] == null && tool is "tc_userdoc" or "tc_refactor" or "tc_motion" or "tc_lessons") return ToolClass.Read;   // default action: data / analyze / list / search

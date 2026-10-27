@@ -5,6 +5,18 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.46.0] – 2026-10-27
+
+### Added
+- **Runtime data backup and restore** (`tc_backup`, `TcAgent.exe backup|restore`, `RuntimeBackup.cs`): persistent
+  variables, the `RETAIN`/`PERSISTENT` variables of the code (GVLs and programs by path, function blocks in every
+  instance) and include patterns for recipes and parameters (also `.tcagent\backup.json`) via ADS into one JSON file per
+  PLC - for several PLCs at once on the command line. `diff` compares a backup with the PLC; `restore` writes only the
+  values that differ, only to symbols that still exist with the same type, only to allowed targets, after confirmation
+  and with the PLC stopped unless `whileRunning`.
+- Sources tab: **Uninstall …** for installed items (also Del and the context menu; a copy goes to the backups);
+  `tc_sources action=uninstall`, `TcAgent.exe sources uninstall`.
+
 ## [0.45.0] – 2026-10-27
 
 ### Added

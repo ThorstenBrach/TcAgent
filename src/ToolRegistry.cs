@@ -494,6 +494,56 @@ public sealed partial class ToolRegistry
                 foreach (ISymbol s in loader.Symbols) Walk(s, 0);
                 return sb.Length > 0 ? sb.ToString() : "no symbols";
             });
+
+        // runtime data: persistent/retain variables and recipes (RuntimeBackup.cs)
+        Add("tc_backup", "Backup and restore of runtime data via ADS: persistent variables, the RETAIN/PERSISTENT variables of the code and " +
+                         "include patterns (recipes, parameters; also .tcagent\\backup.json). action=backup (a JSON file per PLC), list (the backups), " +
+                         "diff (backup against the PLC now, nothing written), restore (writes the values that differ - only existing symbols with the " +
+                         "same type; allowed targets only, the user confirms, the PLC must be stopped unless whileRunning). Read-only for backup/list/diff.",
+            Schema(Req(P("action", "string", "backup, list, diff or restore")),
+                   P("netId", "string", "AmsNetId of the PLC (empty = local)"), P("port", "integer", "ADS port (default 851)"),
+                   P("file", "string", "diff/restore: the backup file; backup: file or folder to write to (default %LOCALAPPDATA%\\TcAgent\\backups\\runtime\\<solution>)"),
+                   P("include", "string", "backup: more variables, ';'-separated paths or patterns, e.g. GVL_Recipe;MAIN.fbAxis.stParams;*.stConfig; restore/diff: only these"),
+                   P("exclude", "string", "backup: leave out, ';'-separated patterns"),
+                   P("whileRunning", "boolean", "restore: write although the PLC is in Run - only if that is safe for the machine"),
+                   P("dryRun", "boolean", "restore: only show what would change (same as diff)")),
+            a =>
+            {
+                string dir = null;
+                try { dir = SolutionDir(5000); } catch { }
+                var net = Str(a, "netId"); var port = Int(a, "port", 851);
+                List<string> Pats(string k) => (Str(a, k) ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
+                switch ((Str(a, "action") ?? "list").ToLowerInvariant())
+                {
+                    case "backup":
+                    {
+                        var b = RuntimeBackupAds.Backup(net, port, dir, Pats("include"), Pats("exclude"), Program.ServerVersion);
+                        var f = Str(a, "file") is { Length: > 0 } ff ? (Directory.Exists(ff) ? Path.Combine(ff, RuntimeBackup.FileName(net, port)) : ff)
+                                                                    : Path.Combine(RuntimeBackup.DefaultFolder(dir), RuntimeBackup.FileName(net, port));
+                        RuntimeBackup.Save(f, b);
+                        var n = ((JsonObject)b["values"]!).Count;
+                        return $"Backup: {n} value(s) of {b["target"]}:{port} (PLC {b["plcState"]}, project {b["project"] ?? "?"}) -> {f}\n" +
+                               $"By reason: {b["selection"]?["byReason"]?.ToJsonString()}; declared RETAIN/PERSISTENT in the code: {b["selection"]?["declaredInCode"]}" +
+                               (n == 0 ? "\nNothing selected - no persistent/retain variables found; name recipes and parameters with include (or .tcagent\\backup.json)." : "") +
+                               (((JsonArray)b["skipped"]!).Count > 0 ? $"\nSkipped: {((JsonArray)b["skipped"]!).Count} (see the file)" : "");
+                    }
+                    case "list":
+                    {
+                        var folder = Str(a, "file") ?? RuntimeBackup.DefaultFolder(dir);
+                        var l = RuntimeBackup.List(folder);
+                        return l.Count == 0 ? "No backups in " + folder : string.Join("\n", l.Select(x => $"{x.Created}  {x.Target}  {x.Values} value(s)  {x.File}"));
+                    }
+                    case "diff":
+                    case "restore":
+                    {
+                        var file = Str(a, "file") ?? throw new Exception("file is required (tc_backup action=list shows the backups)");
+                        var dry = Str(a, "action")!.Equals("diff", StringComparison.OrdinalIgnoreCase) || Bool(a, "dryRun", false);
+                        var r = RuntimeBackupAds.Restore(RuntimeBackup.Load(file), net, port, Pats("include"), dry, Bool(a, "whileRunning", false));
+                        return $"{(dry ? "Difference" : "Restore")} {Path.GetFileName(file)} -> {(string.IsNullOrEmpty(net) ? "local" : net)}:{port}\n" + r.Report(dry);
+                    }
+                    default: throw new Exception("action: backup, list, diff or restore");
+                }
+            });
     }
 
     // ------------------------------------------------------------------ TcUnit (TcUnitDiscovery.cs, TcUnitRun.cs)
@@ -1497,7 +1547,7 @@ public sealed partial class ToolRegistry
     // Target system of a runtime operation: explicit netId or the solution's current target
     string TargetOf(string tool, JsonObject a) => tool switch
     {
-        "ads_write" => Str(a, "netId"),
+        "ads_write" or "tc_backup" => Str(a, "netId"),
         // the target of the call, otherwise the one of .tcagent\tcunit.json (TcUnitRun checks the whitelist again)
         "tc_test_run" => (Str(a, "target") ?? TcUnitConfig.Load(SolutionDir()).Target) is string t && !t.Trim().Equals("local", StringComparison.OrdinalIgnoreCase) ? t.Trim() : null,
         "tc_activate" when !string.IsNullOrEmpty(Str(a, "netId")) => Str(a, "netId"),

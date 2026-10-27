@@ -110,6 +110,18 @@ public sealed class SourcesMergeTests : IDisposable
     }
 
     [Fact]
+    public void UninstallKeepsACopy()
+    {
+        EditLocal("Step one.", "Step one, mine.");
+        var msg = SourcesMerge.Uninstall(Root, Key, Lock);
+        Assert.False(Directory.Exists(Path.Combine(Root, "skills", "review")));
+        Assert.Empty(Sources.LoadLock(Root));
+        var copy = Directory.GetFiles(Path.Combine(Root, "backups", "sources"), "SKILL.md", SearchOption.AllDirectories).Single();
+        Assert.Contains("Step one, mine.", File.ReadAllText(copy));
+        Assert.Contains("a copy is in", msg);
+    }
+
+    [Fact]
     public void ProposeRefusesWithoutChanges() =>
         Assert.Throws<InvalidOperationException>(() => SourcesMerge.Propose(Root, Key, Lock, Src, null, new string[0]));
 }

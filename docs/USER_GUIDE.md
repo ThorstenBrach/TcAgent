@@ -129,7 +129,8 @@ work without the extension. The extension runs **inside** the IDE process and ad
     into your changed item, three-way – your version is backed up, conflicts are marked with `<<<<<<<`) and **Propose
     (pull request) …** (your changes as a commit on a new branch of the source, without TcAgent's metadata and checked
     for your private terms; you decide whether and where it is pushed – the source or your fork – and the pull request
-    page opens in the browser; a patch file is always written as well). In the tab **Files** an item from a source shows
+    page opens in the browser; a patch file is always written as well) and **Uninstall …** (also the Del key: removes the
+    item from its level and from `skills.lock.json`; a copy goes to `%LOCALAPPDATA%\TcAgent\backups\sources\`). In the tab **Files** an item from a source shows
     **✎ changed** or **↑ newer** in the column Source, with the same three actions in the context menu.
   - **Platforms:** the platforms (automation frameworks) with the libraries and terms that detect them, which apply to
     this project and why, the libraries of the project. **New …** (a platform of your own – for you or, with a company
@@ -1232,6 +1233,8 @@ the safety logic on the target is not read.
 - *"Read MAIN.nCounter."*
 - *"List the runtime symbols under GVL_Machine."*
 - *"Set MAIN.bEnable to TRUE."*
+- *"Back up the persistent data and the recipes of the PLC."* · *"What differs between the PLC and yesterday's backup?"*
+  · *"Restore the backup to the new PLC."*
 
 ### What the agent does
 
@@ -1244,6 +1247,13 @@ the safety logic on the target is not read.
 | `ads_symbols` | Lists runtime symbols (`filter`, for example `MAIN.`) | no |
 | `ads_read` | Reads a variable (`MAIN.nCounter`, `GVL_X.y`) | no |
 | `ads_write` | Writes a variable (value as text, converted to the variable type) | yes |
+| `tc_backup` | Runtime data: `backup` (persistent variables, `RETAIN`/`PERSISTENT` of the code, `include` patterns for recipes – a JSON file per PLC), `list`, `diff` (backup against the PLC now), `restore` (only the values that differ, only existing symbols with the same type, PLC stopped unless `whileRunning`) | restore only |
+
+**Runtime data backup.** Before a PLC exchange, a new software version or for a second machine of the same kind:
+`tc_backup action=backup` (or `TcAgent.exe backup --target a,b,c` for several PLCs) stores the persistent and retain
+values and everything you name with `include` – or once for the project in `.tcagent\backup.json`. `diff` shows what
+changed since; `restore` writes the differences back after your confirmation. Values of symbols that no longer exist or
+changed their type are listed, never forced.
 
 After `tc_activate` the usual sequence is `tc_plc_online login`, then `start`. ADS tools default to the local runtime
 and port 851; `netId` and `port` select others.

@@ -157,6 +157,28 @@ public static class SourcesMerge
         return r;
     }
 
+    // ------------------------------------------------------------------ uninstall
+    /// <summary>Removes an installed item (its files and the lock entry) after copying it to the backups - the source stays.</summary>
+    public static string Uninstall(string root, string key, Sources.LockEntry e)
+    {
+        var local = Sources.InstalledPath(root, key, e);
+        string backup = null;
+        if (File.Exists(local) || Directory.Exists(local))
+        {
+            backup = Path.Combine(KnowledgeLayers.UserRoot, "backups", "sources", key.Replace('/', '-') + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"), Path.GetFileName(local));
+            CopyItem(local, backup);
+            if (Directory.Exists(local)) Directory.Delete(local, true);
+            else
+            {
+                File.Delete(local);
+                var notice = Path.ChangeExtension(local, ".LICENSE.txt");     // the notice copied along with a single-file item
+                if (File.Exists(notice)) File.Delete(notice);
+            }
+        }
+        Sources.Unlock(root, key);
+        return $"Uninstalled {key} from {root}" + (backup != null ? $" - a copy is in {backup}" : " (its files were already gone)");
+    }
+
     // ------------------------------------------------------------------ propose (pull request)
     /// <summary>The local changes as a commit on a new branch of a working copy of the source, plus a patch file.</summary>
     public static Result Propose(string root, string key, Sources.LockEntry e, Sources.Source src, string message, IEnumerable<string> privateTerms)

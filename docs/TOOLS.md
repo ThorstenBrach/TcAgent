@@ -251,7 +251,8 @@ these in a pipeline.
   item is backed up to `%LOCALAPPDATA%\TcAgent\backups\sources\` first); `propose message=…` prepares them for the source
   as a commit on a new branch `tcagent/<user>-<item>-<date>` in `%LOCALAPPDATA%\TcAgent\contrib\<source>` plus a patch file –
   without TcAgent's own metadata, checked for private terms, never pushed by the agent (the user pushes in the knowledge
-  window, to the source or a fork, and the pull request page opens).
+  window, to the source or a fork, and the pull request page opens). `uninstall item` removes an installed item (a copy
+  goes to the backups).
 - `install`, `pull` and `promote` show what they do and ask the user (with `TCAGENT_CONFIRM=off` without a question).
 - **Overlay:** an own skill with `metadata.tcagent-extends: <skill>` shows the extended skill first and its own text as
   additions – TwinCAT parts for a general skill without changing the original.
@@ -1253,3 +1254,27 @@ Lists runtime symbols via ADS (optionally filtered).
 | `filter` | string |  | Substring, e.g. MAIN. |
 | `netId` | string |  | AmsNetId |
 | `port` | integer |  | ADS port (851) |
+
+### `tc_backup`
+
+Backup and restore of runtime data via ADS – the values that make a machine "this machine": every symbol flagged
+persistent, the `RETAIN`/`PERSISTENT` variables of the code of the open solution (GVLs and programs by path, function
+blocks in every instance) and include patterns for recipes and parameters (also in `.tcagent\backup.json`:
+`{"include": ["GVL_Recipe"], "exclude": ["*.aTrace"]}`). Structures are stored per element, arrays of simple types as
+one array; pointers, references and interfaces are skipped. One JSON file per PLC, by default in
+`%LOCALAPPDATA%\TcAgent\backups\runtime\<solution>\<target>_<port>-<date>.json`.
+
+`backup`, `list` and `diff` only read. `restore` writes only symbols that still exist with the same type and only the
+values that differ; missing symbols, type changes and read-only symbols are reported, never forced. It is a runtime
+write: allowed targets only, the user confirms, and the PLC must be stopped unless `whileRunning=true`.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | backup, list, diff or restore |
+| `netId` | string |  | AmsNetId of the PLC (empty = local) |
+| `port` | integer |  | ADS port (default 851) |
+| `file` | string |  | diff/restore: the backup file; backup: file or folder to write to; list: the folder |
+| `include` | string |  | backup: more variables, `;`-separated paths or patterns (`GVL_Recipe;*.stConfig`); diff/restore: only these |
+| `exclude` | string |  | backup: leave out, `;`-separated patterns |
+| `whileRunning` | boolean |  | restore: write although the PLC is in Run – only if that is safe |
+| `dryRun` | boolean |  | restore: only show what would change (same as diff) |
