@@ -785,8 +785,8 @@ public static partial class Cli
             && o.Command is not ("knowledge" or "sources")) throw new Exception("--name, --url, --ref, --item, --kind, --query, --libraries, --terms and --accept-license are only for knowledge and sources");
         if (o.Command is "knowledge")                     // files only: the solution is optional (its platform and project level)
         {
-            if (o.Sub is not ("json" or "disable" or "enable" or "new" or "move" or "delete" or "git" or "feedback" or "platform" or "settings"))
-                throw new Exception("knowledge needs json, disable, enable, new, move, delete, git, feedback or platform, e.g. TcAgent.exe knowledge json --solution M.sln");
+            if (o.Sub is not ("json" or "disable" or "enable" or "new" or "move" or "delete" or "git" or "feedback" or "platform" or "settings" or "docs"))
+                throw new Exception("knowledge needs json, disable, enable, new, move, delete, git, feedback, platform, settings or docs, e.g. TcAgent.exe knowledge json --solution M.sln");
             if (o.Sub is "disable" or "enable" && (o.Key == null || !o.Key.Contains('/'))) throw new Exception("knowledge " + o.Sub + " needs --key <kind>/<name>");
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
             return o;
@@ -921,8 +921,9 @@ public static partial class Cli
   TcAgent.exe skills list|mirror [--solution <sln>]
       The skills that apply / copy them into the folders of the agent CLIs. No IDE needed.
 
-  TcAgent.exe knowledge json|new|move|delete|disable|enable|git|platform|feedback|settings [--solution <sln>] ...
-      The actions of the knowledge window (files of every level, Git, platforms, feedback reports) for scripts.
+  TcAgent.exe knowledge json|new|move|delete|disable|enable|git|platform|feedback|settings|docs [--solution <sln>] ...
+      The actions of the knowledge window (files of every level, Git, platforms, documentation sources, feedback
+      reports) for scripts. knowledge docs [--action list|add|remove|copy|search] lists the sources of tc_docs.
 
   TcAgent.exe test --solution <sln> [--target <AmsNetId>] [--plc <names>] [--timeout <s>] [--junit <file>]
       Builds, activates the configuration on the test target, starts the PLC via boot project with autostart,

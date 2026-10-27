@@ -5,6 +5,20 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.44.0] – 2026-10-27
+
+### Added
+- Knowledge window, tab **Documentation**: every source of `tc_docs` – Beckhoff InfoSys, the links, folders and network
+  shares of the `knowledge.md` of every level, `TCAGENT_KNOWLEDGE` and the document folders `knowledge\` – with type,
+  level, state (documents found, pages already read, not reachable within 4 s) and the file it is defined in. Add to a
+  level, edit, remove, copy documents in, open, open the `knowledge.md`, test search.
+- `TcAgent.exe knowledge docs --action list|add|remove|copy|search` - the same for scripts.
+
+### Changed
+- `tc_docs action=sources` shows the level and the state of every source.
+- Documentation sources are read from the team levels too (before: company, platform, user and project only).
+- `tc_docs_add` refuses a source that is neither a URL nor a folder or network path (before it was listed but never read).
+
 ## [0.43.0] – 2026-10-26
 
 ### Added

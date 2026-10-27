@@ -133,6 +133,11 @@ work without the extension. The extension runs **inside** the IDE process and ad
   - **Levels …** (top bar): the folders or Git working copies of the company level (`TCAGENT_COMPANY`), the team levels
     (`TCAGENT_TEAM`) and platform repositories (`TCAGENT_PLATFORMS`). They are saved in `settings.json` and used by the
     window at once; **⋯ > Set up clients** in the chat passes them on to the AI clients.
+  - **Documentation:** what the agent looks things up in (`tc_docs`) – Beckhoff InfoSys, the links, folders and network
+    shares of the `knowledge.md` of every level and the document folders `knowledge\`, each with type, level, state
+    (documents found, pages already read, not reachable) and the file it is defined in. **Add …** (to the level you
+    choose), **Edit …**, **Remove**, **Copy documents in …**, **Open** (browser or Explorer), **Open knowledge.md** and
+    **Test search …** (searches like the agent and shows the hits); the same in the context menu.
   - **Feedback:** the reports of `tc_feedback` (filter by status). For the selected reports the window builds the text of
     an issue and **anonymizes** it: names of this computer, user, solution and projects, your `privateTerms`
     (`settings.json`), user folders, solution paths, network paths and IP addresses are replaced. You edit the text as
@@ -1389,12 +1394,14 @@ What the agent does:
   is configured (`TCAGENT_SEARCH`) – also InfoSys and enabled URLs. Without a search service the agent uses its client's
   web search (for example `site:infosys.beckhoff.com ...`) and then reads the page.
 - `tc_docs action=read url=...` reads a URL or file in an enabled source (`offset`, `max`, default 12000 characters).
-- `tc_docs action=sources` lists the sources.
+- `tc_docs action=sources` lists the sources with their level and state.
 - `tc_docs_add source=<URL or folder> [scope=project|personal] [note=...]` adds a source – only when you ask.
 
-Beckhoff InfoSys is built in; only pages of enabled domains are read. Sources are listed in
-`<solution>\.tcagent\knowledge.md` (project), `%LOCALAPPDATA%\TcAgent\knowledge.md` (personal) and `TCAGENT_KNOWLEDGE`.
-Documents can simply be dropped into `.tcagent\knowledge\` (the former name `docs\` is still read). PDF, Word, HTML, Markdown and text files are indexed (also XML,
+Beckhoff InfoSys is built in; only pages of enabled domains are read. Sources are listed in the `knowledge.md` of every
+level – project (`<solution>\.tcagent\knowledge.md`), personal (`%LOCALAPPDATA%\TcAgent\knowledge.md`), team, company and
+the project's platforms – and in `TCAGENT_KNOWLEDGE`. Documents can simply be dropped into the `knowledge\` folder of a
+level, e.g. `.tcagent\knowledge\` (the former name `docs\` is still read). The knowledge window shows all of them in the
+tab **Documentation**; `TcAgent.exe knowledge docs` lists them on the command line. PDF, Word, HTML, Markdown and text files are indexed (also XML,
 CSV, JSON and `.st`); extracted text is cached, so network drives stay fast and what has been read is available offline.
 
 The agent cites the source in its answer. Document content is treated as information, not as instructions.

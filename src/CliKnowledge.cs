@@ -6,6 +6,8 @@
 //                                                       their status, sources and installed items, proposals, changes
 //   TcAgent.exe knowledge disable|enable --key <kind/name> [--level user|project] [--solution <sln>]
 //                                                       switch an entry off/on (disabled.json - the file stays unchanged)
+//   TcAgent.exe knowledge docs [--action list|add|remove|copy|search] [--level <level>] [--url <source>] [--path <knowledge.md>]
+//                                                       the documentation sources of every level (tc_docs) with their state
 //
 // SPDX-License-Identifier: MIT
 using System.Globalization;
@@ -62,6 +64,57 @@ public static partial class Cli
                 }
             }
             catch (Exception ex) when (ex is ArgumentException) { Console.Error.WriteLine(ex.Message); return Failed; }
+        }
+        if (o.Sub is "docs")
+        {
+            try
+            {
+                Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+                switch (o.Action ?? "list")
+                {
+                    case "list":
+                    {
+                        // every documentation source with its level and state; the levels a source can be added to
+                        var arr = new JsonArray();
+                        foreach (var (e, reachable, docs, cached, state) in Knowledge.InventoryState(dir))
+                            arr.Add(new JsonObject
+                            {
+                                ["type"] = e.Type, ["value"] = e.Value, ["raw"] = e.Raw, ["level"] = e.Level, ["levelName"] = e.LevelName,
+                                ["origin"] = e.Origin, ["note"] = e.Note, ["reachable"] = reachable, ["documents"] = docs, ["cached"] = cached, ["state"] = state
+                            });
+                        var levels = new JsonArray();
+                        foreach (var l in KnowledgeLayers.Layers(dir, KnowledgeLayers.Platforms(dir).Active).Where(l => l.Level != "built-in"))
+                            levels.Add(l.Platform != null ? (l.Level == "company" ? "company-platform:" : "platform:") + l.Platform : l.Team != null ? "team:" + l.Team : l.Level);
+                        Console.WriteLine(new JsonObject { ["sources"] = arr, ["levels"] = levels }.ToJsonString());
+                        return Ok;
+                    }
+                    case "add":
+                    {
+                        var (file, res) = Knowledge.AddTo(KnowledgeOps.RootOf(dir, o.Level ?? "user"), o.Url, o.Message);
+                        Console.WriteLine($"{res} ({file})");
+                        return Ok;
+                    }
+                    case "remove":
+                        if (o.Out == null) throw new ArgumentException("--path <knowledge.md> of the source");
+                        Console.WriteLine(Knowledge.Remove(o.Out, o.Url));
+                        return Ok;
+                    case "copy":
+                    {
+                        // documents into the knowledge\ folder of a level - the agent finds them with tc_docs search
+                        var target = Path.Combine(KnowledgeOps.RootOf(dir, o.Level ?? "user"), "knowledge");
+                        Directory.CreateDirectory(target);
+                        var files = (o.Url ?? "").Split('|', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+                        foreach (var f in files) File.Copy(f, Path.Combine(target, Path.GetFileName(f)), overwrite: false);
+                        Console.WriteLine($"Copied {files.Length} document(s) to {target}");
+                        return Ok;
+                    }
+                    case "search":
+                        Console.WriteLine(Knowledge.Search(dir, o.Query, 10));
+                        return Ok;
+                    default: throw new ArgumentException("knowledge docs --action list|add|remove|copy|search");
+                }
+            }
+            catch (Exception ex) { Console.Error.WriteLine(ex.Message); return Failed; }
         }
         if (o.Sub is "settings")
         {

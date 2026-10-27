@@ -43,81 +43,143 @@ public static class Knowledge
             ? Path.Combine(Root, "knowledge.md")
             : Path.Combine(solutionDir, ".tcagent", "knowledge.md");
 
+    /// <summary>One documentation source with the level it comes from. Type: web (built-in), link, folder, share
+    /// (a network path) or documents (the knowledge\ folder of a level, documents dropped in). Raw is the text of the line
+    /// in the list file (Origin), Value the expanded URL or path.</summary>
+    public sealed record Entry(string Type, string Value, string Raw, string Level, string LevelName, string Origin, string Note);
+
     public static Sources Load(string solutionDir)
     {
-        var urls = new List<string> { InfoSys };
-        var folders = new List<string>();
-        var lists = new List<string>();
-        // documents dropped into knowledge\ (same name as knowledge.md); docs\ is the former folder name and still read
-        if (!string.IsNullOrEmpty(solutionDir))
+        var all = Inventory(solutionDir);
+        return new Sources(all.Where(e => e.Type is "web" or "link").Select(e => e.Value).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+                           all.Where(e => e.Type is "folder" or "share" or "documents").Select(e => e.Value).Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
+                           all.Select(e => e.Origin).Where(f => f != null && f.EndsWith("knowledge.md", StringComparison.OrdinalIgnoreCase)).Distinct(StringComparer.OrdinalIgnoreCase).ToList());
+    }
+
+    /// <summary>Every documentation source of every level: Beckhoff InfoSys, the knowledge\ folder and the knowledge.md list
+    /// of the company, user, team, platform (only the project's platforms) and project level, and TCAGENT_KNOWLEDGE.</summary>
+    public static List<Entry> Inventory(string solutionDir)
+    {
+        var o = new List<Entry> { new("web", InfoSys, InfoSys, "built-in", "built-in", null, "Beckhoff Information System") };
+        foreach (var l in KnowledgeLayers.Layers(solutionDir, KnowledgeLayers.Platforms(solutionDir).Active).Where(l => l.Level != "built-in"))
         {
-            folders.Add(Path.Combine(solutionDir, ".tcagent", "knowledge"));
-            if (Directory.Exists(Path.Combine(solutionDir, ".tcagent", "docs"))) folders.Add(Path.Combine(solutionDir, ".tcagent", "docs"));
-        }
-        folders.Add(Path.Combine(Root, "knowledge"));
-        if (Directory.Exists(Path.Combine(Root, "docs"))) folders.Add(Path.Combine(Root, "docs"));
-        var entries = new List<string>();
-        foreach (var e in (Environment.GetEnvironmentVariable("TCAGENT_KNOWLEDGE") ?? "").Split(';')) entries.Add(e);
-        // company and platform levels (KnowledgeLayers.cs): their knowledge\ folder and knowledge.md list; the platforms
-        // only of the project's platform (e.g. the manuals of the automation framework it is built on)
-        var shared = KnowledgeLayers.Layers(solutionDir, KnowledgeLayers.Platforms(solutionDir).Active)
-                                    .Where(l => l.Level == "company" || l.Platform != null).ToList();
-        foreach (var l in shared) if (Directory.Exists(Path.Combine(l.Root, "knowledge"))) folders.Add(Path.Combine(l.Root, "knowledge"));
-        foreach (var f in shared.Select(l => Path.Combine(l.Root, "knowledge.md"))
-                                .Concat(new[] { ListFile(null, "personal"), string.IsNullOrEmpty(solutionDir) ? null : ListFile(solutionDir, "project") }))
-        {
-            if (f == null || !File.Exists(f)) continue;
-            lists.Add(f);
-            foreach (var line in File.ReadAllLines(f))
+            var levelName = l.Platform != null ? (l.Level == "company" ? "company-platform:" : "platform:") + l.Platform
+                          : l.Team != null ? "team:" + l.Team : l.Level;
+            // documents dropped into knowledge\ (same name as knowledge.md); docs\ is the former folder name and still read.
+            // The user and project folder are listed even before they exist - that is where documents go.
+            foreach (var d in new[] { "knowledge", "docs" })
             {
-                var l = line.Trim();
-                if (l.StartsWith("#") || l.StartsWith("<!--")) continue;
-                if (l.StartsWith("- ") || l.StartsWith("* ")) l = l[2..].Trim();
-                // cut off a comment after "  - " or " # "; paths may contain spaces
-                foreach (var cut in new[] { "  - ", " – ", " # " }) { var i = l.IndexOf(cut, StringComparison.Ordinal); if (i > 0) l = l[..i]; }
-                l = l.Trim().Trim('`', '<', '>', '"');
-                if (Regex.IsMatch(l, @"^(https?://|\\\\|[A-Za-z]:\\|%)", RegexOptions.IgnoreCase)) entries.Add(l);
+                var folder = Path.Combine(l.Root, d);
+                if (Directory.Exists(folder) || d == "knowledge" && l.Level is "user" or "project" && l.Platform == null)
+                    o.Add(new("documents", folder, folder, l.Label, levelName, folder, d == "docs" ? "former folder name docs\\" : null));
             }
+            var list = Path.Combine(l.Root, "knowledge.md");
+            if (!File.Exists(list)) continue;
+            foreach (var (raw, note) in ParseList(File.ReadAllLines(list)))
+                o.Add(Classify(raw, l.Label, levelName, list, note));
         }
-        foreach (var raw in entries)
+        foreach (var raw in (Environment.GetEnvironmentVariable("TCAGENT_KNOWLEDGE") ?? "").Split(';').Select(s => s.Trim().Trim('"')).Where(s => s.Length > 0))
+            o.Add(Classify(raw, "environment", null, "TCAGENT_KNOWLEDGE", null));
+        return o;
+    }
+
+    static Entry Classify(string raw, string level, string levelName, string origin, string note)
+    {
+        var e = Environment.ExpandEnvironmentVariables(raw);
+        var type = e.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || e.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ? "link"
+                 : e.StartsWith(@"\\") ? "share" : "folder";
+        return new(type, e, raw, level, levelName, origin, note);
+    }
+
+    /// <summary>The sources of a knowledge.md: one per line ("- https://..." or "- \\server\share"), a comment after "  - ".</summary>
+    public static IEnumerable<(string Raw, string Note)> ParseList(IEnumerable<string> lines)
+    {
+        foreach (var line in lines)
         {
-            var e = Environment.ExpandEnvironmentVariables((raw ?? "").Trim().Trim('"'));
-            if (e.Length == 0) continue;
-            if (e.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || e.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) urls.Add(e);
-            else folders.Add(e);
+            var l = line.Trim();
+            if (l.StartsWith("#") || l.StartsWith("<!--")) continue;
+            if (l.StartsWith("- ") || l.StartsWith("* ")) l = l[2..].Trim();
+            // cut off a comment after "  - " or " # "; paths may contain spaces
+            string note = null;
+            foreach (var cut in new[] { "  - ", " – ", " # " })
+            {
+                var i = l.IndexOf(cut, StringComparison.Ordinal);
+                if (i > 0) { note ??= l[(i + cut.Length)..].Trim(); l = l[..i]; }
+            }
+            l = l.Trim().Trim('`', '<', '>', '"');
+            if (Regex.IsMatch(l, @"^(https?://|\\\\|[A-Za-z]:\\|%)", RegexOptions.IgnoreCase)) yield return (l, note);
         }
-        return new Sources(urls.Distinct(StringComparer.OrdinalIgnoreCase).ToList(),
-                           folders.Distinct(StringComparer.OrdinalIgnoreCase).ToList(), lists);
+    }
+
+    /// <summary>The inventory with its state: documents per folder (counted with a time limit - network shares can be slow),
+    /// web pages already read per link. For the knowledge window and TcAgent.exe knowledge docs.</summary>
+    public static List<(Entry Entry, bool? Reachable, int Documents, int Cached, string State)> InventoryState(string solutionDir)
+    {
+        var pages = new List<string>();
+        var web = Path.Combine(Cache, "web");
+        try { if (Directory.Exists(web)) foreach (var f in Directory.EnumerateFiles(web, "*.txt")) { using var r = new StreamReader(f); pages.Add(r.ReadLine()?.Trim() ?? ""); } } catch { }
+        var o = new List<(Entry, bool?, int, int, string)>();
+        foreach (var e in Inventory(solutionDir))
+        {
+            if (e.Type is "web" or "link")
+            {
+                var n = pages.Count(p => Allowed(p, e.Value));
+                o.Add((e, null, 0, n, n > 0 ? $"{n} page(s) read" : "no page read yet"));
+                continue;
+            }
+            var count = System.Threading.Tasks.Task.Run(() => Directory.Exists(e.Value) ? Files(e.Value).Take(MaxFilesPerFolder).Count() : -1);
+            if (!count.Wait(TimeSpan.FromSeconds(4))) { o.Add((e, null, 0, 0, "no answer within 4 s")); continue; }
+            if (count.IsFaulted) { o.Add((e, false, 0, 0, "error: " + count.Exception?.GetBaseException().Message)); continue; }
+            o.Add((e, count.Result >= 0, Math.Max(0, count.Result), 0,
+                   count.Result < 0 ? (e.Type == "documents" ? "empty - drop documents here" : "missing or not reachable")
+                                    : $"{count.Result}{(count.Result >= MaxFilesPerFolder ? "+" : "")} document(s)"));
+        }
+        return o;
+    }
+
+    /// <summary>Removes a source line from a knowledge.md (the first line that names it).</summary>
+    public static string Remove(string listFile, string raw)
+    {
+        if (!File.Exists(listFile)) throw new Exception("not found: " + listFile);
+        var lines = File.ReadAllLines(listFile).ToList();
+        var i = lines.FindIndex(l => ParseList(new[] { l }).Any(p => p.Raw.Equals(raw, StringComparison.OrdinalIgnoreCase)));
+        if (i < 0) throw new Exception($"'{raw}' is not listed in {listFile}");
+        lines.RemoveAt(i);
+        File.WriteAllText(listFile, string.Join("\r\n", lines) + "\r\n", new UTF8Encoding(false));
+        return "removed: " + raw;
+    }
+
+    /// <summary>Adds a source line to the knowledge.md of a level root.</summary>
+    public static (string file, string result) AddTo(string root, string source, string note)
+    {
+        source = (source ?? "").Trim();
+        if (source.Length == 0) throw new Exception("source missing");
+        if (!Regex.IsMatch(source, @"^(https?://|\\\\|[A-Za-z]:\\|%)", RegexOptions.IgnoreCase))
+            throw new Exception("a URL (https://...), a folder (C:\\...) or a network path (\\\\server\\share) - not: " + source);
+        var file = Path.Combine(root, "knowledge.md");
+        var text = File.Exists(file) ? File.ReadAllText(file) : "# Knowledge sources for TcAgent (read only)\r\n# One per line: - <URL or folder/network drive>  - comment\r\n";
+        if (ParseList(text.Split('\n')).Any(p => p.Raw.Equals(source, StringComparison.OrdinalIgnoreCase))) return (file, "already listed");
+        Directory.CreateDirectory(root);
+        File.WriteAllText(file, text.TrimEnd() + "\r\n- " + source + (string.IsNullOrWhiteSpace(note) ? "" : "  - " + note.Trim()) + "\r\n", new UTF8Encoding(false));
+        return (file, "added: " + source);
     }
 
     public static string Describe(string solutionDir)
     {
-        var s = Load(solutionDir);
+        var all = InventoryState(solutionDir);
         var sb = new StringBuilder("Knowledge sources (read only):\nWeb (only these domains/paths are read):\n");
-        foreach (var u in s.Urls) sb.AppendLine("  " + u);
+        foreach (var s in all.Where(s => s.Entry.Type is "web" or "link"))
+            sb.AppendLine($"  {s.Entry.Value}  ({s.Entry.Level}; {s.State})");
         sb.AppendLine("Folders:");
-        foreach (var f in s.Folders)
-        {
-            string state;
-            try { state = Directory.Exists(f) ? $"{Files(f).Take(MaxFilesPerFolder).Count()} documents" : "missing/not reachable"; }
-            catch (Exception ex) { state = "Error: " + ex.Message; }
-            sb.AppendLine($"  {f}  ({state})");
-        }
-        sb.AppendLine(s.ListFiles.Count > 0 ? "Source lists: " + string.Join(", ", s.ListFiles) : "Source lists: none (" + ListFile(solutionDir, "project") + ")");
+        foreach (var s in all.Where(s => s.Entry.Type is not ("web" or "link")))
+            sb.AppendLine($"  {s.Entry.Value}  ({s.Entry.Level}; {s.State})");
+        var lists = Load(solutionDir).ListFiles;
+        sb.AppendLine(lists.Count > 0 ? "Source lists: " + string.Join(", ", lists) : "Source lists: none (" + ListFile(solutionDir, "project") + ")");
         return sb.ToString();
     }
 
-    public static (string file, string result) Add(string solutionDir, string scope, string source, string note)
-    {
-        source = (source ?? "").Trim();
-        if (source.Length == 0) throw new Exception("source missing");
-        var file = ListFile(solutionDir, scope);
-        var text = File.Exists(file) ? File.ReadAllText(file) : "# Knowledge sources for TcAgent (read only)\r\n# One per line: - <URL or folder/network drive>  - comment\r\n";
-        if (text.Contains(source, StringComparison.OrdinalIgnoreCase)) return (file, "already listed");
-        Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-        File.WriteAllText(file, text.TrimEnd() + "\r\n- " + source + (string.IsNullOrWhiteSpace(note) ? "" : "  - " + note.Trim()) + "\r\n", new UTF8Encoding(false));
-        return (file, "added: " + source);
-    }
+    public static (string file, string result) Add(string solutionDir, string scope, string source, string note) =>
+        AddTo(Path.GetDirectoryName(ListFile(solutionDir, scope))!, source, note);
 
     static IEnumerable<string> Files(string folder) =>
         Directory.EnumerateFiles(folder, "*", new EnumerationOptions { RecurseSubdirectories = true, IgnoreInaccessible = true, AttributesToSkip = FileAttributes.Hidden | FileAttributes.System })

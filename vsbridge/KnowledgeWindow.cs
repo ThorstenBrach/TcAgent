@@ -79,7 +79,7 @@ namespace TcAgentBridge
                               Gray = TcUnitControl.Frozen(Color.FromArgb(0xB0, 0x80, 0x80, 0x80)), TileBack = TcUnitControl.Frozen(Color.FromArgb(0x18, 0x80, 0x80, 0x80));
 
         readonly Button refresh = TcUnitControl.Tool("⟳", null, "Refresh (read the knowledge and the run logs again)");
-        readonly ToggleButton tOverview = Tab("Overview"), tEffective = Tab("Files"), tSources = Tab("Sources"), tPlatforms = Tab("Platforms"), tFeedback = Tab("Feedback"), tHistory = Tab("History");
+        readonly ToggleButton tOverview = Tab("Overview"), tEffective = Tab("Files"), tSources = Tab("Sources"), tPlatforms = Tab("Platforms"), tDocs = Tab("Documentation"), tFeedback = Tab("Feedback"), tHistory = Tab("History");
         readonly ContentControl page = new ContentControl();
         readonly TextBlock status = new TextBlock { Margin = new Thickness(6, 2, 6, 4), Opacity = 0.75, TextTrimming = TextTrimming.CharacterEllipsis };
         readonly TextBlock platform = new TextBlock { Margin = new Thickness(10, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, Opacity = 0.8 };
@@ -114,6 +114,12 @@ namespace TcAgentBridge
         // platforms
         readonly ListView platformList = NewList();
         readonly TextBlock platformInfo = new TextBlock { Margin = new Thickness(8, 4, 8, 4), TextWrapping = TextWrapping.Wrap };
+        // documentation sources (tc_docs)
+        readonly ListView docsList = NewList();
+        readonly TextBlock docsInfo = new TextBlock { Margin = new Thickness(8, 4, 8, 4), TextWrapping = TextWrapping.Wrap };
+        readonly TextBox docsDetail = new TextBox { IsReadOnly = true, Height = 150, TextWrapping = TextWrapping.Wrap, BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(6),
+                                                    VerticalScrollBarVisibility = ScrollBarVisibility.Auto, FontFamily = new FontFamily("Consolas"), FontSize = 12, Background = Brushes.Transparent };
+        string[] docsLevels = { "user" };
         // feedback
         readonly ListView feedbackList = new ListView { BorderThickness = new Thickness(0), SelectionMode = SelectionMode.Extended };
         readonly ComboBox feedbackStatus = new ComboBox { MinWidth = 100, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center,
@@ -200,7 +206,7 @@ namespace TcAgentBridge
             SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             var bar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4, 4, 4, 2) };
-            foreach (var e in new UIElement[] { refresh, TcUnitControl.Separator(), tOverview, tEffective, tSources, tPlatforms, tFeedback, tHistory, TcUnitControl.Separator(), levelsBtn, platform }) bar.Children.Add(e);
+            foreach (var e in new UIElement[] { refresh, TcUnitControl.Separator(), tOverview, tEffective, tSources, tPlatforms, tDocs, tFeedback, tHistory, TcUnitControl.Separator(), levelsBtn, platform }) bar.Children.Add(e);
             platform.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             status.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             facts.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
@@ -245,8 +251,8 @@ namespace TcAgentBridge
             wfBox.SelectionChanged += (s, e) => FillHistory();
             chart.SizeChanged += (s, e) => DrawChart();
             export.Click += (s, e) => ExportCsv();
-            refresh.Click += (s, e) => Load();
-            foreach (var t in new[] { tOverview, tEffective, tSources, tPlatforms, tFeedback, tHistory }) t.Click += (s, e) => Show((ToggleButton)s);
+            refresh.Click += (s, e) => { Load(); if (docsPage != null && tDocs.IsChecked == true) LoadDocs(); };
+            foreach (var t in new[] { tOverview, tEffective, tSources, tPlatforms, tDocs, tFeedback, tHistory }) t.Click += (s, e) => Show((ToggleButton)s);
             // the platform line next to the tabs leads to the Platforms tab
             platform.Cursor = Cursors.Hand;
             platform.ToolTip = "Platforms of this project - click to show and change them";
@@ -258,11 +264,11 @@ namespace TcAgentBridge
 
         void Show(ToggleButton tab)
         {
-            foreach (var t in new[] { tOverview, tEffective, tSources, tPlatforms, tFeedback, tHistory }) t.IsChecked = t == tab;
+            foreach (var t in new[] { tOverview, tEffective, tSources, tPlatforms, tDocs, tFeedback, tHistory }) t.IsChecked = t == tab;
             try
             {
                 page.Content = tab == tOverview ? OverviewPage() : tab == tEffective ? EffectivePage() : tab == tSources ? SourcesPage()
-                             : tab == tPlatforms ? PlatformsPage() : tab == tFeedback ? FeedbackPage() : (object)HistoryPage();
+                             : tab == tPlatforms ? PlatformsPage() : tab == tDocs ? DocsPage() : tab == tFeedback ? FeedbackPage() : (object)HistoryPage();
             }
             catch (Exception ex)
             {
@@ -271,7 +277,7 @@ namespace TcAgentBridge
             }
         }
 
-        FrameworkElement overviewPage, effectivePage, sourcesPage, historyPage, platformsPage, feedbackPage;
+        FrameworkElement overviewPage, effectivePage, sourcesPage, historyPage, platformsPage, docsPage, feedbackPage;
 
         FrameworkElement OverviewPage()
         {
@@ -1100,6 +1106,156 @@ namespace TcAgentBridge
             var names = boxes.Where(b => b.IsChecked == true).Select(b => (string)b.Tag).ToList();
             status.Text = RunCli("knowledge platform --action set --name " + Quote(names.Count > 0 ? string.Join(",", names) : "none")).output;
             Load();
+        }
+
+        // ------------------------------------------------------------------ documentation: what tc_docs looks things up in
+        FrameworkElement DocsPage()
+        {
+            if (docsPage != null) { LoadDocs(); return docsPage; }
+            Columns(docsList, ("Source", 380, nameof(Line.C1)), ("Type", 120, nameof(Line.C2)), ("Level", 130, nameof(Line.C3)),
+                    ("State", 190, nameof(Line.C4)), ("Comment", 200, nameof(Line.C5)), ("Defined in", 320, nameof(Line.C6)));
+            var tools = new WrapPanel { Margin = new Thickness(6, 4, 6, 4) };
+            foreach (var (label, tip, act) in new (string, string, Action)[] {
+                ("Add …", "A link (only pages below it are read), a folder or a network share - into the knowledge.md of a level", () => EditDoc(null)),
+                ("Edit …", "Change the selected link or folder, its comment or its level", () => EditDoc(docsList.SelectedItem as Line)),
+                ("Remove", "Remove the selected link or folder from its knowledge.md (the documents stay)", RemoveDoc),
+                ("Copy documents in …", "Copy PDF, Word, HTML, Markdown or text files into the knowledge\\ folder of a level", CopyDocs),
+                ("Open", "Open the link in the browser or the folder in the Explorer (or double-click)", OpenDoc),
+                ("Open knowledge.md", "Edit the list file the selected source is defined in", OpenDocOrigin),
+                ("Test search …", "Search like the agent does (tc_docs search) - the hits appear below", SearchDocs) })
+            { var b = Text(label, tip); b.Click += (s, e) => act(); tools.Children.Add(b); }
+            docsInfo.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            docsDetail.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            docsInfo.Text = "What the agent looks things up in (tc_docs): Beckhoff InfoSys, the links and folders of the knowledge.md of every level and the " +
+                            "documents in their knowledge\\ folders. Links: only pages below them are read. Read only - the agent never changes these sources.";
+            docsList.MouseDoubleClick += (s, e) => OpenDoc();
+            bool DSel() => docsList.SelectedItem is Line;
+            bool Listed() => S((docsList.SelectedItem as Line)?.D, "origin") is string o && o.EndsWith("knowledge.md", StringComparison.OrdinalIgnoreCase);
+            docsList.ContextMenu = Menu(("Open", OpenDoc, DSel), ("Open knowledge.md", OpenDocOrigin, Listed), (null, null, null),
+                                        ("Edit …", () => EditDoc(docsList.SelectedItem as Line), Listed), ("Remove", RemoveDoc, Listed), (null, null, null),
+                                        ("Add …", () => EditDoc(null), null), ("Copy documents in …", CopyDocs, null), ("Test search …", SearchDocs, null));
+            docsList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { RemoveDoc(); e.Handled = true; } else if (e.Key == Key.Enter) { OpenDoc(); e.Handled = true; } };
+            var dp = new DockPanel();
+            DockPanel.SetDock(tools, Dock.Top); dp.Children.Add(tools);
+            DockPanel.SetDock(docsInfo, Dock.Top); dp.Children.Add(docsInfo);
+            DockPanel.SetDock(docsDetail, Dock.Bottom); dp.Children.Add(docsDetail);
+            dp.Children.Add(docsList);
+            LoadDocs();
+            return docsPage = dp;
+        }
+
+        // folders are counted with a time limit (network shares) - in the background
+        void LoadDocs()
+        {
+            status.Text = "Reading the documentation sources ...";
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var (ok, output) = RunCli("knowledge docs");
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!ok) { status.Text = "Documentation sources: " + output.Trim(); return; }
+                    try
+                    {
+                        var r = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(output);
+                        docsLevels = ((r.TryGetValue("levels", out var lv) ? lv as IEnumerable : null) ?? new object[0]).Cast<object>().Select(x => x.ToString()).ToArray();
+                        var types = new Dictionary<string, string> { ["web"] = "Beckhoff InfoSys", ["link"] = "Link", ["folder"] = "Folder", ["share"] = "Network share", ["documents"] = "Document folder" };
+                        var list = Arr(r["sources"]).ToList();
+                        docsList.ItemsSource = list.Select(d => new Line
+                        {
+                            D = d, C1 = S(d, "value"), C2 = types.TryGetValue(S(d, "type") ?? "", out var t) ? t : S(d, "type"), C3 = S(d, "level"), C4 = S(d, "state"),
+                            C5 = S(d, "note"), C6 = S(d, "origin"),
+                            Mark = d.TryGetValue("reachable", out var re) && re is bool b ? (b ? (S(d, "type") == "documents" && Convert.ToInt32(d["documents"]) == 0 ? Gray : Green) : Red)
+                                 : S(d, "type") is "web" or "link" ? Blue : Orange,
+                            Tip = S(d, "raw") != S(d, "value") ? S(d, "raw") + " → " + S(d, "value") : S(d, "value")
+                        }).ToList();
+                        status.Text = $"{list.Count} documentation source(s) · {list.Where(d => S(d, "type") is "folder" or "share" or "documents").Sum(d => Convert.ToInt32(d["documents"]))} document(s) in folders";
+                    }
+                    catch (Exception ex) { status.Text = "Documentation sources: " + ex.Message; }
+                }));
+            });
+        }
+
+        void EditDoc(Line l)
+        {
+            var d = l?.D;
+            if (d != null && !(S(d, "origin") ?? "").EndsWith("knowledge.md", StringComparison.OrdinalIgnoreCase))
+            { status.Text = S(d, "type") == "documents" ? "A document folder - open it and add or delete documents there." : "This source is not defined in a knowledge.md (built-in or TCAGENT_KNOWLEDGE)."; return; }
+            var levels = docsLevels.Length > 0 ? docsLevels : new[] { "user" };
+            var r = Prompt(d == null ? "Add a documentation source" : "Edit documentation source",
+                           ("URL (https://…), folder (C:\\…) or network share (\\\\server\\share\\…)", null, S(d, "raw") ?? ""), ("Comment (optional)", null, S(d, "note") ?? ""),
+                           ("Level", levels, S(d, "levelName") ?? (levels.Contains("project") ? "project" : levels[0])));
+            if (r == null || r[0].Trim().Length == 0) return;
+            if (d != null)
+            {
+                var (rok, rout) = RunCli($"knowledge docs --action remove --path {Quote(S(d, "origin"))} --url {Quote(S(d, "raw"))}");
+                if (!rok) { Report(false, rout, "Edit documentation source"); return; }
+            }
+            var (ok, output) = RunCli($"knowledge docs --action add --level {Quote(r[2])} --url {Quote(r[0].Trim())}" + (r[1].Trim().Length > 0 ? " --message " + Quote(r[1].Trim()) : ""));
+            Report(ok, output, d == null ? "Add documentation source" : "Edit documentation source");
+            LoadDocs();
+        }
+
+        void RemoveDoc()
+        {
+            var d = (docsList.SelectedItem as Line)?.D;
+            if (d == null) return;
+            if (!(S(d, "origin") ?? "").EndsWith("knowledge.md", StringComparison.OrdinalIgnoreCase))
+            { status.Text = S(d, "type") == "documents" ? "A document folder can not be removed - open it and delete the documents you do not want." : "Built-in or TCAGENT_KNOWLEDGE - not in a knowledge.md."; return; }
+            if (MessageBox.Show($"Remove this source from {S(d, "origin")}?\n\n{S(d, "raw")}\n\n(the documents themselves stay where they are)", "TcAgent Knowledge",
+                                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            var (ok, output) = RunCli($"knowledge docs --action remove --path {Quote(S(d, "origin"))} --url {Quote(S(d, "raw"))}");
+            Report(ok, output, "Remove documentation source");
+            LoadDocs();
+        }
+
+        void CopyDocs()
+        {
+            var dlg = new Microsoft.Win32.OpenFileDialog { Multiselect = true, Title = "Documents for the agent",
+                                                           Filter = "Documents|*.pdf;*.docx;*.html;*.htm;*.md;*.txt;*.xml;*.csv;*.json;*.st|All files|*.*" };
+            if (dlg.ShowDialog() != true) return;
+            var levels = docsLevels.Length > 0 ? docsLevels : new[] { "user" };
+            var r = Prompt("Copy documents in", ("Into the knowledge\\ folder of the level", levels, levels.Contains("project") ? "project" : levels[0]));
+            if (r == null) return;
+            var (ok, output) = RunCli($"knowledge docs --action copy --level {Quote(r[0])} --url {Quote(string.Join("|", dlg.FileNames))}");
+            Report(ok, output, "Copy documents");
+            LoadDocs();
+        }
+
+        void OpenDoc()
+        {
+            var d = (docsList.SelectedItem as Line)?.D;
+            var v = S(d, "value");
+            if (v == null) return;
+            try
+            {
+                if (S(d, "type") is "web" or "link") Process.Start(new ProcessStartInfo(v) { UseShellExecute = true });
+                else
+                {
+                    if (S(d, "type") == "documents") Directory.CreateDirectory(v);
+                    if (Directory.Exists(v)) Process.Start(new ProcessStartInfo("explorer.exe", "\"" + v + "\"") { UseShellExecute = false });
+                    else status.Text = "Not reachable: " + v;
+                }
+            }
+            catch (Exception ex) { status.Text = ex.Message; }
+        }
+
+        void OpenDocOrigin()
+        {
+            var f = S((docsList.SelectedItem as Line)?.D, "origin");
+            if (f == null || !f.EndsWith("knowledge.md", StringComparison.OrdinalIgnoreCase) || !File.Exists(f)) { status.Text = "This source has no knowledge.md."; return; }
+            try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(f); } catch (Exception ex) { status.Text = ex.Message; }
+        }
+
+        void SearchDocs()
+        {
+            var r = Prompt("Test search", ("Search like the agent (words from the documents, e.g. EtherCAT diagnosis)", null, ""));
+            if (r == null || r[0].Trim().Length == 0) return;
+            docsDetail.Text = "Searching ...";
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var (_, output) = RunCli("knowledge docs --action search --query " + Quote(r[0].Trim()));
+                Dispatcher.BeginInvoke(new Action(() => docsDetail.Text = output.Trim()));
+            });
         }
 
         // ------------------------------------------------------------------ feedback: see, anonymize, edit, share
