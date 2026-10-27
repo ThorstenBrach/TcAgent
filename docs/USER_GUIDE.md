@@ -26,6 +26,7 @@ least one AI client is signed in.
 ## Contents
 
 - [Getting started](#getting-started)
+- [The knowledge window](#the-knowledge-window)
 - [Understanding code](#understanding-code)
 - [Writing and changing code](#writing-and-changing-code)
 - [Plain-text ST files](#plain-text-st-files)
@@ -106,112 +107,8 @@ work without the extension. The extension runs **inside** the IDE process and ad
   answer. The editor context is sent along automatically. The **⋯** menu holds the options (send editor context, check
   after changes), **TcUnit Tests**, **Knowledge**, **Set up clients**, **Copy diagnostics** (versions for an issue
   report) and the version.
-- **TcAgent Knowledge** – a tool window (View > Other Windows, or **⋯ > Knowledge** in the chat) that shows what the agent
-  gets and how the work develops:
-  - **Overview:** tiles for runs, first-time-right, failed checks, corrections and minutes per run and gate stops – the
-    last 10 workflow runs against the 10 before, with a sparkline; the workflows; open improvement proposals; the most
-    frequent compiler errors. Double-click a workflow for its history.
-  - **Files:** coding rules, risk rules, skills, workflows, lessons and templates of every level with their status
-    (applies, replaced by a later level, locked, forced, switched off) and why; filter by kind, level and text. Toolbar
-    and context menu: **New …** (a new file from a template, opened in the editor), **Add existing …** (an existing file
-    or skill/workflow folder taken over to a level), **Open**, **Open folder**, **Rename …** (the name in the header
-    follows), **Move to level …** (moving up checks the text for project and machine names; company and a team in Git as
-    a commit on a new branch for a pull request), **Switch off** for the project or for you, **Switch on**
-    (`disabled.json` – the file itself stays unchanged), **Delete …** (also the Del key; only on your own levels –
-    built-in and company files are switched off instead), **Copy path**.
-
-    *All tabs use the same words in the same order:* New … / Add existing … / Open / Open folder / Edit … / Rename … /
-    Move to level … / Switch off · on / Delete … (Del) / Copy path, groups separated by lines; the toolbar and the
-    context menu of a list show the same entries. Every action answers in the status line or in a message; errors
-    always as a message.
-    For every level kept in Git a line shows local changes, commits to push and new commits in the repository (as of
-    the last **Fetch**), with **Pull**, **Commit …** and **Push** – the push of a company or team level goes to a new
-    branch for a pull request; the column **Git** marks changed and new files.
-  - **Sources:** the Git repositories skills, workflows and rules can be installed from (`tc_sources`): **New …**, **Open**
-    (the repository in the browser), **Open folder** (TcAgent's local copy), **Edit …**, **Delete …**, **Copy path**,
-    **Browse and install …** (everything a source offers with kind and license; before installing you see the
-    license, the files and any scripts – source-available and unlicensed items are refused, others only after you
-    accept the license). Installing offers every level – you, the project, the team, the company and the platforms; a
-    shared level kept in Git gets a commit on a new branch for a pull request instead of a direct change. Below the items
-    installed from sources with their state – **✎ locally changed** (orange), **↑ upstream newer** (blue), **⇅ both
-    changed** (red); it is checked when the window opens, on refresh and when you save a file of a level in the editor.
-    **Check for updates**, **Update all …**, **What changed in the source**, and for the selected item:
-    - **My changes / Diff** – the compare window of Visual Studio, installed version left, yours right;
-    - **Revert …** – back to the installed version (yours goes to `%LOCALAPPDATA%\TcAgent\backups\sources\`);
-    - **Keep as own version …** – no longer tied to the source (no updates, no "changed" state); where it came from stays
-      in its header (`tcagent-source`, `tcagent-detached`);
-    - **Propose upstream …** – your changes as a commit on a new branch of the source (without TcAgent's metadata,
-      checked for your private terms) plus a patch file; you decide whether and where it is pushed – the source or your
-      fork – and the pull request page opens in the browser, you send it yourself;
-    - **Update and merge …** – a preview first, then the newer version of the source is merged into your item (three-way,
-      your version backed up); conflicts open in the merge window of Visual Studio (in the XAE Shell they are marked with
-      `<<<<<<<` in the file);
-    - **Uninstall …** (also Del) – removes the item and its entry in `skills.lock.json`; a copy goes to the backups.
-
-    The tab **Files** shows the same state in the column Source and has the same actions in the context menu.
-  - **Platforms:** the platforms (automation frameworks) with the libraries and terms that detect them, which apply to
-    this project and why, the libraries of the project. **New …** (a platform of your own – for you or, with a company
-    level, for the whole company), **Open platform.md**, **Open folder**, **Set for this project …**, **Detect
-    automatically**, **Delete** (only platforms of your own); the same in the context menu. A click on the platform name
-    in the top bar opens this tab.
-  - **Levels …** (top bar): the folders or Git working copies of the company level (`TCAGENT_COMPANY`), the team levels
-    (`TCAGENT_TEAM`) and platform repositories (`TCAGENT_PLATFORMS`). They are saved in `settings.json` and used by the
-    window at once; **⋯ > Set up clients** in the chat passes them on to the AI clients.
-  - **Documentation:** what the agent looks things up in (`tc_docs`) – Beckhoff InfoSys, the links, folders and network
-    shares of the `knowledge.md` of every level and the document folders `knowledge\`, each with type, level, state
-    (documents found, pages already read, not reachable) and the file it is defined in. **Open** (browser or Explorer),
-    **Open knowledge.md** (of the level of the selected source or of a level you choose - created if missing), **Add link
-    or folder …** (one line in the `knowledge.md` of the level you choose), **Add documents …** (copies files into the
-    `knowledge\` folder of a level), **Open folder**, **Edit …**, **Delete …**, **Copy path** and **Search like the agent …**
-    – the hits are listed below (a PDF on the page of the hit with Acrobat/Reader, Foxit, SumatraPDF or a browser)
-    and open with a double-click (documents with their program, pages in the browser); the same in the context menu.
-  - **Feedback:** the reports of `tc_feedback` (filter by status). For the selected reports the window builds the text of
-    an issue and **anonymizes** it: names of this computer, user, solution and projects, your `privateTerms`
-    (`settings.json`), user folders, solution paths, network paths and IP addresses are replaced. You edit the text as
-    needed and then **Copy**, **Save as …** or **Share with the TcAgent developers …** (opens a new issue in the browser
-    – you check and send it yourself; `feedbackUrl` in `settings.json` changes the target). The text ends with a
-    **Diagnostics** block: versions of TcAgent, the extension, TwinCAT, the IDE and Windows, the runtime state and which
-    knowledge levels are configured – no names or paths. **Copy diagnostics** (also in the chat menu ⋯, without the IDE
-    `TcAgent.exe diag`) copies that block alone for the Diagnostics field of a bug report. **Set status …** marks
-    reports as resolved, wontfix or duplicate. Questions belong in the GitHub Discussions (category Q&A), security
-    problems are reported privately (`SECURITY.md`).
-  - **History:** failed checks and corrections per run with a moving average, every adopted change as a marker, and the
-    changes with their values before and after (helped / no effect / worse / reverted); **Export CSV**. Below that the
-    **backups of the knowledge** (see below) with **Difference**, **Restore …** and **Open folder**.
-  - **Backup … / Restore …** (top bar): the knowledge of every level – coding rules, risk rules, skills, workflows,
-    lessons, templates, platforms, `knowledge.md`, `sources.json`, `skills.lock.json`, `disabled.json`, `config.json` – is
-    backed up **automatically before every change** (from this window, the chat and the command line) as a ZIP with
-    `manifest.json` (TcAgent version, level, SHA-256 of every file) in `%LOCALAPPDATA%\TcAgent\backups\knowledge\`; only
-    when the level changed since its last backup, the last 20 per level are kept. A level in a Git working copy (team,
-    company, project) is backed up with its uncommitted changes only – Git keeps the rest. **Restore** works for the whole
-    level, one file or one skill/workflow: first the difference, then you confirm; the current state is backed up before.
-    **Backup …** asks for the levels (all checked), the folder (TcAgent's backup folder, changeable - another folder gets
-    a copy) and "Open the folder afterwards", then shows the files written with their number of files; **Restore …**
-    lists all backups (or **Restore from a file …** takes a copy from anywhere), then what to restore, the difference
-    and your confirmation. In the History tab a backup can also be deleted (**Delete …**) or its path copied.
-    Command line: `TcAgent.exe knowledgebase list|backup|diff|restore`.
-
-  Decisions (apply a proposal, install, pull, promote) are made in the chat – the agent asks you.
-
-  <details><summary>Screenshots of the knowledge window</summary>
-
-  <p><img src="img/knowledge/overview.png" width="900" alt="Overview: runs, first-time-right, failed checks, corrections and the workflows"><br><em>Overview: runs, first-time-right, failed checks, corrections and the workflows</em></p>
-
-  <p><img src="img/knowledge/files.png" width="900" alt="Files: every knowledge file of every level with its status; an item from a source shows locally changed"><br><em>Files: every knowledge file of every level with its status; an item from a source shows locally changed</em></p>
-
-  <p><img src="img/knowledge/sources.png" width="900" alt="Sources: the Git sources and the items installed from them with their state"><br><em>Sources: the Git sources and the items installed from them with their state</em></p>
-
-  <p><img src="img/knowledge/install.png" width="900" alt="Browse and install: what a source offers, with kind, license and scripts"><br><em>Browse and install: what a source offers, with kind, license and scripts</em></p>
-
-  <p><img src="img/knowledge/context-menu.png" width="900" alt="The context menu shows the same actions as the toolbar"><br><em>The context menu shows the same actions as the toolbar</em></p>
-
-  <p><img src="img/knowledge/platforms.png" width="900" alt="Platforms: which platform applies to the project and why"><br><em>Platforms: which platform applies to the project and why</em></p>
-
-  <p><img src="img/knowledge/documentation.png" width="900" alt="Documentation: the sources of tc_docs and the hits of a test search"><br><em>Documentation: the sources of tc_docs and the hits of a test search</em></p>
-
-  <p><img src="img/knowledge/history.png" width="900" alt="History: the workflow runs and the backups of the knowledge"><br><em>History: the workflow runs and the backups of the knowledge</em></p>
-
-  </details>
+- **TcAgent Knowledge** – a tool window with everything the agent knows about your work and where it comes
+  from: see [The knowledge window](#the-knowledge-window).
 - **Documents in the chat** – paste (Ctrl+V), drop or attach (+) manuals, data sheets, screenshots and long texts. Text files
   and Word documents go into the prompt; PDFs and images are read by the agent from the attachments folder.
 - **GitHub Copilot over ACP** – the Copilot backend runs as a persistent session over the open Agent Client Protocol
@@ -273,6 +170,144 @@ For pure questions (reading, searching, explaining) nothing is checked or built.
   (parameters, I/O configuration, task settings, online settings). `recursive=true` includes children.
 
 Tree paths use `^` as separator. You can copy them from the agent's answers into later prompts.
+
+---
+
+## The knowledge window
+
+The tool window **TcAgent Knowledge** (View > Other Windows, or **⋯ > Knowledge** in the TcAgent Chat) shows what the
+agent gets – coding rules, risk rules, skills, workflows, lessons, documentation sources and templates of every level
+– where it comes from, and how the work develops. It is the place to add, change, move, switch off and back up this
+knowledge without editing folders by hand. The levels and what belongs to them: [Your files](#configuration-reference)
+and [docs/KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md).
+
+*All tabs use the same words in the same order:* New … / Add existing … / Open / Open folder / Edit … / Rename … /
+Move to level … / Switch off · on / Delete … (Del) / Copy path, groups separated by lines; the toolbar and the
+context menu of a list show the same entries. Every action answers in the status line or in a message; errors
+always as a message.
+
+### Overview
+
+Tiles for runs, first-time-right, failed checks, corrections and minutes per run and gate stops – the
+last 10 workflow runs against the 10 before, with a sparkline; the workflows; open improvement proposals; the most
+frequent compiler errors. Double-click a workflow for its history.
+
+<p><img src="img/knowledge/overview.png" width="900" alt="Overview: runs, first-time-right, failed checks, corrections and the workflows"><br><em>Overview: runs, first-time-right, failed checks, corrections and the workflows</em></p>
+
+### Files
+
+Coding rules, risk rules, skills, workflows, lessons and templates of every level with their status
+(applies, replaced by a later level, locked, forced, switched off) and why; filter by kind, level and text. Toolbar
+and context menu: **New …** (a new file from a template, opened in the editor), **Add existing …** (an existing file
+or skill/workflow folder taken over to a level), **Open**, **Open folder**, **Rename …** (the name in the header
+follows), **Move to level …** (moving up checks the text for project and machine names; company and a team in Git as
+a commit on a new branch for a pull request), **Switch off** for the project or for you, **Switch on**
+(`disabled.json` – the file itself stays unchanged), **Delete …** (also the Del key; only on your own levels –
+built-in and company files are switched off instead), **Copy path**.
+
+For every level kept in Git a line shows local changes, commits to push and new commits in the repository (as of
+the last **Fetch**), with **Pull**, **Commit …** and **Push** – the push of a company or team level goes to a new
+branch for a pull request; the column **Git** marks changed and new files.
+
+<p><img src="img/knowledge/files.png" width="900" alt="Files: every knowledge file of every level with its status; an item from a source shows locally changed"><br><em>Files: every knowledge file of every level with its status; an item from a source shows locally changed</em></p>
+
+### Sources
+
+The Git repositories skills, workflows and rules can be installed from (`tc_sources`): **New …**, **Open**
+(the repository in the browser), **Open folder** (TcAgent's local copy), **Edit …**, **Delete …**, **Copy path**,
+**Browse and install …** (everything a source offers with kind and license; before installing you see the
+license, the files and any scripts – source-available and unlicensed items are refused, others only after you
+accept the license). Installing offers every level – you, the project, the team, the company and the platforms; a
+shared level kept in Git gets a commit on a new branch for a pull request instead of a direct change. Below the items
+installed from sources with their state – **✎ locally changed** (orange), **↑ upstream newer** (blue), **⇅ both
+changed** (red); it is checked when the window opens, on refresh and when you save a file of a level in the editor.
+**Check for updates**, **Update all …**, **What changed in the source**, and for the selected item:
+- **My changes / Diff** – the compare window of Visual Studio, installed version left, yours right;
+- **Revert …** – back to the installed version (yours goes to `%LOCALAPPDATA%\TcAgent\backups\sources\`);
+- **Keep as own version …** – no longer tied to the source (no updates, no "changed" state); where it came from stays
+  in its header (`tcagent-source`, `tcagent-detached`);
+- **Propose upstream …** – your changes as a commit on a new branch of the source (without TcAgent's metadata,
+  checked for your private terms) plus a patch file; you decide whether and where it is pushed – the source or your
+  fork – and the pull request page opens in the browser, you send it yourself;
+- **Update and merge …** – a preview first, then the newer version of the source is merged into your item (three-way,
+  your version backed up); conflicts open in the merge window of Visual Studio (in the XAE Shell they are marked with
+  `<<<<<<<` in the file);
+- **Uninstall …** (also Del) – removes the item and its entry in `skills.lock.json`; a copy goes to the backups.
+
+The tab **Files** shows the same state in the column Source and has the same actions in the context menu.
+
+<p><img src="img/knowledge/sources.png" width="900" alt="Sources: the Git sources and the items installed from them with their state"><br><em>Sources: the Git sources and the items installed from them with their state</em></p>
+
+<p><img src="img/knowledge/install.png" width="900" alt="Browse and install: what a source offers, with kind, license and scripts"><br><em>Browse and install: what a source offers, with kind, license and scripts</em></p>
+
+<p><img src="img/knowledge/context-menu.png" width="900" alt="The context menu shows the same actions as the toolbar"><br><em>The context menu shows the same actions as the toolbar</em></p>
+
+### Platforms
+
+The platforms (automation frameworks) with the libraries and terms that detect them, which apply to
+this project and why, the libraries of the project. **New …** (a platform of your own – for you or, with a company
+level, for the whole company), **Open platform.md**, **Open folder**, **Set for this project …**, **Detect
+automatically**, **Delete** (only platforms of your own); the same in the context menu. A click on the platform name
+in the top bar opens this tab.
+
+<p><img src="img/knowledge/platforms.png" width="900" alt="Platforms: which platform applies to the project and why"><br><em>Platforms: which platform applies to the project and why</em></p>
+
+### Levels
+
+(top bar): the folders or Git working copies of the company level (`TCAGENT_COMPANY`), the team levels
+(`TCAGENT_TEAM`) and platform repositories (`TCAGENT_PLATFORMS`). They are saved in `settings.json` and used by the
+window at once; **⋯ > Set up clients** in the chat passes them on to the AI clients.
+
+### Documentation
+
+What the agent looks things up in (`tc_docs`) – Beckhoff InfoSys, the links, folders and network
+shares of the `knowledge.md` of every level and the document folders `knowledge\`, each with type, level, state
+(documents found, pages already read, not reachable) and the file it is defined in. **Open** (browser or Explorer),
+**Open knowledge.md** (of the level of the selected source or of a level you choose - created if missing), **Add link
+or folder …** (one line in the `knowledge.md` of the level you choose), **Add documents …** (copies files into the
+`knowledge\` folder of a level), **Open folder**, **Edit …**, **Delete …**, **Copy path** and **Search like the agent …**
+– the hits are listed below (a PDF on the page of the hit with Acrobat/Reader, Foxit, SumatraPDF or a browser)
+and open with a double-click (documents with their program, pages in the browser); the same in the context menu.
+
+<p><img src="img/knowledge/documentation.png" width="900" alt="Documentation: the sources of tc_docs and the hits of a test search"><br><em>Documentation: the sources of tc_docs and the hits of a test search</em></p>
+
+### Feedback
+
+The reports of `tc_feedback` (filter by status). For the selected reports the window builds the text of
+an issue and **anonymizes** it: names of this computer, user, solution and projects, your `privateTerms`
+(`settings.json`), user folders, solution paths, network paths and IP addresses are replaced. You edit the text as
+needed and then **Copy**, **Save as …** or **Share with the TcAgent developers …** (opens a new issue in the browser
+– you check and send it yourself; `feedbackUrl` in `settings.json` changes the target). The text ends with a
+**Diagnostics** block: versions of TcAgent, the extension, TwinCAT, the IDE and Windows, the runtime state and which
+knowledge levels are configured – no names or paths. **Copy diagnostics** (also in the chat menu ⋯, without the IDE
+`TcAgent.exe diag`) copies that block alone for the Diagnostics field of a bug report. **Set status …** marks
+reports as resolved, wontfix or duplicate. Questions belong in the GitHub Discussions (category Q&A), security
+problems are reported privately (`SECURITY.md`).
+
+### History
+
+Failed checks and corrections per run with a moving average, every adopted change as a marker, and the
+changes with their values before and after (helped / no effect / worse / reverted); **Export CSV**. Below that the
+**backups of the knowledge** (see below) with **Difference**, **Restore …** and **Open folder**.
+
+<p><img src="img/knowledge/history.png" width="900" alt="History: the workflow runs and the backups of the knowledge"><br><em>History: the workflow runs and the backups of the knowledge</em></p>
+
+### Backup and restore
+
+**Backup … / Restore …** (top bar): the knowledge of every level – coding rules, risk rules, skills, workflows,
+lessons, templates, platforms, `knowledge.md`, `sources.json`, `skills.lock.json`, `disabled.json`, `config.json` – is
+backed up **automatically before every change** (from this window, the chat and the command line) as a ZIP with
+`manifest.json` (TcAgent version, level, SHA-256 of every file) in `%LOCALAPPDATA%\TcAgent\backups\knowledge\`; only
+when the level changed since its last backup, the last 20 per level are kept. A level in a Git working copy (team,
+company, project) is backed up with its uncommitted changes only – Git keeps the rest. **Restore** works for the whole
+level, one file or one skill/workflow: first the difference, then you confirm; the current state is backed up before.
+**Backup …** asks for the levels (all checked), the folder (TcAgent's backup folder, changeable - another folder gets
+a copy) and "Open the folder afterwards", then shows the files written with their number of files; **Restore …**
+lists all backups (or **Restore from a file …** takes a copy from anywhere), then what to restore, the difference
+and your confirmation. In the History tab a backup can also be deleted (**Delete …**) or its path copied.
+Command line: `TcAgent.exe knowledgebase list|backup|diff|restore`.
+
+Decisions (apply a proposal, install, pull, promote) are made in the chat – the agent asks you.
 
 ---
 

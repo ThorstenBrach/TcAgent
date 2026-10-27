@@ -166,6 +166,19 @@ framework and the project's conventions (in Git) work together:
 
 <p align="center"><img src="docs/img/knowledge-files.svg" width="900" alt="Where TcAgent keeps coding rules, risk rules, skills, workflows, lessons learned, documentation sources and manual templates on six levels from built-in to project, and the files that are not layered"></p>
 
+## Knowledge window
+
+**TcAgent Knowledge** in Visual Studio / the XAE Shell (View > Other Windows, or **⋯ > Knowledge** in the chat) shows
+all of it in one place: every rule, skill, workflow and lesson of every level with its status and why it applies, the
+Git sources of skills and what changed in them, the platforms of the project, the documentation the agent looks things
+up in, the agent's feedback reports, the workflow history – and backups of the knowledge, made automatically before
+every change. New, add existing, rename, move to another level, switch off, delete, Git, install from a source, merge a
+newer version, propose a change upstream: all from the window, with the same menus in every tab.
+
+<p align="center"><img src="docs/img/knowledge/files.png" width="900" alt="The knowledge window, tab Files: every knowledge file of every level with its status; a skill from a Git source shows that it was changed locally"></p>
+
+Every tab with screenshots: [User guide – The knowledge window](docs/USER_GUIDE.md#the-knowledge-window).
+
 ## Coding rules
 
 Put your conventions in Markdown – TcAgent shows them to every agent before it writes code, whatever the client:
@@ -254,6 +267,7 @@ docs/                   installation, tool reference, CI pipelines (docs/pipelin
   unsaved changes in their open editors are saved first. Scope needs matching Scope packages for the IDE (see troubleshooting).
 * Every Automation Interface call runs on the IDE's UI thread – while the agent works, the IDE can pause briefly.
 * Tested with TwinCAT 3.1 build 4026; other builds may need adjustments.
+* The runtime data backup (`tc_backup`, `TcAgent.exe backup|restore`) is experimental – not yet tested against a running PLC.
 
 ## Legal
 
