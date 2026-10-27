@@ -113,7 +113,7 @@ public static partial class Cli
                         var text = Knowledge.Search(dir, o.Query, 20, out var hits);
                         Console.WriteLine(!o.Json ? text : new JsonObject
                         {
-                            ["hits"] = new JsonArray(hits.Select(h => (JsonNode)new JsonObject { ["kind"] = h.Kind, ["where"] = h.Where, ["title"] = h.Title, ["snippet"] = h.Snippet }).ToArray()),
+                            ["hits"] = new JsonArray(hits.Select(h => (JsonNode)new JsonObject { ["kind"] = h.Kind, ["where"] = h.Where, ["title"] = h.Title, ["snippet"] = h.Snippet, ["page"] = h.Page }).ToArray()),
                             ["text"] = text
                         }.ToJsonString());
                         return Ok;
@@ -144,7 +144,7 @@ public static partial class Cli
             }
             catch (Exception ex) when (ex is ArgumentException) { Console.Error.WriteLine(ex.Message); return Failed; }
         }
-        if (o.Sub is "new" or "move" or "delete" or "git")
+        if (o.Sub is "new" or "move" or "delete" or "git" or "rename")
         {
             try
             {
@@ -155,6 +155,7 @@ public static partial class Cli
                     "new" => KnowledgeOps.New(dir, o.Key?.Split('/')[0], o.Key?.Split('/').Last(), o.Level ?? "user"),
                     "move" => KnowledgeOps.Move(dir, o.Out ?? throw new ArgumentException("--path is required"), o.Level ?? throw new ArgumentException("--level is required"), pi),
                     "delete" => KnowledgeOps.Delete(dir, o.Out ?? throw new ArgumentException("--path is required"), pi),
+                    "rename" => KnowledgeOps.Rename(dir, o.Out ?? throw new ArgumentException("--path is required"), o.Name ?? throw new ArgumentException("--name is required"), pi),
                     _ => KnowledgeOps.GitAction(dir, o.Action ?? "fetch", o.Level ?? throw new ArgumentException("--level is required"), o.Message)
                 });
                 return Ok;
@@ -279,7 +280,7 @@ public static partial class Cli
         var installed = new JsonArray();
         foreach (var (label, root) in Sources.InstallRoots(dir))
             foreach (var (key, state, e) in Sources.Status(root))
-                installed.Add(new JsonObject { ["key"] = key, ["level"] = label, ["state"] = state, ["source"] = e.Source, ["url"] = e.Url,
+                installed.Add(new JsonObject { ["key"] = key, ["level"] = label, ["state"] = state, ["source"] = e.Source, ["url"] = e.Url, ["path"] = Sources.InstalledPath(root, key, e),
                                                ["commit"] = e.Commit, ["license"] = e.License, ["installed"] = e.Installed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) });
         o["installed"] = installed;
 

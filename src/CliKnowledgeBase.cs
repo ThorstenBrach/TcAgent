@@ -21,7 +21,7 @@ public static partial class Cli
     {
         "knowledge" => o.Sub switch
         {
-            "disable" or "enable" or "new" or "move" or "delete" => true,
+            "disable" or "enable" or "new" or "move" or "delete" or "rename" => true,
             "platform" => o.Action is "new" or "set" or "auto" or "delete",
             "docs" => o.Action is "add" or "remove" or "copy",
             "git" => o.Action is "pull",
@@ -69,10 +69,13 @@ public static partial class Cli
                 }
                 case "backup":
                 {
-                    var levels = o.Level != null && o.Level != "all" ? new List<KnowledgeBackup.Level> { KnowledgeBackup.Find(dir, o.Level) } : KnowledgeBackup.Levels(dir);
+                    var levels = o.Level != null && o.Level != "all"
+                        ? o.Level.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(n => KnowledgeBackup.Find(dir, n)).ToList()
+                        : KnowledgeBackup.Levels(dir);
                     foreach (var l in levels)
                     {
                         var z = KnowledgeBackup.Backup(l, o.Message ?? "by hand", force: true);
+                        var count = z != null ? KnowledgeBackup.Read(z).Files.Count : 0;
                         if (z != null && o.Out != null)
                         {
                             Directory.CreateDirectory(o.Out);
@@ -80,7 +83,7 @@ public static partial class Cli
                             File.Copy(z, copy, true);
                             z += " (copy: " + copy + ")";
                         }
-                        Console.WriteLine(z != null ? $"{l.Name}: {z}" : $"{l.Name}: nothing to back up{(KnowledgeBackup.FilesOf(l.Root).Git ? " (Git working copy without uncommitted changes - Git keeps it)" : "")}");
+                        Console.WriteLine(z != null ? $"{l.Name}: {count} file(s) -> {z}" : $"{l.Name}: nothing to back up{(KnowledgeBackup.FilesOf(l.Root).Git ? " (Git working copy without uncommitted changes - Git keeps it)" : "")}");
                     }
                     return Ok;
                 }

@@ -96,6 +96,9 @@ namespace TcAgentBridge
         readonly ListView entries = NewList();
         readonly ComboBox levelBox = new ComboBox { MinWidth = 120, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, ToolTip = "Filter by level" };
         readonly Button newBtn = Text("New …", "A new rule, risk rule, skill, workflow or lesson from a template"),
+                        addExistingBtn = Text("Add existing …", "Take an existing file (or skill/workflow folder) over to a level"),
+                        renameBtn = Text("Rename …", "Rename the file or the skill/workflow folder (the name in its header follows)"),
+                        copyPathBtn = Text("Copy path", "Copy the path of the file"),
                         folderBtn = Text("Open folder", "Show the file in the Explorer"),
                         moveBtn = Text("Move to level …", "Move the file to another level (shared levels in Git: as a pull request)"),
                         deleteBtn = Text("Delete …", "Delete the file (own levels only; Del)"),
@@ -138,7 +141,7 @@ namespace TcAgentBridge
         readonly TextBox backupDetail = new TextBox { IsReadOnly = true, Height = 170, TextWrapping = TextWrapping.NoWrap, BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(6),
                                                       HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
                                                       FontFamily = new FontFamily("Consolas"), FontSize = 12, Background = Brushes.Transparent };
-        const string BackupLabel = "Back up now …", RestoreLabel = "Restore …";
+        const string BackupLabel = "Backup …", RestoreLabel = "Restore …";
         readonly Button backupBtn = Text(BackupLabel, "Back up the knowledge of a level (or all) now - it is also backed up automatically before every change"),
                         restoreBtn = Text(RestoreLabel, "Restore a level, a file or a skill from a backup");
         List<Dictionary<string, object>> backupLevels = new List<Dictionary<string, object>>();
@@ -267,7 +270,10 @@ namespace TcAgentBridge
             entries.MouseDoubleClick += (s, e) => OpenSelected();
             open.Click += (s, e) => OpenSelected();
             levelBox.SelectionChanged += (s, e) => FillEntries();
-            newBtn.Click += (s, e) => NewItem();
+            newBtn.Click += (s, e) => NewItem(false);
+            addExistingBtn.Click += (s, e) => NewItem(true);
+            renameBtn.Click += (s, e) => RenameItem();
+            copyPathBtn.Click += (s, e) => CopyPath((entries.SelectedItem as Line)?["path"]);
             levelsBtn.Click += (s, e) => EditLevels();
             backupBtn.Click += (s, e) => BackupNow();
             restoreBtn.Click += (s, e) => RestoreBackup();
@@ -345,8 +351,9 @@ namespace TcAgentBridge
         {
             if (effectivePage != null) return effectivePage;
             var tools = new WrapPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(6, 4, 6, 4) };
-            foreach (var e in new UIElement[] { kindBox, levelBox, filter, onlyApplied, TcUnitControl.Separator(), newBtn, open, folderBtn, moveBtn, deleteBtn,
-                                                TcUnitControl.Separator(), offProject, offUser, on }) tools.Children.Add(e);
+            foreach (var e in new UIElement[] { kindBox, levelBox, filter, onlyApplied, TcUnitControl.Separator(), newBtn, addExistingBtn, TcUnitControl.Separator(),
+                                                open, folderBtn, TcUnitControl.Separator(), renameBtn, moveBtn, TcUnitControl.Separator(), offProject, offUser, on,
+                                                TcUnitControl.Separator(), deleteBtn, TcUnitControl.Separator(), copyPathBtn }) tools.Children.Add(e);
             var g = new Grid();
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
             g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
@@ -372,11 +379,18 @@ namespace TcAgentBridge
             DockPanel.SetDock(h1, Dock.Top); sp.Children.Add(h1);
             bool SSel() => sourceList.SelectedItem is Line;
             var srcActs = new (string, string, Action, Func<bool>)[] {
-                ("Browse and install …", "Show what the source offers and install items - license, files and scripts are shown first", BrowseSource, null),
+                ("New …", "A new source: a Git repository with skills, workflows, rules or lessons", () => EditSource(null), null),
                 Sep,
-                ("Add source …", "A Git repository with skills, workflows, rules or lessons", () => EditSource(null), null),
-                ("Edit source …", "Change URL, branch/tag or level of the selected source", () => { if (SSel()) EditSource(sourceList.SelectedItem as Line); else Hint("Select a source first."); }, SSel),
-                ("Remove source …", "Remove the selected source (installed items stay)", RemoveSource, SSel) };
+                ("Open", "The repository in the browser (or its folder)", () => OpenUrlOrFolder(S((sourceList.SelectedItem as Line)?.D, "url")), SSel),
+                ("Open folder", "The local copy of the repository (TcAgent's cache)", () => OpenSourceCache(S((sourceList.SelectedItem as Line)?.D, "name")), SSel),
+                Sep,
+                ("Edit …", "Change URL, branch/tag or level of the selected source", () => { if (SSel()) EditSource(sourceList.SelectedItem as Line); else Hint("Select a source first."); }, SSel),
+                Sep,
+                ("Delete …", "Delete the selected source from the list (installed items stay; Del)", RemoveSource, SSel),
+                Sep,
+                ("Copy path", "Copy the URL of the repository", () => CopyPath(S((sourceList.SelectedItem as Line)?.D, "url")), SSel),
+                Sep,
+                ("Browse and install …", "Show what the source offers and install items - license, files and scripts are shown first", BrowseSource, null) };
             var tools1 = Bar(srcActs);
             DockPanel.SetDock(tools1, Dock.Top); sp.Children.Add(tools1);
             DockPanel.SetDock(sourceList, Dock.Top); sourceList.MaxHeight = 160; sp.Children.Add(sourceList);
@@ -385,6 +399,9 @@ namespace TcAgentBridge
             bool ISel() => installedList.SelectedItem is Line;
             void On(Action<string, string> act) { var (n, lv) = Installed(); if (n != null) act(n, lv); }
             var instActs = new (string, string, Action, Func<bool>)[] {
+                ("Open", "Open the installed file in the editor (or double-click)", () => OpenInEditor(S((installedList.SelectedItem as Line)?.D, "path")), ISel),
+                ("Open folder", "Show the installed item in the Explorer", () => ShowInExplorer(S((installedList.SelectedItem as Line)?.D, "path")), ISel),
+                Sep,
                 (SrcCompare, "Your version and the installed one in the compare window of Visual Studio", () => On((n, lv) => CompareSource(n, lv, sourceDetail)), ISel),
                 (SrcChanges, "What changed in the source since the install", DiffInstalled, ISel),
                 Sep,
@@ -392,7 +409,10 @@ namespace TcAgentBridge
                 (SrcDetach, "No longer tied to the source - no updates, the origin stays in the header", () => On(DetachSource), ISel),
                 (SrcPropose, "Your changes as a branch for the source - push it and open the pull request", () => On((n, lv) => ProposeSource(n, lv, sourceDetail)), ISel),
                 (SrcMerge, "Merge the newer version of the source into your item (three-way; conflicts in the merge window)", () => On((n, lv) => MergeSource(n, lv, sourceDetail)), ISel),
-                (SrcUninstall, "Remove the item from its level (a copy goes to the backups; the source stays)", () => On((n, lv) => UninstallSource(n, lv, S((installedList.SelectedItem as Line)?.D, "state"))), ISel),
+                Sep,
+                (SrcUninstall, "Remove the item from its level (a copy goes to the backups; the source stays; Del)", () => On((n, lv) => UninstallSource(n, lv, S((installedList.SelectedItem as Line)?.D, "state"))), ISel),
+                Sep,
+                ("Copy path", "Copy the path of the installed item", () => CopyPath(S((installedList.SelectedItem as Line)?.D, "path")), ISel),
                 Sep,
                 ("Check for updates", "Fetch the sources and list what is newer there", () => RunAsync("sources pull --dry-run", true), null),
                 ("Update all …", "Update every installed item that is newer in its source (not the ones changed locally)", UpdateAll, null) };
@@ -401,6 +421,7 @@ namespace TcAgentBridge
             DockPanel.SetDock(sourceDetail, Dock.Bottom); sp.Children.Add(sourceDetail);
             sp.Children.Add(installedList);
             sourceList.MouseDoubleClick += (s, e) => EditSource(sourceList.SelectedItem as Line);
+            installedList.MouseDoubleClick += (s, e) => OpenInEditor(S((installedList.SelectedItem as Line)?.D, "path"));
             sourceList.ContextMenu = MenuOf(srcActs);
             sourceList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { RemoveSource(); e.Handled = true; } };
             installedList.ContextMenu = MenuOf(instActs);
@@ -408,11 +429,61 @@ namespace TcAgentBridge
             return sourcesPage = sp;
         }
 
+        void OpenInEditor(string path)
+        {
+            if (string.IsNullOrEmpty(path)) { Hint("Select an entry first."); return; }
+            var f = Directory.Exists(path) ? new[] { "SKILL.md", "WORKFLOW.md" }.Select(m => Path.Combine(path, m)).FirstOrDefault(File.Exists) ?? path : path;
+            if (!File.Exists(f)) { ShowInExplorer(path); return; }
+            try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(f); status.Text = "Opened: " + f; }
+            catch (Exception ex) { Error($"Could not open {f}: {ex.Message}"); }
+        }
+
+        void ShowInExplorer(string path)
+        {
+            if (string.IsNullOrEmpty(path)) { Hint("Select an entry first."); return; }
+            try
+            {
+                if (File.Exists(path)) Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + path + "\"") { UseShellExecute = false });
+                else if (Directory.Exists(path)) Process.Start(new ProcessStartInfo("explorer.exe", "\"" + path + "\"") { UseShellExecute = false });
+                else { Hint("Not found: " + path); return; }
+                status.Text = "Explorer: " + path;
+            }
+            catch (Exception ex) { Error(ex.Message); }
+        }
+
+        void OpenUrlOrFolder(string target)
+        {
+            if (string.IsNullOrEmpty(target)) { Hint("Select an entry first."); return; }
+            if (Directory.Exists(target)) { ShowInExplorer(target); return; }
+            try { Process.Start(new ProcessStartInfo(target) { UseShellExecute = true }); status.Text = "Opened: " + target; }
+            catch (Exception ex) { Error($"Could not open {target}: {ex.Message}"); }
+        }
+
+        void OpenSourceCache(string name)
+        {
+            if (name == null) { Hint("Select a source first."); return; }
+            var d = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "sources", name);
+            if (Directory.Exists(d)) ShowInExplorer(d); else Hint($"There is no local copy of {name} yet - \"Browse and install …\" fetches it.");
+        }
+
         // a hint the user sees (the status line is easy to miss)
         void Hint(string text)
         {
             status.Text = text;
             MessageBox.Show(text, "TcAgent Knowledge", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+
+        // an error is always a dialog
+        void Error(string text)
+        {
+            status.Text = text.Split('\n')[0];
+            MessageBox.Show(text, "TcAgent Knowledge - error", MessageBoxButton.OK, MessageBoxImage.Error);
+        }
+
+        void CopyPath(string path)
+        {
+            if (string.IsNullOrEmpty(path)) { Hint("Select an entry first."); return; }
+            try { Clipboard.SetText(path); status.Text = "Copied: " + path; } catch (Exception ex) { Error("Could not copy: " + ex.Message); }
         }
 
         FrameworkElement HistoryPage()
@@ -442,17 +513,22 @@ namespace TcAgentBridge
             DockPanel.SetDock(hb, Dock.Top); dp.Children.Add(hb);
             bool BSel() => backupList.SelectedItem is Line;
             var backupActs = new (string, string, Action, Func<bool>)[] {
-                (BackupLabel, "Back up a level (or all) now - optionally with a copy in a folder of your choice", BackupNow, null),
+                (BackupLabel, "Back up levels now - into a folder of your choice", BackupNow, null),
                 (RestoreLabel, "The whole level, one file or one skill - the difference first, then you confirm; the current state is backed up before", RestoreBackup, null),
                 ("Restore from a file …", "A backup ZIP from another folder or PC", RestoreFromFile, null),
                 Sep,
+                ("Open folder", "The folder with the backups (ZIP files with manifest.json)", OpenBackupFolder, null),
                 ("Compare with current state", "What restoring the selected backup would change", () => DiffBackup(null), BSel),
-                ("Open backup folder", "The folder with the backups (ZIP files with manifest.json)", OpenBackupFolder, null) };
+                Sep,
+                ("Delete …", "Delete the selected backup file (Del)", DeleteBackup, BSel),
+                Sep,
+                ("Copy path", "Copy the path of the backup file", () => CopyPath(S((backupList.SelectedItem as Line)?.D, "zip")), BSel) };
             var bt = Bar(backupActs);
             DockPanel.SetDock(bt, Dock.Top); dp.Children.Add(bt);
             Columns(backupList, ("Level", 160, nameof(Line.C1)), ("Created", 150, nameof(Line.C2)), ("Reason", 260, nameof(Line.C3)), ("Files", 60, nameof(Line.C4)),
                     ("Kind", 150, nameof(Line.C5)), ("TcAgent", 70, nameof(Line.C6)));
             backupList.ContextMenu = MenuOf(backupActs);
+            backupList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { DeleteBackup(); e.Handled = true; } };
             backupList.SelectionChanged += (s, e) => { if (backupList.SelectedItem is Line l) backupDetail.Text = $"{S(l.D, "zip")}\n\n" + string.Join("\n", ((l.D["paths"] as IEnumerable) ?? new object[0]).Cast<object>()); };
             backupList.MouseDoubleClick += (s, e) => DiffBackup(null);
             backupDetail.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
@@ -663,7 +739,7 @@ namespace TcAgentBridge
         void ShowEntry()
         {
             var l = entries.SelectedItem as Line;
-            foreach (var b in new[] { open, offProject, offUser, on, folderBtn, moveBtn, deleteBtn }) b.IsEnabled = l != null;
+            foreach (var b in new[] { open, offProject, offUser, on, folderBtn, moveBtn, deleteBtn, renameBtn, copyPathBtn }) b.IsEnabled = l != null;
             if (l == null) { detail.Text = "Select an entry. A later level replaces an entry with the same name; locked entries can only be switched off by the company level."; return; }
             var d = l.D;
             var sb = new StringBuilder($"{S(d, "key")} – {S(d, "label")} – {S(d, "status")}{(B(d, "locked") ? " (locked)" : "")}{(B(d, "force") ? " (force)" : "")}\n");
@@ -710,16 +786,22 @@ namespace TcAgentBridge
                 return i;
             }
             bool Sel() => entries.SelectedItem is Line;
+            m.Items.Add(Item("New …", () => NewItem(false)));
+            m.Items.Add(Item("Add existing …", () => NewItem(true)));
+            m.Items.Add(new Separator());
             m.Items.Add(Item("Open", OpenSelected, Sel, "Enter"));
             m.Items.Add(Item("Open folder", OpenFolder, Sel));
             m.Items.Add(new Separator());
-            m.Items.Add(Item("New …", NewItem));
+            m.Items.Add(Item("Rename …", RenameItem, Sel));
             m.Items.Add(Item("Move to level …", MoveItem, Sel));
-            m.Items.Add(Item("Delete …", DeleteItem, () => entries.SelectedItem is Line l && LayerOf(l.D) is Dictionary<string, object> ly && B(ly, "deletable"), "Del"));
             m.Items.Add(new Separator());
             m.Items.Add(Item("Switch off for the project", () => Switch("disable", "project"), () => offProject.IsEnabled));
             m.Items.Add(Item("Switch off for me", () => Switch("disable", "user"), () => offUser.IsEnabled));
             m.Items.Add(Item("Switch on", () => { Switch("enable", "project"); Switch("enable", "user"); }, Sel));
+            m.Items.Add(new Separator());
+            m.Items.Add(Item("Delete …", DeleteItem, () => entries.SelectedItem is Line l && LayerOf(l.D) is Dictionary<string, object> ly && B(ly, "deletable"), "Del"));
+            m.Items.Add(new Separator());
+            m.Items.Add(Item("Copy path", () => CopyPath((entries.SelectedItem as Line)?["path"]), Sel));
             // items installed from a source: your changes, a newer version, back to the source
             bool FromSource() => S((entries.SelectedItem as Line)?.D, "sourceState") != null;
             (string, string) Item0() { var d = (entries.SelectedItem as Line)?.D; return (S(d, "name"), S(d, "installLevel") ?? (S(d, "label") ?? "").Split(' ')[0]); }
@@ -740,22 +822,23 @@ namespace TcAgentBridge
             Arr(data?.TryGetValue("levels", out var lv) == true ? lv : null)
                 .Select(l => (S(l, "label") + (B(l, "viaPullRequest") ? "  (Git: commit & push in the Git bar - pull request)" : ""), S(l, "level"), B(l, "viaPullRequest"))).ToList();
 
-        void NewItem()
+        void NewItem(bool existing)
         {
             var levels = Levels(true);
-            if (levels.Count == 0) { status.Text = "No level to create files at."; return; }
+            if (levels.Count == 0) { Hint("No level to create files at."); return; }
             var kinds = new[] { "coding-rules", "risk-rules", "skills", "workflows", "lessons" };
-            const string fromTemplate = "Create a new file from a template", fromFile = "Add an existing file …";
-            var r = Prompt("New knowledge file", ("Kind", kinds, kindBox.SelectedIndex > 0 && kinds.Contains(kindBox.SelectedItem as string) ? (string)kindBox.SelectedItem : "skills"),
-                           ("How", new[] { fromTemplate, fromFile }, fromTemplate),
-                           ("Name (new file only - other characters become hyphens)", null, ""),
-                           ("Level", levels.Select(x => x.Label).ToArray(), levels.Any(x => x.Level == "project") ? levels.First(x => x.Level == "project").Label : levels[0].Label));
+            var kind0 = kindBox.SelectedIndex > 0 && kinds.Contains(kindBox.SelectedItem as string) ? (string)kindBox.SelectedItem : "skills";
+            var level0 = levels.Any(x => x.Level == "project") ? levels.First(x => x.Level == "project").Label : levels[0].Label;
+            var r = existing
+                ? Prompt("Add an existing file", ("Kind", kinds, kind0), ("Level", levels.Select(x => x.Label).ToArray(), level0))
+                : Prompt("New knowledge file", ("Kind", kinds, kind0), ("Name (other characters become hyphens)", null, ""), ("Level", levels.Select(x => x.Label).ToArray(), level0));
             if (r == null) return;
+            r = existing ? new[] { r[0], null, "", r[1] } : new[] { r[0], null, r[1], r[2] };
             var level = levels.First(x => x.Label == r[3]).Level;
             if (levels.First(x => x.Label == r[3]).Pr)
                 status.Text = "The file goes into the working copy of the shared repository - commit and push it in the Git bar.";
             string args;
-            if (r[1] == fromFile)
+            if (existing)
             {
                 var skillLike = r[0] is "skills" or "workflows";
                 var dlg = new Microsoft.Win32.OpenFileDialog
@@ -768,7 +851,7 @@ namespace TcAgentBridge
             }
             else
             {
-                if (r[2].Trim().Length == 0) { status.Text = "A name is needed for a new file."; return; }
+                if (r[2].Trim().Length == 0) { Hint("A name is needed for a new file."); return; }
                 args = $"knowledge new --key {Quote(r[0] + "/" + r[2].Trim())} --level {Quote(level)}";
             }
             var (ok, output) = RunCli(args);
@@ -802,12 +885,23 @@ namespace TcAgentBridge
             Load();
         }
 
+        void RenameItem()
+        {
+            var d = (entries.SelectedItem as Line)?.D;
+            if (d == null) { Hint("Select a file first."); return; }
+            var r = Prompt("Rename " + S(d, "key"), ("New name (other characters become hyphens)", null, S(d, "name") ?? ""));
+            if (r == null || r[0].Trim().Length == 0 || r[0].Trim() == S(d, "name")) return;
+            var (ok, output) = RunCli($"knowledge rename --path {Quote(S(d, "path"))} --name {Quote(r[0].Trim())}");
+            Report(ok, output, "Rename");
+            Load();
+        }
+
         void OpenFolder()
         {
             var p = (entries.SelectedItem as Line)?["path"];
             if (p == null) return;
             try { Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + p + "\"") { UseShellExecute = false }); }
-            catch (Exception ex) { status.Text = ex.Message; }
+            catch (Exception ex) { Error(ex.Message); }
         }
 
         void MoveItem()
@@ -893,7 +987,7 @@ namespace TcAgentBridge
         void Report(bool ok, string output, string what)
         {
             status.Text = output.Split('\n')[0];
-            if (!ok) MessageBox.Show(output, "TcAgent Knowledge - " + what, MessageBoxButton.OK, MessageBoxImage.Warning);
+            if (!ok) MessageBox.Show(output, "TcAgent Knowledge - " + what, MessageBoxButton.OK, MessageBoxImage.Error);
         }
 
         (bool ok, string output) RunCli(string args)
@@ -956,7 +1050,7 @@ namespace TcAgentBridge
                 ThreadHelper.ThrowIfNotOnUIThread();
                 (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(p);
             }
-            catch (Exception ex) { status.Text = "Could not open the file: " + ex.Message; }
+            catch (Exception ex) { Error("Could not open the file: " + ex.Message); }
         }
 
         void Switch(string action, string level)
@@ -970,7 +1064,7 @@ namespace TcAgentBridge
                 var o = Run(exe, $"knowledge {action} --key {Quote(key)} --level {level}" + (string.IsNullOrEmpty(sln) ? "" : " --solution " + Quote(sln)), out var err);
                 status.Text = (o + " " + err).Trim();
             }
-            catch (Exception ex) { status.Text = ex.Message; }
+            catch (Exception ex) { Error(ex.Message); }
             Load();
         }
 
@@ -1159,7 +1253,7 @@ namespace TcAgentBridge
                     foreach (var c in Arr(new JavaScriptSerializer().DeserializeObject(cf.Substring("CONFLICT-FILES ".Length))))
                         OpenMergeTool(S(c, "theirs"), S(c, "yours"), S(c, "base"), S(c, "result"), S(c, "rel"));
                 }
-                catch (Exception ex) { status.Text = "Merge window: " + ex.Message; }
+                catch (Exception ex) { Error("Merge window: " + ex.Message); }
             Load();
         }
 
@@ -1205,7 +1299,7 @@ namespace TcAgentBridge
                                                    (uint)Microsoft.VisualStudio.Shell.Interop.__VSDIFFSERVICEOPTIONS.VSDIFFOPT_LeftFileIsTemporary);
                     else { output.Text = RunCli($"sources changes --item {Quote(name)} --level {Quote(level)}").output; break; }
                 }
-                catch (Exception ex) { status.Text = "Compare: " + ex.Message; }
+                catch (Exception ex) { Error("Compare: " + ex.Message); }
             }
             if (files.Count > 8) status.Text = $"{files.Count} files changed - the first 8 are open.";
         }
@@ -1302,34 +1396,69 @@ namespace TcAgentBridge
                                               C5 = B(b, "git") ? "uncommitted only (Git)" : "whole level", C6 = S(b, "version"), Mark = B(b, "git") ? Blue : Green, Tip = S(b, "zip") };
                         })).OrderByDescending(x => x.C2).ToList();
                     }
-                    catch (Exception ex) { status.Text = "Backups: " + ex.Message; }
+                    catch (Exception ex) { Error("Backups: " + ex.Message); }
                 }));
             });
         }
 
+        // Backup: the levels (all checked), the folder (TcAgent's backup folder, changeable), "open the folder afterwards"
         void BackupNow()
         {
             if (backupLevels.Count == 0) LoadBackupsNow();
-            var levels = new[] { "all" }.Concat(backupLevels.Select(l => S(l, "level"))).ToArray();
-            const string noCopy = "no - only in the backup folder of TcAgent", copy = "yes - choose a folder …";
-            var r = Prompt("Back up the knowledge", ("Level", levels, "all"), ("Reason (optional)", null, "by hand"), ("Also save a copy in a folder of your choice?", new[] { noCopy, copy }, noCopy));
-            if (r == null) return;
-            string target = null;
-            if (r[2] == copy)
+            var defaultFolder = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backups", "knowledge");
+            var w = new Window { Title = "Backup of the knowledge", SizeToContent = SizeToContent.WidthAndHeight, MinWidth = 520, ResizeMode = ResizeMode.NoResize,
+                                 WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Application.Current?.MainWindow, ShowInTaskbar = false };
+            var sp = new StackPanel { Margin = new Thickness(12) };
+            sp.Children.Add(new TextBlock { Text = "Levels:", Margin = new Thickness(0, 0, 0, 4) });
+            var boxes = backupLevels.Select(l => new CheckBox { Content = $"{S(l, "level")}  ({S(l, "root")})", Tag = S(l, "level"), IsChecked = true, Margin = new Thickness(0, 1, 0, 1) }).ToList();
+            foreach (var b in boxes) sp.Children.Add(b);
+            if (boxes.Count == 0) sp.Children.Add(new TextBlock { Text = "No level found - open the window again (⟳).", Opacity = 0.7 });
+            sp.Children.Add(new TextBlock { Text = "Folder (the backups of TcAgent are kept here; another folder gets a copy as well):", Margin = new Thickness(0, 10, 0, 2) });
+            var folderRow = new DockPanel();
+            var browse = new Button { Content = "Browse …", MinWidth = 80, Margin = new Thickness(6, 0, 0, 0) };
+            var folder = new TextBox { Text = defaultFolder, MinWidth = 380 };
+            DockPanel.SetDock(browse, Dock.Right); folderRow.Children.Add(browse); folderRow.Children.Add(folder);
+            browse.Click += (s, e) =>
             {
-                using (var dlg = new System.Windows.Forms.FolderBrowserDialog { Description = "Folder for a copy of the backup", ShowNewFolderButton = true })
-                {
-                    if (dlg.ShowDialog() != System.Windows.Forms.DialogResult.OK) return;
-                    target = dlg.SelectedPath;
-                }
-            }
-            var (ok, output) = RunCli($"knowledgebase backup --level {Quote(r[0])} --message {Quote(string.IsNullOrWhiteSpace(r[1]) ? "by hand" : r[1].Trim())}" + (target != null ? " --out " + Quote(target) : ""));
+                using (var dlg = new System.Windows.Forms.FolderBrowserDialog { Description = "Folder for the backup", SelectedPath = folder.Text, ShowNewFolderButton = true })
+                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK) folder.Text = dlg.SelectedPath;
+            };
+            sp.Children.Add(folderRow);
+            sp.Children.Add(new TextBlock { Text = "Reason (optional):", Margin = new Thickness(0, 10, 0, 2) });
+            var reason = new TextBox { Text = "by hand" };
+            sp.Children.Add(reason);
+            var openAfter = new CheckBox { Content = "Open the folder afterwards", IsChecked = true, Margin = new Thickness(0, 10, 0, 0) };
+            sp.Children.Add(openAfter);
+            var ok = new Button { Content = "Back up", MinWidth = 90, IsDefault = true, Margin = new Thickness(0, 12, 6, 0) };
+            var cancel = new Button { Content = "Cancel", MinWidth = 80, IsCancel = true, Margin = new Thickness(0, 12, 0, 0) };
+            ok.Click += (s, e) => w.DialogResult = true;
+            var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            bar.Children.Add(ok); bar.Children.Add(cancel); sp.Children.Add(bar);
+            w.Content = sp;
+            if (w.ShowDialog() != true) return;
+            var chosen = boxes.Where(b => b.IsChecked == true).Select(b => (string)b.Tag).ToList();
+            if (chosen.Count == 0) { Hint("No level chosen - nothing backed up."); return; }
+            var target = folder.Text.Trim();
+            var copy = target.Length > 0 && !Path.GetFullPath(target).TrimEnd('\\').Equals(defaultFolder, StringComparison.OrdinalIgnoreCase) ? target : null;
+            status.Text = "Backing up ...";
+            var (rok, output) = RunCli($"knowledgebase backup --level {Quote(string.Join(",", chosen))} --message {Quote(reason.Text.Trim().Length > 0 ? reason.Text.Trim() : "by hand")}" +
+                                       (copy != null ? " --out " + Quote(copy) : ""));
             backupDetail.Text = output.Trim();
             LoadBackups();
-            if (!ok) { Report(false, output, "Backup"); return; }
-            var folder = target ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backups", "knowledge");
-            if (MessageBox.Show(output.Trim() + "\n\nOpen the folder?", "TcAgent Knowledge - backup done", MessageBoxButton.YesNo, MessageBoxImage.Information) == MessageBoxResult.Yes)
-                Process.Start(new ProcessStartInfo("explorer.exe", "\"" + folder + "\"") { UseShellExecute = false });
+            if (!rok) { Report(false, output, "Backup"); return; }
+            status.Text = "Backup done.";
+            MessageBox.Show(output.Trim(), "TcAgent Knowledge - backup done", MessageBoxButton.OK, MessageBoxImage.Information);
+            if (openAfter.IsChecked == true) ShowInExplorer(copy ?? defaultFolder);
+        }
+
+        void DeleteBackup()
+        {
+            var d = (backupList.SelectedItem as Line)?.D;
+            var z = S(d, "zip");
+            if (z == null) { Hint("Select a backup first."); return; }
+            if (MessageBox.Show($"Delete this backup?\n\n{z}", "TcAgent Knowledge", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            try { File.Delete(z); status.Text = "Deleted: " + z; } catch (Exception ex) { Error(ex.Message); }
+            LoadBackups();
         }
 
         // the list of the backups for a dialog when the History tab was not open yet
@@ -1444,11 +1573,14 @@ namespace TcAgentBridge
                     ("Detected by terms", 180, nameof(Line.C4)), ("Defined in", 360, nameof(Line.C5)));
             bool PSel() => platformList.SelectedItem is Line;
             var acts = new (string, string, Action, Func<bool>)[] {
-                ("Open platform.md", "Edit the description and detection of the selected platform (or double-click)", OpenPlatform, PSel),
+                ("New …", "A platform of your own: name, description, the libraries and terms that detect it", NewPlatform, null),
+                Sep,
+                ("Open", "Its platform.md: description and detection of the selected platform (or double-click)", OpenPlatform, PSel),
                 ("Open folder", "The folder of the platform (its coding rules, skills, lessons ...)", OpenPlatformFolder, PSel),
                 Sep,
-                ("New …", "A platform of your own: name, description, the libraries and terms that detect it", NewPlatform, null),
                 ("Delete …", "Delete the selected platform of your own with its folder (Del)", DeletePlatform, PSel),
+                Sep,
+                ("Copy path", "Copy the path of its platform.md", () => CopyPath(S((platformList.SelectedItem as Line)?.D, "file")), PSel),
                 Sep,
                 ("Set for this project …", "Choose the platforms of this solution (stored in .tcagent\\config.json)", SetPlatforms, null),
                 ("Detect automatically", "Remove the choice from .tcagent\\config.json - detection by libraries and terms again", () => { status.Text = RunCli("knowledge platform --action auto").output; Load(); }, null) };
@@ -1497,7 +1629,7 @@ namespace TcAgentBridge
         {
             var f = S((platformList.SelectedItem as Line)?.D, "file");
             if (f == null || !File.Exists(f)) { status.Text = "This platform has no platform.md of its own (only a folder) - create one with New …"; return; }
-            try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(f); } catch (Exception ex) { status.Text = ex.Message; }
+            try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(f); } catch (Exception ex) { Error(ex.Message); }
         }
 
         // only a platform folder of the user (or of the company folder without Git) - the delete of KnowledgeOps checks it
@@ -1552,13 +1684,18 @@ namespace TcAgentBridge
             Columns(docsHits, ("Hit", 300, nameof(Line.C1)), ("Where", 420, nameof(Line.C2)), ("Text", 600, nameof(Line.C3)));
             bool DSel() => docsList.SelectedItem is Line;
             var acts = new (string, string, Action, Func<bool>)[] {
+                ("Add link or folder …", "A web address (only pages below it are read), a folder or a network share - one line in the knowledge.md of a level", () => EditDoc(null), null),
+                ("Add documents …", "Copy PDF, Word, HTML, Markdown or text files into the knowledge\\ folder of a level - the agent searches them", CopyDocs, null),
+                Sep,
                 ("Open", "The link in the browser, the folder in the Explorer (or double-click / Enter)", OpenDoc, DSel),
+                ("Open folder", "The folder in the Explorer (document folders, folders, shares)", () => { var d = (docsList.SelectedItem as Line)?.D; if (S(d, "type") is "web" or "link") Hint("A link has no folder - Open shows it in the browser."); else ShowInExplorer(S(d, "value")); }, DSel),
                 ("Open knowledge.md", "The list of links and folders of the level of the selected source (created if it does not exist yet)", OpenDocOrigin, null),
                 Sep,
-                ("Add link or folder …", "A web address (only pages below it are read), a folder or a network share - one line in the knowledge.md of a level", () => EditDoc(null), null),
-                ("Add documents (copy files) …", "Copy PDF, Word, HTML, Markdown or text files into the knowledge\\ folder of a level - the agent searches them", CopyDocs, null),
                 ("Edit …", "Change the selected link or folder, its comment or its level", () => { if (DSel()) EditDoc(docsList.SelectedItem as Line); else Hint("Select a link or folder first."); }, DSel),
-                ("Remove …", "Remove the selected link or folder from its knowledge.md (the documents themselves stay)", RemoveDoc, DSel),
+                Sep,
+                ("Delete …", "Delete the selected link or folder from its knowledge.md (the documents themselves stay; Del)", RemoveDoc, DSel),
+                Sep,
+                ("Copy path", "Copy the link or the path", () => CopyPath(S((docsList.SelectedItem as Line)?.D, "value")), DSel),
                 Sep,
                 ("Search like the agent …", "The same search as tc_docs - the hits are listed below and open with a double-click", SearchDocs, null) };
             var tools = Bar(acts);
@@ -1573,7 +1710,7 @@ namespace TcAgentBridge
             docsHits.MouseDoubleClick += (s, e) => OpenHit();
             docsHits.PreviewKeyDown += (s, e) => { if (e.Key == Key.Enter) { OpenHit(); e.Handled = true; } };
             docsHits.ContextMenu = Menu(("Open", OpenHit, HSel), ("Open folder", OpenHitFolder, () => HSel() && S((docsHits.SelectedItem as Line)?.D, "kind") == "file"),
-                                        ("Copy path or link", () => { try { Clipboard.SetText(S((docsHits.SelectedItem as Line)?.D, "where")); } catch { } }, HSel));
+                                        (null, null, null), ("Copy path", () => CopyPath(S((docsHits.SelectedItem as Line)?.D, "where")), HSel));
             docsHits.Height = 190;
             var bottom = new DockPanel();
             DockPanel.SetDock(docsHitsHeading, Dock.Top); bottom.Children.Add(docsHitsHeading);
@@ -1613,7 +1750,7 @@ namespace TcAgentBridge
                         }).ToList();
                         status.Text = $"{list.Count} documentation source(s) · {list.Where(d => S(d, "type") is "folder" or "share" or "documents").Sum(d => Convert.ToInt32(d["documents"]))} document(s) in folders";
                     }
-                    catch (Exception ex) { status.Text = "Documentation sources: " + ex.Message; }
+                    catch (Exception ex) { Error("Documentation sources: " + ex.Message); }
                 }));
             });
         }
@@ -1683,7 +1820,7 @@ namespace TcAgentBridge
                     else status.Text = "Not reachable: " + v;
                 }
             }
-            catch (Exception ex) { status.Text = ex.Message; }
+            catch (Exception ex) { Error(ex.Message); }
         }
 
         void OpenDocOrigin()
@@ -1739,7 +1876,7 @@ namespace TcAgentBridge
                         var hits = Arr(res["hits"]).ToList();
                         docsHits.ItemsSource = hits.Select(h => new Line
                         {
-                            D = h, C1 = S(h, "title") ?? S(h, "where"), C2 = S(h, "where"), C3 = S(h, "snippet"),
+                            D = h, C1 = (S(h, "title") ?? S(h, "where")) + (h.TryGetValue("page", out var pg) && Convert.ToInt32(pg) > 0 ? $" (page {pg})" : ""), C2 = S(h, "where"), C3 = S(h, "snippet"),
                             Mark = S(h, "kind") == "file" ? Green : Blue, Tip = S(h, "snippet")
                         }).ToList();
                         docsHitsHeading.Text = hits.Count == 0 ? $"Nothing found for \"{q}\" in the documents and the pages read so far."
@@ -1750,25 +1887,48 @@ namespace TcAgentBridge
             });
         }
 
-        // a document with its program (a .md or .txt in the editor), a page in the browser
+        // a document with its program (a .md or .txt in the editor, a PDF on the page of the hit), a page in the browser
         void OpenHit()
         {
             var h = (docsHits.SelectedItem as Line)?.D;
             var w = S(h, "where");
-            if (w == null) return;
+            if (w == null) { Hint("Select a hit first."); return; }
+            var page = h.TryGetValue("page", out var pv) ? Convert.ToInt32(pv) : 0;
             try
             {
                 if (S(h, "kind") == "file" && Path.GetExtension(w).ToLowerInvariant() is ".md" or ".txt" or ".st" or ".xml" or ".json" or ".csv")
-                    (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(w);
-                else Process.Start(new ProcessStartInfo(w) { UseShellExecute = true });
+                    OpenInEditor(w);
+                else if (S(h, "kind") == "file" && w.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase) && page > 0) OpenPdf(w, page);
+                else { Process.Start(new ProcessStartInfo(w) { UseShellExecute = true }); status.Text = "Opened: " + w; }
             }
-            catch (Exception ex) { Report(false, $"Could not open {w}: {ex.Message}", "Open"); }
+            catch (Exception ex) { Error($"Could not open {w}: {ex.Message}"); }
+        }
+
+        [DllImport("shlwapi.dll", CharSet = CharSet.Unicode)]
+        static extern uint AssocQueryString(uint flags, uint str, string assoc, string extra, StringBuilder output, ref uint size);
+
+        // the PDF program of Windows on the page: Acrobat/Reader and Foxit (/A page=n), SumatraPDF (-page n),
+        // browsers (#page=n); any other program opens the file at its start
+        void OpenPdf(string file, int page)
+        {
+            string exe = null;
+            try { var sb = new StringBuilder(1024); uint n = 1024; if (AssocQueryString(0, 2, ".pdf", "open", sb, ref n) == 0) exe = sb.ToString(); } catch { }
+            var name = Path.GetFileNameWithoutExtension(exe ?? "").ToLowerInvariant();
+            if (exe != null && File.Exists(exe))
+            {
+                string args = name.Contains("acro") || name.Contains("foxit") ? $"/A \"page={page}\" \"{file}\""
+                            : name.Contains("sumatra") ? $"-page {page} \"{file}\""
+                            : name is "msedge" or "chrome" or "firefox" or "brave" ? $"\"{new Uri(file).AbsoluteUri}#page={page}\"" : null;
+                if (args != null) { Process.Start(new ProcessStartInfo(exe, args) { UseShellExecute = false }); status.Text = $"Opened on page {page}: {file}"; return; }
+            }
+            Process.Start(new ProcessStartInfo(file) { UseShellExecute = true });
+            status.Text = $"Opened: {file} (the hit is on page {page})";
         }
 
         void OpenHitFolder()
         {
             var w = S((docsHits.SelectedItem as Line)?.D, "where");
-            if (w != null && File.Exists(w)) Process.Start(new ProcessStartInfo("explorer.exe", "/select,\"" + w + "\"") { UseShellExecute = false });
+            ShowInExplorer(w);
         }
 
         // ------------------------------------------------------------------ feedback: see, anonymize, edit, share
@@ -1787,7 +1947,7 @@ namespace TcAgentBridge
             bool FSel() => feedbackList.SelectedItems.Count > 0;
             var acts = new (string, string, Action, Func<bool>)[] {
                 ("Share with the TcAgent developers …", "Opens a new issue in the browser with the text below - you check it there and send it yourself", ShareIssue, FSel),
-                ("Copy text", "Copy the text below", () => { try { Clipboard.SetText(feedbackText.Text); status.Text = "Copied."; } catch (Exception ex) { status.Text = ex.Message; } }, FSel),
+                ("Copy text", "Copy the text below", () => { try { Clipboard.SetText(feedbackText.Text); status.Text = "Copied."; } catch (Exception ex) { Error(ex.Message); } }, FSel),
                 ("Save as …", "Save the text below as a Markdown file", SaveIssue, FSel),
                 Sep,
                 ("Set status …", "resolved / wontfix / duplicate / open for the selected reports", SetFeedbackStatus, FSel),
@@ -1922,7 +2082,7 @@ namespace TcAgentBridge
                                 (tooLong ? "\n\nThe text is long: it is in the clipboard - paste it into the issue." : ""),
                                 "Share with the TcAgent developers", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
             try { Process.Start(new ProcessStartInfo(full) { UseShellExecute = true }); status.Text = "Issue opened in the browser."; }
-            catch (Exception ex) { status.Text = ex.Message; }
+            catch (Exception ex) { Error(ex.Message); }
         }
 
         void SetFeedbackStatus()

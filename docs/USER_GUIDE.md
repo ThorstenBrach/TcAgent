@@ -113,15 +113,23 @@ work without the extension. The extension runs **inside** the IDE process and ad
     frequent compiler errors. Double-click a workflow for its history.
   - **Files:** coding rules, risk rules, skills, workflows, lessons and templates of every level with their status
     (applies, replaced by a later level, locked, forced, switched off) and why; filter by kind, level and text. Toolbar
-    and context menu: **New …** (a new file from a template, opened in the editor – or an existing file taken over to the level), **Open**, **Open folder**, **Move to level …**
-    (moving up checks the text for project and machine names; company and a team in Git as a commit on a new branch for
-    a pull request), **Delete** (also the Del key; only on your own levels – built-in and company files are switched off
-    instead), **Switch off** for the project or for you, **Switch on** (`disabled.json` – the file itself stays unchanged).
+    and context menu: **New …** (a new file from a template, opened in the editor), **Add existing …** (an existing file
+    or skill/workflow folder taken over to a level), **Open**, **Open folder**, **Rename …** (the name in the header
+    follows), **Move to level …** (moving up checks the text for project and machine names; company and a team in Git as
+    a commit on a new branch for a pull request), **Switch off** for the project or for you, **Switch on**
+    (`disabled.json` – the file itself stays unchanged), **Delete …** (also the Del key; only on your own levels –
+    built-in and company files are switched off instead), **Copy path**.
+
+    *All tabs use the same words in the same order:* New … / Add existing … / Open / Open folder / Edit … / Rename … /
+    Move to level … / Switch off · on / Delete … (Del) / Copy path, groups separated by lines; the toolbar and the
+    context menu of a list show the same entries. Every action answers in the status line or in a message; errors
+    always as a message.
     For every level kept in Git a line shows local changes, commits to push and new commits in the repository (as of
     the last **Fetch**), with **Pull**, **Commit …** and **Push** – the push of a company or team level goes to a new
     branch for a pull request; the column **Git** marks changed and new files.
-  - **Sources:** the Git repositories skills, workflows and rules can be installed from (`tc_sources`): **Add / Edit /
-    Remove**, **Browse & install …** (everything a source offers with kind and license; before installing you see the
+  - **Sources:** the Git repositories skills, workflows and rules can be installed from (`tc_sources`): **New …**, **Open**
+    (the repository in the browser), **Open folder** (TcAgent's local copy), **Edit …**, **Delete …**, **Copy path**,
+    **Browse and install …** (everything a source offers with kind and license; before installing you see the
     license, the files and any scripts – source-available and unlicensed items are refused, others only after you
     accept the license). Installing offers every level – you, the project, the team, the company and the platforms; a
     shared level kept in Git gets a commit on a new branch for a pull request instead of a direct change. Below the items
@@ -153,8 +161,9 @@ work without the extension. The extension runs **inside** the IDE process and ad
     shares of the `knowledge.md` of every level and the document folders `knowledge\`, each with type, level, state
     (documents found, pages already read, not reachable) and the file it is defined in. **Open** (browser or Explorer),
     **Open knowledge.md** (of the level of the selected source or of a level you choose - created if missing), **Add link
-    or folder …** (one line in the `knowledge.md` of the level you choose), **Add documents (copy files) …** (into the
-    `knowledge\` folder of a level), **Edit …**, **Remove …** and **Search like the agent …** – the hits are listed below
+    or folder …** (one line in the `knowledge.md` of the level you choose), **Add documents …** (copies files into the
+    `knowledge\` folder of a level), **Open folder**, **Edit …**, **Delete …**, **Copy path** and **Search like the agent …**
+    – the hits are listed below (a PDF on the page of the hit with Acrobat/Reader, Foxit, SumatraPDF or a browser)
     and open with a double-click (documents with their program, pages in the browser); the same in the context menu.
   - **Feedback:** the reports of `tc_feedback` (filter by status). For the selected reports the window builds the text of
     an issue and **anonymizes** it: names of this computer, user, solution and projects, your `privateTerms`
@@ -169,16 +178,17 @@ work without the extension. The extension runs **inside** the IDE process and ad
   - **History:** failed checks and corrections per run with a moving average, every adopted change as a marker, and the
     changes with their values before and after (helped / no effect / worse / reverted); **Export CSV**. Below that the
     **backups of the knowledge** (see below) with **Difference**, **Restore …** and **Open folder**.
-  - **Back up now … / Restore …** (top bar; toolbar and context menu of every list show the same actions with the same
-    names): the knowledge of every level – coding rules, risk rules, skills, workflows,
+  - **Backup … / Restore …** (top bar): the knowledge of every level – coding rules, risk rules, skills, workflows,
     lessons, templates, platforms, `knowledge.md`, `sources.json`, `skills.lock.json`, `disabled.json`, `config.json` – is
     backed up **automatically before every change** (from this window, the chat and the command line) as a ZIP with
     `manifest.json` (TcAgent version, level, SHA-256 of every file) in `%LOCALAPPDATA%\TcAgent\backups\knowledge\`; only
     when the level changed since its last backup, the last 20 per level are kept. A level in a Git working copy (team,
     company, project) is backed up with its uncommitted changes only – Git keeps the rest. **Restore** works for the whole
     level, one file or one skill/workflow: first the difference, then you confirm; the current state is backed up before.
-    **Back up now …** can also put a copy into a folder of your choice and opens the folder afterwards; **Restore …** lists
-    all backups (or **Restore from a file …** takes a copy from anywhere).
+    **Backup …** asks for the levels (all checked), the folder (TcAgent's backup folder, changeable - another folder gets
+    a copy) and "Open the folder afterwards", then shows the files written with their number of files; **Restore …**
+    lists all backups (or **Restore from a file …** takes a copy from anywhere), then what to restore, the difference
+    and your confirmation. In the History tab a backup can also be deleted (**Delete …**) or its path copied.
     Command line: `TcAgent.exe knowledgebase list|backup|diff|restore`.
 
   Decisions (apply a proposal, install, pull, promote) are made in the chat – the agent asks you.

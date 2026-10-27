@@ -798,7 +798,7 @@ public static partial class Cli
             && o.Command is not ("knowledge" or "sources" or "knowledgebase")) throw new Exception("--name, --url, --ref, --item, --kind, --query, --libraries, --terms and --accept-license are only for knowledge and sources");
         if (o.Command is "knowledge")                     // files only: the solution is optional (its platform and project level)
         {
-            if (o.Sub is not ("json" or "disable" or "enable" or "new" or "move" or "delete" or "git" or "feedback" or "platform" or "settings" or "docs"))
+            if (o.Sub is not ("json" or "disable" or "enable" or "new" or "move" or "delete" or "git" or "feedback" or "platform" or "settings" or "docs" or "rename"))
                 throw new Exception("knowledge needs json, disable, enable, new, move, delete, git, feedback, platform, settings or docs, e.g. TcAgent.exe knowledge json --solution M.sln");
             if (o.Sub is "disable" or "enable" && (o.Key == null || !o.Key.Contains('/'))) throw new Exception("knowledge " + o.Sub + " needs --key <kind>/<name>");
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));

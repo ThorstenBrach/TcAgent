@@ -202,6 +202,36 @@ public static class KnowledgeOps
     }
 
     // ------------------------------------------------------------------ delete
+    /// <summary>Renames a file (rule, lesson, template) or a skill/workflow folder on its level; the name in its header follows.</summary>
+    public static string Rename(string solutionDir, string path, string name, IEnumerable<string> platforms)
+    {
+        var item = ItemOf(Path.GetFullPath(path));
+        var from = LayerOf(solutionDir, item, platforms) ?? throw new ArgumentException("not a file of a knowledge level: " + path);
+        if (from.Level == "built-in") throw new ArgumentException("the built-in level comes with TcAgent - switch the file off and create your own instead");
+        var kind = KindDirOf(item, from.Root);
+        var oldName = Path.GetFileNameWithoutExtension(item);
+        if (Sources.LoadLock(from.Root).ContainsKey(kind + "/" + oldName))
+            throw new ArgumentException($"{kind}/{oldName} is installed from a source - \"Keep as own version …\" first, then rename it");
+        var isDir = Directory.Exists(item);
+        var slug = isDir ? Skills.ValidateName(KnowledgeLayers.Slug(name)) : KnowledgeLayers.Slug(name);
+        if (slug.Length == 0) throw new ArgumentException("a name is needed");
+        var target = Path.Combine(Path.GetDirectoryName(item)!, isDir ? slug : slug + Path.GetExtension(item));
+        if (Path.GetFullPath(target).Equals(Path.GetFullPath(item), StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("it has that name already");
+        if (Directory.Exists(target) || File.Exists(target)) throw new ArgumentException(target + " exists already");
+        if (isDir) Directory.Move(item, target); else File.Move(item, target);
+        // the name in the header (skills and workflows need it to match the folder)
+        var main = isDir ? new[] { Skills.MainFile, Workflows.MainFile }.Select(m => Path.Combine(target, m)).FirstOrDefault(File.Exists) : target;
+        if (main != null && Path.GetExtension(main).Equals(".md", StringComparison.OrdinalIgnoreCase))
+        {
+            var t = File.ReadAllText(main);
+            var m = System.Text.RegularExpressions.Regex.Match(t, @"\A(\uFEFF)?---\r?\n(.*?)\r?\n---", System.Text.RegularExpressions.RegexOptions.Singleline);
+            if (m.Success && System.Text.RegularExpressions.Regex.IsMatch(m.Groups[2].Value, @"(?m)^name:"))
+                File.WriteAllText(main, t.Substring(0, m.Groups[2].Index) +
+                                        System.Text.RegularExpressions.Regex.Replace(m.Groups[2].Value, @"(?m)^name:.*$", "name: " + slug) + t.Substring(m.Groups[2].Index + m.Groups[2].Length));
+        }
+        return $"Renamed: {item} -> {target}";
+    }
+
     public static string Delete(string solutionDir, string path, IEnumerable<string> platforms)
     {
         var item = ItemOf(Path.GetFullPath(path));

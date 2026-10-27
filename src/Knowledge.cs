@@ -189,7 +189,7 @@ public static class Knowledge
     public static string Search(string solutionDir, string query, int max = 10) => Search(solutionDir, query, max, out _);
 
     /// <summary>A hit of the search: kind file (a document), page (a web page read before) or web (the search service).</summary>
-    public sealed record Hit(string Kind, string Where, string Title, string Snippet);
+    public sealed record Hit(string Kind, string Where, string Title, string Snippet, int Page = 0);
 
     /// <summary>The search with its hits as data - the knowledge window lists them to open.</summary>
     public static string Search(string solutionDir, string query, int max, out List<Hit> found)
@@ -199,6 +199,7 @@ public static class Knowledge
         if (terms.Count == 0) throw new Exception("query too short");
         var s = Load(solutionDir);
         var hits = new List<(double Score, string Where, string Snip)>();
+        var pageOf = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
         var skipped = new List<string>();
         var deadline = DateTime.UtcNow.AddSeconds(25);
         foreach (var folder in s.Folders)
@@ -242,13 +243,17 @@ public static class Knowledge
             var a = Math.Max(0, first - 120);
             var snip = Regex.Replace(text.Substring(a, Math.Min(360, text.Length - a)), @"\s+", " ").Trim();
             hits.Add((score, where, snip));
+            // a PDF: the page of the first hit ("--- Page n ---" from the text extraction)
+            var pm = Regex.Matches(text[..Math.Max(0, first)], @"--- Page (\d+) ---");
+            if (pm.Count > 0) pageOf[where] = int.Parse(pm[^1].Groups[1].Value);
         }
         var top = hits.OrderByDescending(h => h.Score).Take(max).ToList();
         var o = new StringBuilder();
         // web search in the allowed domains - independent of the AI client, if a search service is configured
         var webHits = WebSearch(query, s.Urls, out var webNote);
         found = webHits.Select(w => new Hit("web", w.Url, w.Title, w.Snip))
-                       .Concat(top.Select(h => new Hit(h.Where.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? "page" : "file", h.Where, Path.GetFileName(h.Where), h.Snip))).ToList();
+                       .Concat(top.Select(h => new Hit(h.Where.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? "page" : "file", h.Where, Path.GetFileName(h.Where), h.Snip,
+                                                       pageOf.TryGetValue(h.Where, out var pg) ? pg : 0))).ToList();
         if (webHits.Count > 0)
         {
             o.AppendLine("Web (allowed sources):");

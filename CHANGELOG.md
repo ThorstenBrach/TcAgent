@@ -5,6 +5,26 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.48.0] – 2026-10-27
+
+### Added
+- Knowledge window, tab Files: **Add existing …** (its own entry instead of a choice inside New …), **Rename …** (files
+  and skill/workflow folders, the name in the header follows; `TcAgent.exe knowledge rename --path --name`), **Copy
+  path**; installed items get **Uninstall …** in Files too.
+- **Copy path** in every list; **Open** / **Open folder** for sources (the repository / TcAgent's local copy), installed
+  items, documentation sources and search hits; **Delete …** for a backup.
+- Search hits of a PDF open on the page of the hit (Acrobat/Reader, Foxit, SumatraPDF, browsers; the page comes from
+  the text extraction).
+- **Backup …** dialog: the levels (checkboxes), the folder (TcAgent's backup folder, changeable), the reason and "Open
+  the folder afterwards"; then a message with every file written and its number of files
+  (`knowledgebase backup --level a,b`).
+
+### Changed
+- One vocabulary in every tab, in one order: New … / Add existing … / Open / Open folder / Edit … / Rename … / Move to
+  level … / Switch off · on / Delete … (Del) / Copy path, groups separated by lines ("Remove …" of sources and
+  documentation sources is now "Delete …"; documentation: "Add link or folder …", "Add documents …").
+- Errors are always shown as a message (error icon), hints as a message, everything else in the status line.
+
 ## [0.47.1] – 2026-10-27
 
 ### Changed

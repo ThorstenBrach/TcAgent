@@ -56,6 +56,17 @@ public sealed class KnowledgeBackupTests : IDisposable
     }
 
     [Fact]
+    public void RenameAFileAndASkill()
+    {
+        KnowledgeOps.Rename(Sln, Path.Combine(User, @"skills\review\SKILL.md"), "Code Review", new string[0]);
+        Assert.True(File.Exists(Path.Combine(User, @"skills\code-review\SKILL.md")));
+        Assert.Contains("name: code-review", ReadFile(@"user\skills\code-review\SKILL.md"));
+        KnowledgeOps.Rename(Sln, Path.Combine(User, @"coding-rules\naming.md"), "names", new string[0]);
+        Assert.True(File.Exists(Path.Combine(User, @"coding-rules\names.md")));
+        Assert.Throws<ArgumentException>(() => KnowledgeOps.Rename(Sln, Path.Combine(User, @"coding-rules\names.md"), "names", new string[0]));
+    }
+
+    [Fact]
     public void KeepsTheLast20()
     {
         for (int i = 0; i < 23; i++) { Write(@"user\lessons\l.md", "v" + i); KnowledgeBackup.Backup(UserLevel, "n" + i); }
