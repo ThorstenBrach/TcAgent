@@ -43,6 +43,13 @@ separately; their notes follow below the highlights.
 
 ### 0.48.1 – 2026-10-27
 
+#### Fixed
+- Tab History: the list of the backups got no height in a smaller window (only its header was visible) - the
+  chart, the changes, the backups and their details now share the height, each with a minimum, with a splitter.
+
+#### Added
+- User guide: screenshots of the knowledge window (`docs/img/knowledge/`).
+
 #### Changed
 - Documentation tab, **Add link or folder …** / **Edit …**: a dialog with the choice link or folder; for a folder or
   network share **Browse …** opens a folder dialog, for a link the address is checked (https://); comment and level as

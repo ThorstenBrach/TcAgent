@@ -133,7 +133,7 @@ namespace TcAgentBridge
         string feedbackUrl;
         // history
         readonly ComboBox wfBox = new ComboBox { MinWidth = 160, Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
-        readonly Canvas chart = new Canvas { Height = 220, Margin = new Thickness(8), ClipToBounds = true };
+        readonly Canvas chart = new Canvas { MinHeight = 100, Margin = new Thickness(8), ClipToBounds = true };
         readonly ListView changes = NewList();
         readonly Button export = Text("Export CSV", "The runs of this workflow and the changes as CSV");
         // backups of the knowledge levels (KnowledgeBackup.cs)
@@ -499,18 +499,11 @@ namespace TcAgentBridge
             legend.Inlines.Add(new System.Windows.Documents.Run("┅ moving average (5)  ") { Foreground = Gray });
             legend.Inlines.Add(new System.Windows.Documents.Run("│ adopted change") { Foreground = Green });
             tools.Children.Add(legend);
-            var dp = new DockPanel();
-            DockPanel.SetDock(tools, Dock.Top); dp.Children.Add(tools);
             var frame = new Border { BorderThickness = new Thickness(1), Margin = new Thickness(6), Child = chart };
             frame.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
-            DockPanel.SetDock(frame, Dock.Top); dp.Children.Add(frame);
             var h = Heading("Adopted changes - values per run (failed checks + corrections) before and over the next 10 runs");
-            DockPanel.SetDock(h, Dock.Top); dp.Children.Add(h);
-            changes.MaxHeight = 160;
-            DockPanel.SetDock(changes, Dock.Top); dp.Children.Add(changes);
             // backups of the knowledge levels
             var hb = Heading("Backups of the knowledge - made automatically before every change (last 20 per level; Git levels: uncommitted changes only)");
-            DockPanel.SetDock(hb, Dock.Top); dp.Children.Add(hb);
             bool BSel() => backupList.SelectedItem is Line;
             var backupActs = new (string, string, Action, Func<bool>)[] {
                 (BackupLabel, "Back up levels now - into a folder of your choice", BackupNow, null),
@@ -524,7 +517,6 @@ namespace TcAgentBridge
                 Sep,
                 ("Copy path", "Copy the path of the backup file", () => CopyPath(S((backupList.SelectedItem as Line)?.D, "zip")), BSel) };
             var bt = Bar(backupActs);
-            DockPanel.SetDock(bt, Dock.Top); dp.Children.Add(bt);
             Columns(backupList, ("Level", 160, nameof(Line.C1)), ("Created", 150, nameof(Line.C2)), ("Reason", 260, nameof(Line.C3)), ("Files", 60, nameof(Line.C4)),
                     ("Kind", 150, nameof(Line.C5)), ("TcAgent", 70, nameof(Line.C6)));
             backupList.ContextMenu = MenuOf(backupActs);
@@ -532,10 +524,22 @@ namespace TcAgentBridge
             backupList.SelectionChanged += (s, e) => { if (backupList.SelectedItem is Line l) backupDetail.Text = $"{S(l.D, "zip")}\n\n" + string.Join("\n", ((l.D["paths"] as IEnumerable) ?? new object[0]).Cast<object>()); };
             backupList.MouseDoubleClick += (s, e) => DiffBackup(null);
             backupDetail.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
-            DockPanel.SetDock(backupDetail, Dock.Bottom); dp.Children.Add(backupDetail);
-            dp.Children.Add(backupList);
+            backupDetail.Height = double.NaN;
+            // rows that share the height of the window - every list keeps a minimum (before, the backups got no room)
+            var g = new Grid();
+            var parts = new (UIElement Element, GridLength Height, double Min)[] {
+                (tools, GridLength.Auto, 0), (frame, new GridLength(3, GridUnitType.Star), 110), (h, GridLength.Auto, 0),
+                (changes, new GridLength(1.2, GridUnitType.Star), 60), (hb, GridLength.Auto, 0), (bt, GridLength.Auto, 0),
+                (backupList, new GridLength(2, GridUnitType.Star), 90), (null, GridLength.Auto, 0), (backupDetail, new GridLength(1, GridUnitType.Star), 50) };
+            for (int i = 0; i < parts.Length; i++)
+            {
+                g.RowDefinitions.Add(new RowDefinition { Height = parts[i].Height, MinHeight = parts[i].Min });
+                var el = parts[i].Element ?? new GridSplitter { Height = 4, HorizontalAlignment = HorizontalAlignment.Stretch, ResizeDirection = GridResizeDirection.Rows };
+                if (parts[i].Element == null) ((GridSplitter)el).SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+                Grid.SetRow(el, i); g.Children.Add(el);
+            }
             LoadBackups();
-            return historyPage = dp;
+            return historyPage = g;
         }
 
         // ------------------------------------------------------------------ load

@@ -192,6 +192,26 @@ work without the extension. The extension runs **inside** the IDE process and ad
     Command line: `TcAgent.exe knowledgebase list|backup|diff|restore`.
 
   Decisions (apply a proposal, install, pull, promote) are made in the chat – the agent asks you.
+
+  <details><summary>Screenshots of the knowledge window</summary>
+
+  <p><img src="img/knowledge/overview.png" width="900" alt="Overview: runs, first-time-right, failed checks, corrections and the workflows"><br><em>Overview: runs, first-time-right, failed checks, corrections and the workflows</em></p>
+
+  <p><img src="img/knowledge/files.png" width="900" alt="Files: every knowledge file of every level with its status; an item from a source shows locally changed"><br><em>Files: every knowledge file of every level with its status; an item from a source shows locally changed</em></p>
+
+  <p><img src="img/knowledge/sources.png" width="900" alt="Sources: the Git sources and the items installed from them with their state"><br><em>Sources: the Git sources and the items installed from them with their state</em></p>
+
+  <p><img src="img/knowledge/install.png" width="900" alt="Browse and install: what a source offers, with kind, license and scripts"><br><em>Browse and install: what a source offers, with kind, license and scripts</em></p>
+
+  <p><img src="img/knowledge/context-menu.png" width="900" alt="The context menu shows the same actions as the toolbar"><br><em>The context menu shows the same actions as the toolbar</em></p>
+
+  <p><img src="img/knowledge/platforms.png" width="900" alt="Platforms: which platform applies to the project and why"><br><em>Platforms: which platform applies to the project and why</em></p>
+
+  <p><img src="img/knowledge/documentation.png" width="900" alt="Documentation: the sources of tc_docs and the hits of a test search"><br><em>Documentation: the sources of tc_docs and the hits of a test search</em></p>
+
+  <p><img src="img/knowledge/history.png" width="900" alt="History: the workflow runs and the backups of the knowledge"><br><em>History: the workflow runs and the backups of the knowledge</em></p>
+
+  </details>
 - **Documents in the chat** – paste (Ctrl+V), drop or attach (+) manuals, data sheets, screenshots and long texts. Text files
   and Word documents go into the prompt; PDFs and images are read by the agent from the attachments folder.
 - **GitHub Copilot over ACP** – the Copilot backend runs as a persistent session over the open Agent Client Protocol
