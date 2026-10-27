@@ -1032,7 +1032,7 @@ public static class PlainText
         return sb.Append('"').ToString();
     }
 
-    /// <summary>references.json in the format of the SRCI repository: an array of {Name, Version, DistributorName, Namespace},
+    /// <summary>references.json: an array of {Name, Version, DistributorName, Namespace},
     /// 2 blanks indentation, lines joined with "\n" (written with CRLF), no line end after the closing bracket.</summary>
     public static string ReferencesJson(IEnumerable<LibraryRef> refs)
     {

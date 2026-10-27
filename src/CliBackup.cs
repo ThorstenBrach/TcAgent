@@ -1,3 +1,4 @@
+// EXPERIMENTAL - not yet tested against a running PLC.
 // TcAgent command line: runtime data backup and restore (part of Cli, see Cli.cs; the logic is in RuntimeBackup.cs).
 // ADS only, no IDE - for the machine park: one backup file per PLC.
 //

@@ -1457,7 +1457,7 @@ namespace TcAgentBridge
                 }
                 var info = string.Join("; ", strings);
                 infos.Add(info);
-                // exact match "title, version" before substring (RobotLibrary must not match RobotLibrarySysDep)
+                // exact match "title, version" before substring (MyLibrary must not match MyLibrarySysDep)
                 if (exact == null && info.IndexOf(library + ",", StringComparison.OrdinalIgnoreCase) >= 0) exact = ctx;
                 if (hit == null && info.IndexOf(library, StringComparison.OrdinalIgnoreCase) >= 0) hit = ctx;
             }

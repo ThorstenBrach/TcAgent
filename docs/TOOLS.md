@@ -688,7 +688,7 @@ Signatures of a library - also from third-party compiled libraries (requires the
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `library` | string | yes | Library title, e.g. RobotLibrary or Tc2_Standard |
+| `library` | string | yes | Library title, e.g. Tc2_Standard or MyLibrary |
 | `version` | string |  | Version (default: the one resolved in the project, otherwise the newest installed) |
 | `symbol` | string |  | Name of an FB, function or type; method as FB.Method |
 | `filter` | string |  | Outline only for names containing this text (e.g. MC_ or FB) |
@@ -1260,6 +1260,9 @@ Lists runtime symbols via ADS (optionally filtered).
 | `port` | integer |  | ADS port (851) |
 
 ### `tc_backup`
+
+> **Experimental** – not yet tested against a running PLC. Try `backup` and `diff` on a test PLC first; use `restore`
+> only where a wrong value cannot do harm.
 
 Backup and restore of runtime data via ADS – the values that make a machine "this machine": every symbol flagged
 persistent, the `RETAIN`/`PERSISTENT` variables of the code of the open solution (GVLs and programs by path, function

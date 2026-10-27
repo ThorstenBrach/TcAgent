@@ -894,7 +894,7 @@ public static partial class Cli
       installed IDEs, runtime state, Windows, configured knowledge levels - no names, paths or addresses.
 
   TcAgent.exe backup [--target <AmsNetId[,AmsNetId...]>] [--port 851] [--include <patterns>] [--exclude <patterns>] [--out <folder>] [--solution <sln>]
-      Runtime data via ADS: persistent variables, the RETAIN/PERSISTENT variables of the code (with --solution) and the
+      EXPERIMENTAL (not yet tested against a running PLC). Runtime data via ADS: persistent variables, the RETAIN/PERSISTENT variables of the code (with --solution) and the
       include patterns (';'-separated, also .tcagent\backup.json) - one JSON file per PLC. Reading only; no IDE needed.
 
   TcAgent.exe restore --from <file> [--target <AmsNetId>] [--allow <AmsNetId>] [--include <patterns>] [--dry-run] [--while-running]

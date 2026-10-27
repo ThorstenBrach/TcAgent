@@ -250,8 +250,8 @@ The `///` comments in the code are the descriptions of the window and of the rep
   ```
 
 - If the test cases live in a catalog of their own (a document, a YAML file), a small script can write them into the
-  comments and check them in CI – e.g. `tools/case_docs.py` of the SRCI tests writes 443 catalog cases into the
-  comments of 1677 tests.
+  comments and check them in CI – e.g. a script that writes several hundred catalog cases into the comments of the
+  tests and fails the build when a case has no test.
 
 ## 6. What happens during a run
 

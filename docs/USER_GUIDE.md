@@ -438,7 +438,7 @@ mirror of the project that the pipeline keeps up to date.
 project>\<folder>\<name>.st` – TwinCAT's declaration and implementation text, the implementation indented by two
 blanks; after `END_FUNCTION_BLOCK` the methods as `METHOD … END_METHOD`, properties as `PROPERTY …` with
 `GET … END_GET` / `SET … END_SET` and actions as `ACTION A_Reset: … END_ACTION`. Next to the code folders it writes `<PLC project>\references.json` with the
-library references of the project (name, version, distributor, namespace – the format of the SRCI repository).
+library references of the project (name, version, distributor, namespace).
 `action=check` lists files that differ from the project. `action=import dryRun=true`
 shows what an import would change; `action=import` takes the files back into the existing project: changed parts are
 replaced (Ids kept), new methods, properties, actions and new files are created, **nothing is deleted**. When the
@@ -582,7 +582,7 @@ temporary notes belong in rule files.
 
 - *"Which inputs and outputs does MC_MoveAbsolute have?"*
 - *"Show me all MC_Move blocks in Tc2_MC2."*
-- *"What methods does FB_RobotTask of RobotLibrary have? It's a compiled library."*
+- *"What methods does FB_AxisTask of MyLibrary have? It's a compiled library."*
 - *"Which libraries are referenced, with resolved versions?"*
 - *"Add Tc2_Utilities to the PLC project."*
 
@@ -1300,9 +1300,9 @@ the safety logic on the target is not read.
 | `ads_symbols` | Lists runtime symbols (`filter`, for example `MAIN.`) | no |
 | `ads_read` | Reads a variable (`MAIN.nCounter`, `GVL_X.y`) | no |
 | `ads_write` | Writes a variable (value as text, converted to the variable type) | yes |
-| `tc_backup` | Runtime data: `backup` (persistent variables, `RETAIN`/`PERSISTENT` of the code, `include` patterns for recipes – a JSON file per PLC), `list`, `diff` (backup against the PLC now), `restore` (only the values that differ, only existing symbols with the same type, PLC stopped unless `whileRunning`) | restore only |
+| `tc_backup` | *Experimental, not yet tested against a running PLC.* Runtime data: `backup` (persistent variables, `RETAIN`/`PERSISTENT` of the code, `include` patterns for recipes – a JSON file per PLC), `list`, `diff` (backup against the PLC now), `restore` (only the values that differ, only existing symbols with the same type, PLC stopped unless `whileRunning`) | restore only |
 
-**Runtime data backup.** Before a PLC exchange, a new software version or for a second machine of the same kind:
+**Runtime data backup (experimental – not yet tested against a running PLC).** Before a PLC exchange, a new software version or for a second machine of the same kind:
 `tc_backup action=backup` (or `TcAgent.exe backup --target a,b,c` for several PLCs) stores the persistent and retain
 values and everything you name with `include` – or once for the project in `.tcagent\backup.json`. `diff` shows what
 changed since; `restore` writes the differences back after your confirmation. Values of symbols that no longer exist or

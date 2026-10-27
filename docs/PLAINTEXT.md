@@ -34,14 +34,14 @@ by `.plcproj` name or PLC project name, also with ` Project` (`--plc MyPlc` or `
 
 ## references.json
 
-`export` writes the library references of each PLC project to `<folder>\<PLC project>\references.json`, in the format
-of the [SRCI repository](https://github.com/ThorstenBrach/SRCI) (`RobotLibrary\references.json`): UTF-8 without BOM,
-CRLF, 2 blanks indentation, no line end after the closing `]`.
+`export` writes the library references of each PLC project to `<folder>\<PLC project>\references.json` (an array of
+`Name`, `Version`, `DistributorName`, `Namespace`): UTF-8 without BOM, CRLF, 2 blanks indentation, no line end after the
+closing `]`.
 
 ```json
 [
   {
-    "Name": "RobotLibrarySysDep",
+    "Name": "MyLibrarySysDep",
     "Version": "*",
     "DistributorName": "Thorsten Brach",
     "Namespace": null

@@ -1,506 +1,135 @@
 # Changelog
 
 All notable changes to TcAgent (MCP server `TcAgent.exe` and the Visual Studio extension TcAgentBridge).
-Versions follow [Semantic Versioning](https://semver.org/); server and extension share one version number.
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
+[Semantic Versioning](https://semver.org/); server and extension share one version number.
 
 ## [Unreleased]
 
 ## [0.48.1] – 2026-10-27
 
-Release since v0.28.5 - the knowledge of TcAgent in levels and the tools around it, a chat on the Agent Client
-Protocol, a knowledge window to manage everything, backups. The versions 0.29.0 to 0.48.1 were not published
-separately; their notes follow below the highlights.
+Release since v0.28.5: the knowledge of TcAgent in levels (company, user, team, platform, project) with skills,
+workflows and Git sources, self-improvement from run logs, a knowledge window to manage all of it, backups of the
+knowledge, a chat window on the Agent Client Protocol and issue forms with anonymized reports. The internal versions
+0.29.0 to 0.48.0 were not published; their changes are summarized here.
 
-### Highlights
-- **Client neutrality:** `tc_ask_user` for questions in every AI client, `%LOCALAPPDATA%\TcAgent\settings.json` as the
-  single source of settings (its `env` is applied at every start of TcAgent.exe), `AGENTS.md` as the single project guide.
-- **Knowledge levels:** built-in < company < user < team < platform < project for coding rules, risk rules, skills,
-  workflows, lessons, documentation sources and templates; platforms detected from the libraries, one file per topic,
-  `locked`/`force`, `disabled.json`, `tc_knowledge`.
-- **Skills** in the Agent Skills format (built-in: requirements-interview, plc-debugging, plc-code-review), mirrored into
-  the skill folders of the agent CLIs.
-- **Workflows with checkpoints** (built-in `new-feature`), hard gate: `tc_activate` only after a build with 0 errors;
-  `tc_check` before every build.
-- **Self-improvement:** run logs, `tc_improve` (proposals by fixed rules, evaluation over 10 runs, revert, promote).
-- **Sources:** skills, workflows, rules and lessons from Git repositories with `skills.lock.json`, license check,
-  overlay skills, `sources sync` for pipelines; local changes are detected (locally changed / upstream newer / both),
-  compared, reverted, kept as an own version, merged three-way with a newer version or proposed upstream as a pull
-  request; install into every level (a level in Git gets a branch for a pull request).
-- **Knowledge window** in Visual Studio / XAE Shell: Overview, Files, Sources, Platforms, Documentation, Feedback,
-  History - new, add existing, rename, move between levels, delete, switch off, Git (fetch/pull/commit/push), one menu
-  vocabulary in every tab.
-- **Backup and restore of the knowledge** before every change (ZIP with manifest, last 20 per level; Git levels: the
-  uncommitted changes), restore of a level, a file or a skill after a difference and a confirmation
-  (`TcAgent.exe knowledgebase`).
-- **Chat window on ACP** (GitHub Copilot as the first ACP backend), TcUnit window updated live from the chat.
-- **Deterministic first:** `tc_test_skeleton`, checkpoint steps that check themselves.
-- **Feedback and support:** the knowledge window anonymizes `tc_feedback` reports and opens them as a prepared GitHub
-  issue; issue forms with a Diagnostics field (`TcAgent.exe diag`, Copy diagnostics), questions in the Discussions.
-- **Runtime data backup:** `tc_backup` / `TcAgent.exe backup|restore` for persistent and retain variables and recipes
-  via ADS (restore only to allowed targets, confirmed, PLC stopped).
+### Added
 
-### Notes per internal version
+**Client neutrality**
+- `tc_ask_user`: questions of the agent with options (recommended first) and a free answer in every AI client – a card
+  in the TcAgent Chat, the client's own question dialog (MCP elicitation) elsewhere.
+- `%LOCALAPPDATA%\TcAgent\settings.json` as the single source of TcAgent's settings and of the registered server;
+  `setup-clients.ps1` sets up every client from it. TcAgent.exe applies its `env` at every start (a variable set by the
+  client or the pipeline wins).
+- `AGENTS.md` as the single guide file in a project (`CLAUDE.md` and `GEMINI.md` import it).
 
-### 0.48.1 – 2026-10-27
+**Knowledge levels and platforms** ([docs/KNOWLEDGE_LAYERS.md](docs/KNOWLEDGE_LAYERS.md))
+- One scheme for coding rules, risk rules, skills, workflows, lessons, documentation sources and templates on the
+  levels built-in → company (`TCAGENT_COMPANY`) → user → team (`TCAGENT_TEAM`, several with `;`) → platform → project;
+  the later level wins. One file per topic, front matter in the Agent Skills format with `tcagent-locked` /
+  `tcagent-force`, `disabled.json` switches files off without changing them.
+- Platforms (automation frameworks): `<company or user>\platforms\<name>\` or own repositories (`TCAGENT_PLATFORMS`);
+  set in `.tcagent\config.json` or detected from the referenced libraries and terms of `platform.md`, ambiguous → the
+  agent asks.
+- `tc_knowledge` (platforms, effective, why, disable/enable, split), `scope=team|platform:<name>` for the tools that add
+  rules, skills and lessons; a shared level in Git changes by a commit on a new branch for a pull request, never pushed.
 
-#### Fixed
-- Tab History: the list of the backups got no height in a smaller window (only its header was visible) - the
-  chart, the changes, the backups and their details now share the height, each with a minimum, with a splitter.
+**Skills and workflows**
+- Skills in the open Agent Skills format (`<level>\skills\<name>\SKILL.md`), `tc_skills` (list, show, add, mirror),
+  built-in TwinCAT skills `requirements-interview`, `plc-debugging`, `plc-code-review`. The skills that apply everywhere
+  are mirrored into the skill folders of the agent CLIs – by the client setup and at every server start, only what
+  changed (`TCAGENT_SKILL_MIRROR=0` switches it off).
+- Engineering workflows with checkpoints (`<level>\workflows\<name>\WORKFLOW.md`, `check-ok`, `build-ok`, `tests-ok`),
+  `tc_workflow`, built-in workflow `new-feature` (requirements → change plan → code → check → build with 0 errors →
+  tests → review → save). A checkpoint step runs the check itself.
+- Hard gate before `tc_activate`: a build with 0 errors first (`TCAGENT_ACTIVATE_GATE=0` switches it off); the refusal
+  tells the agent to show the errors and ask before changing code.
 
-#### Added
-- User guide: screenshots of the knowledge window (`docs/img/knowledge/`).
+**Self-improvement**
+- Run logs of the workflows, locally in `%LOCALAPPDATA%\TcAgent\runs\` (counts and names only, last 100 runs).
+- `tc_improve`: KPIs per workflow, proposals by fixed rules (step hints, revert, promote lesson, frequent error,
+  duplicate lesson, stale tool), apply after asking, evaluation over the next 10 runs, revert, promote with a check for
+  project and machine names (`privateTerms`).
 
-#### Changed
-- Documentation tab, **Add link or folder …** / **Edit …**: a dialog with the choice link or folder; for a folder or
-  network share **Browse …** opens a folder dialog, for a link the address is checked (https://); comment and level as
-  before.
+**Sources: skills, workflows and rules from Git repositories**
+- `tc_sources` and `TcAgent.exe sources`: add a repository, search, install (license check: MIT, Apache 2.0, BSD, ISC
+  accepted with their notice, source-available and unlicensed refused, others only after confirmation; scripts are
+  listed, never run), status, pull, diff, promote. `<level>\skills.lock.json` pins every item (commit, checksum,
+  license); `TcAgent.exe sources sync` restores exactly these in a pipeline.
+- Overlay skills (`metadata.tcagent-extends`) adapt a general skill without copying it.
+- Install into every level; a level kept in Git gets a commit on a new branch for a pull request.
+- Local changes of installed items: the state locally changed / upstream newer / both changed (checked on opening,
+  refreshing and saving); compare with the installed version (compare window of Visual Studio), revert, keep as own
+  version (`tcagent-detached`), update and merge three-way (conflicts in the merge window of Visual Studio), propose
+  upstream as a pull request (a branch in a working copy of the source plus a patch – pushed only when you confirm, to
+  the source or your fork), uninstall. `tc_sources action=changes|merge|propose|revert|detach|uninstall`.
 
-### 0.48.0 – 2026-10-27
-#### Added
-- Knowledge window, tab Files: **Add existing …** (its own entry instead of a choice inside New …), **Rename …** (files
-  and skill/workflow folders, the name in the header follows; `TcAgent.exe knowledge rename --path --name`), **Copy
-  path**; installed items get **Uninstall …** in Files too.
-- **Copy path** in every list; **Open** / **Open folder** for sources (the repository / TcAgent's local copy), installed
-  items, documentation sources and search hits; **Delete …** for a backup.
-- Search hits of a PDF open on the page of the hit (Acrobat/Reader, Foxit, SumatraPDF, browsers; the page comes from
-  the text extraction).
-- **Backup …** dialog: the levels (checkboxes), the folder (TcAgent's backup folder, changeable), the reason and "Open
-  the folder afterwards"; then a message with every file written and its number of files
-  (`knowledgebase backup --level a,b`).
+**Knowledge window** (View > Other Windows, or ⋯ > Knowledge in the chat)
+- Overview (KPI tiles, workflows, improvement proposals), Files (every knowledge file of every level with its status:
+  new, add existing, open, rename, move to level with name check, switch off/on, delete, copy path; Git per level with
+  fetch, pull, commit, push), Sources (sources and installed items with all actions above, browse and install),
+  Platforms (detection, set for the project, new, delete), Documentation (every source of `tc_docs` with its state:
+  add links, folders and documents, search like the agent with hits that open – PDFs on the page of the hit), Feedback
+  (see below), History (workflow runs, adopted changes, backups), Levels … (company, team and platform folders in
+  `settings.json`).
+- One vocabulary and order in every tab; toolbar and context menu show the same actions; errors as a message.
+- `TcAgent.exe knowledge json|new|move|rename|delete|disable|enable|git|platform|docs|feedback|settings` – the actions
+  of the window for scripts.
 
-#### Changed
-- One vocabulary in every tab, in one order: New … / Add existing … / Open / Open folder / Edit … / Rename … / Move to
-  level … / Switch off · on / Delete … (Del) / Copy path, groups separated by lines ("Remove …" of sources and
-  documentation sources is now "Delete …"; documentation: "Add link or folder …", "Add documents …").
-- Errors are always shown as a message (error icon), hints as a message, everything else in the status line.
+**Backup and restore of the knowledge**
+- Every level is backed up automatically before every change (knowledge window, chat tools, command line) as a ZIP with
+  `manifest.json` (TcAgent version, level, SHA-256 of every file), only when it changed since its last backup, the last
+  20 per level, in `%LOCALAPPDATA%\TcAgent\backups\knowledge\`. A level in Git: its uncommitted changes only.
+- Restore of the whole level, one file or one skill/workflow: the difference first, then the confirmation; the current
+  state is backed up before. **Backup …** / **Restore …** in the knowledge window, `TcAgent.exe knowledgebase
+  list|backup|diff|restore`.
 
-### 0.47.1 – 2026-10-27
-#### Changed
-- Knowledge window: the toolbar and the context menu of every list come from one list of actions - the same entries with
-  the same names in every tab (e.g. "Compare with installed version", "Revert to installed version …", "Uninstall …" in
-  Files and Sources; "Delete …" / "Remove …" with the dots of a confirmation). Hints appear as a message, not only in the
-  status line.
-- **Back up now …** asks for an optional copy in a folder of your choice (`knowledgebase backup --out`) and offers to open
-  the folder; **Restore …** opens a list of all backups, **Restore from a file …** takes a backup ZIP from anywhere (its
-  level comes from the manifest).
-- Tab Documentation: **Add link or folder …** and **Add documents (copy files) …** instead of "Add" and "Copy documents
-  in"; **Edit …** with nothing selected no longer opens the add dialog, on a document folder it opens the folder;
-  **Open knowledge.md** opens the list of the selected source's level or of a level you choose and creates it if
-  missing; **Search like the agent …** lists the hits - double-click opens the document or the page
-  (`knowledge docs --action search --json`).
+**Chat window**
+- The chat speaks the Agent Client Protocol (ACP): a persistent session, live text and tool calls, permission cards,
+  Stop as `session/cancel`. GitHub Copilot is the first ACP backend (`copilot --acp`); `setup-clients.ps1` switches the
+  former Copilot entry over. The stream-json way stays for Claude Code.
+- Copy diagnostics in the ⋯ menu.
 
-### 0.47.0 – 2026-10-27
-#### Added
-- **Backup and restore of the knowledge** (`KnowledgeBackup.cs`, `TcAgent.exe knowledgebase list|backup|diff|restore`):
-  every kind on every level (company, user, team, platform, project) is backed up automatically before every change -
-  knowledge window, chat tools, command line - as a ZIP with `manifest.json` (version, level, SHA-256), only when the
-  level changed, the last 20 per level. Levels in Git: only uncommitted (and ignored) files. Restore of the whole level,
-  one file or one skill/workflow: the difference first, then the confirmation, the current state backed up before.
-  Knowledge window: **Backup …** / **Restore …** in the top bar, the backups in the tab History.
-- Installed items: **Revert …**, **Keep as own version …** (`tcagent-detached`), **Diff** in the compare window of
-  Visual Studio, conflicts of **Update and merge …** in the merge window of Visual Studio (`vsDiffMerge`); the state
-  **⇅ both changed** besides locally changed and upstream newer, in colour in Files and Sources; refreshed when a file of
-  a level is saved in the editor. `tc_sources action=revert|detach`, `TcAgent.exe sources revert|detach`.
-- Install from a source into every level - team, company, platforms; a level kept in Git gets a commit on a new branch
-  for a pull request.
+**Tests and deterministic first** ([docs/DETERMINISTIC_FIRST.md](docs/DETERMINISTIC_FIRST.md))
+- `tc_test_skeleton`: the TcUnit test suite of a function block, generated the same way every time (enable bools,
+  an `InitialOutputs` test, one test per public method with every parameter, naming and folder of the existing
+  suites, `instanceName`).
+- The TcUnit Tests window shows a run started by an AI client live.
 
-#### Changed
-- Installed items on the company level and in platform folders are listed and checked too.
+**Feedback and support**
+- The knowledge window anonymizes `tc_feedback` reports (names of computer, user, solution and projects,
+  `privateTerms`, user folders, paths, IP addresses / AmsNetIds) for editing and opens them as a prepared GitHub issue –
+  you check and send it yourself.
+- `TcAgent.exe diag`: versions of TcAgent, extension, TwinCAT and IDEs, runtime state, Windows, .NET, knowledge levels
+  as a Markdown list without names or paths.
+- GitHub issue forms (bug report, feature request, reports from TcAgent) with a Diagnostics field, questions in the
+  GitHub Discussions, private security reports (`SECURITY.md`).
 
-### 0.46.0 – 2026-10-27
-#### Added
-- **Runtime data backup and restore** (`tc_backup`, `TcAgent.exe backup|restore`, `RuntimeBackup.cs`): persistent
-  variables, the `RETAIN`/`PERSISTENT` variables of the code (GVLs and programs by path, function blocks in every
-  instance) and include patterns for recipes and parameters (also `.tcagent\backup.json`) via ADS into one JSON file per
-  PLC - for several PLCs at once on the command line. `diff` compares a backup with the PLC; `restore` writes only the
-  values that differ, only to symbols that still exist with the same type, only to allowed targets, after confirmation
-  and with the PLC stopped unless `whileRunning`.
-- Sources tab: **Uninstall …** for installed items (also Del and the context menu; a copy goes to the backups);
-  `tc_sources action=uninstall`, `TcAgent.exe sources uninstall`.
+**Runtime data backup – experimental**
+- `tc_backup` / `TcAgent.exe backup|restore`: persistent variables, the `RETAIN`/`PERSISTENT` variables of the code and
+  include patterns (recipes, parameters; `.tcagent\backup.json`) via ADS into one JSON file per PLC; `diff`; `restore`
+  writes only values that differ to symbols that exist with the same type, only to allowed targets, after confirmation
+  and with the PLC stopped unless `whileRunning`. **Experimental: not yet tested against a running PLC.**
 
-### 0.45.0 – 2026-10-27
-#### Added
-- Items installed from sources that you changed: **My changes** (diff against the installed version), **Merge new
-  version …** (preview first, then a three-way merge per file of the newer version of the source into your item - your
-  version is backed up, conflicts are marked with `<<<<<<<`) and **Propose (pull request) …** (your changes as a commit on
-  a new branch of the source without TcAgent's metadata, checked for private terms, plus a patch file; pushed only when
-  you confirm - to the source or your fork - and the pull request page opens). In the Sources tab and in the context menu
-  of the Files tab.
-- `tc_sources action=changes|merge|propose` and `TcAgent.exe sources changes|merge|propose|push` (`SourcesMerge.cs`).
+### Changed
+- Coding workflows end with a build with 0 errors, always preceded by `tc_check` (a pre-compile without code
+  generation); the guidance of every agent says so.
+- Agents change code only when the user asked for a change; errors found on the way are reported and the user is
+  asked.
+- `tc_coding_rules` shows the level of every rule file and the platform of the project and lists skills and workflows.
+- Documentation sources are read from every level including the team levels; `tc_docs action=sources` shows level and
+  state; `tc_docs_add` refuses entries that are neither a URL nor a folder.
+- `TCAGENT_LESSONS` keeps working; `TCAGENT_TEAM\lessons\` replaces it.
+- TcAgentBridge serves several requests at once; messages name no single AI product.
+- `setup-clients.ps1` writes a configuration only when it changes and keeps the first and the last 3 backups per file.
 
-#### Changed
-- Tab Files: an item from a source shows **✎ changed** or **↑ newer** in the column Source (orange mark when changed).
-
-### 0.44.0 – 2026-10-27
-#### Added
-- Knowledge window, tab **Documentation**: every source of `tc_docs` – Beckhoff InfoSys, the links, folders and network
-  shares of the `knowledge.md` of every level, `TCAGENT_KNOWLEDGE` and the document folders `knowledge\` – with type,
-  level, state (documents found, pages already read, not reachable within 4 s) and the file it is defined in. Add to a
-  level, edit, remove, copy documents in, open, open the `knowledge.md`, test search.
-- `TcAgent.exe knowledge docs --action list|add|remove|copy|search` - the same for scripts.
-
-#### Changed
-- `tc_docs action=sources` shows the level and the state of every source.
-- Documentation sources are read from the team levels too (before: company, platform, user and project only).
-- `tc_docs_add` refuses a source that is neither a URL nor a folder or network path (before it was listed but never read).
-
-### 0.43.0 – 2026-10-26
-#### Added
-- `TcAgent.exe diag`: TcAgent, the extension registered by setup, TwinCAT, the installed IDEs, the runtime state of this
-  PC, Windows, .NET and the configured knowledge levels as a Markdown list for issue reports - no names, paths or
-  addresses. **Copy diagnostics** in the chat menu ⋯ and in the knowledge window (tab Feedback) adds the extension
-  version and the IDE the window runs in and copies the block.
-- Feedback reports of the knowledge window end with this Diagnostics block (anonymized like the rest).
-
-#### Changed
-- Issue forms: one required Diagnostics field instead of the separate version fields; the bug report asks where the
-  problem is (tool, decision of the agent, IDE/TwinCAT) and how TcAgent ran (interactive, command line/pipeline);
-  bug report and feature request have a check for existing issues; the feature request asks whether you can help.
-  New issues get the label `needs-triage`.
-- Questions moved from the issues to the GitHub Discussions (category Q&A, with a form); the issue chooser links there
-  and to the private security report. `SECURITY.md` says what a report should contain.
-
-### 0.42.6 – 2026-10-26
-#### Changed
-- Issue templates: TcAgent version and the version of the TcAgent extension (bridge) are required fields of bug report
-  and question - after an update the two can differ. The fields are in a fixed order: description, then versions, then
-  the AI client.
-- Knowledge window, tab Feedback: the report text fills in the bridge version, the TwinCAT version (registry) and the IDE
-  with its version (the running Visual Studio or XAE Shell) by itself.
-
-### 0.42.5 – 2026-10-26
-#### Changed
-- Issue templates: TwinCAT version, IDE (Visual Studio 2022/2019, XAE Shell 64-bit/32-bit) and IDE version as required fields
-  of bug report and question, the AI client as a field of its own; the feature request asks for them optionally. The
-  feedback text of the knowledge window has the lines for TwinCAT and IDE version to fill in.
-
-### 0.42.4 – 2026-10-26
-#### Added
-- Issue template **Question** (question, what you tried, area, version, environment; label `question`). Bug report: field
-  *Reproducible* (always / sometimes / once); feature request: *Importance for you* and the TcAgent version; feedback
-  template: environment line.
-
-### 0.42.3 – 2026-10-26
-#### Added
-- **GitHub issue templates** (`.github/ISSUE_TEMPLATE`): bug report and feature request as issue forms (tool, what happened,
-  expected, steps, workaround, severity, version, environment, log, a check that the report is anonymized), a template
-  for reports from TcAgent (`tcagent_feedback.md`, label `feedback`) and a chooser without blank issues.
-- The knowledge window shares a report with that template and a label by its type (bug, enhancement, documentation).
-
-### 0.42.2 – 2026-10-26
-#### Added
-- Knowledge window: context menus in Platforms (open, open folder, new, set for the project, detect, **delete** an own
-  platform - also with Del), Sources (browse & install, edit, remove - Del, add; installed: diff, check for updates, update
-  all) and Feedback (share, copy, save, set status, anonymize again).
-
-### 0.42.1 – 2026-10-26
-#### Added
-- Knowledge window: the company definition of a platform (`<company>\platforms\<name>`) as a level of its own for New, Add
-  existing and Move ("platform · <name> (company)"); **New platform** can be defined at the company level. **Levels …**
-  moved to the top bar (visible in every tab).
-
-### 0.42.0 – 2026-10-26
-#### Added
-- **Knowledge window, Levels …:** set the company level, the team level(s) and platform repositories (`TCAGENT_COMPANY`,
-  `TCAGENT_TEAM`, `TCAGENT_PLATFORMS`) - stored in `settings.json`; Set up clients passes them on to the AI clients.
-- **New / Add existing / Move offer every level:** user, project, team(s), company and every known platform (also one that
-  does not apply to the open project). A company or team level kept in Git gets the file in its working copy - commit and
-  push it in the Git bar (the push goes to a new branch for a pull request); the original of a move stays until it is merged.
-
-#### Changed
-- **TcAgent.exe reads `settings.json` \"env\" on every start** (MCP server, command line, the windows of the extension) - where
-  the environment does not set a variable already (a client configuration or a pipeline wins). Before, the knowledge
-  window did not see the company and team levels the AI clients got through their configuration.
-
-### 0.41.4 – 2026-10-26
-#### Added
-- Knowledge window, **New …**: create a new file from a template **or add an existing file** - a Markdown file (rule, risk
-  rule, lesson) is copied into the folder of its kind, a skill or workflow with its whole folder (pick its `SKILL.md` /
-  `WORKFLOW.md`; the name comes from its front matter). `TcAgent.exe knowledge new --key <kind>/x --path <file> --level <level>`.
-
-### 0.41.3 – 2026-10-26
-#### Fixed
-- Knowledge window: a new platform, skill, workflow or source with capitals or spaces in its name ("My Framework") was
-  refused with a message in the status line only. Names are now made valid (`my-framework`), and a failed action
-  (new, move, delete, add source) is shown as a dialog.
-
-### 0.41.2 – 2026-10-26
-#### Fixed
-- A test run started from the chat blocked the IDE for about 250 ms per event: the bridge handled every event of the run
-  synchronously on the UI thread. The events are now handed over without waiting (background priority) - the run does not
-  slow the IDE down, the TcUnit Tests window catches up when the UI is idle.
-
-### 0.41.1 – 2026-10-26
-#### Fixed
-- Knowledge window: the platform line next to the tabs opens the Platforms tab; an error while showing a page or filling
-  the data is shown in the status bar and written to `bridge.log` instead of leaving the page unchanged.
-
-### 0.41.0 – 2026-10-26
-#### Added
-- **Knowledge window, Sources:** add, edit and remove sources; **Browse & install** shows what a source offers with kind
-  and license and installs after a confirmation that lists license, files and scripts; Check for updates, Update all, Diff.
-- **Knowledge window, Platforms:** the platforms with their detection (libraries, terms), which apply to the project and
-  why, the libraries of the project; New, Open platform.md, Open folder, Set for this project, Detect automatically.
-- **Knowledge window, Feedback:** the `tc_feedback` reports; the selected ones as an anonymized issue text (names of
-  computer, user, solution and projects, `privateTerms`, user folders, solution and network paths, IP addresses /
-  AmsNetIds replaced) that can be edited, copied, saved and shared with the TcAgent developers as a new issue in the
-  browser (sent by the user; `feedbackUrl` in `settings.json`); Set status.
-- CLI for the window: `TcAgent.exe sources add|remove|search|install|pull|diff`, `knowledge feedback --action issue|resolve`,
-  `knowledge platform --action new|set|auto`.
-
-### 0.40.0 – 2026-10-26
-#### Added
-- **Knowledge window, tab Files** (formerly Effective): filter by level; **New …** (rule, risk rule, skill, workflow or lesson
-  from a template, opened in the editor), **Open folder**, **Move to level …** (name check when moving up; company and a
-  team in Git as a commit on a new branch for a pull request), **Delete** (Del key; own levels only), all of it also in the
-  context menu.
-- **Git in the knowledge window:** per level kept in a Git repository the local changes, commits to push and new commits
-  in the repository (as of the last fetch), with Fetch, Pull (fast-forward), Commit and Push - a company or team level
-  pushes to a new branch for a pull request; column Git per file.
-- `TcAgent.exe knowledge new|move|delete|git` (`--key`, `--path`, `--level`, `--action`, `--message`) -
-  `KnowledgeOps.cs`, tests `KnowledgeOpsTests`.
-
-### 0.39.9 – 2026-10-26
-#### Changed
-- **Skill mirror stays current by itself:** whenever the TcAgent server starts it mirrors the skills that apply everywhere
-  (built-in, company, user, team) into the skill folders of the agent CLIs, in the background. Only changed skills are
-  copied (folder checksum); a copy that was edited by hand is restored from its source. `TCAGENT_SKILL_MIRROR=0` switches
-  it off. Copies, not links: shared levels on network drives, no writes into the source by an agent, no broken links
-  after an update.
-
-### 0.39.8 – 2026-10-26
-#### Fixed
-- **Set up clients** created a backup of every touched configuration file on every run (hundreds of identical
-  `*.bak-*` files). A file is now written only when its content changes, a backup only then, and per file the very first
-  backup (the state before TcAgent) and the last 3 are kept.
-
-### 0.39.7 – 2026-10-26
-#### Fixed
-- **Chat after a TcAgent update:** a running chat session kept talking to the TcAgent server it started with (e.g. 0.39.2
-  after installing a newer version), so fixes of the new version did not apply. Before the next question the chat now
-  compares the registered server version with the one of the session and starts the session again with the new server
-  (with a note in the chat).
-
-### 0.39.6 – 2026-10-26
-#### Changed
-- **Code changes only when asked:** asked to activate, an agent found the compiler error with its own `tc_check` and fixed
-  it without asking (the gate never came into play). The chat prompt and the TcAgent guide now say: change code only when
-  the user asked for a change; errors found on the way to something else are reported and the user is asked.
-
-### 0.39.5 – 2026-10-26
-#### Changed
-- **Activation gate:** after the refusal an agent fixed the code on its own and activated again. The refusal, the
-  description of `tc_activate` and the TcAgent guide now say it clearly: show the errors and ask the user before changing
-  any code - the user asked for an activation, not for a code change.
-
-### 0.39.4 – 2026-10-26
-#### Fixed
-- **TcUnit Tests window and runs from the chat:** a run started by an AI client (`tc_test_run`) was not shown in the
-  window. TcAgent now forwards every event of the run to the window of this IDE (TcAgentBridge command `tcunit_event`):
-  progress, running test, results and the final state appear live, as for a run started in the window; the window opens
-  without taking the focus if it was closed. Cancel stays with the AI client.
-
-### 0.39.3 – 2026-10-26
-#### Added
-- `tc_test_skeleton instanceName`: the name of the instance under test (default `fbUnderTest`), so the generated tests
-  follow the naming of the coding rules.
-
-### 0.39.2 – 2026-10-26
-#### Fixed
-- `tc_test_skeleton` (found in the first real use): every method parameter (`VAR_INPUT` and `VAR_IN_OUT`) gets a local
-  variable and is passed - a call without a required input does not compile. The suite name follows the existing suites
-  (e.g. `<FB>TestSuiteFB`, a trailing `FB` of the block dropped), the default folder is the one of the existing suites
-  or a folder `Tests`/`Test` instead of the folder of the function block (which may be library source).
-
-### 0.39.1 – 2026-10-26
-#### Fixed
-- Chat window: changes of `chat-backends.json` (e.g. by **Set up clients**, which switches Copilot to ACP) took effect only
-  after restarting Visual Studio - the window kept the backends it read when it was created. It now reads the file again
-  after the setup and before every question, and restarts a running session whose backend settings changed.
-- The `new-feature` workflow description names check and build with 0 errors.
-
-### 0.39.0 – 2026-10-26
-#### Changed
-- **Coding workflows end with a build with 0 errors, always preceded by a check.** The built-in `new-feature` workflow has
-  a `check` step (`tc_check` until clean - a pre-compile without code generation, much faster) and then the checkpoint
-  `build` (`requires: build-ok`). When the agent marks the build step done, TcAgent runs `tc_check` first and `tc_build`
-  only if the check is clean; with check errors it reports them without building - several failed builds cost far more
-  time than several checks.
-- Guidance for every agent (tool description of `tc_build`, TcAgent guide, chat prompt, user guide): run `tc_check`
-  before every `tc_build`.
-
-### 0.38.0 – 2026-10-26
-#### Added
-- **Chat window on the Agent Client Protocol (ACP)**: backend format `"acp"` (`vsbridge/ChatAcp.cs`) - a persistent
-  session per backend (`initialize`, `session/new` with the solution folder and the tcagent MCP server, `session/prompt`),
-  the answer streams live (text chunks, one line per tool call, failed tool calls), context usage in the status line,
-  permission requests of the agent as permission cards (allow once / always for this session / deny), **Stop** sends
-  `session/cancel` and keeps the session open. A missing sign-in is reported with the agent's own hint.
-- **GitHub Copilot** is the first ACP backend: `copilot --acp --no-ask-user --allow-tool tcagent` (questions to the user
-  go through `tc_ask_user`). `setup-clients.ps1` switches the former one-shot Copilot entry of `chat-backends.json` to ACP
-  (also in the indented layout; a backup is kept).
-
-#### Changed
-- The permission card names the asking agent instead of always "Claude".
-
-### 0.37.0 – 2026-10-26
-#### Added
-- **Team level** between the user and the platform: `TCAGENT_TEAM` - a shared folder or Git repository per team
-  (several separated by `;`, shown as `team · <folder>`). Order: built-in → company → user → team → platform → project.
-  For coding rules, risk rules, skills, workflows, lessons, knowledge and templates; skills of the team level are also
-  mirrored into the agent CLIs.
-- `scope=team` for `tc_coding_rules_add`, `tc_skills add`, `tc_lessons add` and `tc_sources install` (a plain shared
-  folder directly; a team in Git only by promoting) and for promoting (`tc_sources promote`, `tc_improve apply`
-  promote-lesson): a team in Git gets a commit on a new branch for a pull request, never pushed.
-- A locked team file can be switched off by the team itself (its `disabled.json`) or the company, not by a user or a
-  project. Tests in `KnowledgeLayersTests`.
-
-#### Changed
-- `TCAGENT_LESSONS` (the former team lessons file) keeps working; `TCAGENT_TEAM\lessons\` replaces it.
-- Concept: checkpoints belong to the step of a workflow (coding workflows end with 0 compiler errors, other workflows
-  define their own); only the gate before `tc_activate` is global.
-
-### 0.36.0 – 2026-10-26
-#### Added
-- **Deterministic first** ([docs/DETERMINISTIC_FIRST.md](docs/DETERMINISTIC_FIRST.md)): what TcAgent already does
-  without the agent, the conversions of this version and a list of candidates with effort and benefit.
-- **`tc_test_skeleton`**: the TcUnit test suite of a function block, generated the same way every time - enable bools of
-  the TcUnit Tests window, a complete `InitialOutputs` test (every output against its initial value) and one test per
-  public method with an assertion that fails until the TODO is replaced; `VAR_IN_OUT` parameters get local variables.
-  Tests: `TestSkeletonTests`.
-
-#### Changed
-- **`tc_workflow action=step` on a checkpoint** whose check is missing or failed: TcAgent runs `tc_check` / `tc_build`
-  itself and completes the step if it passes (before: refused, the agent had to check and call again).
-- **`tc_workflow action=finish`** lists the PLC objects written during the run (`tc_plc_write`, `tc_plc_create`,
-  `tc_test_skeleton`) - only in the summary, not in the run log.
-
-### 0.35.0 – 2026-10-26
-#### Added
-- **Window "TcAgent Knowledge"** in Visual Studio / XAE Shell (View > Other Windows, or **⋯ > Knowledge** in the chat):
-  - **Overview** - KPI tiles (runs, first-time-right, failed checks, corrections and minutes per run, gate stops; the last
-    10 runs against the 10 before, sparkline), the workflows, open improvement proposals, most frequent compiler errors.
-  - **Effective** - every coding rule, risk rule, skill, workflow, lesson and template of every level with status and
-    reason; open the file, switch it off for the project or the user, switch it on.
-  - **Sources** - Git sources and installed items (commit, license, changed locally, newer upstream).
-  - **History** - failed checks and corrections per run, moving average, adopted changes as markers, before/after of
-    every change; export as CSV.
-- **`TcAgent.exe knowledge json|disable|enable [--key <kind/name>] [--level user|project] [--solution <sln>]`** - the
-  data of the window (files only, no IDE); the window itself does no work.
-- README: rows for skills & workflows, self-improvement and skill sources.
-
-### 0.34.0 – 2026-10-26
-#### Added
-- **Knowledge sources** (`tc_sources`): Git repositories as sources of skills, workflows, coding rules, risk rules and
-  lessons - `add`/`remove` (in `<level>\sources.json`), `search`, `install` (personal, project, platform), `status`,
-  `pull`, `diff`, `promote` (own item one level up after the name check; company as a commit on a new branch for a pull
-  request, never pushed). A clone per source in `%LOCALAPPDATA%\TcAgent\sources\`.
-- **Lock file** `<level>\skills.lock.json`: source, URL, path, commit, checksum and license per installed item; updates
-  only by `pull`. **`TcAgent.exe sources status|sync [--solution] [--dry-run]`** restores the pinned items in a pipeline
-  (`--dry-run` only checks, exit code 1 on a difference).
-- **License check** on install and pull: MIT, Apache 2.0, BSD, ISC, public domain accepted (notice copied along);
-  source-available and unlicensed refused; others only with `acceptLicense`. Scripts of a skill are listed, never run.
-- **Overlay skills**: `metadata.tcagent-extends: <skill>` - `tc_skills show` returns the extended skill first, then the
-  additions. `tc_skills show` names source and license of an installed skill.
-- Tests: `SourcesTests` (local Git repositories, no network).
-
-### 0.33.0 – 2026-10-26
-#### Added
-- **Run logs** of the workflows, locally in `%LOCALAPPDATA%\TcAgent\runs\<solution>\` (never in Git): workflow,
-  duration, failed checks per step with the compiler error codes, checkpoint and activate stops, user corrections (a "no"
-  to a confirmation, an answer other than the recommended option of `tc_ask_user`), skills used - counts and names only.
-  The last 100 runs are kept, older ones are added up in `summary.json`.
-- **`tc_improve`**: `runs` (KPIs per workflow: first-time-right, failed checks, corrections, minutes, trend of the last
-  10 runs, most frequent compiler errors), `analyze` (proposals by fixed rules: `step-hint`, `revert`,
-  `promote-lesson`, `frequent-error`, `duplicate-lesson`, `stale-tool`), `apply` (shows the change and asks the user;
-  step hints go into a copy of the workflow, lessons move up to personal / platform / company - company as a commit on a
-  new branch for a pull request, never pushed), `history` (every adopted change with the values before and over the
-  next 10 runs), `revert`.
-- **Name check** before anything moves up or into a hint: names of the computer, user, solution and projects plus
-  `privateTerms` (`settings.json`, `.tcagent\config.json`).
-- Tests: `ImproverTests`.
-
-#### Fixed
-- User guide: the lesson scopes show the folders (one file per lesson) of 0.30.
-
-### 0.32.0 – 2026-10-26
-#### Added
-- **Engineering workflows** (`<level>\workflows\<name>\WORKFLOW.md`, same levels and platform as skills): the steps are
-  the numbered list of the body, `1. **id** (requires: check-ok) – text`. Checkpoints `check-ok`, `build-ok`, `tests-ok`
-  are enforced by TcAgent - a checkpoint step can neither be marked done before its check holds nor be skipped.
-- **`tc_workflow`**: `list`, `show`, `start`, `step` (`skip`), `status`, `finish` (`abort`). A run counts failed checks,
-  checkpoint stops and activate stops per step (the base for the run logs). `tc_coding_rules` also lists the workflows;
-  `tc_knowledge` knows the kind `workflows`.
-- **Built-in workflow `new-feature`**: requirements (skill `requirements-interview`) → change plan → code → check
-  (`check-ok`) → tests (recommended) → review (skill `plc-code-review`) → save.
-- Tests: `WorkflowsTests`.
-
-#### Changed
-- **Hard gate before `tc_activate`**: TcAgent builds first (without "check all objects") and refuses the activation with
-  build errors - before anybody is asked to confirm it. Saving stays allowed with errors. `TCAGENT_ACTIVATE_GATE=0`
-  switches the gate off.
-
-### 0.31.0 – 2026-10-26
-#### Added
-- **Skills** in the open Agent Skills format (`<level>\skills\<name>\SKILL.md`), from the levels built-in, company, user,
-  platform and project – a later level replaces a skill with the same name, `locked` / `disabled.json` as for the rules.
-- **`tc_skills`**: `list`, `show`, `add` (name rules of the standard checked), `mirror`. `tc_coding_rules` ends with the
-  list of skills (name + description); the agent loads a skill only when the task fits.
-- **Built-in TwinCAT skills** (shipped in `knowledge\skills` next to `TcAgent.exe`; the methods of well-known open-source
-  skills adopted, the content written for TwinCAT and the TcAgent tools): `requirements-interview`, `plc-debugging`,
-  `plc-code-review`.
-- **Mirror into the agent CLIs**: `TcAgent.exe skills mirror` (run by `setup-clients.ps1`) copies the skills that apply
-  everywhere into `%USERPROFILE%\.claude\skills` and `%USERPROFILE%\.agents\skills` (or `skillMirrors` in
-  `settings.json`). Only folders TcAgent created there (`.tcagent-mirror`) are updated or removed.
-- `TcAgent.exe skills list|mirror [--solution <sln>] [--dry-run]`. Tests: `SkillsTests`.
-
-### 0.30.0 – 2026-10-26
-Knowledge layers ([KNOWLEDGE_LAYERS.md](docs/KNOWLEDGE_LAYERS.md)): one scheme for coding rules, risk rules, lessons,
-knowledge sources and documentation templates.
-
-#### Added
-- **Levels × platform**: company (`TCAGENT_COMPANY` – a network share or Git repository), user (`%LOCALAPPDATA%\TcAgent`),
-  **platform** (the automation framework a project is built on: `<company or user>\platforms\<name>\`, or a repository of
-  its own in `TCAGENT_PLATFORMS`) and project (`<solution>\.tcagent`). Order: company → user → company·platform →
-  user·platform → project, the later one wins.
-- **Platform of a project**: `.tcagent\config.json` `{"platforms": [...]}`, otherwise detected from the referenced
-  libraries or terms listed in the platform's `platform.md`. Ambiguous → `tc_coding_rules` tells the agent to ask the user
-  (`tc_ask_user`) and to store the answer (`tc_knowledge action=set_platform`).
-- **One file per topic / lesson**: `coding-rules\<topic>.md`, `risk-rules\<topic>.md`, `lessons\<date>-<title>.md` (new
-  lessons and new rules are written this way – no merge conflicts in Git); the former single files are still read.
-- **Front matter in the Agent Skills format** with TcAgent's fields under `metadata`: `tcagent-locked` (a later level can
-  neither replace nor switch off the file), `tcagent-force` (a user file stays against a platform file).
-  `tc_coding_rules_add force=true` writes it – after the agent pointed out the contradiction and the user confirmed.
-- **`disabled.json`** per level switches files off without changing them.
-- **`tc_knowledge`**: `platforms`, `set_platform`, `list`, `effective` (what applies here and why), `why`, `disable` /
-  `enable`, `split` (a former single file → one file per topic, after asking). Tests: `KnowledgeLayersTests`.
-- Lessons: new scope `platform:<name>`; `tc_coding_rules_add scope=platform:<name>`.
-
-#### Changed
-- `tc_coding_rules` shows the level of every rule file (company, user, platform, project; locked, forced) and the
-  platform of the project.
-- Knowledge sources and documentation templates also come from the company and platform levels.
-
-### 0.29.0 – 2026-10-26
-Client neutrality, part 1 – TcAgent works the same with every AI client (concept: `docs/KNOWLEDGE_LAYERS.md`).
-
-#### Added
-- **`tc_ask_user`**: the agent asks the user when a decision or missing information blocks the work – 1-4 questions with
-  options (recommended first) and a free answer, in **every** AI client. From the TcAgent Chat: a question card in the
-  chat window; other clients: their own question dialog (MCP elicitation), the card in the IDE as fallback; without any
-  channel the agent is told to ask in its reply. The chat prompt and the guide tell the agent to use it instead of
-  ending a reply with a question (the chat still answers a CLI's own question tool). Tests: `AskQuestionsTests`.
-- **`%LOCALAPPDATA%\TcAgent\settings.json`** – the single source of TcAgent's settings (`TCAGENT_*` environment variables)
-  and of the registered server (path and version). `setup-clients.ps1` sets up every client from it; on the first run
-  the values are taken over once from an existing client configuration (any client, not only one product). The VS
-  extension reads the registered version from there.
-
-#### Changed
-- **`AGENTS.md` is the single guide file in the project** (`setup-clients.ps1 -SolutionDir`): `CLAUDE.md` and
-  `GEMINI.md` only import it (`@AGENTS.md`), `.github\copilot-instructions.md` points to it.
-- Messages name no single AI product any more ("quit desktop apps completely" instead of one product's name).
-- TcAgentBridge serves several requests at once (pipe with 4 instances): a question waiting for the user no longer
-  blocks other calls.
+### Fixed
+- A running chat session kept talking to the server it started with after a TcAgent update; it now restarts with the
+  new server. Changes of `chat-backends.json` take effect without restarting Visual Studio.
+- A test run started from the chat blocked the IDE briefly for every event.
+- `tc_test_skeleton` left out required inputs, which did not compile.
+- Names with capitals or spaces (platform, skill, source) were refused with a message in the status line only.
+- The backup list in the History tab got no height in a smaller window.
 
 ## [0.28.5] – 2026-10-25
 
@@ -682,7 +311,7 @@ Client neutrality, part 1 – TcAgent works the same with every AI client (conce
   - A `// @implementation` line separates declaration and implementation where the split is ambiguous; graphical bodies
     (SFC, LD, FBD, CFC) appear as `// @implementation SFC - ...` and stay untouched. Format: `docs/PLAINTEXT.md`.
 - **references.json** – `st export|check` and `tc_plaintext` also write/compare `<folder>\<PLC project>\references.json`
-  with the library references of each PLC project, in the format of the SRCI repository (`Name`, `Version`,
+  with the library references of each PLC project (`Name`, `Version`,
   `DistributorName`, `Namespace`; UTF-8 without BOM, CRLF, 2 blanks indentation). Placeholders from
   `<DefaultResolution>`, overridden by a project-specific `<PlaceholderResolution>` (the library TwinCAT really uses);
   library references from `Include` (`newest` → `*`); `Namespace` is `null` when it equals the name; placeholder

@@ -322,7 +322,7 @@ public sealed partial class ToolRegistry
             });
 
         Add("tc_lib_signatures", "Signatures of a library - also from third-party compiled libraries - (requires the VS extension TcAgentBridge). Without symbol: outline (one line per FB/function/type, with EXTENDS and number of inputs/outputs). With symbol: interface as ST declaration incl. inherited inputs/outputs, methods and doc comments. The result is cached per library version.",
-            Schema(Req(P("library", "string", "Library title, e.g. RobotLibrary or Tc2_Standard")),
+            Schema(Req(P("library", "string", "Library title, e.g. Tc2_Standard or MyLibrary")),
                    P("version", "string", "Version (default: the one resolved in the project, otherwise the newest installed)"),
                    P("symbol", "string", "Name of an FB, a function, a type; method as FB.Method"),
                    P("filter", "string", "Outline only for names containing this text (e.g. MC_ or FB)"),
@@ -496,7 +496,7 @@ public sealed partial class ToolRegistry
             });
 
         // runtime data: persistent/retain variables and recipes (RuntimeBackup.cs)
-        Add("tc_backup", "Backup and restore of runtime data via ADS: persistent variables, the RETAIN/PERSISTENT variables of the code and " +
+        Add("tc_backup", "EXPERIMENTAL (not yet tested against a running PLC - say so to the user). Backup and restore of runtime data via ADS: persistent variables, the RETAIN/PERSISTENT variables of the code and " +
                          "include patterns (recipes, parameters; also .tcagent\\backup.json). action=backup (a JSON file per PLC), list (the backups), " +
                          "diff (backup against the PLC now, nothing written), restore (writes the values that differ - only existing symbols with the " +
                          "same type; allowed targets only, the user confirms, the PLC must be stopped unless whileRunning). Read-only for backup/list/diff.",

@@ -16,20 +16,20 @@ public sealed class PlainTextRepositoryTests : IDisposable
 
     static readonly (string Folder, string Name, string Ext, string Xml, string St)[] Objects =
     {
-        (@"POUs\_internal\Recv", "RobotLibraryResponseDataFB", ".TcPOU", ResponseDataFbXml, ResponseDataFbSt),
-        (@"Interfaces", "IRobotLibraryCommandFB", ".TcIO", CommandItfXml, CommandItfSt),
+        (@"POUs\_internal\Recv", "MyLibraryResponseDataFB", ".TcPOU", ResponseDataFbXml, ResponseDataFbSt),
+        (@"Interfaces", "IMyLibraryCommandFB", ".TcIO", CommandItfXml, CommandItfSt),
         (@"Functions\Swap", "SwapIecTime", ".TcPOU", SwapFunctionXml, SwapFunctionSt),
         (@"Enumerations\Flag", "SequenceFlagEnum", ".TcDUT", AliasDutXml, AliasDutSt),
-        (@"Constants", "RobotLibraryDefines", ".TcGVL", DefinesGvlXml, DefinesGvlSt),
+        (@"Constants", "MyLibraryDefines", ".TcGVL", DefinesGvlXml, DefinesGvlSt),
     };
 
     public PlainTextRepositoryTests()
     {
-        Directory.CreateDirectory(Path.Combine(Sln, "RobotLibrary"));
-        File.WriteAllText(Path.Combine(Sln, "RobotLibrary", "RobotLibrary.plcproj"), Crlf(PlcProj), new UTF8Encoding(true));
+        Directory.CreateDirectory(Path.Combine(Sln, "MyLibrary"));
+        File.WriteAllText(Path.Combine(Sln, "MyLibrary", "MyLibrary.plcproj"), Crlf(PlcProj), new UTF8Encoding(true));
         foreach (var o in Objects)
         {
-            var path = Path.Combine(Sln, "RobotLibrary", "Library", o.Folder.Replace('\\', Path.DirectorySeparatorChar), o.Name + o.Ext);
+            var path = Path.Combine(Sln, "MyLibrary", "Library", o.Folder.Replace('\\', Path.DirectorySeparatorChar), o.Name + o.Ext);
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             File.WriteAllText(path, Crlf(o.Xml), new UTF8Encoding(true));
         }
@@ -43,7 +43,7 @@ public sealed class PlainTextRepositoryTests : IDisposable
     static string Crlf(string s) => s.Replace("\r\n", "\n").Replace("\n", "\r\n");
 
     string StPath((string Folder, string Name, string Ext, string Xml, string St) o) =>
-        Path.Combine(Out, "RobotLibrary", "Library", o.Folder.Replace('\\', Path.DirectorySeparatorChar), o.Name + ".st");
+        Path.Combine(Out, "MyLibrary", "Library", o.Folder.Replace('\\', Path.DirectorySeparatorChar), o.Name + ".st");
 
     [Fact]
     public void Export_writes_the_reference_text_byte_identical()
@@ -83,9 +83,9 @@ public sealed class PlainTextRepositoryTests : IDisposable
         File.WriteAllText(StPath(o), Crlf(o.St + "\n").Replace("PayloadPtr < UDINT_TO_DINT(PayloadLen );", "PayloadPtr < UDINT_TO_DINT(PayloadLen);"), new UTF8Encoding(false));
         var imp = PlainText.Import(Sln, new List<string>(), Out);
         Assert.Empty(imp.Errors);
-        Assert.Contains(imp.Lines, l => l.Contains("changed RobotLibraryResponseDataFB.IsPayloadRemaining.Get (implementation)"));
+        Assert.Contains(imp.Lines, l => l.Contains("changed MyLibraryResponseDataFB.IsPayloadRemaining.Get (implementation)"));
         PlainText.WriteFiles(imp);
-        var xml = File.ReadAllText(Path.Combine(Sln, "RobotLibrary", "Library", "POUs", "_internal", "Recv", "RobotLibraryResponseDataFB.TcPOU"));
+        var xml = File.ReadAllText(Path.Combine(Sln, "MyLibrary", "Library", "POUs", "_internal", "Recv", "MyLibraryResponseDataFB.TcPOU"));
         Assert.Contains("<![CDATA[IsPayloadRemaining := PayloadPtr < UDINT_TO_DINT(PayloadLen);]]>", xml);
     }
 
@@ -93,13 +93,13 @@ public sealed class PlainTextRepositoryTests : IDisposable
         <?xml version="1.0" encoding="utf-8"?>
         <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
           <PropertyGroup>
-            <Name>RobotLibrary</Name>
+            <Name>MyLibrary</Name>
           </PropertyGroup>
           <ItemGroup>
-            <Compile Include="Library\POUs\_internal\Recv\RobotLibraryResponseDataFB.TcPOU">
+            <Compile Include="Library\POUs\_internal\Recv\MyLibraryResponseDataFB.TcPOU">
               <SubType>Code</SubType>
             </Compile>
-            <Compile Include="Library\Interfaces\IRobotLibraryCommandFB.TcIO">
+            <Compile Include="Library\Interfaces\IMyLibraryCommandFB.TcIO">
               <SubType>Code</SubType>
             </Compile>
             <Compile Include="Library\Functions\Swap\SwapIecTime.TcPOU">
@@ -108,7 +108,7 @@ public sealed class PlainTextRepositoryTests : IDisposable
             <Compile Include="Library\Enumerations\Flag\SequenceFlagEnum.TcDUT">
               <SubType>Code</SubType>
             </Compile>
-            <Compile Include="Library\Constants\RobotLibraryDefines.TcGVL">
+            <Compile Include="Library\Constants\MyLibraryDefines.TcGVL">
               <SubType>Code</SubType>
             </Compile>
           </ItemGroup>
@@ -118,14 +118,14 @@ public sealed class PlainTextRepositoryTests : IDisposable
     const string ResponseDataFbXml = """
         <?xml version="1.0" encoding="utf-8"?>
         <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
-          <POU Name="RobotLibraryResponseDataFB" Id="{66a5c2ed-51ca-48e8-9dd7-cc594336593c}" SpecialFunc="None">
+          <POU Name="MyLibraryResponseDataFB" Id="{66a5c2ed-51ca-48e8-9dd7-cc594336593c}" SpecialFunc="None">
             <Declaration><![CDATA[{attribute 'pack_mode' := '1'} 
-        FUNCTION_BLOCK RobotLibraryResponseDataFB EXTENDS RobotLibraryRecvDataBaseFB
+        FUNCTION_BLOCK MyLibraryResponseDataFB EXTENDS MyLibraryRecvDataBaseFB
         // ------------------------------------------------------------------------- 
         //  Robot Library                                                
         // ------------------------------------------------------------------------- 
         //                                                                           
-        //  Object:      RobotLibraryResponseDataFB                                       
+        //  Object:      MyLibraryResponseDataFB                                       
         //  Author:      Thorsten Brach                                                
         //  Date:        2025-03-29
         //
@@ -145,7 +145,7 @@ public sealed class PlainTextRepositoryTests : IDisposable
 
         VAR_INPUT
           /// Payload
-          Payload    : ARRAY [0..RobotLibraryParameter.RESPONSE_PAYLOAD_MAX] OF BYTE;
+          Payload    : ARRAY [0..MyLibraryParameter.RESPONSE_PAYLOAD_MAX] OF BYTE;
         END_VAR]]></Declaration>
             <Implementation>
               <ST><![CDATA[]]></ST>
@@ -185,17 +185,17 @@ public sealed class PlainTextRepositoryTests : IDisposable
         _payloadSize := SIZEOF(Payload); // ST-FIX F22]]></ST>
               </Implementation>
             </Method>
-            <LineIds Name="RobotLibraryResponseDataFB">
+            <LineIds Name="MyLibraryResponseDataFB">
               <LineId Id="2" Count="0" />
             </LineIds>
-            <LineIds Name="RobotLibraryResponseDataFB.IsPayloadRemaining.Get">
+            <LineIds Name="MyLibraryResponseDataFB.IsPayloadRemaining.Get">
               <LineId Id="2" Count="0" />
             </LineIds>
-            <LineIds Name="RobotLibraryResponseDataFB.Reset">
+            <LineIds Name="MyLibraryResponseDataFB.Reset">
               <LineId Id="3" Count="3" />
               <LineId Id="2" Count="0" />
             </LineIds>
-            <LineIds Name="RobotLibraryResponseDataFB.UpdatePointer">
+            <LineIds Name="MyLibraryResponseDataFB.UpdatePointer">
               <LineId Id="3" Count="0" />
               <LineId Id="2" Count="0" />
             </LineIds>
@@ -205,12 +205,12 @@ public sealed class PlainTextRepositoryTests : IDisposable
 
     const string ResponseDataFbSt = """
         {attribute 'pack_mode' := '1'} 
-        FUNCTION_BLOCK RobotLibraryResponseDataFB EXTENDS RobotLibraryRecvDataBaseFB
+        FUNCTION_BLOCK MyLibraryResponseDataFB EXTENDS MyLibraryRecvDataBaseFB
         // ------------------------------------------------------------------------- 
         //  Robot Library                                                
         // ------------------------------------------------------------------------- 
         //                                                                           
-        //  Object:      RobotLibraryResponseDataFB                                       
+        //  Object:      MyLibraryResponseDataFB                                       
         //  Author:      Thorsten Brach                                                
         //  Date:        2025-03-29
         //
@@ -230,7 +230,7 @@ public sealed class PlainTextRepositoryTests : IDisposable
 
         VAR_INPUT
           /// Payload
-          Payload    : ARRAY [0..RobotLibraryParameter.RESPONSE_PAYLOAD_MAX] OF BYTE;
+          Payload    : ARRAY [0..MyLibraryParameter.RESPONSE_PAYLOAD_MAX] OF BYTE;
         END_VAR
 
 
@@ -273,8 +273,8 @@ public sealed class PlainTextRepositoryTests : IDisposable
     const string CommandItfXml = """
         <?xml version="1.0" encoding="utf-8"?>
         <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
-          <Itf Name="IRobotLibraryCommandFB" Id="{8b2f97cd-d701-45d4-a2bd-620934b85f71}">
-            <Declaration><![CDATA[INTERFACE IRobotLibraryCommandFB
+          <Itf Name="IMyLibraryCommandFB" Id="{8b2f97cd-d701-45d4-a2bd-620934b85f71}">
+            <Declaration><![CDATA[INTERFACE IMyLibraryCommandFB
         ]]></Declaration>
             <Method Name="CallBack" Id="{b9b72c53-4f8f-4deb-b3a9-0f787d160a79}">
               <Declaration><![CDATA[METHOD PUBLIC CallBack : DINT
@@ -285,7 +285,7 @@ public sealed class PlainTextRepositoryTests : IDisposable
         ]]></Declaration>
             </Method>
             <Property Name="CommandData" Id="{d98170c8-da07-4589-932b-e8f8018d0eb7}">
-              <Declaration><![CDATA[PROPERTY CommandData : RobotLibrarySendDataFB]]></Declaration>
+              <Declaration><![CDATA[PROPERTY CommandData : MyLibrarySendDataFB]]></Declaration>
               <Get Name="Get" Id="{de1c9b03-9057-4022-8b3d-cdee2645e380}">
                 <Declaration><![CDATA[]]></Declaration>
               </Get>
@@ -298,7 +298,7 @@ public sealed class PlainTextRepositoryTests : IDisposable
         """;
 
     const string CommandItfSt = """
-        INTERFACE IRobotLibraryCommandFB
+        INTERFACE IMyLibraryCommandFB
 
 
         METHOD PUBLIC CallBack : DINT
@@ -309,7 +309,7 @@ public sealed class PlainTextRepositoryTests : IDisposable
 
         END_METHOD
 
-        PROPERTY CommandData : RobotLibrarySendDataFB
+        PROPERTY CommandData : MyLibrarySendDataFB
 
 
         GET
@@ -422,13 +422,13 @@ public sealed class PlainTextRepositoryTests : IDisposable
     const string DefinesGvlXml = """
         <?xml version="1.0" encoding="utf-8"?>
         <TcPlcObject Version="1.1.0.1" ProductVersion="3.1.4024.16">
-          <GVL Name="RobotLibraryDefines" Id="{e3ec4c2f-778a-420e-9aaf-7206eca366c1}">
+          <GVL Name="MyLibraryDefines" Id="{e3ec4c2f-778a-420e-9aaf-7206eca366c1}">
             <Declaration><![CDATA[{attribute 'qualified_only'}
         // ------------------------------------------------------------------------- 
         //  Robot Library                                                
         // ------------------------------------------------------------------------- 
         //                                                                           
-        //  Object:      RobotLibraryDefines                                       
+        //  Object:      MyLibraryDefines                                       
         //  Author:      Thorsten Brach                                                
         //  Date:        2024-06-01
         //
@@ -459,7 +459,7 @@ public sealed class PlainTextRepositoryTests : IDisposable
         //  Robot Library                                                
         // ------------------------------------------------------------------------- 
         //                                                                           
-        //  Object:      RobotLibraryDefines                                       
+        //  Object:      MyLibraryDefines                                       
         //  Author:      Thorsten Brach                                                
         //  Date:        2024-06-01
         //

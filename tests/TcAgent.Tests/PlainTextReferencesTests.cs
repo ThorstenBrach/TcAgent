@@ -97,17 +97,17 @@ public sealed class PlainTextReferencesTests : IDisposable
     }
 
     [Fact]
-    public void Json_has_the_format_of_the_SRCI_repository()
+    public void Json_has_the_common_format()
     {
         var json = PlainText.ReferencesJson(new[]
         {
-            new PlainText.LibraryRef { Name = "RobotLibrarySysDep", Version = "*", DistributorName = "Thorsten Brach" },
+            new PlainText.LibraryRef { Name = "MyLibrarySysDep", Version = "*", DistributorName = "Thorsten Brach" },
             new PlainText.LibraryRef { Name = "Tc2_Standard", Version = "3.4.5.0", DistributorName = "Beckhoff Automation GmbH" },
         });
         const string expected = """
             [
               {
-                "Name": "RobotLibrarySysDep",
+                "Name": "MyLibrarySysDep",
                 "Version": "*",
                 "DistributorName": "Thorsten Brach",
                 "Namespace": null
