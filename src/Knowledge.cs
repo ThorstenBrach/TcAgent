@@ -186,7 +186,13 @@ public static class Knowledge
                  .Where(f => Exts.Contains(Path.GetExtension(f).ToLowerInvariant()));
 
     // ------------------------------------------------------------------ Search
-    public static string Search(string solutionDir, string query, int max = 10)
+    public static string Search(string solutionDir, string query, int max = 10) => Search(solutionDir, query, max, out _);
+
+    /// <summary>A hit of the search: kind file (a document), page (a web page read before) or web (the search service).</summary>
+    public sealed record Hit(string Kind, string Where, string Title, string Snippet);
+
+    /// <summary>The search with its hits as data - the knowledge window lists them to open.</summary>
+    public static string Search(string solutionDir, string query, int max, out List<Hit> found)
     {
         if (string.IsNullOrWhiteSpace(query)) throw new Exception("query missing");
         var terms = Regex.Split(query.ToLowerInvariant(), @"[^\p{L}\p{N}_\.]+").Where(t => t.Length >= 2).Distinct().ToList();
@@ -241,6 +247,8 @@ public static class Knowledge
         var o = new StringBuilder();
         // web search in the allowed domains - independent of the AI client, if a search service is configured
         var webHits = WebSearch(query, s.Urls, out var webNote);
+        found = webHits.Select(w => new Hit("web", w.Url, w.Title, w.Snip))
+                       .Concat(top.Select(h => new Hit(h.Where.StartsWith("http", StringComparison.OrdinalIgnoreCase) ? "page" : "file", h.Where, Path.GetFileName(h.Where), h.Snip))).ToList();
         if (webHits.Count > 0)
         {
             o.AppendLine("Web (allowed sources):");

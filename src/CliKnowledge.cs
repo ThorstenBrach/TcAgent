@@ -109,8 +109,15 @@ public static partial class Cli
                         return Ok;
                     }
                     case "search":
-                        Console.WriteLine(Knowledge.Search(dir, o.Query, 10));
+                    {
+                        var text = Knowledge.Search(dir, o.Query, 20, out var hits);
+                        Console.WriteLine(!o.Json ? text : new JsonObject
+                        {
+                            ["hits"] = new JsonArray(hits.Select(h => (JsonNode)new JsonObject { ["kind"] = h.Kind, ["where"] = h.Where, ["title"] = h.Title, ["snippet"] = h.Snippet }).ToArray()),
+                            ["text"] = text
+                        }.ToJsonString());
                         return Ok;
+                    }
                     default: throw new ArgumentException("knowledge docs --action list|add|remove|copy|search");
                 }
             }

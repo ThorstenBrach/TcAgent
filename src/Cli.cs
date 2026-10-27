@@ -821,7 +821,8 @@ public static partial class Cli
         {
             if (o.Sub is not ("backup" or "restore" or "list" or "diff")) throw new Exception("knowledgebase needs backup, restore, diff or list, e.g. TcAgent.exe knowledgebase list");
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
-            if (o.Sub is "restore" or "diff" && o.Level == null) throw new Exception("knowledgebase " + o.Sub + " needs --level <level> (knowledgebase list shows them)");
+            if (o.Sub is "restore" or "diff" && o.Level == null && !(o.From != null && File.Exists(o.From)))
+                throw new Exception("knowledgebase " + o.Sub + " needs --level <level> (knowledgebase list shows them) or --from <backup zip>");
             return o;
         }
         if (o.Command is "backup" or "restore")

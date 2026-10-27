@@ -2,7 +2,8 @@
 // KnowledgeBackup.cs). Files only, no IDE.
 //
 //   TcAgent.exe knowledgebase list    [--level <level>] [--json] [--solution <sln>]       the levels and their backups
-//   TcAgent.exe knowledgebase backup  [--level <level>] [--message <reason>]              zip now (all levels without --level)
+//   TcAgent.exe knowledgebase backup  [--level <level>] [--message <reason>] [--out <folder>]   zip now (all levels without
+//                                                       --level); --out also copies the ZIP files to a folder of your choice
 //   TcAgent.exe knowledgebase diff    --level <level> [--from <zip|latest>] [--item <path>]  what a restore would change
 //   TcAgent.exe knowledgebase restore --level <level> [--from <zip|latest>] [--item <path>] [--dry-run]
 //
@@ -72,14 +73,23 @@ public static partial class Cli
                     foreach (var l in levels)
                     {
                         var z = KnowledgeBackup.Backup(l, o.Message ?? "by hand", force: true);
+                        if (z != null && o.Out != null)
+                        {
+                            Directory.CreateDirectory(o.Out);
+                            var copy = Path.Combine(o.Out, KnowledgeLayers.Slug(l.Name.Replace(':', '-')) + "-" + Path.GetFileName(z));
+                            File.Copy(z, copy, true);
+                            z += " (copy: " + copy + ")";
+                        }
                         Console.WriteLine(z != null ? $"{l.Name}: {z}" : $"{l.Name}: nothing to back up{(KnowledgeBackup.FilesOf(l.Root).Git ? " (Git working copy without uncommitted changes - Git keeps it)" : "")}");
                     }
                     return Ok;
                 }
                 default:   // diff / restore
                 {
-                    var l = KnowledgeBackup.Find(dir, o.Level);
-                    var zip = KnowledgeBackup.Resolve(l, o.From);
+                    // a backup file from anywhere (a copy, another PC): its level comes from its manifest
+                    var fromFile = o.From != null && File.Exists(o.From) ? KnowledgeBackup.Read(Path.GetFullPath(o.From)) : null;
+                    var l = KnowledgeBackup.Find(dir, o.Level ?? fromFile?.Level);
+                    var zip = fromFile?.Zip ?? KnowledgeBackup.Resolve(l, o.From);
                     var info = KnowledgeBackup.Read(zip);
                     if (o.Sub == "diff" || o.DryRun)
                     {

@@ -5,6 +5,22 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.47.1] – 2026-10-27
+
+### Changed
+- Knowledge window: the toolbar and the context menu of every list come from one list of actions - the same entries with
+  the same names in every tab (e.g. "Compare with installed version", "Revert to installed version …", "Uninstall …" in
+  Files and Sources; "Delete …" / "Remove …" with the dots of a confirmation). Hints appear as a message, not only in the
+  status line.
+- **Back up now …** asks for an optional copy in a folder of your choice (`knowledgebase backup --out`) and offers to open
+  the folder; **Restore …** opens a list of all backups, **Restore from a file …** takes a backup ZIP from anywhere (its
+  level comes from the manifest).
+- Tab Documentation: **Add link or folder …** and **Add documents (copy files) …** instead of "Add" and "Copy documents
+  in"; **Edit …** with nothing selected no longer opens the add dialog, on a document folder it opens the folder;
+  **Open knowledge.md** opens the list of the selected source's level or of a level you choose and creates it if
+  missing; **Search like the agent …** lists the hits - double-click opens the document or the page
+  (`knowledge docs --action search --json`).
+
 ## [0.47.0] – 2026-10-27
 
 ### Added

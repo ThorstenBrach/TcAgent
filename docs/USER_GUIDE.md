@@ -151,9 +151,11 @@ work without the extension. The extension runs **inside** the IDE process and ad
     window at once; **⋯ > Set up clients** in the chat passes them on to the AI clients.
   - **Documentation:** what the agent looks things up in (`tc_docs`) – Beckhoff InfoSys, the links, folders and network
     shares of the `knowledge.md` of every level and the document folders `knowledge\`, each with type, level, state
-    (documents found, pages already read, not reachable) and the file it is defined in. **Add …** (to the level you
-    choose), **Edit …**, **Remove**, **Copy documents in …**, **Open** (browser or Explorer), **Open knowledge.md** and
-    **Test search …** (searches like the agent and shows the hits); the same in the context menu.
+    (documents found, pages already read, not reachable) and the file it is defined in. **Open** (browser or Explorer),
+    **Open knowledge.md** (of the level of the selected source or of a level you choose - created if missing), **Add link
+    or folder …** (one line in the `knowledge.md` of the level you choose), **Add documents (copy files) …** (into the
+    `knowledge\` folder of a level), **Edit …**, **Remove …** and **Search like the agent …** – the hits are listed below
+    and open with a double-click (documents with their program, pages in the browser); the same in the context menu.
   - **Feedback:** the reports of `tc_feedback` (filter by status). For the selected reports the window builds the text of
     an issue and **anonymizes** it: names of this computer, user, solution and projects, your `privateTerms`
     (`settings.json`), user folders, solution paths, network paths and IP addresses are replaced. You edit the text as
@@ -167,13 +169,16 @@ work without the extension. The extension runs **inside** the IDE process and ad
   - **History:** failed checks and corrections per run with a moving average, every adopted change as a marker, and the
     changes with their values before and after (helped / no effect / worse / reverted); **Export CSV**. Below that the
     **backups of the knowledge** (see below) with **Difference**, **Restore …** and **Open folder**.
-  - **Backup … / Restore …** (top bar): the knowledge of every level – coding rules, risk rules, skills, workflows,
+  - **Back up now … / Restore …** (top bar; toolbar and context menu of every list show the same actions with the same
+    names): the knowledge of every level – coding rules, risk rules, skills, workflows,
     lessons, templates, platforms, `knowledge.md`, `sources.json`, `skills.lock.json`, `disabled.json`, `config.json` – is
     backed up **automatically before every change** (from this window, the chat and the command line) as a ZIP with
     `manifest.json` (TcAgent version, level, SHA-256 of every file) in `%LOCALAPPDATA%\TcAgent\backups\knowledge\`; only
     when the level changed since its last backup, the last 20 per level are kept. A level in a Git working copy (team,
     company, project) is backed up with its uncommitted changes only – Git keeps the rest. **Restore** works for the whole
     level, one file or one skill/workflow: first the difference, then you confirm; the current state is backed up before.
+    **Back up now …** can also put a copy into a folder of your choice and opens the folder afterwards; **Restore …** lists
+    all backups (or **Restore from a file …** takes a copy from anywhere).
     Command line: `TcAgent.exe knowledgebase list|backup|diff|restore`.
 
   Decisions (apply a proposal, install, pull, promote) are made in the chat – the agent asks you.

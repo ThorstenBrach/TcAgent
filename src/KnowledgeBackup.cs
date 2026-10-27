@@ -38,7 +38,7 @@ public static class KnowledgeBackup
 
     public sealed class Info
     {
-        public string Zip, Created, Reason, Version;
+        public string Zip, Created, Reason, Version, Level, Root;
         public bool Git;
         public List<(string Path, string Sha256)> Files = new();
         public List<string> Deleted = new();
@@ -182,6 +182,7 @@ public static class KnowledgeBackup
         return new Info
         {
             Zip = zip, Created = m["created"]?.ToString(), Reason = m["reason"]?.ToString(), Version = m["tcagent"]?.ToString(),
+            Level = m["level"]?.ToString(), Root = m["root"]?.ToString(),
             Git = m["git"]?.GetValue<bool>() == true,
             Files = (m["files"]?.AsArray() ?? new JsonArray()).Select(f => (f!["path"]!.ToString(), f["sha256"]!.ToString())).ToList(),
             Deleted = (m["deleted"]?.AsArray() ?? new JsonArray()).Select(d => d!.ToString()).ToList()
