@@ -8,7 +8,7 @@ namespace TcAgent;
 
 public static class Program
 {
-    public const string ServerVersion = "0.46.0";
+    public const string ServerVersion = "0.47.0";
     public static string ClientName = "unknown";
 
     public static int Main(string[] args)
@@ -17,6 +17,8 @@ public static class Program
         // the settings of settings.json (levels, targets, ...) apply to every start - MCP server, command line, the windows of the
         // extension - unless the environment sets them already (a client configuration or a pipeline wins)
         KnowledgeLayers.ApplySettingsEnv();
+        KnowledgeBackup.Version = ServerVersion;
+        KnowledgeBackup.Warn = m => Log.Error(m);
         // Command line for CI pipelines (check/build/test) - without arguments: MCP server
         if (Cli.IsCommand(args)) { Console.OutputEncoding = new UTF8Encoding(false); return Cli.Run(args); }
         Mcp.Start();

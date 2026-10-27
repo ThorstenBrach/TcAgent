@@ -31,7 +31,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -51,7 +51,7 @@ public static partial class Cli
         public string Approve;                                                                      // tcunit report --approve <id>
         public string Key, Level, Action, Message;                                                  // knowledge ... --key <kind/name> --level <level> --action <git action> --message <text>
         public string Name, Url, Ref, Item, Kind, Query, Libraries, Terms; public bool AcceptLicense;  // sources / knowledge platform (window)
-        public string Include, Exclude; public int Port = 851; public bool WhileRunning;               // backup / restore (CliBackup.cs)
+        public string Include, Exclude; public int Port = 851; public bool WhileRunning, Json;               // backup / restore (CliBackup.cs)
 
     }
 
@@ -75,6 +75,12 @@ public static partial class Cli
         if (o.Command is "tcunit" && o.Sub == "list") { Program.ClientName = "cli:tcunit"; return TcUnitList(o); }   // CliTcUnit.cs - project files only
         if (o.Command is "tcunit" && o.Sub == "report") { Program.ClientName = "cli:tcunit"; return TcUnitReportCli(o); }
         if (o.Command is "skills") { Program.ClientName = "cli:skills"; return SkillsCli(o); }   // files only, no IDE
+        if (o.Command is "knowledge" or "sources" && WritesKnowledge(o))
+        {
+            KnowledgeBackup.Version = Program.ServerVersion;
+            KnowledgeBackup.BeforeWrite(o.Solution != null ? Path.GetDirectoryName(Path.GetFullPath(o.Solution)) : null, $"{o.Command} {o.Sub} {o.Action}".Trim());
+        }
+        if (o.Command is "knowledgebase") { Program.ClientName = "cli:knowledgebase"; return KnowledgeBaseCli(o); }   // CliKnowledgeBase.cs - backup/restore of the levels
         if (o.Command is "sources") { Program.ClientName = "cli:sources"; return SourcesCli(o); }   // files and git only, no IDE
         if (o.Command is "knowledge") { Program.ClientName = "cli:knowledge"; return KnowledgeCli(o); }   // files only, no IDE (knowledge manager window)
 
@@ -771,13 +777,14 @@ public static partial class Cli
                 case "--exclude": o.Exclude = Val(); break;
                 case "--port": o.Port = int.Parse(Val()); break;
                 case "--while-running": o.WhileRunning = true; break;
+                case "--json": o.Json = true; break;
                 default:
                     // st: the sub-command (export, check, import) is the first argument that is not an option
-                    if (o.Command is "st" or "tcunit" or "skills" or "sources" or "knowledge" && o.Sub == null && !a.StartsWith("-")) { o.Sub = a.ToLowerInvariant(); break; }
+                    if (o.Command is "st" or "tcunit" or "skills" or "sources" or "knowledge" or "knowledgebase" && o.Sub == null && !a.StartsWith("-")) { o.Sub = a.ToLowerInvariant(); break; }
                     throw new Exception("Unknown option " + a);
             }
         }
-        if (o.Command != "ci" && (o.Config != null || o.Only != null || o.Init || (o.Command is not ("st" or "skills" or "sources" or "restore") && (o.From != null || o.DryRun))))
+        if (o.Command != "ci" && (o.Config != null || o.Only != null || o.Init || (o.Command is not ("st" or "skills" or "sources" or "restore" or "knowledgebase") && (o.From != null || o.DryRun))))
             throw new Exception("--config, --only, --from, --dry-run and --init are only for ci (--from and --dry-run also for st import and restore, --dry-run for skills mirror and sources sync)");
         if ((o.Clean || o.Force) && o.Command != "st") throw new Exception("--clean and --force are only for st");
         if (o.Command is "help" or "version") return o;
@@ -786,9 +793,9 @@ public static partial class Cli
         if (o.Command is "tcunit") { ValidateTcUnit(o); return o; }
         if (o.Command is "install") return o;
         if (o.Command is "ci") return o;                  // the steps are checked by ci itself (CliCi.cs)
-        if ((o.Key != null || o.Level != null || o.Action != null || o.Message != null) && o.Command is not ("knowledge" or "sources")) throw new Exception("--key, --level, --action and --message are only for knowledge and sources");
+        if ((o.Key != null || o.Level != null || o.Action != null || o.Message != null) && o.Command is not ("knowledge" or "sources" or "knowledgebase")) throw new Exception("--key, --level, --action and --message are only for knowledge and sources");
         if ((o.Name != null || o.Url != null || o.Ref != null || o.Item != null || o.Kind != null || o.Query != null || o.Libraries != null || o.Terms != null || o.AcceptLicense)
-            && o.Command is not ("knowledge" or "sources")) throw new Exception("--name, --url, --ref, --item, --kind, --query, --libraries, --terms and --accept-license are only for knowledge and sources");
+            && o.Command is not ("knowledge" or "sources" or "knowledgebase")) throw new Exception("--name, --url, --ref, --item, --kind, --query, --libraries, --terms and --accept-license are only for knowledge and sources");
         if (o.Command is "knowledge")                     // files only: the solution is optional (its platform and project level)
         {
             if (o.Sub is not ("json" or "disable" or "enable" or "new" or "move" or "delete" or "git" or "feedback" or "platform" or "settings" or "docs"))
@@ -799,8 +806,8 @@ public static partial class Cli
         }
         if (o.Command is "sources")                       // files and git only: the solution is optional (its project level)
         {
-            if (o.Sub is not ("status" or "sync" or "add" or "remove" or "search" or "install" or "pull" or "diff" or "changes" or "merge" or "propose" or "push" or "uninstall"))
-                throw new Exception("sources needs status, sync, add, remove, search, install, pull, diff, changes, merge, propose, push or uninstall, e.g. TcAgent.exe sources sync --solution M.sln");
+            if (o.Sub is not ("status" or "sync" or "add" or "remove" or "search" or "install" or "pull" or "diff" or "changes" or "merge" or "propose" or "push" or "uninstall" or "revert" or "detach"))
+                throw new Exception("sources needs status, sync, add, remove, search, install, pull, diff, changes, merge, propose, push, uninstall, revert or detach, e.g. TcAgent.exe sources sync --solution M.sln");
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
             return o;
         }
@@ -808,6 +815,13 @@ public static partial class Cli
         {
             if (o.Sub is not ("list" or "mirror")) throw new Exception("skills needs list or mirror, e.g. TcAgent.exe skills mirror");
             if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
+            return o;
+        }
+        if (o.Command is "knowledgebase")
+        {
+            if (o.Sub is not ("backup" or "restore" or "list" or "diff")) throw new Exception("knowledgebase needs backup, restore, diff or list, e.g. TcAgent.exe knowledgebase list");
+            if (o.Solution != null && !File.Exists(o.Solution)) throw new Exception(SolutionNotFound(o.Solution));
+            if (o.Sub is "restore" or "diff" && o.Level == null) throw new Exception("knowledgebase " + o.Sub + " needs --level <level> (knowledgebase list shows them)");
             return o;
         }
         if (o.Command is "backup" or "restore")
@@ -934,7 +948,7 @@ public static partial class Cli
       ready to paste into GitHub issues - to stdout or into the file. --open: only open entries; --summary: counts only.
       No IDE needed.
 
-  TcAgent.exe sources status|sync|add|remove|search|install|pull|diff|changes|merge|propose|push|uninstall [--solution <sln>] [--dry-run]
+  TcAgent.exe sources status|sync|add|remove|search|install|pull|diff|changes|merge|propose|push|uninstall|revert|detach [--solution <sln>] [--dry-run]
       The Git sources of skills, workflows and rules: sync restores every installed item at the commit of
       skills.lock.json (--dry-run only compares, exit 1 on differences). No IDE needed.
 

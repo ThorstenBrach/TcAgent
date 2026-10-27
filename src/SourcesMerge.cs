@@ -25,6 +25,8 @@ public static class SourcesMerge
         public readonly List<string> Merged = new(), Conflicts = new(), Taken = new(), Deleted = new(), Kept = new();
         public string Backup, Branch, Folder, Patch, CompareUrl;
         public List<string> Specifics = new();
+        /// <summary>Files with conflicts and their three versions - for a merge tool (Visual Studio: vsDiffMerge /m).</summary>
+        public readonly List<(string Rel, string Base, string Theirs, string Yours, string Result)> ConflictFiles = new();
     }
 
     // ------------------------------------------------------------------ helpers
@@ -94,6 +96,14 @@ public static class SourcesMerge
             }
             var (code, text) = Run(null, "merge-file", "-p", "-L", "yours", "-L", "installed", "-L", "source", c, b, o);
             if (code < 0 || code > 127) { r.Conflicts.Add(rel + " (could not be merged: " + text + ")"); continue; }
+            if (code > 0)
+            {
+                // your version before the merge, for the merge tool (the file itself gets the conflict markers)
+                var yours = Path.Combine(Path.GetTempPath(), "tcagent-merge", Guid.NewGuid().ToString("N")[..8], Path.GetFileName(c));
+                Directory.CreateDirectory(Path.GetDirectoryName(yours)!);
+                File.Copy(c, yours, true);
+                r.ConflictFiles.Add((rel, b, o, yours, Out(rel)));
+            }
             Write(Out(rel), text);
             if (code > 0) r.Conflicts.Add($"{rel} ({code} conflict(s) marked with <<<<<<<)"); else r.Merged.Add(rel);
         }
@@ -155,6 +165,74 @@ public static class SourcesMerge
             Sources.SetLock(root, key, e);
         }
         return r;
+    }
+
+    // ------------------------------------------------------------------ changed files, revert, keep as own version
+    /// <summary>The files you changed, added or deleted - with the installed version next to them (for a compare window).</summary>
+    public static List<(string Rel, string Installed, string Yours, string Kind)> ChangedFiles(string root, string key, Sources.LockEntry e, Sources.Source src)
+    {
+        var local = Sources.InstalledPath(root, key, e);
+        var orig = Pristine(key, e, src, e.Commit);
+        var a = FilesIn(orig); var b = FilesIn(local);
+        var list = new List<(string, string, string, string)>();
+        foreach (var rel in a.Keys.Concat(b.Keys).Distinct(StringComparer.OrdinalIgnoreCase).OrderBy(x => x, StringComparer.Ordinal))
+        {
+            a.TryGetValue(rel, out var x); b.TryGetValue(rel, out var y);
+            if (x != null && y != null && Text(x) == Text(y)) continue;
+            list.Add((rel, x, y, x == null ? "added" : y == null ? "deleted" : "changed"));
+        }
+        return list;
+    }
+
+    /// <summary>Back to the installed version (your changes go to the backups first).</summary>
+    public static string Revert(string root, string key, Sources.LockEntry e, Sources.Source src)
+    {
+        var local = Sources.InstalledPath(root, key, e);
+        string backup = null;
+        if (File.Exists(local) || Directory.Exists(local))
+        {
+            backup = Path.Combine(KnowledgeLayers.UserRoot, "backups", "sources", key.Replace('/', '-') + "-" + DateTime.Now.ToString("yyyyMMdd-HHmmss"), Path.GetFileName(local));
+            CopyItem(local, backup);
+        }
+        var repo = Sources.Checkout(src.Name, e.Url, e.Commit);
+        var it = Sources.Scan(repo).FirstOrDefault(i => i.RelPath == e.Path) ?? throw new InvalidOperationException($"{e.Path} is not in {src.Name} @{e.Commit[..8]}");
+        Sources.Install(root, repo, it, src, e.Commit);
+        return $"{key}: back to the installed version @{e.Commit[..8]}" + (backup != null ? $" - your version is in {backup}" : "");
+    }
+
+    /// <summary>Keeps the item as your own version: no longer tied to the source (no updates, no "changed" state); where it
+    /// came from stays in its header (tcagent-source, -commit, -license and tcagent-detached).</summary>
+    public static string Detach(string root, string key, Sources.LockEntry e)
+    {
+        var local = Sources.InstalledPath(root, key, e);
+        var main = Directory.Exists(local) && Sources.FolderKinds.TryGetValue(Sources.KindDir(key), out var mf) ? Path.Combine(local, mf) : local;
+        if (File.Exists(main))
+            File.WriteAllText(main, Sources.AddMeta(File.ReadAllText(main), new Dictionary<string, string> { ["tcagent-detached"] = $"{e.Source}@{e.Commit[..Math.Min(12, e.Commit.Length)]}" }));
+        Sources.Unlock(root, key);
+        return $"{key} is your own version now - it is no longer updated from {e.Source}; its origin stays in the header.";
+    }
+
+    /// <summary>Installs into a shared level kept in Git as a commit on a new branch (pull request) - never pushed.</summary>
+    public static string InstallViaPullRequest(string root, Sources.Item it, Sources.Source s, string commit, string checkout)
+    {
+        var repo = KnowledgeOps.RepoOf(root) ?? throw new InvalidOperationException("the level is not in a Git working copy");
+        if (Sources.Git(repo, "status --porcelain").Length > 0) throw new InvalidOperationException("the shared repository has uncommitted changes - commit or stash them first");
+        var previous = Sources.Git(repo, "rev-parse --abbrev-ref HEAD");
+        var branch = "tcagent/install-" + KnowledgeLayers.Slug(it.Name) + "-" + DateTime.Now.ToString("yyyyMMddHHmm");
+        Sources.Git(repo, $"switch -q -c {branch}");
+        try
+        {
+            Sources.Install(root, checkout, it, s, commit);
+            Sources.Git(repo, $"add -- \"{Path.GetRelativePath(repo, Sources.TargetOf(root, it))}\" \"{Path.GetRelativePath(repo, Path.Combine(root, Sources.LockFile))}\"");
+            Sources.Git(repo, $"-c core.safecrlf=false commit -q -m \"Install {it.Key} from {s.Name}\"");
+        }
+        catch
+        {
+            try { Sources.Git(repo, "reset -q --hard"); Sources.Git(repo, "clean -fdq"); } catch { }
+            throw;
+        }
+        finally { try { Sources.Git(repo, $"switch -q {previous}"); } catch { } }
+        return $"Committed on branch {branch} in {repo} (not pushed) - push it and open a pull request; the owners of the level decide.";
     }
 
     // ------------------------------------------------------------------ uninstall

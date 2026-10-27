@@ -123,15 +123,24 @@ work without the extension. The extension runs **inside** the IDE process and ad
   - **Sources:** the Git repositories skills, workflows and rules can be installed from (`tc_sources`): **Add / Edit /
     Remove**, **Browse & install …** (everything a source offers with kind and license; before installing you see the
     license, the files and any scripts – source-available and unlicensed items are refused, others only after you
-    accept the license). Below the items installed from sources – pinned commit, license, changed locally, newer upstream
-    – with **Check for updates**, **Update all …**, **Diff** (what changed in the source), **My changes** (what you
-    changed since the install), **Merge new version …** (a preview first; then the newer version of the source is merged
-    into your changed item, three-way – your version is backed up, conflicts are marked with `<<<<<<<`) and **Propose
-    (pull request) …** (your changes as a commit on a new branch of the source, without TcAgent's metadata and checked
-    for your private terms; you decide whether and where it is pushed – the source or your fork – and the pull request
-    page opens in the browser; a patch file is always written as well) and **Uninstall …** (also the Del key: removes the
-    item from its level and from `skills.lock.json`; a copy goes to `%LOCALAPPDATA%\TcAgent\backups\sources\`). In the tab **Files** an item from a source shows
-    **✎ changed** or **↑ newer** in the column Source, with the same three actions in the context menu.
+    accept the license). Installing offers every level – you, the project, the team, the company and the platforms; a
+    shared level kept in Git gets a commit on a new branch for a pull request instead of a direct change. Below the items
+    installed from sources with their state – **✎ locally changed** (orange), **↑ upstream newer** (blue), **⇅ both
+    changed** (red); it is checked when the window opens, on refresh and when you save a file of a level in the editor.
+    **Check for updates**, **Update all …**, **What changed in the source**, and for the selected item:
+    - **My changes / Diff** – the compare window of Visual Studio, installed version left, yours right;
+    - **Revert …** – back to the installed version (yours goes to `%LOCALAPPDATA%\TcAgent\backups\sources\`);
+    - **Keep as own version …** – no longer tied to the source (no updates, no "changed" state); where it came from stays
+      in its header (`tcagent-source`, `tcagent-detached`);
+    - **Propose upstream …** – your changes as a commit on a new branch of the source (without TcAgent's metadata,
+      checked for your private terms) plus a patch file; you decide whether and where it is pushed – the source or your
+      fork – and the pull request page opens in the browser, you send it yourself;
+    - **Update and merge …** – a preview first, then the newer version of the source is merged into your item (three-way,
+      your version backed up); conflicts open in the merge window of Visual Studio (in the XAE Shell they are marked with
+      `<<<<<<<` in the file);
+    - **Uninstall …** (also Del) – removes the item and its entry in `skills.lock.json`; a copy goes to the backups.
+
+    The tab **Files** shows the same state in the column Source and has the same actions in the context menu.
   - **Platforms:** the platforms (automation frameworks) with the libraries and terms that detect them, which apply to
     this project and why, the libraries of the project. **New …** (a platform of your own – for you or, with a company
     level, for the whole company), **Open platform.md**, **Open folder**, **Set for this project …**, **Detect
@@ -156,7 +165,16 @@ work without the extension. The extension runs **inside** the IDE process and ad
     reports as resolved, wontfix or duplicate. Questions belong in the GitHub Discussions (category Q&A), security
     problems are reported privately (`SECURITY.md`).
   - **History:** failed checks and corrections per run with a moving average, every adopted change as a marker, and the
-    changes with their values before and after (helped / no effect / worse / reverted); **Export CSV**.
+    changes with their values before and after (helped / no effect / worse / reverted); **Export CSV**. Below that the
+    **backups of the knowledge** (see below) with **Difference**, **Restore …** and **Open folder**.
+  - **Backup … / Restore …** (top bar): the knowledge of every level – coding rules, risk rules, skills, workflows,
+    lessons, templates, platforms, `knowledge.md`, `sources.json`, `skills.lock.json`, `disabled.json`, `config.json` – is
+    backed up **automatically before every change** (from this window, the chat and the command line) as a ZIP with
+    `manifest.json` (TcAgent version, level, SHA-256 of every file) in `%LOCALAPPDATA%\TcAgent\backups\knowledge\`; only
+    when the level changed since its last backup, the last 20 per level are kept. A level in a Git working copy (team,
+    company, project) is backed up with its uncommitted changes only – Git keeps the rest. **Restore** works for the whole
+    level, one file or one skill/workflow: first the difference, then you confirm; the current state is backed up before.
+    Command line: `TcAgent.exe knowledgebase list|backup|diff|restore`.
 
   Decisions (apply a proposal, install, pull, promote) are made in the chat – the agent asks you.
 - **Documents in the chat** – paste (Ctrl+V), drop or attach (+) manuals, data sheets, screenshots and long texts. Text files

@@ -133,6 +133,15 @@ namespace TcAgentBridge
         readonly Canvas chart = new Canvas { Height = 220, Margin = new Thickness(8), ClipToBounds = true };
         readonly ListView changes = NewList();
         readonly Button export = Text("Export CSV", "The runs of this workflow and the changes as CSV");
+        // backups of the knowledge levels (KnowledgeBackup.cs)
+        readonly ListView backupList = NewList();
+        readonly TextBox backupDetail = new TextBox { IsReadOnly = true, Height = 170, TextWrapping = TextWrapping.NoWrap, BorderThickness = new Thickness(0, 1, 0, 0), Padding = new Thickness(6),
+                                                      HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                                                      FontFamily = new FontFamily("Consolas"), FontSize = 12, Background = Brushes.Transparent };
+        readonly Button backupBtn = Text("Backup …", "Back up the knowledge of a level (or all) now - it is also backed up automatically before every change"),
+                        restoreBtn = Text("Restore …", "Restore a level, a file or a skill from a backup (History tab)");
+        List<Dictionary<string, object>> backupLevels = new List<Dictionary<string, object>>();
+        EnvDTE.DocumentEvents docEvents;   // kept: the events object must live as long as the window
 
         static ToggleButton Tab(string text)
         {
@@ -206,7 +215,7 @@ namespace TcAgentBridge
             SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             var bar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4, 4, 4, 2) };
-            foreach (var e in new UIElement[] { refresh, TcUnitControl.Separator(), tOverview, tEffective, tSources, tPlatforms, tDocs, tFeedback, tHistory, TcUnitControl.Separator(), levelsBtn, platform }) bar.Children.Add(e);
+            foreach (var e in new UIElement[] { refresh, TcUnitControl.Separator(), tOverview, tEffective, tSources, tPlatforms, tDocs, tFeedback, tHistory, TcUnitControl.Separator(), levelsBtn, backupBtn, restoreBtn, platform }) bar.Children.Add(e);
             platform.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             status.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             facts.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
@@ -239,6 +248,8 @@ namespace TcAgentBridge
             levelBox.SelectionChanged += (s, e) => FillEntries();
             newBtn.Click += (s, e) => NewItem();
             levelsBtn.Click += (s, e) => EditLevels();
+            backupBtn.Click += (s, e) => BackupNow();
+            restoreBtn.Click += (s, e) => { Show(tHistory); if (backupList.SelectedItem == null) status.Text = "Select a backup below and click Restore … (or use the context menu)."; else RestoreBackup(); };
             folderBtn.Click += (s, e) => OpenFolder();
             moveBtn.Click += (s, e) => MoveItem();
             deleteBtn.Click += (s, e) => DeleteItem();
@@ -251,13 +262,30 @@ namespace TcAgentBridge
             wfBox.SelectionChanged += (s, e) => FillHistory();
             chart.SizeChanged += (s, e) => DrawChart();
             export.Click += (s, e) => ExportCsv();
-            refresh.Click += (s, e) => { Load(); if (docsPage != null && tDocs.IsChecked == true) LoadDocs(); };
+            refresh.Click += (s, e) => { Load(); if (docsPage != null && tDocs.IsChecked == true) LoadDocs(); if (historyPage != null) LoadBackups(); };
             foreach (var t in new[] { tOverview, tEffective, tSources, tPlatforms, tDocs, tFeedback, tHistory }) t.Click += (s, e) => Show((ToggleButton)s);
             // the platform line next to the tabs leads to the Platforms tab
             platform.Cursor = Cursors.Hand;
             platform.ToolTip = "Platforms of this project - click to show and change them";
             platform.MouseLeftButtonUp += (s, e) => Show(tPlatforms);
             IsVisibleChanged += (s, e) => { if (IsVisible && data == null && !loading) Load(); };
+            // a file of a knowledge level saved in the editor: read again (changed items from sources show their new state)
+            try
+            {
+                docEvents = (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.Events.DocumentEvents;
+                if (docEvents != null) docEvents.DocumentSaved += d =>
+                {
+                    try
+                    {
+                        var p = d?.FullName;
+                        if (p == null || data == null || loading) return;
+                        if (Arr(data.TryGetValue("layers", out var lo) ? lo : null).Any(l => S(l, "root") is string r && p.StartsWith(r.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase)))
+                            Load();
+                    }
+                    catch { }
+                };
+            }
+            catch { }
             Show(tOverview);
             status.Text = "Reading the knowledge ...";
         }
@@ -333,9 +361,11 @@ namespace TcAgentBridge
                 ("Check for updates", "Fetch the sources and list what is newer there", () => RunAsync("sources pull --dry-run", true)),
                 ("Update all …", "Update every installed item that is newer in its source (not the ones changed locally)", UpdateAll),
                 ("Diff", "Changes of the selected item in its source since the install", DiffInstalled),
-                ("My changes", "What you changed in the selected item since the install", () => { var (n, lv) = Installed(); SourceChanges(n, lv, sourceDetail); }),
-                ("Merge new version …", "Merge the newer version of the source into your changed item (three-way; conflicts are marked)", () => { var (n, lv) = Installed(); MergeSource(n, lv, sourceDetail); }),
-                ("Propose (pull request) …", "Your changes as a branch for the source - push it and open the pull request", () => { var (n, lv) = Installed(); ProposeSource(n, lv, sourceDetail); }),
+                ("My changes", "Compare your version with the installed one (Visual Studio compare window)", () => { var (n, lv) = Installed(); CompareSource(n, lv, sourceDetail); }),
+                ("Revert …", "Back to the installed version (yours goes to the backups)", () => { var (n, lv) = Installed(); RevertSource(n, lv); }),
+                ("Keep as own version …", "No longer tied to the source - no updates, the origin stays in the header", () => { var (n, lv) = Installed(); DetachSource(n, lv); }),
+                ("Propose upstream …", "Your changes as a branch for the source - push it and open the pull request", () => { var (n, lv) = Installed(); ProposeSource(n, lv, sourceDetail); }),
+                ("Update and merge …", "Merge the newer version of the source into your changed item (three-way; conflicts in the merge window)", () => { var (n, lv) = Installed(); MergeSource(n, lv, sourceDetail); }),
                 ("Uninstall …", "Remove the selected item from its level (a copy goes to the backups; the source stays)", UninstallSource) })
             { var b = Text(label, tip); b.Click += (s, e) => act(); tools2.Children.Add(b); }
             DockPanel.SetDock(tools2, Dock.Top); sp.Children.Add(tools2);
@@ -348,9 +378,12 @@ namespace TcAgentBridge
             sourceList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { RemoveSource(); e.Handled = true; } };
             installedList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { UninstallSource(); e.Handled = true; } };
             bool ISel() => installedList.SelectedItem is Line;
-            installedList.ContextMenu = Menu(("Diff", DiffInstalled, ISel), ("My changes", () => { var (n, lv) = Installed(); SourceChanges(n, lv, sourceDetail); }, ISel),
-                                             ("Merge new version …", () => { var (n, lv) = Installed(); MergeSource(n, lv, sourceDetail); }, ISel),
-                                             ("Propose (pull request) …", () => { var (n, lv) = Installed(); ProposeSource(n, lv, sourceDetail); }, ISel), (null, null, null),
+            installedList.ContextMenu = Menu(("Diff (compare with the installed version)", () => { var (n, lv) = Installed(); CompareSource(n, lv, sourceDetail); }, ISel),
+                                             ("What changed in the source", DiffInstalled, ISel), (null, null, null),
+                                             ("Revert …", () => { var (n, lv) = Installed(); RevertSource(n, lv); }, ISel),
+                                             ("Keep as own version …", () => { var (n, lv) = Installed(); DetachSource(n, lv); }, ISel),
+                                             ("Propose upstream …", () => { var (n, lv) = Installed(); ProposeSource(n, lv, sourceDetail); }, ISel),
+                                             ("Update and merge …", () => { var (n, lv) = Installed(); MergeSource(n, lv, sourceDetail); }, ISel), (null, null, null),
                                              ("Uninstall …", UninstallSource, ISel), (null, null, null),
                                              ("Check for updates", () => RunAsync("sources pull --dry-run", true), null), ("Update all …", UpdateAll, null));
             return sourcesPage = sp;
@@ -376,7 +409,30 @@ namespace TcAgentBridge
             DockPanel.SetDock(frame, Dock.Top); dp.Children.Add(frame);
             var h = Heading("Adopted changes - values per run (failed checks + corrections) before and over the next 10 runs");
             DockPanel.SetDock(h, Dock.Top); dp.Children.Add(h);
-            dp.Children.Add(changes);
+            changes.MaxHeight = 160;
+            DockPanel.SetDock(changes, Dock.Top); dp.Children.Add(changes);
+            // backups of the knowledge levels
+            var hb = Heading("Backups of the knowledge - made automatically before every change (last 20 per level; Git levels: uncommitted changes only)");
+            DockPanel.SetDock(hb, Dock.Top); dp.Children.Add(hb);
+            var bt = new WrapPanel { Margin = new Thickness(6, 0, 6, 4) };
+            foreach (var (label, tip, act) in new (string, string, Action)[] {
+                ("Backup …", "Back up a level (or all) now", BackupNow),
+                ("Difference", "What restoring the selected backup would change", () => DiffBackup(null)),
+                ("Restore …", "The whole level, one file or one skill - the difference first, then you confirm; the current state is backed up before", RestoreBackup),
+                ("Open folder", "The folder with the backups (ZIP files with manifest.json)", OpenBackupFolder) })
+            { var b = Text(label, tip); b.Click += (s, e) => act(); bt.Children.Add(b); }
+            DockPanel.SetDock(bt, Dock.Top); dp.Children.Add(bt);
+            Columns(backupList, ("Level", 160, nameof(Line.C1)), ("Created", 150, nameof(Line.C2)), ("Reason", 260, nameof(Line.C3)), ("Files", 60, nameof(Line.C4)),
+                    ("Kind", 150, nameof(Line.C5)), ("TcAgent", 70, nameof(Line.C6)));
+            bool BSel() => backupList.SelectedItem is Line;
+            backupList.ContextMenu = Menu(("Difference", () => DiffBackup(null), BSel), ("Restore …", RestoreBackup, BSel), (null, null, null),
+                                          ("Backup …", BackupNow, null), ("Open folder", OpenBackupFolder, null));
+            backupList.SelectionChanged += (s, e) => { if (backupList.SelectedItem is Line l) backupDetail.Text = $"{S(l.D, "zip")}\n\n" + string.Join("\n", ((l.D["paths"] as IEnumerable) ?? new object[0]).Cast<object>()); };
+            backupList.MouseDoubleClick += (s, e) => DiffBackup(null);
+            backupDetail.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            DockPanel.SetDock(backupDetail, Dock.Bottom); dp.Children.Add(backupDetail);
+            dp.Children.Add(backupList);
+            LoadBackups();
             return historyPage = dp;
         }
 
@@ -558,15 +614,24 @@ namespace TcAgentBridge
                 var st = S(e, "status") + (B(e, "locked") ? ", locked" : "");
                 var src = S(e, "source") is string so ? so + (S(e, "license") is string li ? " · " + li : "") : "";
                 var ss = S(e, "sourceState") ?? "";
-                if (ss.Contains("changed locally")) src = "✎ changed · " + src;
-                if (ss.Contains("newer upstream")) src = "↑ newer · " + src;
+                var (stateText, stateBrush) = SourceState(ss);
+                if (stateText != null) src = stateText + " · " + src;
+                else if (S(e, "detached") is string dt) src = "own version (from " + dt + ")";
                 var l = new Line { D = e, C1 = S(e, "name"), C2 = S(e, "kind"), C3 = S(e, "label"), C4 = st, C5 = S(e, "reason") ?? "", C6 = src, C7 = S(e, "git") ?? "",
-                                   Mark = B(e, "active") ? (ss.Contains("changed locally") ? Orange : Green) : S(e, "status") == "disabled" ? Orange : Gray, Tip = S(e, "path") };
+                                   Mark = B(e, "active") ? stateBrush ?? Green : S(e, "status") == "disabled" ? Orange : Gray, Tip = S(e, "path") };
                 if (q.Length > 0 && !$"{l.C1} {l.C2} {l.C3} {l.C4} {l.C5} {l.C6}".ToLowerInvariant().Contains(q.ToLowerInvariant())) continue;
                 lines.Add(l);
             }
             entries.ItemsSource = lines;
             ShowEntry();
+        }
+
+        /// <summary>The state of an item from a source: locally changed (orange), upstream newer (blue), both changed (red).</summary>
+        static (string Text, Brush Mark) SourceState(string state)
+        {
+            bool mine = (state ?? "").Contains("changed locally"), theirs = (state ?? "").Contains("newer upstream");
+            return mine && theirs ? ("⇅ both changed", Red) : mine ? ("✎ locally changed", Orange) : theirs ? ("↑ upstream newer", Blue)
+                 : (state ?? "").StartsWith("missing") ? ("✗ missing", Red) : (null, null);
         }
 
         void ShowEntry()
@@ -631,11 +696,13 @@ namespace TcAgentBridge
             m.Items.Add(Item("Switch on", () => { Switch("enable", "project"); Switch("enable", "user"); }, Sel));
             // items installed from a source: your changes, a newer version, back to the source
             bool FromSource() => S((entries.SelectedItem as Line)?.D, "sourceState") != null;
-            (string, string) Item0() { var d = (entries.SelectedItem as Line)?.D; return (S(d, "name"), (S(d, "label") ?? "").Split(' ')[0]); }
+            (string, string) Item0() { var d = (entries.SelectedItem as Line)?.D; return (S(d, "name"), S(d, "installLevel") ?? (S(d, "label") ?? "").Split(' ')[0]); }
             m.Items.Add(new Separator());
-            m.Items.Add(Item("Show my changes (source)", () => { var (n, lv) = Item0(); SourceChanges(n, lv, detail); }, FromSource));
-            m.Items.Add(Item("Merge the new version of the source …", () => { var (n, lv) = Item0(); MergeSource(n, lv, detail); }, FromSource));
-            m.Items.Add(Item("Propose to the source (pull request) …", () => { var (n, lv) = Item0(); ProposeSource(n, lv, detail); }, FromSource));
+            m.Items.Add(Item("Diff (compare with the installed version)", () => { var (n, lv) = Item0(); CompareSource(n, lv, detail); }, FromSource));
+            m.Items.Add(Item("Revert to the installed version …", () => { var (n, lv) = Item0(); RevertSource(n, lv); }, FromSource));
+            m.Items.Add(Item("Keep as own version …", () => { var (n, lv) = Item0(); DetachSource(n, lv); }, FromSource));
+            m.Items.Add(Item("Propose upstream (pull request) …", () => { var (n, lv) = Item0(); ProposeSource(n, lv, detail); }, FromSource));
+            m.Items.Add(Item("Update and merge …", () => { var (n, lv) = Item0(); MergeSource(n, lv, detail); }, FromSource));
             return m;
         }
 
@@ -888,10 +955,11 @@ namespace TcAgentBridge
             installedList.ItemsSource = Arr(data["installed"]).Select(i =>
             {
                 var st = S(i, "state") ?? "";
+                var (stateText, stateBrush) = SourceState(st);
                 return new Line
                 {
-                    D = i, C1 = S(i, "key"), C2 = S(i, "level"), C3 = st, C4 = S(i, "source") + " @" + (S(i, "commit") ?? "").Substring(0, Math.Min(8, (S(i, "commit") ?? "").Length)),
-                    C5 = S(i, "license"), C6 = S(i, "installed"), Mark = st == "ok" ? Green : st.Contains("changed") || st.Contains("missing") ? Red : Orange, Tip = S(i, "url")
+                    D = i, C1 = S(i, "key"), C2 = S(i, "level"), C3 = stateText ?? st, C4 = S(i, "source") + " @" + (S(i, "commit") ?? "").Substring(0, Math.Min(8, (S(i, "commit") ?? "").Length)),
+                    C5 = S(i, "license"), C6 = S(i, "installed"), Mark = stateBrush ?? (st == "ok" ? Green : Orange), Tip = st + " · " + S(i, "url")
                 };
             }).ToList();
         }
@@ -973,7 +1041,10 @@ namespace TcAgentBridge
                 C6 = S(i, "description"), Mark = S(i, "licenseClass") == "accepted" ? Green : S(i, "refusal") != null && S(i, "licenseClass") is "source-available" or "none" ? Red : Orange,
                 Tip = S(i, "refusal") ?? S(i, "path")
             }).ToList();
-            var level = new ComboBox { ItemsSource = string.IsNullOrEmpty(S(data, "solutionDir")) ? new[] { "personal" } : new[] { "personal", "project" }, SelectedIndex = 0, MinWidth = 120, Margin = new Thickness(6, 0, 6, 0) };
+            // every level: user, project, team, company, platforms - a shared level in Git gets a branch for a pull request
+            var levelNames = Levels(true).Where(x => x.Level != null).Select(x => x.Level + (x.Pr ? "  (pull request)" : "")).ToList();
+            if (levelNames.Count == 0) levelNames.Add("user");
+            var level = new ComboBox { ItemsSource = levelNames, SelectedIndex = Math.Max(0, levelNames.FindIndex(x => x.StartsWith("user"))), MinWidth = 200, Margin = new Thickness(6, 0, 6, 0) };
             var install = new Button { Content = "Install …", MinWidth = 90, IsDefault = true };
             var close = new Button { Content = "Close", MinWidth = 80, IsCancel = true, Margin = new Thickness(6, 0, 0, 0) };
             var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(8) };
@@ -989,12 +1060,12 @@ namespace TcAgentBridge
                 if (cls is "source-available" or "none") { MessageBox.Show(w, S(i, "refusal"), "Not installed", MessageBoxButton.OK, MessageBoxImage.Stop); return; }
                 var files = ((IEnumerable)i["files"]).Cast<object>().Select(x => x.ToString()).ToList();
                 var scripts = ((IEnumerable)i["scripts"]).Cast<object>().Select(x => x.ToString()).ToList();
-                var text = $"Install {S(i, "kind")} \"{S(i, "name")}\" from {S(i, "source")} @{(S(i, "commit") ?? "").Substring(0, Math.Min(8, (S(i, "commit") ?? "").Length))} to the {level.SelectedItem} level?\n\n" +
+                var text = $"Install {S(i, "kind")} \"{S(i, "name")}\" from {S(i, "source")} @{(S(i, "commit") ?? "").Substring(0, Math.Min(8, (S(i, "commit") ?? "").Length))} to the {level.SelectedItem} level?{(((string)level.SelectedItem).Contains("pull request") ? " (a commit on a new branch of its repository - you push it and open the pull request)" : "")}\n\n" +
                            $"License: {S(i, "license")}{(cls == "accepted" ? "" : $" - {cls}: check it before you accept it")}\n" +
                            $"Files ({files.Count}): {string.Join(", ", files.Take(20))}{(files.Count > 20 ? " …" : "")}\n" +
                            (scripts.Count > 0 ? $"\nContains scripts: {string.Join(", ", scripts)}\nTcAgent never runs them - read them before you use the skill.\n" : "");
                 if (MessageBox.Show(w, text, "Install", MessageBoxButton.YesNo, scripts.Count > 0 || cls != "accepted" ? MessageBoxImage.Warning : MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-                var (ok, output) = RunCli($"sources install --name {Quote(S(i, "source"))} --item {Quote(S(i, "name"))} --kind {S(i, "kind")} --level {level.SelectedItem}" + (cls == "accepted" ? "" : " --accept-license"));
+                var (ok, output) = RunCli($"sources install --name {Quote(S(i, "source"))} --item {Quote(S(i, "name"))} --kind {S(i, "kind")} --level {Quote(((string)level.SelectedItem).Split(' ')[0])}" + (cls == "accepted" ? "" : " --accept-license"));
                 MessageBox.Show(w, output, ok ? "Installed" : "Not installed", MessageBoxButton.OK, ok ? MessageBoxImage.Information : MessageBoxImage.Warning);
                 if (ok) Load();
             };
@@ -1045,13 +1116,91 @@ namespace TcAgentBridge
             var conflicts = preview.Contains("Conflicts");
             if (!pok && !conflicts) { Report(false, preview, "Merge"); return; }
             if (MessageBox.Show($"Merge the new version of the source into your {name}?\n\n{preview.Trim()}\n\n" +
-                                (conflicts ? "Conflicts are marked with <<<<<<< in the file - edit them afterwards. " : "") +
+                                (conflicts ? "Conflicts open in the merge window of Visual Studio (or are marked with <<<<<<< in the file). " : "") +
                                 "Your version is backed up first.", "TcAgent Knowledge", MessageBoxButton.YesNo,
                                 conflicts ? MessageBoxImage.Warning : MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-            var (ok, o) = RunCli($"sources merge --item {Quote(name)} --level {Quote(level)}");
-            output.Text = o.Trim();
-            status.Text = o.Trim().Split('\n')[0];
+            var (ok, o) = RunCli($"sources merge --json --item {Quote(name)} --level {Quote(level)}");
+            var lines = o.Split('\n').ToList();
+            var cf = lines.FirstOrDefault(x => x.StartsWith("CONFLICT-FILES "));
+            output.Text = string.Join("\n", lines.Where(x => !x.StartsWith("CONFLICT-FILES "))).Trim();
+            status.Text = output.Text.Split('\n')[0];
             if (!ok && !o.Contains("Conflicts")) Report(false, o, "Merge");
+            if (cf != null)
+                try
+                {
+                    foreach (var c in Arr(new JavaScriptSerializer().DeserializeObject(cf.Substring("CONFLICT-FILES ".Length))))
+                        OpenMergeTool(S(c, "theirs"), S(c, "yours"), S(c, "base"), S(c, "result"), S(c, "rel"));
+                }
+                catch (Exception ex) { status.Text = "Merge window: " + ex.Message; }
+            Load();
+        }
+
+        // Visual Studio's merge tool (vsDiffMerge /m): source = the new version, target = yours, base = the installed one,
+        // result = your file (it holds the conflict markers until you save the merge)
+        void OpenMergeTool(string theirs, string yours, string @base, string result, string rel)
+        {
+            string tool = null;
+            try
+            {
+                var ide = Path.GetDirectoryName(Process.GetCurrentProcess().MainModule.FileName);
+                tool = new[] { @"CommonExtensions\Microsoft\TeamFoundation\Team Explorer\vsDiffMerge.exe", "vsDiffMerge.exe" }.Select(p => Path.Combine(ide, p)).FirstOrDefault(File.Exists);
+            }
+            catch { }
+            if (tool == null || theirs == null || yours == null || @base == null)
+            {
+                // no merge tool (e.g. the XAE Shell): the file with the conflict markers in the editor
+                try { (Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(result); } catch { }
+                return;
+            }
+            Process.Start(new ProcessStartInfo(tool, $"/m \"{theirs}\" \"{yours}\" \"{@base}\" \"{result}\" \"Source (new): {rel}\" \"Yours: {rel}\" \"Installed: {rel}\" \"Result: {rel}\"")
+                          { UseShellExecute = false });
+        }
+
+        // the compare window of Visual Studio for every file you changed (installed version left, yours right)
+        void CompareSource(string name, string level, TextBox output)
+        {
+            if (name == null) return;
+            var (ok, o) = RunCli($"sources changes --json --item {Quote(name)} --level {Quote(level)}");
+            if (!ok) { Report(false, o, "Diff"); return; }
+            List<Dictionary<string, object>> files;
+            try { files = Arr(new JavaScriptSerializer().DeserializeObject(o)).ToList(); } catch { output.Text = o; return; }
+            if (files.Count == 0) { status.Text = $"{name}: no local changes."; return; }
+            output.Text = string.Join("\n", files.Select(f => $"{S(f, "kind")}: {S(f, "rel")}"));
+            var diff = Package.GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SVsDifferenceService)) as Microsoft.VisualStudio.Shell.Interop.IVsDifferenceService;
+            foreach (var f in files.Take(8))
+            {
+                var left = S(f, "installed") ?? EmptyFile(); var right = S(f, "yours") ?? EmptyFile();
+                try
+                {
+                    if (diff != null)
+                        diff.OpenComparisonWindow2(left, right, $"{name}: {S(f, "rel")}", $"{left} ↔ {right}", "Installed", "Yours", $"{name}: {S(f, "rel")}", null,
+                                                   (uint)Microsoft.VisualStudio.Shell.Interop.__VSDIFFSERVICEOPTIONS.VSDIFFOPT_LeftFileIsTemporary);
+                    else { output.Text = RunCli($"sources changes --item {Quote(name)} --level {Quote(level)}").output; break; }
+                }
+                catch (Exception ex) { status.Text = "Compare: " + ex.Message; }
+            }
+            if (files.Count > 8) status.Text = $"{files.Count} files changed - the first 8 are open.";
+        }
+
+        static string EmptyFile() { var p = Path.Combine(Path.GetTempPath(), "tcagent-empty.txt"); if (!File.Exists(p)) File.WriteAllText(p, ""); return p; }
+
+        void RevertSource(string name, string level)
+        {
+            if (name == null) return;
+            if (MessageBox.Show($"Revert {name} to the installed version?\n\nYour changes are copied to %LOCALAPPDATA%\\TcAgent\\backups\\sources first (and the knowledge level is backed up).",
+                                "TcAgent Knowledge", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            var (ok, o) = RunCli($"sources revert --item {Quote(name)} --level {Quote(level)}");
+            Report(ok, o, "Revert");
+            Load();
+        }
+
+        void DetachSource(string name, string level)
+        {
+            if (name == null) return;
+            if (MessageBox.Show($"Keep {name} as your own version?\n\nIt is no longer updated from its source and no longer shown as changed; where it came from stays in its header (tcagent-source, tcagent-detached).",
+                                "TcAgent Knowledge", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            var (ok, o) = RunCli($"sources detach --item {Quote(name)} --level {Quote(level)}");
+            Report(ok, o, "Keep as own version");
             Load();
         }
 
@@ -1095,6 +1244,84 @@ namespace TcAgentBridge
             var (ok, output) = RunCli($"sources uninstall --item {Quote(name)} --level {Quote(level)}");
             Report(ok, output, "Uninstall");
             Load();
+        }
+
+        // ------------------------------------------------------------------ backups of the knowledge levels
+        void LoadBackups()
+        {
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var (ok, output) = RunCli("knowledgebase list --json");
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (!ok) { status.Text = "Backups: " + output.Trim(); return; }
+                    try
+                    {
+                        backupLevels = Arr(new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(output)).ToList();
+                        backupList.ItemsSource = backupLevels.SelectMany(l => Arr(l["backups"]).Select(b =>
+                        {
+                            b["level"] = S(l, "level"); b["folder"] = S(l, "folder");
+                            return new Line { D = b, C1 = S(l, "level"), C2 = (S(b, "created") ?? "").Replace('T', ' '), C3 = S(b, "reason"), C4 = Convert.ToString(b["files"]),
+                                              C5 = B(b, "git") ? "uncommitted only (Git)" : "whole level", C6 = S(b, "version"), Mark = B(b, "git") ? Blue : Green, Tip = S(b, "zip") };
+                        })).OrderByDescending(x => x.C2).ToList();
+                    }
+                    catch (Exception ex) { status.Text = "Backups: " + ex.Message; }
+                }));
+            });
+        }
+
+        void BackupNow()
+        {
+            var levels = new[] { "all" }.Concat(backupLevels.Select(l => S(l, "level"))).ToArray();
+            var r = Prompt("Back up the knowledge", ("Level", levels, "all"), ("Reason (optional)", null, "by hand"));
+            if (r == null) return;
+            var (ok, output) = RunCli($"knowledgebase backup --level {Quote(r[0])} --message {Quote(string.IsNullOrWhiteSpace(r[1]) ? "by hand" : r[1].Trim())}");
+            Report(ok, output, "Backup");
+            if (ok) { backupDetail.Text = output.Trim(); status.Text = "Backed up."; }
+            LoadBackups();
+        }
+
+        void DiffBackup(string item)
+        {
+            if (!(backupList.SelectedItem is Line l)) { status.Text = "Select a backup first."; return; }
+            backupDetail.Text = "Comparing ...";
+            var args = $"knowledgebase diff --level {Quote(S(l.D, "level"))} --from {Quote(S(l.D, "zip"))}" + (item != null ? " --item " + Quote(item) : "");
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var (_, output) = RunCli(args);
+                Dispatcher.BeginInvoke(new Action(() => backupDetail.Text = output.Trim()));
+            });
+        }
+
+        // the whole level, one skill/workflow folder or one file: the difference first, then the confirmation
+        void RestoreBackup()
+        {
+            if (!(backupList.SelectedItem is Line l)) { status.Text = "Select a backup in the History tab first."; return; }
+            var paths = ((l.D["paths"] as IEnumerable) ?? new object[0]).Cast<object>().Select(x => x.ToString()).ToList();
+            var folders = paths.Where(p => p.StartsWith("skills/") || p.StartsWith("workflows/") || p.StartsWith("platforms/"))
+                               .Select(p => string.Join("/", p.Split('/').Take(2))).Distinct();
+            var choices = new[] { "(the whole level)" }.Concat(folders).Concat(paths).ToArray();
+            var r = Prompt($"Restore from the backup of {S(l.D, "level")} ({l.C2})", ("What", choices, choices[0]));
+            if (r == null) return;
+            var item = r[0] == choices[0] ? null : r[0];
+            var common = $"--level {Quote(S(l.D, "level"))} --from {Quote(S(l.D, "zip"))}" + (item != null ? " --item " + Quote(item) : "");
+            var (dok, diff) = RunCli("knowledgebase diff " + common);
+            backupDetail.Text = diff.Trim();
+            if (!dok) { Report(false, diff, "Restore"); return; }
+            if (diff.Contains(": 0 file(s) would change")) { status.Text = "Nothing to restore - the level is the same as the backup."; return; }
+            var head = string.Join("\n", diff.Split('\n').Where(x => x.StartsWith("[") || x.Contains("would change")).Take(25));
+            if (MessageBox.Show($"Restore {(item ?? "the whole level")} of {S(l.D, "level")} from {l.C2}?\n\n{head}\n\n(the details are below the list) The current state is backed up first.",
+                                "TcAgent Knowledge", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            var (ok, output) = RunCli("knowledgebase restore " + common);
+            Report(ok, output, "Restore");
+            backupDetail.Text = output.Trim();
+            Load(); LoadBackups();
+        }
+
+        void OpenBackupFolder()
+        {
+            var f = backupList.SelectedItem is Line l ? S(l.D, "folder") : Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "backups", "knowledge");
+            if (f != null) { Directory.CreateDirectory(f); Process.Start(new ProcessStartInfo("explorer.exe", "\"" + f + "\"") { UseShellExecute = false }); }
         }
 
         void DiffInstalled()

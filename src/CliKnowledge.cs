@@ -173,11 +173,12 @@ public static partial class Cli
         };
 
         // items installed from sources: changed locally / newer in the source (as of the last fetch) - shown with the file
-        var sourceState = new List<(string Path, string State)>();
-        foreach (var root in new[] { KnowledgeLayers.ProjectRoot(dir), KnowledgeLayers.UserRoot }.Concat(KnowledgeLayers.TeamRoots).Where(r => r != null))
-            try { foreach (var (key, state, le) in Sources.Status(root)) sourceState.Add((Path.GetFullPath(Sources.InstalledPath(root, key, le)), state)); } catch { }
-        string StateOf(string path) => path == null ? null : sourceState.FirstOrDefault(s => Path.GetFullPath(path).Equals(s.Path, StringComparison.OrdinalIgnoreCase) ||
-                                                                                          Path.GetFullPath(path).StartsWith(s.Path + "\\", StringComparison.OrdinalIgnoreCase)).State;
+        var sourceState = new List<(string Path, string State, string Level)>();
+        foreach (var (label, root) in Sources.InstallRoots(dir))
+            try { foreach (var (key, state, le) in Sources.Status(root)) sourceState.Add((Path.GetFullPath(Sources.InstalledPath(root, key, le)), state, label)); } catch { }
+        (string Path, string State, string Level) Installed(string path) => path == null ? default : sourceState.FirstOrDefault(s => Path.GetFullPath(path).Equals(s.Path, StringComparison.OrdinalIgnoreCase) ||
+                                                                                                    Path.GetFullPath(path).StartsWith(s.Path + "\\", StringComparison.OrdinalIgnoreCase));
+        string StateOf(string path) => Installed(path).State;
         // entries of every kind and level
         var entries = new JsonArray();
         var counts = new JsonObject();
@@ -192,7 +193,7 @@ public static partial class Cli
                     ["kind"] = kind, ["name"] = e.Name, ["key"] = e.Key, ["level"] = e.Layer.Level, ["label"] = e.Layer.Label, ["platform"] = e.Layer.Platform,
                     ["status"] = e.Status, ["active"] = e.Active, ["reason"] = e.Reason, ["path"] = e.Path, ["locked"] = e.Locked, ["force"] = e.Force,
                     ["description"] = e.Meta?.Top.TryGetValue("description", out var d) == true ? d : null,
-                    ["source"] = e.Meta?.Get("source"), ["license"] = e.Meta?.Get("license"), ["sourceState"] = StateOf(e.Path)
+                    ["source"] = e.Meta?.Get("source"), ["license"] = e.Meta?.Get("license"), ["sourceState"] = StateOf(e.Path), ["installLevel"] = Installed(e.Path).Level, ["detached"] = e.Meta?.Get("detached")
                 });
         }
         // the levels with their Git state (behind/ahead as of the last fetch, local changes) and what the window may do there
@@ -269,11 +270,7 @@ public static partial class Cli
         // sources and installed items
         o["sources"] = new JsonArray(Sources.All(dir).Select(s => (JsonNode)new JsonObject { ["name"] = s.Name, ["url"] = s.Url, ["ref"] = s.Ref, ["level"] = s.Level }).ToArray());
         var installed = new JsonArray();
-        var roots = new List<(string, string)>();
-        if (KnowledgeLayers.ProjectRoot(dir) is { } pr) roots.Add(("project", pr));
-        roots.Add(("user", KnowledgeLayers.UserRoot));
-        roots.AddRange(KnowledgeLayers.TeamRoots.Select(t => ("team", t)));
-        foreach (var (label, root) in roots)
+        foreach (var (label, root) in Sources.InstallRoots(dir))
             foreach (var (key, state, e) in Sources.Status(root))
                 installed.Add(new JsonObject { ["key"] = key, ["level"] = label, ["state"] = state, ["source"] = e.Source, ["url"] = e.Url,
                                                ["commit"] = e.Commit, ["license"] = e.License, ["installed"] = e.Installed.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) });

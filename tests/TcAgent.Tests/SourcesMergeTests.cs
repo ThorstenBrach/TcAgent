@@ -122,6 +122,62 @@ public sealed class SourcesMergeTests : IDisposable
     }
 
     [Fact]
+    public void ChangedFilesRevertAndKeepAsOwn()
+    {
+        EditLocal("Step one.", "Step one, mine.");
+        File.WriteAllText(Path.Combine(Root, "skills", "review", "notes.md"), "mine");
+        var files = SourcesMerge.ChangedFiles(Root, Key, Lock, Src);
+        Assert.Equal(new[] { "SKILL.md:changed", "notes.md:added" }, files.Select(f => f.Rel + ":" + f.Kind));
+        Assert.Contains("Step one.", File.ReadAllText(files[0].Installed));
+
+        SourcesMerge.Revert(Root, Key, Lock, Src);
+        Assert.Equal("ok", Sources.Status(Root).Single().State);
+        Assert.Contains("Step one, mine.", File.ReadAllText(Directory.GetFiles(Path.Combine(Root, "backups", "sources"), "SKILL.md", SearchOption.AllDirectories).Single()));
+
+        EditLocal("Step two.", "Step two, mine.");
+        SourcesMerge.Detach(Root, Key, Lock);
+        Assert.Empty(Sources.LoadLock(Root));                                            // no longer tied to the source
+        var fm = KnowledgeLayers.ParseFrontMatter(File.ReadAllText(Local));
+        Assert.StartsWith("collection@", fm.Get("detached"));
+        Assert.Equal("collection/skills/review", fm.Get("source"));                     // the origin stays in the header
+    }
+
+    [Fact]
+    public void ConflictsComeWithTheirThreeVersions()
+    {
+        EditLocal("Step two.", "Step two, my way.");
+        Write(@"collection\skills\review\SKILL.md", Skill.Replace("Step two.", "Step two, their way."));
+        Commit(Repo, "second");
+        var r = SourcesMerge.Merge(Root, Key, Lock, Src, Sources.Fetch(Src), false, dryRun: false);
+        var c = Assert.Single(r.ConflictFiles);
+        Assert.Contains("Step two, my way.", File.ReadAllText(c.Yours));
+        Assert.Contains("Step two, their way.", File.ReadAllText(c.Theirs));
+        Assert.Contains("Step two.", File.ReadAllText(c.Base));
+        Assert.Equal(Path.GetFullPath(Local), Path.GetFullPath(c.Result));
+    }
+
+    [Fact]
+    public void InstallIntoASharedGitLevelAsBranch()
+    {
+        var company = Path.Combine(dir, "company");
+        Directory.CreateDirectory(company);
+        File.WriteAllText(Path.Combine(company, "README.md"), "company knowledge");
+        Git(company, "init -q");
+        Commit(company, "first");
+        var before = Git(company, "rev-parse --abbrev-ref HEAD");
+        var s = Src;
+        var commit = Sources.Fetch(s);
+        var repo = Sources.Checkout(s.Name, s.Url, commit);
+        var msg = SourcesMerge.InstallViaPullRequest(company, Sources.Scan(repo).Single(), s, commit, repo);
+        Assert.Contains("not pushed", msg);
+        Assert.Equal(before, Git(company, "rev-parse --abbrev-ref HEAD"));               // back on the previous branch
+        Assert.False(Directory.Exists(Path.Combine(company, "skills", "review")));      // the working copy is unchanged
+        var branch = Git(company, "branch --list tcagent/install-*").Trim().TrimStart('*').Trim();
+        Assert.Contains("skills/review/SKILL.md", Git(company, $"show --name-only --format= {branch}"));
+        Assert.Contains("skills.lock.json", Git(company, $"show --name-only --format= {branch}"));
+    }
+
+    [Fact]
     public void ProposeRefusesWithoutChanges() =>
         Assert.Throws<InvalidOperationException>(() => SourcesMerge.Propose(Root, Key, Lock, Src, null, new string[0]));
 }

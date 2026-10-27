@@ -252,7 +252,11 @@ these in a pipeline.
   as a commit on a new branch `tcagent/<user>-<item>-<date>` in `%LOCALAPPDATA%\TcAgent\contrib\<source>` plus a patch file –
   without TcAgent's own metadata, checked for private terms, never pushed by the agent (the user pushes in the knowledge
   window, to the source or a fork, and the pull request page opens). `uninstall item` removes an installed item (a copy
-  goes to the backups).
+  goes to the backups), `revert item` goes back to the installed version, `detach item` keeps it as an own version (no
+  longer updated; `tcagent-detached` in the header). `install scope=team|company|company-platform:<name>` on a level kept
+  in Git makes a commit on a new branch for a pull request.
+- **Backups:** the tools that change knowledge (`tc_knowledge`, `tc_skills`, `tc_sources`, `tc_improve`, `tc_lessons`,
+  `tc_coding_rules_add`, `tc_risk_rules`, `tc_docs_add`) back up the changed levels first (`TcAgent.exe knowledgebase`).
 - `install`, `pull` and `promote` show what they do and ask the user (with `TCAGENT_CONFIRM=off` without a question).
 - **Overlay:** an own skill with `metadata.tcagent-extends: <skill>` shows the extended skill first and its own text as
   additions – TwinCAT parts for a general skill without changing the original.

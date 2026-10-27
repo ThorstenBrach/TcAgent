@@ -5,6 +5,25 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.47.0] – 2026-10-27
+
+### Added
+- **Backup and restore of the knowledge** (`KnowledgeBackup.cs`, `TcAgent.exe knowledgebase list|backup|diff|restore`):
+  every kind on every level (company, user, team, platform, project) is backed up automatically before every change -
+  knowledge window, chat tools, command line - as a ZIP with `manifest.json` (version, level, SHA-256), only when the
+  level changed, the last 20 per level. Levels in Git: only uncommitted (and ignored) files. Restore of the whole level,
+  one file or one skill/workflow: the difference first, then the confirmation, the current state backed up before.
+  Knowledge window: **Backup …** / **Restore …** in the top bar, the backups in the tab History.
+- Installed items: **Revert …**, **Keep as own version …** (`tcagent-detached`), **Diff** in the compare window of
+  Visual Studio, conflicts of **Update and merge …** in the merge window of Visual Studio (`vsDiffMerge`); the state
+  **⇅ both changed** besides locally changed and upstream newer, in colour in Files and Sources; refreshed when a file of
+  a level is saved in the editor. `tc_sources action=revert|detach`, `TcAgent.exe sources revert|detach`.
+- Install from a source into every level - team, company, platforms; a level kept in Git gets a commit on a new branch
+  for a pull request.
+
+### Changed
+- Installed items on the company level and in platform folders are listed and checked too.
+
 ## [0.46.0] – 2026-10-27
 
 ### Added

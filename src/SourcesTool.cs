@@ -14,21 +14,21 @@ public sealed partial class ToolRegistry
     {
         Add("tc_sources", "Git repositories as sources of skills, workflows, coding rules, risk rules and lessons (an external skill collection, " +
                           "a team, platform or company repository). action=list (sources and installed items), add name url [ref] [scope], remove name, " +
-                          "search [query] [source], install item=<source>/<name> [kind] scope=personal|project|platform:<name> (license check, shows files " +
+                          "search [query] [source], install item=<source>/<name> [kind] scope=personal|project|team|company|platform:<name>|company-platform:<name> (shared levels in Git: a branch for a pull request; license check, shows files " +
                           "and scripts, asks the user; MIT/Apache/BSD/ISC accepted, source-available and unlicensed refused, others only with acceptLicense), " +
                           "status (ok / changed locally / newer upstream), pull [item] (updates after asking; skips locally changed items unless force), " +
                           "diff item, changes item (what the user changed in an installed item), merge item (a newer version of the source into the locally changed " +
                           "item, three-way; dryRun first, then only after the user agreed - conflicts are marked in the file), propose item message (the local " +
-                          "changes as a commit on a new branch of the source plus a patch - never pushed; the user pushes in the knowledge window), uninstall item (only when the user asks; a copy goes to the backups), promote item=<kind>/<name> scope=personal|team|platform:<name>|company (own item one level up; checked for specific names; " +
+                          "changes as a commit on a new branch of the source plus a patch - never pushed; the user pushes in the knowledge window), uninstall item (only when the user asks; a copy goes to the backups), revert item (back to the installed version, after asking), detach item (keep as own version: no longer updated, the origin stays in the header), promote item=<kind>/<name> scope=personal|team|platform:<name>|company (own item one level up; checked for specific names; " +
                           "company and a team in Git as a commit on a new branch for a pull request). Installed items are pinned in skills.lock.json of their level.",
-            Schema(Req(P("action", "string", "list, add, remove, search, install, status, pull, diff, changes, merge, propose, uninstall or promote")),
+            Schema(Req(P("action", "string", "list, add, remove, search, install, status, pull, diff, changes, merge, propose, uninstall, revert, detach or promote")),
                    P("name", "string", "add/remove: source name (lowercase, hyphens)"),
                    P("url", "string", "add: Git URL or path of the repository"),
                    P("ref", "string", "add: branch or tag (default HEAD)"),
                    P("item", "string", "install/pull/diff: <source>/<name> or <name>; promote: <kind>/<name>, e.g. skills/driver-fb"),
                    P("kind", "string", "install: skills, workflows, coding-rules, risk-rules or lessons (when a name exists in several kinds)"),
                    P("query", "string", "search: words in name or description"),
-                   P("scope", "string", "add: personal (default) or project; install: personal (default), project, team or platform:<name>; promote: personal, team, platform:<name> or company"),
+                   P("scope", "string", "add: personal (default) or project; install: personal (default), project, team, company, platform:<name> or company-platform:<name>; changes/merge/propose/revert/detach/uninstall: the level if installed on several; promote: personal, team, platform:<name> or company"),
                    P("acceptLicense", "boolean", "install/pull: take over an item whose license is neither accepted nor refused (e.g. copyleft) - after the user checked it"),
                    P("force", "boolean", "install: overwrite an own file of the same name; pull: also update locally changed items"),
                    P("message", "string", "propose: what the change improves (the commit message)"),
@@ -50,8 +50,8 @@ public sealed partial class ToolRegistry
                         "pull" => SourcesPull(a, dir),
                         "diff" => SourcesDiff(dir, Str(a, "item") ?? throw new ArgumentException("item is required")),
                         "promote" => SourcesPromote(a, dir),
-                        "changes" or "merge" or "propose" or "uninstall" => SourcesLocal(a, dir),
-                        _ => throw new ArgumentException("action: list, add, remove, search, install, status, pull, diff, changes, merge, propose, uninstall or promote")
+                        "changes" or "merge" or "propose" or "uninstall" or "revert" or "detach" => SourcesLocal(a, dir),
+                        _ => throw new ArgumentException("action: list, add, remove, search, install, status, pull, diff, changes, merge, propose, uninstall, revert, detach or promote")
                     };
                 }
                 catch (ArgumentException ex) { throw new Exception("NOT done: " + ex.Message); }
@@ -72,6 +72,8 @@ public sealed partial class ToolRegistry
         switch (Str(a, "action")!.ToLowerInvariant())
         {
             case "uninstall": return SourcesMerge.Uninstall(root, key, e);
+            case "revert": return SourcesMerge.Revert(root, key, e, src);
+            case "detach": return SourcesMerge.Detach(root, key, e);
             case "changes": return $"{key} ({label}) - the user's changes since the install @{e.Commit[..8]}:\n\n{SourcesMerge.LocalDiff(root, key, e, src)}";
             case "merge":
             {
@@ -96,16 +98,7 @@ public sealed partial class ToolRegistry
     static string SourceOfItem(string item) => item != null && item.Contains('/') ? item.Split('/')[0] : null;
 
     /// <summary>The level roots that can hold installed items: project, user and the user's platform folders.</summary>
-    static List<(string Label, string Root)> InstallRoots(string dir)
-    {
-        var list = new List<(string, string)>();
-        if (KnowledgeLayers.ProjectRoot(dir) is { } p) list.Add(("project", p));
-        list.Add(("user", KnowledgeLayers.UserRoot));
-        foreach (var t in KnowledgeLayers.TeamRoots) list.Add(("team", t));
-        var plat = Path.Combine(KnowledgeLayers.UserRoot, "platforms");
-        if (Directory.Exists(plat)) foreach (var d in Directory.GetDirectories(plat)) list.Add(("user · " + Path.GetFileName(d), d));
-        return list;
-    }
+    static List<(string Label, string Root)> InstallRoots(string dir) => Sources.InstallRoots(dir);
 
     string SourcesList(string dir)
     {
@@ -165,7 +158,10 @@ public sealed partial class ToolRegistry
         var repo = Sources.Checkout(s.Name, s.Url, commit);
         var it = FindItem(Sources.Scan(repo), name, Str(a, "kind"));
         if (Sources.LicenseRefusal(it, Bool(a, "acceptLicense", false)) is { } lic) throw new InvalidOperationException(lic);
-        var root = Sources.RootOf(dir, Str(a, "scope") ?? "personal");
+        // every level; a shared level kept in Git gets a branch for a pull request
+        var level = (Str(a, "scope") ?? "user").Trim().ToLowerInvariant() is "personal" ? "user" : (Str(a, "scope") ?? "user").Trim();
+        var root = KnowledgeOps.RootOf(dir, level);
+        var viaPr = KnowledgeOps.ViaPullRequest(level, root) && KnowledgeOps.RepoOf(Directory.Exists(root) ? root : Path.GetDirectoryName(root)) != null;
         var target = Sources.TargetOf(root, it);
         bool exists = Directory.Exists(target) || File.Exists(target);
         if (exists && !Sources.LoadLock(root).ContainsKey(it.Key) && !Bool(a, "force", false))
@@ -175,8 +171,10 @@ public sealed partial class ToolRegistry
         var what = $"Install {it.Kind[..^1]} '{it.Name}' from {s.Name} @{commit[..8]} ({s.Url}), license {it.License}, into {target}\n" +
                    $"Files: {string.Join(", ", files.Take(30))}{(files.Count > 30 ? $" … ({files.Count})" : "")}" +
                    (scripts.Count > 0 ? $"\nContains scripts ({string.Join(", ", scripts)}) - TcAgent never runs them; read them before using the skill." : "");
+        if (viaPr) what += "\nThe level is shared in Git: a commit on a new branch for a pull request (not pushed).";
         if (DryRun(a)) return "PROPOSAL (nothing installed):\n" + what;
         AskImprove(what);
+        if (viaPr) { Directory.CreateDirectory(root); return SourcesMerge.InstallViaPullRequest(root, it, s, commit, repo); }
         var e = Sources.Install(root, repo, it, s, commit);
         return $"Installed: {target}\nPinned in {Path.Combine(root, Sources.LockFile)} (commit {e.Commit[..8]}).";
     }

@@ -337,6 +337,25 @@ public static class Sources
 
     public static string KindDir(string key) => key.Split('/')[0];
 
+    /// <summary>Every level root that can hold installed items, with the level name the commands take: project, user,
+    /// platform:&lt;name&gt; (yours), team / team:&lt;folder&gt;, company, company-platform:&lt;name&gt;.</summary>
+    public static List<(string Label, string Root)> InstallRoots(string solutionDir)
+    {
+        var list = new List<(string, string)>();
+        if (KnowledgeLayers.ProjectRoot(solutionDir) is { } p) list.Add(("project", p));
+        list.Add(("user", KnowledgeLayers.UserRoot));
+        void Platforms(string root, string prefix)
+        {
+            var d = Path.Combine(root, "platforms");
+            if (Directory.Exists(d)) foreach (var f in Directory.GetDirectories(d)) list.Add((prefix + Path.GetFileName(f), f));
+        }
+        Platforms(KnowledgeLayers.UserRoot, "platform:");
+        var teams = KnowledgeLayers.TeamRoots;
+        foreach (var t in teams) list.Add((teams.Count > 1 ? "team:" + Path.GetFileName(t.TrimEnd('\\', '/')) : "team", t));
+        if (KnowledgeLayers.CompanyRoot is { } c && Directory.Exists(c)) { list.Add(("company", c)); Platforms(c, "company-platform:"); }
+        return list;
+    }
+
     /// <summary>The installed path of a lock entry.</summary>
     public static string InstalledPath(string root, string key, LockEntry e) =>
         FolderKinds.ContainsKey(KindDir(key)) ? Path.Combine(root, KindDir(key), key.Split('/')[1]) : Path.Combine(root, KindDir(key), Path.GetFileName(e.Path));

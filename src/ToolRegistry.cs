@@ -1624,6 +1624,10 @@ public sealed partial class ToolRegistry
                     throw new OperationCanceledException(refused);
                 }
             }
+            // the knowledge levels are backed up before a tool changes them (KnowledgeBackup.cs - only what changed since the last backup)
+            if (name is "tc_knowledge" or "tc_skills" or "tc_sources" or "tc_improve" or "tc_lessons" or "tc_coding_rules_add" or "tc_risk_rules" or "tc_docs_add"
+                && Policy.ClassOf(name, args) != ToolClass.Read && !DryRun(args))
+                KnowledgeBackup.BeforeWrite(SolutionDir(), name + " " + (Str(args, "action") ?? ""));
             Log.Info($"{name} started{LogAttrs(args)}");
             // tc_refactor apply/result wait for the user themselves (job with its own dialog watch) - see RefactorJobs.cs
             text = WatchesItself(name, args) ? t.Handler(args) : RunWatchingDialogs(name, () => t.Handler(args), args);

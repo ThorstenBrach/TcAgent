@@ -24,6 +24,7 @@ exit code, JUnit XML and inline annotations.
 | `TcAgent.exe feedback --open --markdown feedback.md` | Markdown report of the agents' `tc_feedback` entries (grouped by tool, ready for GitHub issues); `--summary` for counts, `--path` for another store; no IDE needed | weekly triage of a shared feedback folder |
 | `TcAgent.exe sources sync --solution X.sln` | restores the skills, workflows and rules installed from Git sources exactly at the commit in `skills.lock.json`; `--dry-run` only compares (exit 1 on differences); no IDE needed | before the build, so every runner works with the same knowledge |
 | `TcAgent.exe backup --target 5.1.2.3.1.1,5.1.2.4.1.1 --solution X.sln` | runtime data of each PLC (persistent, retain of the code, `--include` patterns or `.tcagent\backup.json`) as one JSON file per PLC; `restore --from <file> --target <id> --allow <id> [--dry-run]` writes the differences back (PLC stopped unless `--while-running`) | nightly backup of the machine park, before a software update |
+| `TcAgent.exe knowledgebase list\|backup\|diff\|restore` | backups of the knowledge levels (made automatically before every change); `restore --level <level> [--from <zip>] [--item <file or skills/name>] [--dry-run]` | restoring rules or skills after a mistake |
 | `TcAgent.exe diag` | versions of TcAgent, extension, TwinCAT and IDEs, runtime state, Windows – as a Markdown list for an issue report; no IDE needed | when a pipeline fails and you report it |
 
 ```powershell

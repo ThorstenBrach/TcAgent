@@ -22,13 +22,10 @@ public static partial class Cli
     static int SourcesCli(Options o)
     {
         var dir = o.Solution != null ? Path.GetDirectoryName(Path.GetFullPath(o.Solution)) : null;
-        if (o.Sub is "add" or "remove" or "search" or "install" or "pull" or "diff" or "changes" or "merge" or "propose" or "push" or "uninstall")
+        if (o.Sub is "add" or "remove" or "search" or "install" or "pull" or "diff" or "changes" or "merge" or "propose" or "push" or "uninstall" or "revert" or "detach")
             try { return SourcesEdit(o, dir); }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or TimeoutException) { Console.Error.WriteLine(ex.Message); return Failed; }
-        var roots = new List<(string Label, string Root)>();
-        if (KnowledgeLayers.ProjectRoot(dir) is { } p) roots.Add(("project", p));
-        roots.Add(("user", KnowledgeLayers.UserRoot));
-        roots.AddRange(KnowledgeLayers.TeamRoots.Select(t => ("team", t)));
+        var roots = Sources.InstallRoots(dir);
         int differs = 0;
         foreach (var (label, root) in roots)
             foreach (var (key, state, e) in Sources.Status(root))
@@ -58,10 +55,7 @@ public static partial class Cli
         Console.OutputEncoding = new System.Text.UTF8Encoding(false);
         Sources.Source Find(string name) => Sources.All(dir).FirstOrDefault(s => s.Name.Equals(name ?? "", StringComparison.OrdinalIgnoreCase))
                                             ?? throw new ArgumentException($"source '{name}' not defined");
-        var roots = new List<(string Label, string Root)>();
-        if (KnowledgeLayers.ProjectRoot(dir) is { } pr) roots.Add(("project", pr));
-        roots.Add(("user", KnowledgeLayers.UserRoot));
-        roots.AddRange(KnowledgeLayers.TeamRoots.Select(t => ("team", t)));
+        var roots = Sources.InstallRoots(dir);
         // an installed item by name (and level label, if it is installed on several levels)
         (string Label, string Root, string Key, Sources.LockEntry E, Sources.Source Src) Locate()
         {
@@ -85,7 +79,26 @@ public static partial class Cli
             case "changes":
             {
                 var (label, root, key, e, src) = Locate();
+                if (o.Json)
+                {
+                    // for the compare window of the IDE: your file and the installed one side by side
+                    Console.WriteLine(new System.Text.Json.Nodes.JsonArray(SourcesMerge.ChangedFiles(root, key, e, src).Select(f => (System.Text.Json.Nodes.JsonNode)new System.Text.Json.Nodes.JsonObject
+                        { ["rel"] = f.Rel, ["installed"] = f.Installed, ["yours"] = f.Yours, ["kind"] = f.Kind }).ToArray()).ToJsonString());
+                    return Ok;
+                }
                 Console.WriteLine($"{key} ({label}) from {src.Name} @{e.Commit[..8]} - your changes since the install:\n\n{SourcesMerge.LocalDiff(root, key, e, src)}");
+                return Ok;
+            }
+            case "revert":
+            {
+                var (_, root, key, e, src) = Locate();
+                Console.WriteLine(SourcesMerge.Revert(root, key, e, src));
+                return Ok;
+            }
+            case "detach":
+            {
+                var (_, root, key, e, _) = Locate();
+                Console.WriteLine(SourcesMerge.Detach(root, key, e));
                 return Ok;
             }
             case "merge":
@@ -95,6 +108,9 @@ public static partial class Cli
                 if (up == e.Commit) { Console.WriteLine($"{key}: the source has no newer version (@{up[..8]})."); return Ok; }
                 var from = e.Commit[..8];
                 var r = SourcesMerge.Merge(root, key, e, src, up, o.AcceptLicense, o.DryRun);
+                if (o.Json && !o.DryRun)
+                    Console.WriteLine("CONFLICT-FILES " + new System.Text.Json.Nodes.JsonArray(r.ConflictFiles.Select(c => (System.Text.Json.Nodes.JsonNode)new System.Text.Json.Nodes.JsonObject
+                        { ["rel"] = c.Rel, ["base"] = c.Base, ["theirs"] = c.Theirs, ["yours"] = c.Yours, ["result"] = c.Result }).ToArray()).ToJsonString());
                 Console.WriteLine($"{key} ({label}): {(o.DryRun ? "merge preview" : "merged")} {from} -> {up[..8]}\n" +
                                   Lines("Conflicts - marked with <<<<<<< in the file", r.Conflicts) + Lines("Merged (yours and the source's changes)", r.Merged) +
                                   Lines("Taken from the source", r.Taken) + Lines("Deleted in the source", r.Deleted) +
@@ -157,10 +173,19 @@ public static partial class Cli
                 if (matches.Count != 1) throw new ArgumentException(matches.Count == 0 ? $"'{o.Item}' not found in {s.Name}" : $"'{o.Item}' exists in several kinds - give --kind");
                 var it = matches[0];
                 if (Sources.LicenseRefusal(it, o.AcceptLicense) is { } lic) throw new InvalidOperationException(lic);
-                var root = Sources.RootOf(dir, o.Level ?? "personal");
+                // every level: personal/user, project, team(:<folder>), platform:<name>, company, company-platform:<name>
+                var level = (o.Level ?? "user").Trim().ToLowerInvariant() is "personal" ? "user" : (o.Level ?? "user").Trim();
+                var root = KnowledgeOps.RootOf(dir, level);
                 var target = Sources.TargetOf(root, it);
                 if ((Directory.Exists(target) || File.Exists(target)) && !Sources.LoadLock(root).ContainsKey(it.Key))
                     throw new InvalidOperationException($"{target} exists and was not installed from a source - an own file");
+                // a shared level kept in Git changes by pull request: a commit on a new branch, never pushed
+                if (KnowledgeOps.ViaPullRequest(level, root) && KnowledgeOps.RepoOf(Directory.Exists(root) ? root : Path.GetDirectoryName(root)) != null)
+                {
+                    Directory.CreateDirectory(root);
+                    Console.WriteLine($"{it.Key} for the {level} level: " + SourcesMerge.InstallViaPullRequest(root, it, s, commit, repo));
+                    return Ok;
+                }
                 var e = Sources.Install(root, repo, it, s, commit);
                 Console.WriteLine($"Installed: {target} (commit {e.Commit[..8]}, license {e.License})");
                 return Ok;
