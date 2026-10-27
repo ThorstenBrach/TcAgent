@@ -5,6 +5,13 @@ Versions follow [Semantic Versioning](https://semver.org/); server and extension
 
 ## [Unreleased]
 
+## [0.48.1] – 2026-10-27
+
+### Changed
+- Documentation tab, **Add link or folder …** / **Edit …**: a dialog with the choice link or folder; for a folder or
+  network share **Browse …** opens a folder dialog, for a link the address is checked (https://); comment and level as
+  before.
+
 ## [0.48.0] – 2026-10-27
 
 ### Added

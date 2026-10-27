@@ -1760,14 +1760,13 @@ namespace TcAgentBridge
             var d = l?.D;
             if (d != null && !(S(d, "origin") ?? "").EndsWith("knowledge.md", StringComparison.OrdinalIgnoreCase))
             {
-                if (S(d, "type") == "documents") { Hint("A document folder: its documents are what the agent searches. It opens now - add or delete documents there (or use \"Add documents (copy files) …\")."); OpenDoc(); }
+                if (S(d, "type") == "documents") { Hint("A document folder: its documents are what the agent searches. It opens now - add or delete documents there (or use \"Add documents …\")."); OpenDoc(); }
                 else Hint(S(d, "type") == "web" ? "Beckhoff InfoSys is built in and cannot be changed." : "This source comes from the variable TCAGENT_KNOWLEDGE (settings.json) - change it there.");
                 return;
             }
             var levels = docsLevels.Length > 0 ? docsLevels : new[] { "user" };
-            var r = Prompt(d == null ? "Add a documentation source" : "Edit documentation source",
-                           ("URL (https://…), folder (C:\\…) or network share (\\\\server\\share\\…)", null, S(d, "raw") ?? ""), ("Comment (optional)", null, S(d, "note") ?? ""),
-                           ("Level", levels, S(d, "levelName") ?? (levels.Contains("project") ? "project" : levels[0])));
+            var r = DocSourceDialog(d == null ? "Add link or folder" : "Edit link or folder", S(d, "raw"), S(d, "note"),
+                                    S(d, "levelName") ?? (levels.Contains("project") ? "project" : levels[0]), levels, S(d, "type"));
             if (r == null || r[0].Trim().Length == 0) return;
             if (d != null)
             {
@@ -1777,6 +1776,63 @@ namespace TcAgentBridge
             var (ok, output) = RunCli($"knowledge docs --action add --level {Quote(r[2])} --url {Quote(r[0].Trim())}" + (r[1].Trim().Length > 0 ? " --message " + Quote(r[1].Trim()) : ""));
             Report(ok, output, d == null ? "Add documentation source" : "Edit documentation source");
             LoadDocs();
+        }
+
+        // a link or a folder: for a folder a folder dialog (also for network shares), for a link the address
+        string[] DocSourceDialog(string title, string value, string note, string level, string[] levels, string type)
+        {
+            var w = new Window { Title = title, SizeToContent = SizeToContent.WidthAndHeight, MinWidth = 560, ResizeMode = ResizeMode.NoResize,
+                                 WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Application.Current?.MainWindow, ShowInTaskbar = false };
+            var sp = new StackPanel { Margin = new Thickness(12) };
+            var isLink = new RadioButton { Content = "Link (web address - only pages below it are read)", GroupName = "kind", Margin = new Thickness(0, 0, 0, 2) };
+            var isFolder = new RadioButton { Content = "Folder or network share (its documents are searched)", GroupName = "kind", Margin = new Thickness(0, 0, 0, 8) };
+            var folderLike = type is "folder" or "share" || value != null && !value.StartsWith("http", StringComparison.OrdinalIgnoreCase) && value.Length > 0;
+            (folderLike ? isFolder : isLink).IsChecked = true;
+            sp.Children.Add(isLink); sp.Children.Add(isFolder);
+            var label = new TextBlock { Margin = new Thickness(0, 0, 0, 2) };
+            sp.Children.Add(label);
+            var row = new DockPanel();
+            var browse = new Button { Content = "Browse …", MinWidth = 80, Margin = new Thickness(6, 0, 0, 0) };
+            var box = new TextBox { Text = value ?? "", MinWidth = 420 };
+            DockPanel.SetDock(browse, Dock.Right); row.Children.Add(browse); row.Children.Add(box);
+            sp.Children.Add(row);
+            void Kind()
+            {
+                var folder = isFolder.IsChecked == true;
+                label.Text = folder ? "Folder (C:\\…) or network share (\\\\server\\share\\…):" : "Address (https://…):";
+                browse.Visibility = folder ? Visibility.Visible : Visibility.Collapsed;
+                if (!folder && box.Text.Length == 0) box.Text = "https://";
+                if (folder && box.Text == "https://") box.Text = "";
+            }
+            isLink.Checked += (s, e) => Kind(); isFolder.Checked += (s, e) => Kind();
+            Kind();
+            browse.Click += (s, e) =>
+            {
+                using (var dlg = new System.Windows.Forms.FolderBrowserDialog { Description = "Folder with documents for the agent", ShowNewFolderButton = false,
+                                                                               SelectedPath = Directory.Exists(box.Text) ? box.Text : "" })
+                    if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK) box.Text = dlg.SelectedPath;
+            };
+            sp.Children.Add(new TextBlock { Text = "Comment (optional):", Margin = new Thickness(0, 8, 0, 2) });
+            var comment = new TextBox { Text = note ?? "" };
+            sp.Children.Add(comment);
+            sp.Children.Add(new TextBlock { Text = "Level (its knowledge.md):", Margin = new Thickness(0, 8, 0, 2) });
+            var lv = new ComboBox { ItemsSource = levels, SelectedItem = levels.Contains(level) ? level : levels[0] };
+            sp.Children.Add(lv);
+            var ok = new Button { Content = "OK", MinWidth = 80, IsDefault = true, Margin = new Thickness(0, 12, 6, 0) };
+            var cancel = new Button { Content = "Cancel", MinWidth = 80, IsCancel = true, Margin = new Thickness(0, 12, 0, 0) };
+            ok.Click += (s, e) =>
+            {
+                var v = box.Text.Trim();
+                if (isLink.IsChecked == true && !(v.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || v.StartsWith("https://", StringComparison.OrdinalIgnoreCase)) || v == "https://")
+                { MessageBox.Show(w, "A link starts with https:// (or http://).", title, MessageBoxButton.OK, MessageBoxImage.Information); return; }
+                if (isFolder.IsChecked == true && !(v.StartsWith(@"\\") || System.Text.RegularExpressions.Regex.IsMatch(v, @"^[A-Za-z]:\\") || v.StartsWith("%")))
+                { MessageBox.Show(w, "Choose a folder (Browse …) or type a path like C:\\Manuals or \\\\server\\share\\manuals.", title, MessageBoxButton.OK, MessageBoxImage.Information); return; }
+                w.DialogResult = true;
+            };
+            var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
+            bar.Children.Add(ok); bar.Children.Add(cancel); sp.Children.Add(bar);
+            w.Content = sp;
+            return w.ShowDialog() == true ? new[] { box.Text.Trim(), comment.Text.Trim(), lv.SelectedItem as string } : null;
         }
 
         void RemoveDoc()
