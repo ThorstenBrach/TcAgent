@@ -139,6 +139,8 @@ namespace TcAgentBridge
                 r = new Dictionary<string, object> { ["version"] = BridgeVersion, ["pid"] = System.Diagnostics.Process.GetCurrentProcess().Id, ["is64bit"] = Environment.Is64BitProcess };
             // tc_ask_user: waits for the user's answer in the chat - not on the UI thread (the card is shown there)
             else if (cmd == "ask") r = AskUser(req);
+            // confirmation before a runtime action: a gate card in the chat when it is open (waits here, not on the UI thread)
+            else if (cmd == "confirm" && ChatControl.Instance != null) r = ConfirmInChat(Str(req, "title"), Str(req, "text"));
             // a test run started elsewhere (tc_test_run from an AI client): its events are handed to the TcUnit Tests window
             // without waiting for the UI - the run never slows the IDE down and the window catches up when it is idle
             else if (cmd == "tcunit_event")
@@ -210,6 +212,17 @@ namespace TcAgentBridge
             bool ok = r == System.Windows.MessageBoxResult.Yes;
             Log("Confirmation '" + text + "': " + (ok ? "yes" : "no"));
             try { ChatControl.Instance?.Notice(ok ? "Confirmed: " + text : "Declined: " + text); } catch { }
+            return new Dictionary<string, object> { ["confirmed"] = ok };
+        }
+
+        // the gate card in the TcAgent Chat (ChatCards.cs): goal, consequence, gate and Execute / Don't execute
+        Dictionary<string, object> ConfirmInChat(string title, string text)
+        {
+            ui.Invoke(new Action(() => ShowChat()));
+            var chat = ChatControl.Instance;
+            if (chat == null) return (Dictionary<string, object>)ui.Invoke(new Func<Dictionary<string, object>>(() => ConfirmAction(title, text)));
+            bool ok = chat.AskGate(title, text);
+            Log("Confirmation '" + text + "': " + (ok ? "yes" : "no"));
             return new Dictionary<string, object> { ["confirmed"] = ok };
         }
 

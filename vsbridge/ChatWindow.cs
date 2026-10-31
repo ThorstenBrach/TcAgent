@@ -3,6 +3,7 @@
 // headless, with TcAgent as its MCP toolbox. The editor context (object, part, line, selection)
 // and a truncated history are passed along automatically - so every CLI works the same, without its own sessions.
 // Configuration: %LOCALAPPDATA%\TcAgent\chat-backends.json (created by setup-clients.ps1; otherwise defaults).
+// The backend shows its state as a dot (● ready, ◐ starting / working, ● error); the status line the tool calls and the time.
 using System;
 using System.Collections;
 using System.Collections.Generic;
@@ -147,7 +148,22 @@ namespace TcAgentBridge
         internal void Notice(string msg)
         {
             if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(() => Notice(msg))); return; }
-            SystemLine("[TcAgent] " + msg);
+            msg = (msg ?? "").Trim();
+            var setupDone = Regex.Match(msg, @"^TcAgent (\S+) registered:");
+            if (setupDone.Success)
+            {
+                // "TcAgent x is set up for n clients - restart the open ones", the paths only in the details
+                var lines = msg.Split('\n').Select(l => l.Trim()).Where(l => l.StartsWith("- ")).ToList();
+                var clients = lines.Count(l => !Regex.IsMatch(l, @"^- (Settings|Guide|Chat window|Environment)\b", RegexOptions.IgnoreCase));
+                Info($"✓ TcAgent {setupDone.Groups[1].Value} is set up for {clients} client{(clients == 1 ? "" : "s")} - restart the open ones (desktop apps: tray icon > Quit).",
+                     ShortPaths(string.Join("\n", lines)));
+            }
+            else if (msg.Contains("\n") || msg.Length > 160 || Regex.IsMatch(msg, @"could not|failed|not found|error", RegexOptions.IgnoreCase))
+            {
+                var first = msg.Split('\n')[0];
+                Info(Short(ShortPaths(first), 200), msg.Contains("\n") || first.Length > 200 ? ShortPaths(msg) : null, Regex.IsMatch(msg, @"could not|failed|not found|error", RegexOptions.IgnoreCase));
+            }
+            else SystemLine(msg);
             UpdateVersionLabel();      // e.g. after the automatic setup at startup ("TcAgent x registered")
         }
 
@@ -178,7 +194,7 @@ namespace TcAgentBridge
             stop.Click += (s, e) => Stop();
             setup.Click += (s, e) =>
             {
-                status.Text = "Setting up AI clients ...";
+                status.Text = "Setting up AI clients …";
                 System.Threading.Tasks.Task.Run(() =>
                 {
                     Installer.Run(true, _ => { }, m => BridgePackage.Instance?.Notify(m));
@@ -190,28 +206,79 @@ namespace TcAgentBridge
             {
                 try { BridgePackage.Instance?.ShowTcUnit(true); } catch (Exception ex) { status.Text = "TcUnit window: " + ex.Message; }
             };
-            clear.Click += (s, e) => { history.Clear(); msgs.Children.Clear(); cur = null; KillSession(); UpdateVersionLabel(); status.Text = "New conversation."; WarmUp(); };
+            clear.Click += (s, e) =>
+            {
+                history.Clear(); msgs.Children.Clear(); cur = null; lock (toolCalls) toolCalls.Clear(); contextOff = false;
+                KillSession(); UpdateVersionLabel(); ShowEmptyState(); UpdateContextChip(); status.Text = "New conversation."; WarmUp();
+            };
             // Pre-start the Claude session as soon as the window becomes visible or the backend changes
             IsVisibleChanged += (s, e) => { if (IsVisible) WarmUp(); };
-            backendBox.SelectionChanged += (s, e) => { SaveDefaultBackend(Current?.Key); if (IsVisible && !busy) WarmUp(); };
+            backendBox.SelectionChanged += (s, e) => { SaveDefaultBackend(Current?.Key); UpdatePlaceholder(); if (IsVisible && !busy) WarmUp(); };
             Dispatcher.ShutdownStarted += (s, e) => KillSession();
             input.PreviewKeyDown += (s, e) =>
             {
                 if (InputKey(e)) e.Handled = true;
+                else if (e.Key == Key.Escape && busy) { e.Handled = true; Stop(); }
                 else if (e.Key == Key.Escape) { e.Handled = true; BridgePackage.Instance?.ReturnToEditor(); }
             };
-            status.Text = File.Exists(SettingsFile) ? "Ready." : "Default settings - run setup-clients.ps1 once to set up all clients.";
-            SystemLine("TcAgent Chat - choose a backend above, enter your question below. The agent works directly in this TwinCAT solution through the TcAgent tools (tc_*). " +
-                       "Paste or drop documents (manuals, data sheets, screenshots) into the input box to give them to the agent.");
+            status.Text = File.Exists(SettingsFile) ? "Ready." : "Default settings - \"⋯ > Set up clients\" sets up all clients.";
+            turnClock.Tick += (s, e) => ShowWorking();
+            ShowEmptyState();
+            UpdatePlaceholder();
         }
 
         // ------------------------------------------------------------------ Settings
         DateTime settingsStamp;
 
+        // the backend in the combo box: short name and a dot for its state (the word in the tooltip and the status line)
+        readonly Dictionary<string, (TextBlock Dot, string State)> backendState = new Dictionary<string, (TextBlock, string)>();
+
+        /// <summary>"Claude (Claude Code)" -> "Claude Code", "GitHub Copilot (CLI)" -> "GitHub Copilot".</summary>
+        internal static string ShortName(string name)
+        {
+            var m = Regex.Match(name ?? "", @"^(.*?)\s*\((.+)\)\s*$");
+            if (!m.Success) return name;
+            return m.Groups[2].Value.Trim().Equals("CLI", StringComparison.OrdinalIgnoreCase) ? m.Groups[1].Value.Trim() : m.Groups[2].Value.Trim();
+        }
+
+        void SetState(Backend be, string state, string why = null)
+        {
+            if (be == null) return;
+            if (!Dispatcher.CheckAccess()) { Dispatcher.BeginInvoke(new Action(() => SetState(be, state, why))); return; }
+            if (!backendState.TryGetValue(be.Key, out var e)) return;
+            var (glyph, brush, word) = state switch
+            {
+                "ready" => ("●", OkBrush, "ready"),
+                "starting" => ("◐", CardBorder, "starting"),
+                "working" => ("◐", CardBorder, "working"),
+                "error" => ("●", ErrorBrush, "error"),
+                _ => ("○", DimBrush, "not started")
+            };
+            e.Dot.Text = glyph; e.Dot.Foreground = brush;
+            backendState[be.Key] = (e.Dot, state);
+            ((FrameworkElement)e.Dot.Parent).ToolTip = $"{be.Name}: {word}" + (string.IsNullOrEmpty(why) ? "" : "\n" + why);
+            if (be == Current && state != "working") status.Text = $"{glyph} {ShortName(be.Name)} {word}" + (string.IsNullOrEmpty(why) ? "" : " - " + why.Split('\n')[0]);
+        }
+
+        void UpdatePlaceholder()
+        {
+            placeholder.Text = $"Ask {ShortName(Current?.Name) ?? "the agent"} about this solution …";
+            backendBox.ToolTip = Current?.Name;
+        }
+
         void FillBackends(string keepKey)
         {
             backendBox.Items.Clear();
-            foreach (var b in backends) backendBox.Items.Add(new ComboBoxItem { Content = b.Name, Tag = b });
+            backendState.Clear();
+            foreach (var b in backends)
+            {
+                var dot = new TextBlock { Text = "○", Foreground = DimBrush, FontFamily = new FontFamily("Segoe UI Symbol"), Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
+                var name = new TextBlock { Text = ShortName(b.Name), VerticalAlignment = VerticalAlignment.Center };
+                var sp = new StackPanel { Orientation = Orientation.Horizontal, ToolTip = b.Name };
+                sp.Children.Add(dot); sp.Children.Add(name);
+                backendState[b.Key] = (dot, "idle");
+                backendBox.Items.Add(new ComboBoxItem { Content = sp, Tag = b });
+            }
             var keep = keepKey == null ? -1 : backends.FindIndex(x => x.Key == keepKey);
             if (backendBox.Items.Count > 0) backendBox.SelectedIndex = keep >= 0 ? keep : Math.Min(preferred, backendBox.Items.Count - 1);
         }
@@ -359,11 +426,11 @@ namespace TcAgentBridge
             if (line.IndexOf("\"control_request\"", StringComparison.Ordinal) >= 0 && ControlRequest(s, line)) return;
             var t = s.TurnSw?.Elapsed.TotalSeconds ?? 0;
             var (show, final, stat, sum, done) = ClaudeEvent(line, t, s.Answer.Length > 0);
+            if (stat != null && stat.StartsWith("Claude ready")) SetState(s.Be, s.Turn == null ? "ready" : "working");
             if (s.Turn == null) return;                     // do not show output before the first question (startup)
             if (final != null) s.Answer.AppendLine(final);
             if (sum != null) s.Summary = sum;
             if (show != null) AgentAppend(show);
-            if (stat != null) Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => status.Text = stat));
             if (done) s.Turn.TrySetResult(s.Answer.ToString());
         }
 
@@ -472,6 +539,7 @@ namespace TcAgentBridge
             var s = sess; sess = null;
             CancelOpenCards();          // a card that is still open counts as "deny" / "not answered"
             if (s == null) return;
+            SetState(s.Be, "idle");
             s.Turn?.TrySetResult(null);
             if (s.Exited) return;
             try { s.In.Close(); } catch { }
@@ -481,19 +549,46 @@ namespace TcAgentBridge
         void WarmUp()
         {
             var be = Current;
+            if (be != null && !IsPersistent(be))
+            {
+                // a backend that starts per question: ready if its program is there
+                try { Resolve(be.Exe); SetState(be, "ready", "starts with each question"); } catch (Exception ex) { SetState(be, "error", ex.Message); }
+                return;
+            }
             if (be == null || !IsPersistent(be) || (sess != null && !sess.Exited && sess.Be == be)) return;
             try
             {
                 var s = EnsureSession(be);
-                if (s.Acp != null) AcpOpen(s).ContinueWith(t => { var _ = t.Exception; });   // errors are shown with the first question
-                status.Text = $"{be.Name} is starting in the background ...";
+                SetState(be, "starting");
+                if (s.Acp != null) AcpOpen(s).ContinueWith(t => SetState(be, t.IsFaulted || s.Exited ? "error" : "ready", t.Exception?.GetBaseException().Message));
+                else Task.Delay(2500).ContinueWith(_ =>
+                {
+                    if (sess != s) return;
+                    string err; lock (s.Err) err = s.Err.ToString().Trim();
+                    SetState(be, s.Exited ? "error" : "ready", s.Exited ? Tail(err, 300) : null);
+                });
             }
-            catch (Exception ex) { status.Text = $"{be.Name} could not be pre-started: {ex.Message}"; }
+            catch (Exception ex) { SetState(be, "error", ex.Message); }
         }
 
         bool busy;
 
         internal bool IsBusy => busy;
+
+        // while the agent works: "◐ Claude Code is working · 3 tool calls · 12 s · tc_check"; afterwards "Done in …"
+        readonly System.Windows.Threading.DispatcherTimer turnClock = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        DateTime turnStart;
+        string workingName, lastTool, doneText;
+
+        void ShowWorking()
+        {
+            if (!busy) return;
+            if (status.Text.StartsWith("Waiting for your answer")) return;   // an open card says what is needed
+            var n = turnTools;
+            status.Text = $"◐ {workingName} is working · {n} tool call{(n == 1 ? "" : "s")} · {(DateTime.Now - turnStart).TotalSeconds:0} s" + (lastTool != null ? " · " + lastTool : "");
+        }
+
+        string Done(double sec) => $"✓ Done in {sec:0} s · {turnTools} tool call{(turnTools == 1 ? "" : "s")}";
 
         // Question from outside (inline box in the code window); the context was already captured there
         internal void SendExternal(string text, string ctx) => Send(text, ctx);
@@ -523,13 +618,18 @@ namespace TcAgentBridge
             if (be == null) return;
 
             string ctx = external != null ? (contextBox.IsChecked == true ? externalCtx : null)
-                                          : (contextBox.IsChecked == true ? EditorContext() : null);
+                                          : (contextBox.IsChecked == true && !contextOff ? EditorContext() : null);
+            contextOff = false;
             var att = external == null ? TakeAttachments() : new List<Attachment>();
             AddUserBubble(text, ctx, att, external != null);
             if (external == null) { RememberPrompt(text); input.Clear(); }
             var docs = AttachmentPrompt(att);
             if (docs != null) ctx = (ctx != null ? ctx + "\n\n" : "") + docs;
             busy = true; send.IsEnabled = false; stop.IsEnabled = true;
+            turnTools = 0; lastTool = null; turnStart = DateTime.Now; workingName = ShortName(be.Name);
+            SetState(be, "working");
+            turnClock.Start();
+            bool failed = false;
             try
             {
                 if (IsPersistent(be)) await SendPersistent(be, text, ctx);
@@ -537,11 +637,21 @@ namespace TcAgentBridge
             }
             catch (System.ComponentModel.Win32Exception ex)
             {
+                failed = true;
                 SystemLine($"{be.Name} could not be started: {ex.Message}\nIs the CLI installed and signed in? If needed, enter its path in chat-backends.json.", true);
-                status.Text = "Start failed.";
+                SetState(be, "error", ex.Message);
             }
-            catch (Exception ex) { SystemLine(ex.Message, true); }
-            finally { FlushAgent(); cur = null; busy = false; send.IsEnabled = true; stop.IsEnabled = false; }
+            catch (Exception ex) { failed = true; SystemLine(ex.Message, true); }
+            finally
+            {
+                turnClock.Stop();
+                FlushAgent(); cur = null; busy = false; send.IsEnabled = true; stop.IsEnabled = false;
+                var st = backendState.TryGetValue(be.Key, out var bs) ? bs.State : null;
+                if (!failed && st == "working") SetState(be, sess != null && sess.Be == be || !IsPersistent(be) ? "ready" : "idle", null);
+                status.Text = doneText ?? status.Text;
+                doneText = null;
+                UpdateContextChip();
+            }
         }
 
         async Task SendPersistent(Backend be, string text, string ctx)
@@ -575,11 +685,12 @@ namespace TcAgentBridge
                 string err; lock (s.Err) err = s.Err.ToString().Trim();
                 FlushAgent();
                 SystemLine($"{be.Name} session ended." + (err.Length > 0 ? "\n" + Tail(err, 2500) : ""), true);
-                status.Text = "Session ended - the next question starts a new one.";
+                doneText = "Session ended - the next question starts a new one.";
+                SetState(be, "error", "the session ended" + (err.Length > 0 ? ": " + Tail(err, 300) : ""));
                 if (sess == s) sess = null;
                 return;
             }
-            status.Text = $"Done in {s.TurnSw.Elapsed.TotalSeconds:0} s ({be.Name}, {(warm ? "running session" : "newly started")})" + (s.Summary != null ? " - " + s.Summary : ".");
+            doneText = Done(s.TurnSw.Elapsed.TotalSeconds) + (s.Summary != null ? " · " + s.Summary : "");
             if (answer.Length > 0) history.Add(new KeyValuePair<string, string>(text, answer.Trim()));
         }
 
@@ -618,7 +729,6 @@ namespace TcAgentBridge
                         if (final != null) answer.AppendLine(final);
                         if (sum != null) summary = sum;
                         if (show != null) AgentAppend(show);
-                        if (stat != null) Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => status.Text = stat));
                     }
                 });
                 var errTask = Task.Run(() => { string line; while ((line = p.StandardError.ReadLine()) != null) lock (errors) errors.AppendLine(line); });
@@ -631,7 +741,7 @@ namespace TcAgentBridge
                     FlushAgent();
                     SystemLine($"{be.Name} exited with code {code}." + (err.Length > 0 ? "\n" + Tail(err, 2500) : ""), true);
                 }
-                status.Text = $"Done in {sw.Elapsed.TotalSeconds:0} s ({be.Name})" + (summary != null ? " - " + summary : ".");
+                doneText = Done(sw.Elapsed.TotalSeconds) + (summary != null ? " · " + summary : "");
                 if (answer.Length > 0) history.Add(new KeyValuePair<string, string>(text, answer.ToString().Trim()));
             }
             finally { proc = null; }
@@ -639,7 +749,7 @@ namespace TcAgentBridge
 
         // Evaluate one event from "claude -p --output-format stream-json --verbose".
         // Returns: text to display, answer text for the history, status line, summary, answer complete.
-        static (string show, string final, string stat, string sum, bool done) ClaudeEvent(string line, double t, bool haveText)
+        (string show, string final, string stat, string sum, bool done) ClaudeEvent(string line, double t, bool haveText)
         {
             Dictionary<string, object> e;
             try { e = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(line); }
@@ -661,15 +771,25 @@ namespace TcAgentBridge
                     else if (ct == "tool_use")
                     {
                         var name = (c.TryGetValue("name", out var nm) ? nm as string : "?") ?? "?";
-                        name = Regex.Replace(name, "^mcp__[^_]+(?:_[^_]+)*?__", "");
-                        var arg = "";
-                        if (c.TryGetValue("input", out var inp) && inp is Dictionary<string, object> d && d.Count > 0)
-                            arg = " " + string.Join(", ", d.Select(kv => kv.Key + "=" + Short(Convert.ToString(kv.Value), 60)));
-                        show.Append($"{ToolMark}{name}{arg}  [{t:0.0} s]\n");
-                        stat = $"{name} ... ({t:0} s)";
+                        var input = c.TryGetValue("input", out var inp) ? inp as Dictionary<string, object> : null;
+                        if (show.Length > 0 && show[show.Length - 1] != '\n') show.Append('\n');
+                        show.Append(ToolStart(c.TryGetValue("id", out var tid) ? tid as string : null, name, input, t));
                     }
                 }
                 return (show.Length > 0 ? show.ToString() : null, final.Length > 0 ? final.ToString() : null, stat, null, false);
+            }
+            // the results of the tool calls: {"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":..,"content":..,"is_error":..}]}}
+            if (type == "user" && e.TryGetValue("message", out var um) && um is Dictionary<string, object> umd && umd.TryGetValue("content", out var uc) && uc is IEnumerable uitems)
+            {
+                foreach (var it in uitems)
+                    if (it is Dictionary<string, object> r0 && (r0.TryGetValue("type", out var rt) ? rt as string : null) == "tool_result")
+                    {
+                        var content = r0.TryGetValue("content", out var rc) ? rc : null;
+                        var text = content as string ?? string.Join("\n", ((content as IEnumerable)?.OfType<Dictionary<string, object>>() ?? Enumerable.Empty<Dictionary<string, object>>())
+                                                                          .Select(x => x.TryGetValue("text", out var xt) ? xt as string : null).Where(x => x != null));
+                        ToolEnd(r0.TryGetValue("tool_use_id", out var ru) ? ru as string : null, !(r0.TryGetValue("is_error", out var ie) && ie is bool ib && ib), text, t);
+                    }
+                return (null, null, null, null, false);
             }
             if (type == "result")
             {
@@ -701,13 +821,13 @@ namespace TcAgentBridge
             if (sess != null && sess.Turn != null)
             {
                 KillSession();          // abort the running answer; the next question starts a new session
-                SystemLine("cancelled (session restarted)", true);
+                SystemLine("⊘ Stopped by you - the next question starts a new session.");
                 return;
             }
             var p = proc;
             if (p == null) return;
             try { Process.Start(new ProcessStartInfo("taskkill", $"/T /F /PID {p.Id}") { CreateNoWindow = true, UseShellExecute = false }); } catch { }
-            SystemLine("cancelled", true);
+            SystemLine("⊘ Stopped by you.");
         }
 
         string BuildPrompt(string text, string ctx, bool followUp, bool askTool = false)

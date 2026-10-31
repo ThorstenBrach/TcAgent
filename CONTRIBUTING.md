@@ -56,3 +56,11 @@ Every tool window and dialog of the extension follows the same rules - the knowl
   checked while typing (OK stays off until the input is valid, the reason below the field), long lists with a filter,
   folders and files with Browse …. Several items are chosen with **check boxes** (ticks stay when the filter changes;
   Space ticks the selected line), never with Ctrl/Shift selection - one click beside it would lose everything.
+* **Narrow windows** (tool windows are often ~400 px wide): nothing important is cut off - hints wrap instead of
+  "…"; long output (a setup result, a list of paths) is one line in the info bar with **Details**, left-aligned, user
+  folders as %LOCALAPPDATA% / %USERPROFILE%; never centered multi-line text.
+* **Cards and questions** (chat): Goal, Consequence and Gate in three short lines, one filled primary button with the
+  focus (Enter), Esc for no, the answer stays visible on the card; a card closed from outside says why.
+* **Running work**: a state dot (● ready, ◐ starting / working, ● error) where the work is chosen, and in the status line
+  what runs, how many steps and how long; every step as one compact line (◐ / ✓ / ✗, result, time, details).
+  The chat window (`vsbridge/ChatView.cs`, `ChatCards.cs`) is the reference for these.

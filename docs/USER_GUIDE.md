@@ -101,15 +101,24 @@ configuration – see [Configuration reference](#configuration-reference).
 TcAgent drives the IDE from outside through the TwinCAT Automation Interface. Code, build, tests, I/O and runtime all
 work without the extension. The extension runs **inside** the IDE process and adds what is not reachable from outside:
 
-- **TcAgent Chat** – a tool window with backend selection (Claude Code, Copilot CLI, Gemini CLI, Codex CLI). Your prompts
-  on the right, the agent's answers on the left, tool calls as compact lines. Enter sends, Shift+Enter makes a new line,
-  ↑/↓ brings back earlier prompts (kept across sessions). **New chat** clears the history, **Stop** cancels the running
-  answer. The editor context is sent along automatically. The **⋯** menu holds the options (send editor context, check
-  after changes), **TcUnit Tests**, **Knowledge**, **Set up clients**, **Copy diagnostics** (versions for an issue
-  report) and the version.
+- **TcAgent Chat** – a tool window with backend selection (Claude Code, GitHub Copilot, Gemini CLI, Codex CLI), each with a
+  dot for its state: ● ready (green), ◐ starting or working, ● error (red, the reason in the tooltip and the status line).
+  An empty chat shows suggestions to click (they go into the input, edit them and press Enter). Your prompts on the right,
+  the agent's answers on the left with **Copy**; every tool call is one compact line – ◐ while it runs, then ✓ or ✗ with
+  the first line of its result and the time; **details** shows its parameters and result, and a call that writes code
+  (`tc_plc_write`, `tc_plc_create`) has **diff**: the saved object against what the agent writes, in the compare window.
+  The input shows "Ask … about this solution", above it a chip with the editor context that goes with the question
+  (📄 MAIN · line 12 – **×** sends the next question without it) and the attachments; below it the keys: Enter sends,
+  Shift+Enter makes a new line, ↑/↓ brings back earlier prompts (kept across sessions), Esc stops the answer while the
+  agent works (otherwise back to the editor). **New chat** clears the history, **Stop** cancels the running answer. The
+  status line shows the state of the backend, while working "◐ Claude Code is working · 3 tool calls · 12 s · tc_check",
+  afterwards "✓ Done in 14 s · 6 tool calls". The **⋯** menu is grouped: *Chat* (send editor context, check after changes,
+  New chat, Copy conversation), *Windows* (TcUnit Tests, Knowledge), *Setup and help* (Set up clients, Copy diagnostics,
+  Open user guide) and the version. The result of **Set up clients** is one line at the top ("TcAgent x is set up for n
+  clients – restart the open ones") with **Details** (the files written, user folders as %LOCALAPPDATA% / %USERPROFILE%).
 - **TcAgent Knowledge** – a tool window with everything the agent knows about your work and where it comes
   from: see [The knowledge window](#the-knowledge-window).
-- **Documents in the chat** – paste (Ctrl+V), drop or attach (+) manuals, data sheets, screenshots and long texts. Text files
+- **Documents in the chat** – paste (Ctrl+V), drop or attach (**📎 Attach …**) manuals, data sheets, screenshots and long texts. Text files
   and Word documents go into the prompt; PDFs and images are read by the agent from the attachments folder.
 - **GitHub Copilot over ACP** – the Copilot backend runs as a persistent session over the open Agent Client Protocol
   (`copilot --acp`): follow-up questions keep Copilot's own history, tool calls appear live as lines, **Stop** ends only the
@@ -117,10 +126,13 @@ work without the extension. The extension runs **inside** the IDE process and ad
   Other ACP agents can be added in `chat-backends.json` with `"format": "acp"` (e.g. Gemini CLI with
   `--experimental-acp`).
 - **Permission questions** (Claude and ACP backends) – if the agent needs something its rules do not allow, e.g. a file outside
-  the solution folder, a card in the chat asks: **Allow once**, **Allow for this session** (e.g. reading in that folder until the
-  chat session ends) or **Deny**. An open card counts as Deny when you start a new chat or stop the answer.
+  the solution folder, a card in the chat says **Goal** (what the agent wants), **Consequence** (reads only, changes a file,
+  changes the project, acts on the PLC …) and **Gate** (why it asks) and offers **Allow once** (focused – Enter),
+  **Allow for this session** (e.g. reading in that folder until the chat session ends) or **Deny** (Esc). An open card counts
+  as Deny when you start a new chat or stop the answer, and says so.
 - **Follow-up questions** (every backend) – when the agent needs a decision, it asks with `tc_ask_user`: a card in the chat
-  shows the question with options to click and a field for a free answer. Outside the chat the AI client shows its own
+  shows the question with options to click and a field for a free answer; **Answer** is active once every question has an
+  answer, **Skip** (Esc) lets the agent go on without it. Outside the chat the AI client shows its own
   question dialog, if it has one.
 - **Inline question** – press **Ctrl+Shift+Q** in the TwinCAT editor, type, press Enter. You stay in the code; the answer
   streams into the chat window. Esc cancels. (The hotkey can be changed with `askHotkey` in
@@ -129,7 +141,9 @@ work without the extension. The extension runs **inside** the IDE process and ad
 - **Go to definition and cross references** resolved like TwinCAT itself (`tc_goto_definition`, `tc_find_references`).
 - **Library interfaces**, including compiled third-party libraries (`tc_lib_signatures`).
 - **Cursor placement** when opening an object in the editor (`tc_editor_open`).
-- **Confirmation dialogs** in Visual Studio for runtime actions and refactoring when you work from the TcAgent Chat.
+- **Confirmations** for runtime actions (activate, PLC start/stop, ADS write – `TCAGENT_CONFIRM`) as a gate card in the chat
+  when the chat window is open (Goal, Consequence, Gate, **Execute** / **Don't execute** – no answer within 15 minutes is a
+  no), otherwise as a dialog; refactoring proposals as a dialog with Apply / Apply all / Reject.
 
 The chat window opens when Visual Studio starts (unless `"showOnStartup": false` is set in `chat-backends.json`). The
 agent can also open it with `tc_ide command=chat_show`. If you install an AI client later, click **⋯ > Set up clients** in
@@ -143,7 +157,7 @@ To check that the extension is running, ask *"Is the TcAgent bridge running?"* �
 shell, run `vsbridge\install-xaeshell.ps1` once (shell closed, asks for administrator rights). After an update install the VSIX
 of the same version too - the shell takes the new `TcAgent.exe` from it.
 
-The chat window shows the TcAgent version at the top right. If it says *"TcAgent server x ≠ extension y"* in orange, the chat
+The chat window shows the TcAgent version in the ⋯ menu. If the top bar says *"TcAgent server x ≠ extension y"* in orange, the chat
 still starts the old server: click **⋯ > Set up clients**, then **New chat**. The backend you chose last (Claude, Copilot,
 Gemini, Codex) is selected again the next time.
 

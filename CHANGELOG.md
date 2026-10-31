@@ -59,6 +59,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   - The legend of the symbols in the status line; colors for the light and the dark theme.
   - Check boxes stay the way to choose tests – a click beside them loses nothing.
 
+- **TcAgent Chat in the same style** (`vsbridge/ChatView.cs`, `ChatWindow.cs`, `ChatCards.cs`, `ChatAcp.cs`):
+  - The result of "Set up clients" as one line in an info bar ("TcAgent x is set up for n clients – restart the open
+    ones") with **Details** (left-aligned, user folders as %LOCALAPPDATA% / %USERPROFILE%) and **Copy** - no longer a
+    block of centered paths in the conversation. Other notices are one left-aligned line.
+  - The start shows suggestions to click instead of a welcome text.
+  - The backend with a short name ("Claude Code") and a dot for its state: ready / starting or working / error (the
+    reason in the tooltip and the status line); a backend that starts per question is checked for its program.
+  - Tool calls as compact lines: ◐ while running, ✓ / ✗ with the first line of the result and the time, **details**
+    (parameters and result), **diff** for `tc_plc_write` / `tc_plc_create` (the saved object against what the agent
+    writes, compare window). Claude's tool results are read now; Copilot (ACP) reports completed and failed calls.
+  - Cards with **Goal**, **Consequence** and **Gate**, a filled primary button with the focus (Enter) and Esc for no;
+    **Answer** only when every question is answered; a card closed by New chat / Stop says so.
+  - Runtime confirmations (TCAGENT_CONFIRM) as a gate card in the chat when it is open (Execute / Don't execute).
+  - Input with a placeholder ("Ask Claude Code about this solution …"), a removable chip with the editor context that
+    goes with the question, attachments as chips, **📎 Attach …**, the keys below the field in full (wrapped, never cut).
+  - ⋯ menu grouped: Chat (editor context, check after changes, New chat, Copy conversation) / Windows / Setup and help
+    (Set up clients, Copy diagnostics, Open user guide) and the version line.
+  - Status line: the backend state, while working "◐ … is working · n tool calls · time · last tool", afterwards
+    "✓ Done in … · n tool calls".
+  - Esc stops the answer while the agent works; "Stopped by you" is a neutral line instead of a red error; answers
+    have **Copy**; errors are marked with ⚠ (not only red); Copy diagnostics no longer opens a message box.
+
 ### Added
 - CONTRIBUTING.md: **Windows and dialogs** – the rules every window and dialog of the extension follows.
 - TcUnit progress block: the optional outputs `Cycle` and `Cycles` of the running test (shown as "cycle x/y").

@@ -161,23 +161,22 @@ namespace TcAgentBridge
                     break;
                 case "tool_call":
                 {
+                    // one compact line per call (ChatView.cs): ◐ while it runs, ✓ / ✗ with the result and the time afterwards
                     var id = u.TryGetValue("toolCallId", out var ti) ? ti as string : "";
-                    var title = ToolTitle(u);
+                    var title = (u.TryGetValue("title", out var to) ? to as string : null) ?? "tool";
                     s.Acp.ToolTitles[id ?? ""] = title;
-                    AgentAppend((s.Acp.LastNewline ? "" : "\n") + $"{ToolMark}{title}  [{t:0.0} s]\n");
+                    var input = u.TryGetValue("rawInput", out var ri) ? ri as Dictionary<string, object> : null;
+                    AgentAppend((s.Acp.LastNewline ? "" : "\n") + ToolStart(id, title, input, t));
                     s.Acp.LastNewline = true;
-                    Status($"{title} ... ({t:0} s)");
                     break;
                 }
                 case "tool_call_update":
                 {
                     var st = u.TryGetValue("status", out var so) ? so as string : null;
-                    if (st == "failed")
+                    if (st == "completed" || st == "failed")
                     {
                         var id = u.TryGetValue("toolCallId", out var ti) ? ti as string : "";
-                        s.Acp.ToolTitles.TryGetValue(id ?? "", out var title);
-                        AgentAppend((s.Acp.LastNewline ? "" : "\n") + $"{ToolMark}{title ?? "tool"} failed  [{t:0.0} s]\n");
-                        s.Acp.LastNewline = true;
+                        ToolEnd(id, st == "completed", ContentText(u), t);
                     }
                     break;
                 }
@@ -198,7 +197,16 @@ namespace TcAgentBridge
             return Short(title, 160);
         }
 
-        void Status(string text) => Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.Background, new Action(() => status.Text = text));
+        // the text of an update: "content":[{"type":"content","content":{"type":"text","text":".."}}] or "rawOutput"
+        static string ContentText(Dictionary<string, object> u)
+        {
+            var parts = new List<string>();
+            if (u.TryGetValue("content", out var co) && co is IEnumerable items)
+                foreach (var it in items.OfType<Dictionary<string, object>>())
+                    if (it.TryGetValue("content", out var inner) && inner is Dictionary<string, object> c && c.TryGetValue("text", out var tx) && tx is string text) parts.Add(text);
+            if (parts.Count == 0 && u.TryGetValue("rawOutput", out var ro) && ro != null) parts.Add(ro as string ?? Js().Serialize(ro));
+            return string.Join("\n", parts);
+        }
 
         // session/request_permission: options allow_once / allow_always / reject_once / reject_always -> the permission card
         void AcpPermission(Session s, object reqId, Dictionary<string, object> prms)
@@ -220,14 +228,12 @@ namespace TcAgentBridge
         {
             var warm = sess != null && !sess.Exited && sess.Be == be && sess.Acp?.SessionId != null;
             var s = EnsureSession(be);
-            status.Text = $"{be.Name} is starting ...";
             await AcpOpen(s);
             s.Answer.Clear(); s.Summary = null; s.Acp.LastNewline = true; s.Acp.Usage = null;
             s.TurnSw = Stopwatch.StartNew();
             s.Turn = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             var prompt = BuildPrompt(text, ctx, followUp: s.Greeted, askTool: true);
             s.Greeted = true;
-            status.Text = $"{be.Name} is working ... ({(warm ? "session running" : "session started")})";
             StartAgent(be.Name);
             string stop;
             try
@@ -244,16 +250,17 @@ namespace TcAgentBridge
                 string err; lock (s.Err) err = s.Err.ToString().Trim();
                 FlushAgent();
                 SystemLine($"{be.Name}: {ex.Message}" + (s.Exited && err.Length > 0 ? "\n" + Tail(err, 2500) : ""), true);
-                status.Text = s.Exited ? "Session ended - the next question starts a new one." : "Error.";
+                doneText = s.Exited ? "Session ended - the next question starts a new one." : "Error - see the conversation.";
+                SetState(be, "error", ex.Message);
                 if (s.Exited && sess == s) sess = null;
                 s.Turn = null;
                 return;
             }
             s.Turn = null;
             var answer = s.Answer.ToString();
-            if (stop == "cancelled") SystemLine("cancelled", true);
+            if (stop == "cancelled") SystemLine("⊘ Stopped by you.");
             else if (stop != "end_turn") SystemLine($"{be.Name} stopped: {stop}", true);
-            status.Text = $"Done in {s.TurnSw.Elapsed.TotalSeconds:0} s ({be.Name}, ACP{(warm ? ", running session" : "")})" + (s.Acp.Usage != null ? " - " + s.Acp.Usage : ".");
+            doneText = Done(s.TurnSw.Elapsed.TotalSeconds) + (s.Acp.Usage != null ? " · " + s.Acp.Usage : "");
             if (answer.Trim().Length > 0) history.Add(new KeyValuePair<string, string>(text, answer.Trim()));
         }
 
