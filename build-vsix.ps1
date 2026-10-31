@@ -60,6 +60,41 @@ if (-not $built) { throw "TcAgent.vsix of this build not found under vsbridge\bi
 Write-Host "Package: $($built.FullName)"
 $vsix = Join-Path $here "bin\TcAgent-$version.vsix"
 Copy-Item $built.FullName $vsix -Force
+
+# 3) package for a PC with the TwinCAT XAE Shell alone (no Visual Studio 2022 there): the extension prebuilt per shell base,
+#    the server and install-xaeshell.ps1 - the script installs it without compiling
+$pkg = Join-Path $here 'bin\xaeshell-package'
+if (Test-Path $pkg) { Remove-Item $pkg -Recurse -Force }
+New-Item -ItemType Directory -Force "$pkg\bridge-vs17" | Out-Null
+# VS 2022 base (64-bit shell): the extension of this VSIX build
+Copy-Item (Join-Path $built.DirectoryName 'TcAgentBridge.dll'), "$here\vsbridge\TcAgentBridge.pkgdef", "$here\vsbridge\extension.vsixmanifest" "$pkg\bridge-vs17"
+Copy-Item "$here\LICENSE" "$pkg\bridge-vs17\LICENSE.txt"; Copy-Item "$here\docs\img\icon.png" "$pkg\bridge-vs17\icon.png"
+# VS 2017 base (32-bit shell): built against the shell of this PC, if one is installed here
+& "$here\vsbridge\install-xaeshell.ps1" -BuildOnly *>&1 | Out-Null
+$shellBuild = Join-Path $here 'vsbridge\bin-xaeshell'
+$shellBase = ([regex]::Match((Get-Content "$shellBuild\extension.vsixmanifest" -Raw -ErrorAction SilentlyContinue), 'Version="\[(\d+)\.')).Groups[1].Value
+if ((Test-Path "$shellBuild\TcAgentBridge.dll") -and $shellBase -and $shellBase -ne '17' -and (Get-Item "$shellBuild\TcAgentBridge.dll").LastWriteTime -ge $buildStart) {
+    New-Item -ItemType Directory -Force "$pkg\bridge-vs$shellBase" | Out-Null
+    Get-ChildItem $shellBuild -File | Copy-Item -Destination "$pkg\bridge-vs$shellBase"
+    Copy-Item "$here\vsbridge\extension.vsixmanifest" "$pkg\bridge-vs$shellBase\extension.vsixmanifest" -Force
+} else { Write-Host "No 32-bit XAE Shell on this PC - the XAE Shell package has no extension for it (only bridge-vs17)" -ForegroundColor Yellow }
+Copy-Item "$stage\tcagent" "$pkg\tcagent" -Recurse
+Copy-Item "$here\vsbridge\install-xaeshell.ps1" $pkg
+@"
+TcAgent $version for the TwinCAT XAE Shell - for a PC without Visual Studio 2022.
+
+1. Close the XAE Shell. Extract this ZIP into a folder of its own (Explorer: right-click the ZIP > Properties > Unblock first).
+2. In that folder, in PowerShell:  powershell -ExecutionPolicy Bypass -File .\install-xaeshell.ps1
+   (confirm the administrator prompt - the extension goes into the shell's folder under Program Files)
+3. Start the XAE Shell: TcAgent sets itself up and asks whether the AI clients should be set up.
+   View > Other Windows > TcAgent Chat. Remove it again: install-xaeshell.ps1 -Uninstall
+
+Details: docs/INSTALLATION.md, section "Only the XAE Shell".
+"@ | Set-Content "$pkg\README.txt" -Encoding UTF8
+$shellZip = Join-Path $here "bin\TcAgent-XaeShell-$version.zip"
+if (Test-Path $shellZip) { Remove-Item $shellZip -Force }
+Compress-Archive -Path "$pkg\*" -DestinationPath $shellZip
+Write-Host "XAE Shell package: $shellZip ($((Get-ChildItem $pkg -Directory -Filter 'bridge-vs*' | ForEach-Object Name) -join ', '))"
 Write-Host ""
 Write-Host "OK: $vsix" -ForegroundColor Green
 Write-Host "Install: double-click (close Visual Studio first). Uninstall: Extensions > Manage Extensions > TcAgent."

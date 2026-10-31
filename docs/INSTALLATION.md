@@ -42,11 +42,38 @@ update install the VSIX of the same version (double-click) and run `install-xaes
 the new server from the VSIX and registers it (the chat window shows "TcAgent server x ≠ extension y" in orange until then -
 "⋯ > Set up clients" does it at once, then "New chat").
 
-**Only the XAE Shell, no Visual Studio 2022?** Not supported yet – Visual Studio 2022 has to be installed alongside (the
-free Community edition is enough; TcAgent can still work with the XAE Shell). It provides three things TcAgent needs:
-the VSIX installer that brings the server `TcAgent.exe`, the C# compiler for `install-xaeshell.ps1`, and the automation
-assemblies (`EnvDTE` 17) that `TcAgent.exe` loads from the Visual Studio installation. A setup for the XAE Shell alone is
-planned.
+**Only the XAE Shell, no Visual Studio 2022?** See [Only the XAE Shell](#only-the-xae-shell-no-visual-studio-2022).
+
+### Only the XAE Shell (no Visual Studio 2022)
+
+Since 0.49 TcAgent also works on a PC that has the TwinCAT XAE Shell alone – no Visual Studio, no build tools, no .NET SDK.
+Each release has a package for it: `TcAgent-XaeShell-<version>.zip`.
+
+1. Close the XAE Shell. Download the ZIP; in the Explorer right-click it > Properties > **Unblock**, then extract it into a
+   folder of its own.
+2. In that folder, in PowerShell:
+
+   ```powershell
+   powershell -ExecutionPolicy Bypass -File .\install-xaeshell.ps1
+   ```
+
+   Confirm the administrator prompt – the extension goes into the shell's folder under Program Files. The script takes the
+   prebuilt extension for your shell (`bridge-vs15` for the 32-bit shell, `bridge-vs17` for the 64-bit shell) and the
+   server (`tcagent`) – nothing is compiled. `-BuildOnly` only checks the package, without installing.
+3. Start the XAE Shell. On the first start TcAgent sets itself up as it does in Visual Studio: the server goes to
+   `%LOCALAPPDATA%\TcAgent\app\<version>`, the interop is generated from your TwinCAT installation, and it asks whether the
+   AI clients should be set up. Then **View > Other Windows > TcAgent Chat**.
+
+Update: the same with the ZIP of the new version. Remove: `install-xaeshell.ps1 -Uninstall`.
+
+How it works without Visual Studio: `TcAgent.exe` is built against the automation interface EnvDTE 8.0, which the 32-bit
+shell brings along (Visual Studio 2022 offers a newer, compatible one), and it finds it in the shell's folder.
+`TcAgent.exe diag` shows where it was loaded from ("IDE automation (EnvDTE)"). From the source, without the package:
+`vsbridge\install-xaeshell.ps1 -Vsix bin\TcAgent-<version>.vsix` compiles the extension (needs Visual Studio 2022 or its
+Build Tools) and takes the server from the VSIX.
+
+Tested: the 32-bit shell (VS 2017 base). The 64-bit shell (TcXaeShell64, VS 2022 base) gets the extension of the Visual
+Studio 2022 build – not tested yet; please report how it works.
 
 Optional, for the Scope and HMI tools: **TE1300 Scope View** (`tc_scope`) and **TE2000 HMI Engineering** (`tc_hmi*`).
 
@@ -203,6 +230,7 @@ In addition, every client can require confirmation of individual tool calls – 
 | `tc_hmi action=controls`: "Control package not found" | Build the HMI project once in the IDE (restores the NuGet packages into `<solution>\Packages`). |
 | XAE Shell crashes during HMI/Scope changes (event log: `OutOfMemoryException`, TcXaeShell.exe) | The XAE Shell is a 32-bit process; a large project with HMI and Scope open exhausts its memory, reloading a project then crashes it. Restart the shell regularly, close designers you do not need, or use Visual Studio 2022 (64-bit) for HMI/Scope work. TwinCAT 4026 also offers a 64-bit XAE Shell (TcPkg setting `useTcXaeShell64`, see the TwinCAT installation documentation); TcAgent and `install-xaeshell.ps1` support it. TcAgent refuses unload/reload when the 32-bit shell is close to the limit. |
 | `vsbridge\install.ps1` / `uninstall.ps1`: "Administrator rights are needed" (before 0.48.2: `UnauthorizedAccessException` at `New-Item … Extensions\TcAgentBridge`) | The script writes into the Visual Studio installation. Start PowerShell with "Run as administrator" and run the script again - or install the VSIX instead (per user, no rights needed). |
+| XAE Shell alone: `TcAgent.exe … EnvDTE.dll not found` | The automation assemblies are searched in Visual Studio 2022 and in the XAE Shell (`…\Beckhoff\TcXaeShell\Common7\IDE\PublicAssemblies`, also `C:\TwinCAT\TcXaeShell`). A shell in another folder: set `TCAGENT_IDE_ASSEMBLIES` to its `Common7\IDE\PublicAssemblies`. `TcAgent.exe diag` shows what was found. |
 | `vsbridge\install-xaeshell.ps1`: CS0234 for `SVsDifferenceService` / `IVsDifferenceService` / `__VSDIFFSERVICEOPTIONS` in `Microsoft.VisualStudio.Shell.Interop` | Fixed in 0.48.2 (the build references `Microsoft.VisualStudio.Shell.Interop.11.0` of the shell). With a newer script and the error still there: is `-ShellIde` the `Common7\IDE` folder of the XAE Shell, and is `PublicAssemblies\Microsoft.VisualStudio.Shell.Interop.11.0.dll` there? `-BuildOnly` tries the build without installing. |
 | `vsbridge\build.ps1`: CS1705 (version conflict) | Several versions of a VS assembly installed; the script uses the highest. Please report as an issue, with output. |
 

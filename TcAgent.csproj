@@ -32,8 +32,12 @@
       <EmbedInteropTypes>false</EmbedInteropTypes>
       <Private>$(InteropPrivate)</Private>
     </Reference>
-    <PackageReference Include="EnvDTE" Version="17.0.32112.339" />
-    <PackageReference Include="EnvDTE80" Version="17.0.32112.339" />
+    <!-- EnvDTE 8.0 (not 17): the oldest automation API, so TcAgent.exe runs with the EnvDTE of Visual Studio 2022 (17.0, newer is
+         accepted) and with the one of the 32-bit XAE Shell alone (8.0) - InteropResolver.cs. .NET Framework PIAs: NU1701 expected -->
+    <PackageReference Include="EnvDTE" Version="8.0.2" NoWarn="NU1701" />
+    <PackageReference Include="EnvDTE80" Version="8.0.3" NoWarn="NU1701" />
+    <!-- dependency of EnvDTE 8.0, named here only to silence NU1701; never shipped (see ExcludeVsAssembliesFromVsix) -->
+    <PackageReference Include="stdole" Version="7.0.3302" NoWarn="NU1701" />
     <PackageReference Include="Beckhoff.TwinCAT.Ads" Version="7.0.389" />
     <!-- PDF text for tc_docs (Apache-2.0) -->
     <PackageReference Include="PdfPig" Version="0.1.16" />
@@ -43,7 +47,7 @@
   <Target Name="ExcludeVsAssembliesFromVsix" AfterTargets="ComputeResolvedFilesToPublishList" Condition="'$(InteropPrivate)' == 'false'">
     <ItemGroup>
       <ResolvedFileToPublish Remove="@(ResolvedFileToPublish)"
-        Condition="'%(Filename)' == 'envdte' Or '%(Filename)' == 'envdte80' Or '%(Filename)' == 'Microsoft.VisualStudio.Interop' Or $([System.String]::Copy('%(Filename)').StartsWith('Interop.'))" />
+        Condition="'%(Filename)' == 'envdte' Or '%(Filename)' == 'envdte80' Or '%(Filename)' == 'stdole' Or '%(Filename)' == 'Microsoft.VisualStudio.Interop' Or $([System.String]::Copy('%(Filename)').StartsWith('Interop.'))" />
     </ItemGroup>
   </Target>
 </Project>

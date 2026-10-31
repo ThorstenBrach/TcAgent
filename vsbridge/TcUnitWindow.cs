@@ -444,7 +444,7 @@ namespace TcAgentBridge
             var sln = SolutionPath();
             var exe = TcAgentExe();
             if (string.IsNullOrEmpty(sln) || !File.Exists(sln)) { Clear(); status.Text = "No solution open."; return; }
-            if (exe == null) { Clear(); status.Text = "TcAgent.exe not found - start Visual Studio 2022 once after installing the VSIX (or set TCAGENT_EXE)."; return; }
+            if (exe == null) { Clear(); status.Text = "TcAgent.exe not found - start the IDE once after installing TcAgent (VSIX in Visual Studio 2022, install-xaeshell.ps1 in the XAE Shell), or set TCAGENT_EXE."; return; }
             discovering = true;
             status.Text = "Reading the tests from the code ...";
             System.Threading.Tasks.Task.Run(() =>

@@ -39,6 +39,14 @@ public static partial class Cli
             return File.Exists(f) ? (string)JsonNode.Parse(File.ReadAllText(f))?["version"] ?? "not yet" : "never (no setup-state.json)";
         }));
         Line("TwinCAT", Try(TwinCatVersion));
+        Line("IDE automation (EnvDTE)", Try(() =>
+        {
+            var a = typeof(EnvDTE.DTE).Assembly; var b = typeof(EnvDTE80.DTE2).Assembly;
+            string Where(System.Reflection.Assembly x) => x == typeof(Cli).Assembly ? "built into TcAgent"
+                                                          : x.Location.Contains("TcXaeShell", StringComparison.OrdinalIgnoreCase) ? "XAE Shell"
+                                                          : x.Location.Contains("Microsoft Visual Studio", StringComparison.OrdinalIgnoreCase) ? "Visual Studio" : "TcAgent folder";
+            return $"EnvDTE {a.GetName().Version} ({Where(a)}), EnvDTE80 {(b == typeof(Cli).Assembly ? "" : b.GetName().Version + " ")}({Where(b)})";
+        }));
         Line("IDEs installed", Try(() => string.Join(", ", InstalledIdes()) is { Length: > 0 } s ? s : "none found"));
         Line("Runtime on this PC", Try(() => { var (state, err) = ReadSystemState(LocalNetId); return state?.ToString() ?? "no answer (" + err + ")"; }));
         Line("Windows", $"{RuntimeInformation.OSDescription.Trim()} ({RuntimeInformation.OSArchitecture})");

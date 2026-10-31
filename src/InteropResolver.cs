@@ -1,4 +1,6 @@
-// Loads the interop assembly of the TwinCAT Automation Interface at runtime.
+// Loads the interop assembly of the TwinCAT Automation Interface at runtime, and the Visual Studio automation assemblies
+// (EnvDTE, EnvDTE80, stdole) from the IDE: Visual Studio 2022, otherwise the TwinCAT XAE Shell (a PC with the shell alone).
+// TCAGENT_IDE_ASSEMBLIES (folders, ';'-separated) is searched first.
 // It is not redistributed (it is generated from Beckhoff's type library): in developer builds it sits next to TcAgent.exe;
 // with the VSIX installation the VS extension generates it on first start from the local TwinCAT installation in
 // %LOCALAPPDATA%\TcAgent\lib\.
@@ -30,9 +32,14 @@ static class InteropResolver
         catch { }
         foreach (var ed in new[] { "Enterprise", "Professional", "Community" })
             roots.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Microsoft Visual Studio", "2022", ed));
-        vsDirs = roots.Distinct(StringComparer.OrdinalIgnoreCase)
-            .SelectMany(r => new[] { @"Common7\IDE\PublicAssemblies", @"Common7\IDE\PrivateAssemblies", @"Common7\IDE" }.Select(d => Path.Combine(r, d)))
-            .Where(Directory.Exists).ToList();
+        // the TwinCAT XAE Shell (32 bit: EnvDTE 8.0, 64 bit: the VS 2022 base) - TcAgent is built against EnvDTE 8.0, so both fit
+        foreach (var pf in new[] { Environment.SpecialFolder.ProgramFilesX86, Environment.SpecialFolder.ProgramFiles })
+            roots.Add(Path.Combine(Environment.GetFolderPath(pf), "Beckhoff", "TcXaeShell"));
+        roots.Add(@"C:\TwinCAT\TcXaeShell");
+        var own = (Environment.GetEnvironmentVariable("TCAGENT_IDE_ASSEMBLIES") ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+        vsDirs = own.Concat(roots.Distinct(StringComparer.OrdinalIgnoreCase)
+            .SelectMany(r => new[] { @"Common7\IDE\PublicAssemblies", @"Common7\IDE\PrivateAssemblies", @"Common7\IDE" }.Select(d => Path.Combine(r, d))))
+            .Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         return vsDirs;
     }
 
@@ -44,7 +51,7 @@ static class InteropResolver
             if (name.Name == null) return null;
             var n = name.Name;
             bool vs = n.Equals("envdte", StringComparison.OrdinalIgnoreCase) || n.Equals("envdte80", StringComparison.OrdinalIgnoreCase)
-                   || n.Equals("Microsoft.VisualStudio.Interop", StringComparison.OrdinalIgnoreCase);
+                   || n.Equals("stdole", StringComparison.OrdinalIgnoreCase) || n.Equals("Microsoft.VisualStudio.Interop", StringComparison.OrdinalIgnoreCase);
             if (!vs && !n.StartsWith("Interop.", StringComparison.OrdinalIgnoreCase)) return null;
             var dirs = new List<string>
             {
@@ -60,7 +67,7 @@ static class InteropResolver
             }
             if (vs)
             {
-                Console.Error.WriteLine($"[TcAgent] {n}.dll not found in the Visual Studio installation.");
+                Console.Error.WriteLine($"[TcAgent] {n}.dll not found - neither in Visual Studio 2022 nor in the TwinCAT XAE Shell (TCAGENT_IDE_ASSEMBLIES names other folders).");
                 return null;
             }
             Console.Error.WriteLine($"[TcAgent] {name.Name}.dll not found - start Visual Studio with the TcAgent extension once " +
