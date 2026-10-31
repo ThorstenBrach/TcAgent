@@ -42,6 +42,12 @@ update install the VSIX of the same version (double-click) and run `install-xaes
 the new server from the VSIX and registers it (the chat window shows "TcAgent server x ≠ extension y" in orange until then -
 "⋯ > Set up clients" does it at once, then "New chat").
 
+**Only the XAE Shell, no Visual Studio 2022?** Not supported yet – Visual Studio 2022 has to be installed alongside (the
+free Community edition is enough; TcAgent can still work with the XAE Shell). It provides three things TcAgent needs:
+the VSIX installer that brings the server `TcAgent.exe`, the C# compiler for `install-xaeshell.ps1`, and the automation
+assemblies (`EnvDTE` 17) that `TcAgent.exe` loads from the Visual Studio installation. A setup for the XAE Shell alone is
+planned.
+
 Optional, for the Scope and HMI tools: **TE1300 Scope View** (`tc_scope`) and **TE2000 HMI Engineering** (`tc_hmi*`).
 
 ## 2. Build TcAgent
