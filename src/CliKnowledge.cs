@@ -60,7 +60,11 @@ public static partial class Cli
                     case "resolve":
                         Console.WriteLine(Feedback.Resolve(o.Key, o.Message ?? "resolved", null, null));
                         return Ok;
-                    default: throw new ArgumentException("feedback --action issue|resolve");
+                    case "delete":
+                        // for good - the window asks first
+                        Console.WriteLine(Feedback.Delete(o.Key));
+                        return Ok;
+                    default: throw new ArgumentException("feedback --action issue|resolve|delete");
                 }
             }
             catch (Exception ex) when (ex is ArgumentException) { Console.Error.WriteLine(ex.Message); return Failed; }

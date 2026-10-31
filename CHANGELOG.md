@@ -92,9 +92,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   orange).
 
 ### Added
-- **Delete feedback reports** in the Feedback tab: **Delete …** (Del) hides the selected reports everywhere (status
-  `deleted`, also left out of `all` and of `tc_feedback action=list`); they stay in the feedback file - several PCs may share
-  it - and **Show: deleted** with **Restore** brings them back.
+- **Delete feedback reports** in the Feedback tab: **Delete …** (Del) asks first (default No) and then removes the selected
+  reports and their status records from the feedback file for good (`TcAgent.exe knowledge feedback --action delete
+  --key <ids>`); the file is held exclusively while it is rewritten, other TcAgent processes retry their append.
 - **docs/UI_GUIDELINES.md** – the UI/UX rules for every window and dialog of the extension (tabs and ⋯ menu, 4-6 main
   actions, master-detail, states as symbol and word, long actions in the background, keys, empty states, check boxes,
   visible safety information, vocabulary, privacy, theme colors, narrow windows, mockup before building); CONTRIBUTING.md

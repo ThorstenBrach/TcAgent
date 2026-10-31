@@ -323,8 +323,8 @@ needed and then **Copy**, **Save as …** or **Share with the TcAgent developers
 **Diagnostics** block: versions of TcAgent, the extension, TwinCAT, the IDE and Windows, the runtime state and which
 knowledge levels are configured – no names or paths. **Copy diagnostics** (also in the chat menu ⋯, without the IDE
 `TcAgent.exe diag`) copies that block alone for the Diagnostics field of a bug report. **Set status …** marks
-reports as resolved, wontfix or duplicate; **Delete …** (Del) hides the selected reports everywhere - they stay in the
-feedback file, **Show: deleted** and **Restore** bring them back. Questions belong in the GitHub Discussions (category Q&A), security
+reports as resolved, wontfix or duplicate; **Delete …** (Del) deletes the selected reports for good - after a question
+(default No) they and their status changes are removed from the feedback file. Questions belong in the GitHub Discussions (category Q&A), security
 problems are reported privately (`SECURITY.md`).
 
 ### Workflow runs

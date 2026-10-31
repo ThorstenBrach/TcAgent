@@ -8,8 +8,8 @@
 //                           (feedback-<yyyyMMdd>-<MACHINE>.jsonl) - no write conflicts; all *.jsonl files there are read
 // Records (one JSON object per line):
 //   entry   {id, time, status:"open", type, severity, tool, summary, details, expected, workaround, serverVersion, client, machine, solution}
-//   status  {kind:"status", id, status: resolved|wontfix|duplicate|deleted|open, note, version, time, machine}
-//           (deleted = hidden everywhere, also from "all"; the entry stays in the file and "open" brings it back)
+//   status  {kind:"status", id, status: resolved|wontfix|duplicate|open, note, version, time, machine}
+//   Delete removes an entry and its status records from the file(s) - for good.
 // Status changes are appended as own records instead of editing lines - safe with several writers. The newest status wins.
 // Entries of older versions without id get a stable id derived from time, tool and summary.
 //
@@ -26,8 +26,7 @@ public static class Feedback
 {
     static readonly JsonSerializerOptions JsonLine = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
     static readonly string[] Fields = { "type", "severity", "tool", "summary", "details", "expected", "workaround" };
-    // "deleted": hidden everywhere (also from "all"), kept in the file - set back to "open" to restore it
-    static readonly string[] Statuses = { "open", "resolved", "wontfix", "duplicate", "deleted" };
+    static readonly string[] Statuses = { "open", "resolved", "wontfix", "duplicate" };
 
     public static string DefaultFile => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "feedback", "feedback.jsonl"));
 
@@ -164,12 +163,56 @@ public static class Feedback
         return $"Status changes written to {file}:\n" + o;
     }
 
+    /// <summary>Deletes entries for good: the report and its status records leave the file(s). The file is rewritten while it
+    /// is held exclusively - other TcAgent processes that append meanwhile retry (SharedFile.Append).</summary>
+    public static string Delete(string ids, string overridePath = null)
+    {
+        if (string.IsNullOrWhiteSpace(ids)) throw new Exception("id is required (e.g. FB-1A2B3C4D, several separated by ',')");
+        var wanted = new HashSet<string>(ids.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+                                            .Select(x => x.StartsWith("FB-", StringComparison.OrdinalIgnoreCase) ? x : "FB-" + x), StringComparer.OrdinalIgnoreCase);
+        var found = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var f in ReadFiles(overridePath))
+        {
+            for (int attempt = 1; ; attempt++)
+            {
+                try
+                {
+                    using var fs = new FileStream(f, FileMode.Open, FileAccess.ReadWrite, FileShare.None);
+                    var lines = new List<string>();
+                    using (var r = new StreamReader(fs, new UTF8Encoding(false), true, 4096, leaveOpen: true))
+                        for (string l; (l = r.ReadLine()) != null;) lines.Add(l);
+                    var keep = lines.Where(l =>
+                    {
+                        if (string.IsNullOrWhiteSpace(l)) return false;
+                        JsonObject o;
+                        try { o = JsonNode.Parse(l) as JsonObject; } catch { return true; }
+                        if (o == null) return true;
+                        var id = S(o, "kind") == "status" ? S(o, "id") : S(o, "id") ?? StableId(o);
+                        if (id == null || !wanted.Contains(id)) return true;
+                        found.Add(id);
+                        return false;
+                    }).ToList();
+                    if (keep.Count != lines.Count(l => !string.IsNullOrWhiteSpace(l)))
+                    {
+                        fs.SetLength(0);
+                        var bytes = new UTF8Encoding(false).GetBytes(keep.Count > 0 ? string.Join(Environment.NewLine, keep) + Environment.NewLine : "");
+                        fs.Write(bytes, 0, bytes.Length);
+                    }
+                    break;
+                }
+                catch (IOException) when (attempt < 10) { Thread.Sleep(50 * attempt); }
+            }
+        }
+        var missing = wanted.Where(w => !found.Contains(w)).ToList();
+        return $"Deleted {found.Count} report(s)" + (missing.Count > 0 ? $"; not found: {string.Join(", ", missing)}" : "") + ".";
+    }
+
     static int SeverityRank(string s) => (s ?? "").ToLowerInvariant() switch { "blocker" => 0, "major" => 1, "minor" => 2, _ => 3 };
 
     static IEnumerable<Item> Filter(List<Item> items, string status, string tool)
     {
         status = string.IsNullOrWhiteSpace(status) ? "open" : status.Trim().ToLowerInvariant();
-        return items.Where(i => (status == "all" ? i.Status != "deleted" : string.Equals(i.Status, status, StringComparison.OrdinalIgnoreCase)) &&
+        return items.Where(i => (status == "all" || string.Equals(i.Status, status, StringComparison.OrdinalIgnoreCase)) &&
                                 (string.IsNullOrWhiteSpace(tool) || (i.Tool ?? "").Contains(tool.Trim(), StringComparison.OrdinalIgnoreCase)));
     }
 
@@ -382,7 +425,7 @@ public sealed partial class ToolRegistry
                    P("expected", "string", "report: what should have happened"),
                    P("workaround", "string", "report: how the task was solved anyway (if at all)"),
                    P("severity", "string", "report: blocker | major | minor"),
-                   P("status", "string", "list: open (default), resolved, wontfix, duplicate, deleted or all (all without deleted); resolve: new status (default resolved, open = reopen)"),
+                   P("status", "string", "list: open (default), resolved, wontfix, duplicate or all; resolve: new status (default resolved, open = reopen)"),
                    P("id", "string", "resolve: entry id(s), e.g. FB-1A2B3C4D (several separated by ',')"),
                    P("note", "string", "resolve: what was done / why"),
                    P("version", "string", "resolve: TcAgent version containing the fix, e.g. 0.21.0"),
