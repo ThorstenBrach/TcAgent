@@ -54,4 +54,5 @@ Every tool window and dialog of the extension follows the same rules - the knowl
   Plain words over jargon; the same terms as in the User Guide.
 * **Dialogs:** `Dialog(...)` (colors of the IDE), OK/Cancel at the bottom right, focus in the first required field,
   checked while typing (OK stays off until the input is valid, the reason below the field), long lists with a filter,
-  folders and files with Browse ….
+  folders and files with Browse …. Several items are chosen with **check boxes** (ticks stay when the filter changes;
+  Space ticks the selected line), never with Ctrl/Shift selection - one click beside it would lose everything.

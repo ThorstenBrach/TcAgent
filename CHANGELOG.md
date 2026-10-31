@@ -25,7 +25,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   - Sources: **Browse and install …** first and highlighted, rare actions under **More ▾**, Check for updates and Update
     all next to the heading, **Copy URL**, the output folded while it is empty, empty states.
   - **Browse and install** dialog: search, kind filter, "Only not installed", state column (installed where, not
-    installable), details of the selected item, several items at once.
+    installable), details of the selected line, several items ticked with check boxes (the ticks stay when the filter
+    changes; Space ticks the line) instead of a Ctrl/Shift selection that one click beside it would lose.
   - Platforms: the decision for this project on top with Set for this project … and Detect automatically.
   - Documentation: search like the agent right in the tab (Enter), state "○ empty – use Add documents …" in grey instead
     of an error, shorter intro.

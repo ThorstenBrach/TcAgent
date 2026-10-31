@@ -84,6 +84,7 @@ namespace TcAgentBridge
             public string C1 { get; set; } public string C2 { get; set; } public string C3 { get; set; }
             public string C4 { get; set; } public string C5 { get; set; } public string C6 { get; set; } public string C7 { get; set; }
             public Brush Mark { get; set; }
+            public bool On { get; set; }   // ticked in a list with check boxes
             public string Tip { get; set; }
         }
 
@@ -239,7 +240,8 @@ namespace TcAgentBridge
         }
 
         /// <summary>Columns (header, width, property of Line); a property with ! in front is the state: shown in the color of Mark
-        /// (always with a symbol and a word - the color alone says nothing to everybody).</summary>
+        /// (always with a symbol and a word - the color alone says nothing to everybody); ? in front = a check box (several items
+        /// are ticked, not selected with Ctrl/Shift - one click beside them would lose the whole selection).</summary>
         static void Columns(ListView l, params (string Header, double Width, string Prop)[] cols)
         {
             var g = new GridView { AllowsColumnReorder = false };
@@ -251,7 +253,14 @@ namespace TcAgentBridge
             foreach (var col in cols)
             {
                 var c = new GridViewColumn { Header = col.Header, Width = col.Width };
-                if (col.Prop.StartsWith("!"))
+                if (col.Prop.StartsWith("?"))
+                {
+                    var box = new FrameworkElementFactory(typeof(CheckBox));
+                    box.SetBinding(ToggleButton.IsCheckedProperty, new Binding(col.Prop.Substring(1)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
+                    box.SetValue(FocusableProperty, false);
+                    c.CellTemplate = new DataTemplate { VisualTree = box };
+                }
+                else if (col.Prop.StartsWith("!"))
                 {
                     var txt = new FrameworkElementFactory(typeof(TextBlock));
                     txt.SetBinding(TextBlock.TextProperty, new Binding(col.Prop.Substring(1)));
@@ -1710,8 +1719,7 @@ namespace TcAgentBridge
                 };
             }).ToList();
             var list = NewList();
-            list.SelectionMode = SelectionMode.Extended;
-            Columns(list, ("Name", 200, nameof(Line.C1)), ("Kind", 90, nameof(Line.C2)), ("Source", 120, nameof(Line.C3)), ("State", 150, "!" + nameof(Line.C4)),
+            Columns(list, ("", 30, "?" + nameof(Line.On)), ("Name", 190, nameof(Line.C1)), ("Kind", 90, nameof(Line.C2)), ("Source", 120, nameof(Line.C3)), ("State", 150, "!" + nameof(Line.C4)),
                     ("License", 110, nameof(Line.C5)), ("Scripts", 60, nameof(Line.C6)), ("Description", 360, nameof(Line.C7)));
             var query = new TextBox();
             var kinds = new[] { "All kinds" }.Concat(lines.Select(l => l.C2).Distinct()).ToArray();
@@ -1727,8 +1735,11 @@ namespace TcAgentBridge
             kind.SelectionChanged += (s, e) => Filter();
             notYet.Click += (s, e) => Filter();
             Filter();
+            // tick: the shown items, none (the ticks stay when the filter changes)
+            var tickAll = Text("Tick all shown", "Tick every item the filter shows");
+            var tickNone = Text("Untick all", "Remove every tick");
             var top = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
-            foreach (var e in new UIElement[] { SearchBox(query, "Search name, license, description", 280), kind, notYet }) top.Children.Add(e);
+            foreach (var e in new UIElement[] { SearchBox(query, "Search name, license, description", 280), kind, notYet, TcUnitControl.Separator(), tickAll, tickNone }) top.Children.Add(e);
             // the details of the selected item
             var info = new TextBox { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Height = 130, Padding = new Thickness(4),
                                      FontFamily = new FontFamily("Consolas"), FontSize = 12, Margin = new Thickness(0, 6, 0, 0) };
@@ -1738,15 +1749,25 @@ namespace TcAgentBridge
             var level = new ComboBox { ItemsSource = levelNames, SelectedIndex = Math.Max(0, levelNames.FindIndex(x => x.StartsWith("user"))), MinWidth = 200, Margin = new Thickness(6, 0, 6, 0) };
             var install = new Button { Content = "Install …", MinWidth = 110, IsDefault = true };
             var say = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, Margin = new Thickness(0, 0, 10, 0) };
-            List<Dictionary<string, object>> Chosen() => list.SelectedItems.OfType<Line>().Select(l => l.D).ToList();
-            void Selected()
+            List<Dictionary<string, object>> Chosen() => lines.Where(l => l.On).Select(l => l.D).ToList();
+            void Ticked()
             {
                 var c = Chosen();
                 var ok = c.Where(i => !(S(i, "licenseClass") is "source-available" or "none")).ToList();
                 install.IsEnabled = ok.Count > 0;
                 install.Content = ok.Count > 1 ? $"Install {ok.Count} …" : "Install …";
-                if (c.Count != 1) { info.Text = c.Count == 0 ? "Select one or more items (Ctrl/Shift for several)." : $"{c.Count} items selected."; return; }
-                var i = c[0];
+                say.Text = c.Count == 0 ? "Tick the items to install (Space ticks the selected line)." : $"{c.Count} ticked" + (c.Count > ok.Count ? $", {c.Count - ok.Count} of them not installable" : "") + ".";
+            }
+            list.AddHandler(ToggleButton.ClickEvent, new RoutedEventHandler((s, e) => Ticked()));
+            list.KeyDown += (s, e) => { if (e.Key == Key.Space && list.SelectedItem is Line l) { l.On = !l.On; Filter(); list.SelectedItem = l; Ticked(); e.Handled = true; } };
+            list.MouseDoubleClick += (s, e) => { if (list.SelectedItem is Line l) { l.On = !l.On; Filter(); list.SelectedItem = l; Ticked(); } };
+            tickAll.Click += (s, e) => { foreach (var l in list.Items.OfType<Line>()) l.On = true; Filter(); Ticked(); };
+            tickNone.Click += (s, e) => { foreach (var l in lines) l.On = false; Filter(); Ticked(); };
+            // the details: the line the cursor is on
+            void Selected()
+            {
+                if (!(list.SelectedItem is Line sel)) { info.Text = "Select a line to see its details; tick the items to install."; return; }
+                var i = sel.D;
                 var files = Strings(i, "files"); var scripts = Strings(i, "scripts");
                 info.Text = $"{S(i, "name")} ({KindName(S(i, "kind"))}) from {S(i, "source")} @{Short(S(i, "commit"))}\n{S(i, "description")}\n\n" +
                             $"License: {S(i, "license")} ({S(i, "licenseClass")})" + (S(i, "refusal") is string rf ? "\nNot installable: " + rf : "") + "\n" +
@@ -1754,7 +1775,7 @@ namespace TcAgentBridge
                             (scripts.Count > 0 ? $"\nScripts: {string.Join(", ", scripts)} - TcAgent never runs them; read them before you use the item." : "");
             }
             list.SelectionChanged += (s, e) => Selected();
-            Selected();
+            Selected(); Ticked();
             install.Click += async (s, e) =>
             {
                 var chosen = Chosen();
