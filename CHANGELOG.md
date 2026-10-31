@@ -6,6 +6,46 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+## [0.50.0] – 2026-10-31
+
+### Changed
+- **Knowledge window reworked after a UX review** (`vsbridge/KnowledgeWindow.cs`):
+  - Top bar with real tabs (the selected one underlined, a badge counts what needs attention there), the platform as a
+    short link, ⟳ (F5) and a ⋯ menu with Levels …, Backup now …, Restore …, Refresh and Copy diagnostics.
+  - New tab **Backups**; History is now **Workflow runs** (with a note instead of an empty chart while there are fewer
+    than two runs).
+  - Overview starts with **what the agent gets in this project** (each entry opens the Files tab with that kind) and
+    **Needs attention** (items from a source changed or newer, Git changes, documentation not reachable, open
+    blocker/major feedback) with links to the tab; rates show "—" until there are 5 runs.
+  - States as symbol and word instead of a colored dot: ✓ applies, ↷ replaced, ⊘ switched off, ✎ changed locally,
+    ↑ newer in the source, ⇅ both changed, ✗ missing, ⚠ not reachable, ○ empty.
+  - Files: one toolbar row with **Switch off ▾** (for this project / for me) and **Source ▾**, filters in their own row
+    (search with hint and ✕, Ctrl+F), kinds as words, a detail header with the fitting actions as links and the file
+    folded.
+  - Sources: **Browse and install …** first and highlighted, rare actions under **More ▾**, Check for updates and Update
+    all next to the heading, **Copy URL**, the output folded while it is empty, empty states.
+  - **Browse and install** dialog: search, kind filter, "Only not installed", state column (installed where, not
+    installable), details of the selected item, several items at once.
+  - Platforms: the decision for this project on top with Set for this project … and Detect automatically.
+  - Documentation: search like the agent right in the tab (Enter), state "○ empty – use Add documents …" in grey instead
+    of an error, shorter intro.
+  - Feedback: "Show:" filter label, the issue text as an editable section with its own heading.
+- **The IDE stays responsive:** every call of TcAgent.exe from the knowledge window runs in the background with a thin
+  progress bar; before, many actions (merge, propose, backup, restore, platforms, feedback text) blocked the IDE until
+  they were done. Calls from the background now also pass the open solution (it was missing there).
+- **Feedback:** successes and hints in the status line or a yellow info bar below the tabs (with a link such as Open
+  folder) instead of a dialog to click away; errors stay dialogs. Long texts in confirmations (merge preview, update
+  plan, restore difference, install list) scroll; for risky steps Enter cancels. The status line shows on the right
+  what the tab holds.
+- **Buttons follow the selection:** they are only enabled when they fit the selected entry (toolbar and context menu).
+- **Keyboard:** F5 refreshes and Ctrl+F jumps to the search box while the window is active (the IDE no longer takes
+  them); Enter opens and Del deletes in every list; toolbar buttons can be reached with Tab.
+- **Dialogs in the colors of the IDE** (light, dark, blue), OK only when the input is valid (checked while typing, the
+  reason below the field), the restore choice and the backup list with a filter.
+
+### Added
+- CONTRIBUTING.md: **Windows and dialogs** – the rules every window and dialog of the extension follows.
+
 ## [0.49.0] – 2026-10-31
 
 ### Added

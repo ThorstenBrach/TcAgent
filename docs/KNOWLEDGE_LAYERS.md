@@ -6,7 +6,7 @@
 > mirror into the agent CLIs). Since 0.32: workflows with checkpoints (`tc_workflow`, built-in `new-feature`) and the
 > hard gate "`tc_activate` only after a build with 0 errors". Since 0.33: run logs and `tc_improve` (proposals by fixed rules,
 > apply after asking, evaluation over 10 runs, revert, promote with name check). Since 0.34: sources (`tc_sources`, `skills.lock.json`, license check, overlay
-> `tcagent-extends`, `TcAgent.exe sources sync`). Since 0.35: the knowledge manager window (Overview, Effective, Sources, History) and
+> `tcagent-extends`, `TcAgent.exe sources sync`). Since 0.35: the knowledge manager window (Overview, Effective, Sources, History; since 0.50 Overview, Files, Sources, Platforms, Documentation, Feedback, Backups, Workflow runs) and
 > `TcAgent.exe knowledge json|disable|enable`. Since 0.37: the team level between user and platform (`TCAGENT_TEAM`). Since 0.38: the chat window speaks ACP (GitHub Copilot). Since 0.40–0.42: the
 > knowledge window manages the files (tab Files instead of Effective: new, move between levels, delete, switch off, Git),
 > sources (add, edit, browse and install, updates), platforms (new for you or the company, set, detect, delete), the levels
@@ -318,7 +318,7 @@ gets and where it comes from:
   run, minutes per run, gate stops; a table of all workflows (runs, trend, current value, change, proposals); open
   improvement proposals; the most frequent causes of failed checks; counts of rules, skills, workflows and lessons.
   A click on a workflow opens its history.
-- **History view:** the metrics of the run logs over the runs (failed checks, user corrections, minutes per run,
+- **Workflow runs** (called History before 0.50): the metrics of the run logs over the runs (failed checks, user corrections, minutes per run,
   moving average) per workflow, every adopted change as a marker, a reverted change as a shaded range, and a list of the
   changes with before / after values over the following 10 runs. Open proposals can be reviewed from there; export as CSV.
 - The same actions exist for agents and the command line (`tc_knowledge`, `TcAgent.exe knowledge`), so the agent can

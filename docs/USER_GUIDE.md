@@ -181,29 +181,44 @@ agent gets – coding rules, risk rules, skills, workflows, lessons, documentati
 knowledge without editing folders by hand. The levels and what belongs to them: [Your files](#configuration-reference)
 and [docs/KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md).
 
-*All tabs use the same words in the same order:* New … / Add existing … / Open / Open folder / Edit … / Rename … /
-Move to level … / Switch off · on / Delete … (Del) / Copy path, groups separated by lines; the toolbar and the
-context menu of a list show the same entries. Every action answers in the status line or in a message; errors
-always as a message.
+*How the window works:* the tabs are on top – a badge on a tab counts what needs your attention there; on the right
+the platform of the project (a click opens the Platforms tab), **⟳** (F5) and **⋯** with **Levels …**, **Backup now …**,
+**Restore …**, **Refresh** and **Copy diagnostics**. All tabs use the same words in the same order: New … / Add
+existing … / Open / Open folder / Edit … / Rename … / Move to level … / Switch off ▾ · Switch on / Delete … (Del) /
+Copy path, groups separated by lines; the main action of a tab comes first and is highlighted, rarer ones are in a
+drop-down (▾). The toolbar and the context menu of a list show the same entries, and a button is only active when it
+fits the selection. Double-click or Enter opens, Del deletes, Ctrl+F jumps to the search box. A state is always a
+symbol and a word (✓ applies, ↷ replaced, ⊘ switched off, ✎ changed locally, ↑ newer in the source, ⚠ not reachable)
+– never a color alone. TcAgent.exe works in the background (a thin bar under the tabs) – the IDE stays responsive.
+Successes and hints appear in the status line or in a yellow bar below the tabs; errors always as a message. The
+status line shows on the right what the tab holds.
 
 ### Overview
 
-Tiles for runs, first-time-right, failed checks, corrections and minutes per run and gate stops – the
-last 10 workflow runs against the 10 before, with a sparkline; the workflows; open improvement proposals; the most
-frequent compiler errors. Double-click a workflow for its history.
+First **what the agent gets in this project** – one entry per kind (coding rule files, skills, workflows,
+documentation sources …); a click shows them in the Files tab. Then **Needs attention** (items from a source changed
+or newer, Git changes, documentation not reachable, open blocker/major feedback), each with a link to its tab. Below
+the tiles for runs, first-time-right, failed checks, corrections and minutes per run and gate stops – the last 10
+workflow runs against the 10 before, with a sparkline; with fewer than 5 runs the rates show "—" (from 5 runs), trends
+need 20 runs. Then the workflows, open improvement proposals and the most frequent compiler errors. Double-click a
+workflow for its runs over time.
 
 <p><img src="img/knowledge/overview.png" width="900" alt="Overview: runs, first-time-right, failed checks, corrections and the workflows"><br><em>Overview: runs, first-time-right, failed checks, corrections and the workflows</em></p>
 
 ### Files
 
-Coding rules, risk rules, skills, workflows, lessons and templates of every level with their status
-(applies, replaced by a later level, locked, forced, switched off) and why; filter by kind, level and text. Toolbar
-and context menu: **New …** (a new file from a template, opened in the editor), **Add existing …** (an existing file
+Coding rules, risk rules, skills, workflows, lessons and templates of every level with their state
+(✓ applies, ↷ replaced by a later level, ⊘ switched off, locked, forced, and for an item from a source ✎ changed
+locally / ↑ newer in the source) and why; filters in their own row – kind, level, search (Ctrl+F), "Only what
+applies". Toolbar and context menu: **New …** (a new file from a template, opened in the editor), **Add existing …** (an existing file
 or skill/workflow folder taken over to a level), **Open**, **Open folder**, **Rename …** (the name in the header
 follows), **Move to level …** (moving up checks the text for project and machine names; company and a team in Git as
-a commit on a new branch for a pull request), **Switch off** for the project or for you, **Switch on**
+a commit on a new branch for a pull request), **Switch off ▾** for this project or for you, **Switch on**
 (`disabled.json` – the file itself stays unchanged), **Delete …** (also the Del key; only on your own levels –
-built-in and company files are switched off instead), **Copy path**.
+built-in and company files are switched off instead), **Copy path**, and **Source ▾** for an item installed from a
+source (the same actions as in the Sources tab). Below the list the selected file: name and state, level and path,
+description, why, source and license, the actions that fit (e.g. *Compare with installed version · Update and
+merge … · Propose upstream …* for your changes) and the file itself, folded.
 
 For every level kept in Git a line shows local changes, commits to push and new commits in the repository (as of
 the last **Fetch**), with **Pull**, **Commit …** and **Push** – the push of a company or team level goes to a new
@@ -213,20 +228,25 @@ branch for a pull request; the column **Git** marks changed and new files.
 
 ### Sources
 
-The Git repositories skills, workflows and rules can be installed from (`tc_sources`): **New …**, **Open**
-(the repository in the browser), **Open folder** (TcAgent's local copy), **Edit …**, **Delete …**, **Copy path**,
-**Browse and install …** (everything a source offers with kind and license; before installing you see the
-license, the files and any scripts – source-available and unlicensed items are refused, others only after you
-accept the license). Installing offers every level – you, the project, the team, the company and the platforms; a
+The Git repositories skills, workflows and rules can be installed from (`tc_sources`): **Browse and install …**
+first, then **New …**, **Open** (the repository in the browser; double-click), **Open folder** (TcAgent's local copy),
+**Edit …**, **Delete …**, **Copy URL**. **Browse and install …** lists everything a source offers – search, filter by
+kind, "Only not installed", the state (✓ installed and where, ○ not installed, ✗ not installable), license, scripts and
+the details of the selected item (description, license, files, scripts); several items can be installed at once.
+Before installing you confirm the license, the files and any scripts – source-available and unlicensed items are
+refused, others only after you accept the license. Installing offers every level – you, the project, the team, the company and the platforms; a
 shared level kept in Git gets a commit on a new branch for a pull request instead of a direct change. Below the items
-installed from sources with their state – **✎ locally changed** (orange), **↑ upstream newer** (blue), **⇅ both
-changed** (red); it is checked when the window opens, on refresh and when you save a file of a level in the editor.
-**Check for updates**, **Update all …**, **What changed in the source**, and for the selected item:
-- **My changes / Diff** – the compare window of Visual Studio, installed version left, yours right;
-- **Revert …** – back to the installed version (yours goes to `%LOCALAPPDATA%\TcAgent\backups\sources\`);
-- **Keep as own version …** – no longer tied to the source (no updates, no "changed" state); where it came from stays
+installed from sources with their state – **✓ as installed**, **✎ changed locally**, **↑ newer in the source**, **⇅ both
+changed**, **✗ missing**; it is checked when the window opens, on refresh and when you save a file of a level in the
+editor. Next to the heading **Check for updates** and **Update all …** (the plan first, scrollable); for the selected
+item **Open**, **Open folder**, **Compare with installed version**, **Update and merge …**, **More ▾**, **Uninstall …**,
+**Copy path**:
+- **Compare with installed version** – the compare window of Visual Studio, installed version left, yours right;
+- **Changes in the source** (More ▾) – what changed in the source since the install;
+- **Revert to installed version …** (More ▾) – back to the installed version (yours goes to `%LOCALAPPDATA%\TcAgent\backups\sources\`);
+- **Keep as own version …** (More ▾) – no longer tied to the source (no updates, no "changed" state); where it came from stays
   in its header (`tcagent-source`, `tcagent-detached`);
-- **Propose upstream …** – your changes as a commit on a new branch of the source (without TcAgent's metadata,
+- **Propose upstream (pull request) …** (More ▾) – your changes as a commit on a new branch of the source (without TcAgent's metadata,
   checked for your private terms) plus a patch file; you decide whether and where it is pushed – the source or your
   fork – and the pull request page opens in the browser, you send it yourself;
 - **Update and merge …** – a preview first, then the newer version of the source is merged into your item (three-way,
@@ -234,7 +254,8 @@ changed** (red); it is checked when the window opens, on refresh and when you sa
   `<<<<<<<` in the file);
 - **Uninstall …** (also Del) – removes the item and its entry in `skills.lock.json`; a copy goes to the backups.
 
-The tab **Files** shows the same state in the column Source and has the same actions in the context menu.
+The output of these actions appears in the box **Output** at the bottom (folded while it is empty). The tab
+**Files** shows the same state and has the same actions under **Source ▾**.
 
 <p><img src="img/knowledge/sources.png" width="900" alt="Sources: the Git sources and the items installed from them with their state"><br><em>Sources: the Git sources and the items installed from them with their state</em></p>
 
@@ -244,17 +265,18 @@ The tab **Files** shows the same state in the column Source and has the same act
 
 ### Platforms
 
-The platforms (automation frameworks) with the libraries and terms that detect them, which apply to
-this project and why, the libraries of the project. **New …** (a platform of your own – for you or, with a company
-level, for the whole company), **Open platform.md**, **Open folder**, **Set for this project …**, **Detect
-automatically**, **Delete** (only platforms of your own); the same in the context menu. A click on the platform name
+On top the decision for this project – which platforms apply, chosen by hand or detected and why, the
+libraries of the project – with **Set for this project …** and **Detect automatically**. Below all platforms
+(automation frameworks) with the libraries and terms that detect them and **✓ applies**. **New …** (a platform of your own – for you or, with a company
+level, for the whole company), **Open** (its platform.md), **Open folder**, **Delete …** (only platforms of your own), **Copy path**;
+the same in the context menu. A click on the platform name
 in the top bar opens this tab.
 
 <p><img src="img/knowledge/platforms.png" width="900" alt="Platforms: which platform applies to the project and why"><br><em>Platforms: which platform applies to the project and why</em></p>
 
 ### Levels
 
-(top bar): the folders or Git working copies of the company level (`TCAGENT_COMPANY`), the team levels
+(**⋯ > Levels …**): the folders or Git working copies of the company level (`TCAGENT_COMPANY`), the team levels
 (`TCAGENT_TEAM`) and platform repositories (`TCAGENT_PLATFORMS`). They are saved in `settings.json` and used by the
 window at once; **⋯ > Set up clients** in the chat passes them on to the AI clients.
 
@@ -262,18 +284,18 @@ window at once; **⋯ > Set up clients** in the chat passes them on to the AI cl
 
 What the agent looks things up in (`tc_docs`) – Beckhoff InfoSys, the links, folders and network
 shares of the `knowledge.md` of every level and the document folders `knowledge\`, each with type, level, state
-(documents found, pages already read, not reachable) and the file it is defined in. **Open** (browser or Explorer),
+(✓ n documents, ↗ online, ○ empty – use Add documents …, ⚠ not reachable) and the file it is defined in. **Open** (browser or Explorer),
 **Open knowledge.md** (of the level of the selected source or of a level you choose - created if missing), **Add link
 or folder …** (one line in the `knowledge.md` of the level you choose), **Add documents …** (copies files into the
-`knowledge\` folder of a level), **Open folder**, **Edit …**, **Delete …**, **Copy path** and **Search like the agent …**
-– the hits are listed below (a PDF on the page of the hit with Acrobat/Reader, Foxit, SumatraPDF or a browser)
+`knowledge\` folder of a level), **Open folder**, **Edit …**, **Delete …**, **Copy path**. **Search like the agent**
+right in the tab (type, Enter; Ctrl+F) – the hits are listed below (a PDF on the page of the hit with Acrobat/Reader, Foxit, SumatraPDF or a browser)
 and open with a double-click (documents with their program, pages in the browser); the same in the context menu.
 
 <p><img src="img/knowledge/documentation.png" width="900" alt="Documentation: the sources of tc_docs and the hits of a test search"><br><em>Documentation: the sources of tc_docs and the hits of a test search</em></p>
 
 ### Feedback
 
-The reports of `tc_feedback` (filter by status). For the selected reports the window builds the text of
+The reports of `tc_feedback` (**Show:** open, all, resolved …). For the selected reports the window builds the text of
 an issue and **anonymizes** it: names of this computer, user, solution and projects, your `privateTerms`
 (`settings.json`), user folders, solution paths, network paths and IP addresses are replaced. You edit the text as
 needed and then **Copy**, **Save as …** or **Share with the TcAgent developers …** (opens a new issue in the browser
@@ -284,27 +306,29 @@ knowledge levels are configured – no names or paths. **Copy diagnostics** (als
 reports as resolved, wontfix or duplicate. Questions belong in the GitHub Discussions (category Q&A), security
 problems are reported privately (`SECURITY.md`).
 
-### History
+### Workflow runs
 
-Failed checks and corrections per run with a moving average, every adopted change as a marker, and the
-changes with their values before and after (helped / no effect / worse / reverted); **Export CSV**. Below that the
-**backups of the knowledge** (see below) with **Difference**, **Restore …** and **Open folder**.
+Failed checks and corrections per run with a moving average, every adopted improvement as a marker, and the
+improvements with their values before and after (helped / no effect / worse / reverted); **Export CSV**. With fewer
+than two runs the chart says so instead of staying empty.
 
 <p><img src="img/knowledge/history.png" width="900" alt="History: the workflow runs and the backups of the knowledge"><br><em>History: the workflow runs and the backups of the knowledge</em></p>
 
 ### Backup and restore
 
-**Backup … / Restore …** (top bar): the knowledge of every level – coding rules, risk rules, skills, workflows,
+The tab **Backups** (and **⋯ > Backup now … / Restore …**): the knowledge of every level – coding rules, risk rules, skills, workflows,
 lessons, templates, platforms, `knowledge.md`, `sources.json`, `skills.lock.json`, `disabled.json`, `config.json` – is
 backed up **automatically before every change** (from this window, the chat and the command line) as a ZIP with
 `manifest.json` (TcAgent version, level, SHA-256 of every file) in `%LOCALAPPDATA%\TcAgent\backups\knowledge\`; only
 when the level changed since its last backup, the last 20 per level are kept. A level in a Git working copy (team,
 company, project) is backed up with its uncommitted changes only – Git keeps the rest. **Restore** works for the whole
 level, one file or one skill/workflow: first the difference, then you confirm; the current state is backed up before.
-**Backup …** asks for the levels (all checked), the folder (TcAgent's backup folder, changeable - another folder gets
-a copy) and "Open the folder afterwards", then shows the files written with their number of files; **Restore …**
-lists all backups (or **Restore from a file …** takes a copy from anywhere), then what to restore, the difference
-and your confirmation. In the History tab a backup can also be deleted (**Delete …**) or its path copied.
+**Backup now …** asks for the levels (all checked), the folder (TcAgent's backup folder, changeable - another folder gets
+a copy) and "Open the folder afterwards", then says in the yellow bar what was written (with **Open folder**); **Restore …**
+lists all backups with a filter (or **From a file …** takes a copy from anywhere), then what to restore (the whole
+level, a skill/workflow folder or one file – with a filter), the difference (scrollable) and your confirmation. In
+the tab a backup can also be compared with the current state (double-click), deleted (**Delete …**) or its path
+copied.
 Command line: `TcAgent.exe knowledgebase list|backup|diff|restore`.
 
 Decisions (apply a proposal, install, pull, promote) are made in the chat – the agent asks you.

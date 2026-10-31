@@ -32,3 +32,26 @@ descriptions need improvement.
 * Test against a project without connected hardware.
 * Unit tests for the file logic (no TwinCAT needed): `dotnet test tests\TcAgent.Tests`. The test project links the
   sources it tests from `src/` (the server project itself needs the TwinCAT interop).
+
+## Windows and dialogs
+
+Every tool window and dialog of the extension follows the same rules - the knowledge window
+(`vsbridge/KnowledgeWindow.cs`) is the reference and has the helpers for them.
+
+* **Layout:** real tabs on top (a badge counts what needs attention there); context, refresh (F5) and a ⋯ menu for rare
+  and global actions on the right. Per tab: heading with a short explanation, the main action first and highlighted,
+  filters in their own row, the list, then the details of the selection (facts, the fitting actions as links, long
+  content folded). The status line shows the last message on the left and what the tab holds on the right.
+* **Actions:** one list of actions per list - toolbar and context menu show the same entries with the same names in the
+  same order (New … / Add existing … / Open / Open folder / Edit … / Rename … / Move to level … / Switch off ▾ · Switch on /
+  Delete … / Copy path). "…" only when a dialog follows, "▾" for a drop-down, rare actions under "More ▾". A button is
+  only enabled when it fits the selection. Double-click and Enter open, Del deletes, Ctrl+F goes to the search box.
+* **Feedback:** every action answers - success and hints in the status line or the info bar, errors always as a dialog;
+  no dialog only to say "done". Long texts in a confirmation (a diff, a plan) scroll. Calls of TcAgent.exe run in the
+  background (`await Cli(...)`) with the progress bar - never wait on the UI thread.
+* **States and texts:** a state is a symbol and a word (✓ applies, ⊘ switched off, ✎ changed locally, ⚠ not reachable …),
+  never a color alone; empty lists say what they are for and how to fill them; numbers with too little data show "—".
+  Plain words over jargon; the same terms as in the User Guide.
+* **Dialogs:** `Dialog(...)` (colors of the IDE), OK/Cancel at the bottom right, focus in the first required field,
+  checked while typing (OK stays off until the input is valid, the reason below the field), long lists with a filter,
+  folders and files with Browse ….
