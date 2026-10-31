@@ -93,7 +93,7 @@ tells you whether a machine is ready and what is missing – step by step in [do
 **TE1030** license (TwinCAT 3 Documentation Generation).
 
 1. Download `TcAgent-<version>.vsix` from the [releases](https://github.com/ThorstenBrach/TcAgent/releases), close Visual Studio, double-click the file.
-   Only the TwinCAT XAE Shell, no Visual Studio 2022? Take `TcAgent-XaeShell-<version>.zip` instead – see
+   Only the TwinCAT XAE Shell, no Visual Studio 2022? Take `TcAgent-XaeShell-<version>.zip` instead (preview) – see
    [docs/INSTALLATION.md](docs/INSTALLATION.md#only-the-xae-shell-no-visual-studio-2022).
 2. Start Visual Studio 2022 with your TwinCAT solution. TcAgent asks once whether it should register itself in the
    AI clients it finds (Claude Desktop/Code, GitHub Copilot in VS and CLI, Gemini CLI, Codex CLI). A backup of every

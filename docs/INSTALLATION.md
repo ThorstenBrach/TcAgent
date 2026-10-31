@@ -46,8 +46,8 @@ the new server from the VSIX and registers it (the chat window shows "TcAgent se
 
 ### Only the XAE Shell (no Visual Studio 2022)
 
-Since 0.49 TcAgent also works on a PC that has the TwinCAT XAE Shell alone – no Visual Studio, no build tools, no .NET SDK.
-Each release has a package for it: `TcAgent-XaeShell-<version>.zip`.
+Since 0.49 TcAgent is meant to work on a PC that has the TwinCAT XAE Shell alone – no Visual Studio, no build tools, no
+.NET SDK (**preview**: see "Tested" below). Each release has a package for it: `TcAgent-XaeShell-<version>.zip`.
 
 1. Close the XAE Shell. Download the ZIP; in the Explorer right-click it > Properties > **Unblock**, then extract it into a
    folder of its own.
@@ -72,8 +72,11 @@ shell brings along (Visual Studio 2022 offers a newer, compatible one), and it f
 `vsbridge\install-xaeshell.ps1 -Vsix bin\TcAgent-<version>.vsix` compiles the extension (needs Visual Studio 2022 or its
 Build Tools) and takes the server from the VSIX.
 
-Tested: the 32-bit shell (VS 2017 base). The 64-bit shell (TcXaeShell64, VS 2022 base) gets the extension of the Visual
-Studio 2022 build – not tested yet; please report how it works.
+Tested: the package in the 32-bit shell (VS 2017 base) on a PC that also has Visual Studio 2022 – install without a
+compiler, the setup on the first start, the extension 0.49.0 in the shell, and TcAgent controlling the shell with the
+shell's own EnvDTE 8.0 (forced with `TCAGENT_IDE_ASSEMBLIES`). **Not tested yet:** a PC without Visual Studio 2022 at all
+(something Visual Studio brings along could still be missing) and the 64-bit shell (TcXaeShell64, VS 2022 base, which
+gets the extension of the Visual Studio 2022 build). Please report how it works there – tab Feedback or an issue.
 
 Optional, for the Scope and HMI tools: **TE1300 Scope View** (`tc_scope`) and **TE2000 HMI Engineering** (`tc_hmi*`).
 

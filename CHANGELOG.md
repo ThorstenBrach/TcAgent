@@ -9,7 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [0.49.0] – 2026-10-31
 
 ### Added
-- **TcAgent with the TwinCAT XAE Shell alone** (no Visual Studio 2022, no build tools): every release gets the package
+- **TcAgent with the TwinCAT XAE Shell alone** (no Visual Studio 2022, no build tools) – preview: tested in the 32-bit shell
+  on a PC that also has Visual Studio 2022 (shell-only simulated with `TCAGENT_IDE_ASSEMBLIES`); a PC without Visual
+  Studio 2022 and the 64-bit shell are not tested yet. Every release gets the package
   `TcAgent-XaeShell-<version>.zip` (built by `build-vsix.ps1`) with the extension prebuilt for the 32-bit shell
   (`bridge-vs15`, built against the shell) and the 64-bit shell (`bridge-vs17`, the Visual Studio 2022 build - not tested
   in that shell yet), the server and `install-xaeshell.ps1`. The script installs from the package without compiling and
