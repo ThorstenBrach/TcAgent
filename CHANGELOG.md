@@ -81,8 +81,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   - Esc stops the answer while the agent works; "Stopped by you" is a neutral line instead of a red error; answers
     have **Copy**; errors are marked with ⚠ (not only red); Copy diagnostics no longer opens a message box.
 
+- Knowledge window: the actions on an item from a source are named **My changes** and **What's new upstream**; F2 renames
+  a file, Ctrl+C copies the path of the selected line in every list; long paths in the details are shortened in the
+  middle (Copy path copies the full one); red only for errors ("⇅ both changed", a worse trend and "not installable" are
+  orange).
+
 ### Added
-- CONTRIBUTING.md: **Windows and dialogs** – the rules every window and dialog of the extension follows.
+- **docs/UI_GUIDELINES.md** – the UI/UX rules for every window and dialog of the extension (tabs and ⋯ menu, 4-6 main
+  actions, master-detail, states as symbol and word, long actions in the background, keys, empty states, check boxes,
+  visible safety information, vocabulary, privacy, theme colors, narrow windows, mockup before building); CONTRIBUTING.md
+  and the agent guide (`agents/TCAGENT_GUIDE.md`, `SKILL.md`) point to it.
 - TcUnit progress block: the optional outputs `Cycle` and `Cycles` of the running test (shown as "cycle x/y").
 - The TcUnit window keeps the last 5 results of every test per solution (`%LOCALAPPDATA%\TcAgent\tcunit\history.json`).
 

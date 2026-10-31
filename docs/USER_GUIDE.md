@@ -231,7 +231,7 @@ a commit on a new branch for a pull request), **Switch off ▾** for this projec
 (`disabled.json` – the file itself stays unchanged), **Delete …** (also the Del key; only on your own levels –
 built-in and company files are switched off instead), **Copy path**, and **Source ▾** for an item installed from a
 source (the same actions as in the Sources tab). Below the list the selected file: name and state, level and path,
-description, why, source and license, the actions that fit (e.g. *Compare with installed version · Update and
+description, why, source and license, the actions that fit (e.g. *My changes · Update and
 merge … · Propose upstream …* for your changes) and the file itself, folded.
 
 For every level kept in Git a line shows local changes, commits to push and new commits in the repository (as of
@@ -255,10 +255,10 @@ shared level kept in Git gets a commit on a new branch for a pull request instea
 installed from sources with their state – **✓ as installed**, **✎ changed locally**, **↑ newer in the source**, **⇅ both
 changed**, **✗ missing**; it is checked when the window opens, on refresh and when you save a file of a level in the
 editor. Next to the heading **Check for updates** and **Update all …** (the plan first, scrollable); for the selected
-item **Open**, **Open folder**, **Compare with installed version**, **Update and merge …**, **More ▾**, **Uninstall …**,
+item **Open**, **Open folder**, **My changes**, **Update and merge …**, **More ▾**, **Uninstall …**,
 **Copy path**:
-- **Compare with installed version** – the compare window of Visual Studio, installed version left, yours right;
-- **Changes in the source** (More ▾) – what changed in the source since the install;
+- **My changes** – the compare window of Visual Studio, installed version left, yours right;
+- **What's new upstream** (More ▾) – what changed in the source since the install;
 - **Revert to installed version …** (More ▾) – back to the installed version (yours goes to `%LOCALAPPDATA%\TcAgent\backups\sources\`);
 - **Keep as own version …** (More ▾) – no longer tied to the source (no updates, no "changed" state); where it came from stays
   in its header (`tcagent-source`, `tcagent-detached`);

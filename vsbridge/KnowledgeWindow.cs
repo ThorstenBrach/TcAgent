@@ -576,7 +576,27 @@ namespace TcAgentBridge
                 Dispatcher.BeginInvoke(new Action(() => { box.Focus(); Keyboard.Focus(box); box.SelectAll(); }), System.Windows.Threading.DispatcherPriority.Input);
                 return true;
             }
+            // in a list (not in a text box): F2 = Rename (Files), Ctrl+C = Copy path of the selected line
+            var list = Keyboard.FocusedElement is DependencyObject f ? (f as ListView ?? ItemsControl.ItemsControlFromItemContainer(f) as ListView) : null;
+            if (list == null) return false;
+            if (key == System.Windows.Forms.Keys.F2 && !ctrl && list == entries) { RenameItem(); return true; }
+            if (key == System.Windows.Forms.Keys.C && ctrl && list.SelectedItem is Line l)
+            {
+                CopyPath(new[] { "path", "zip", "value", "url", "file", "where" }.Select(k => S(l.D, k)).FirstOrDefault(v => !string.IsNullOrEmpty(v)) ?? l.C1);
+                return true;
+            }
             return false;
+        }
+
+        /// <summary>A long path shortened in the middle: "D:\Projekte\…\POUs\MAIN.TcPOU" (the full one stays in Copy path).</summary>
+        internal static string MiddlePath(string path, int max = 70)
+        {
+            if (string.IsNullOrEmpty(path) || path.Length <= max) return path;
+            var parts = path.Split('\\');
+            if (parts.Length < 4) return path.Substring(0, max / 2) + "…" + path.Substring(path.Length - max / 2);
+            string head = parts[0] + "\\" + parts[1], tail = parts[parts.Length - 1];
+            for (int i = parts.Length - 2; i > 1 && head.Length + tail.Length + parts[i].Length + 3 <= max; i--) tail = parts[i] + "\\" + tail;
+            return head + "\\…\\" + tail;
         }
 
         void RefreshAll()
@@ -712,7 +732,7 @@ namespace TcAgentBridge
         }
 
         // the names of the actions on an item installed from a source - the same in Files and Sources
-        const string SrcCompare = "Compare with installed version", SrcChanges = "Changes in the source", SrcRevert = "Revert to installed version …",
+        const string SrcCompare = "My changes", SrcChanges = "What's new upstream", SrcRevert = "Revert to installed version …",
                      SrcDetach = "Keep as own version …", SrcPropose = "Propose upstream (pull request) …", SrcMerge = "Update and merge …", SrcUninstall = "Uninstall …";
 
         FrameworkElement SourcesPage()
@@ -1113,7 +1133,7 @@ namespace TcAgentBridge
             var d = now.Value - prev.Value;
             if (Math.Abs(d) < 0.05) return ("= previous", Gray);
             bool better = higherIsBetter ? d > 0 : d < 0;
-            return ((d > 0 ? "▲ " : "▼ ") + Math.Abs(d).ToString("0.0", CultureInfo.InvariantCulture) + " vs. previous 10", better ? Green : Red);
+            return ((d > 0 ? "▲ " : "▼ ") + Math.Abs(d).ToString("0.0", CultureInfo.InvariantCulture) + " vs. previous 10", better ? Green : Orange);   // red is for errors only
         }
 
         // a KPI tile; note replaces the change line (e.g. "from 5 runs" while there are fewer)
@@ -1189,7 +1209,7 @@ namespace TcAgentBridge
         static (string Text, Brush Mark) SourceState(string state)
         {
             bool mine = (state ?? "").Contains("changed locally"), theirs = (state ?? "").Contains("newer upstream");
-            return mine && theirs ? ("⇅ both changed", Red) : mine ? ("✎ changed locally", Orange) : theirs ? ("↑ newer in the source", Blue)
+            return mine && theirs ? ("⇅ both changed", Orange) : mine ? ("✎ changed locally", Orange) : theirs ? ("↑ newer in the source", Blue)
                  : (state ?? "").StartsWith("missing") ? ("✗ missing", Red) : (null, null);
         }
 
@@ -1215,7 +1235,7 @@ namespace TcAgentBridge
             detailTitle.Inlines.Add(new System.Windows.Documents.Run(S(d, "name")));
             detailTitle.Inlines.Add(new System.Windows.Documents.Run("   " + state) { FontSize = 12, FontWeight = FontWeights.Normal, Foreground = mark });
             var path = S(d, "path");
-            Row("Level", $"{S(d, "label")} · {KindName(S(d, "kind"))} · {path} ", ("Open folder", OpenFolder));
+            Row("Level", $"{S(d, "label")} · {KindName(S(d, "kind"))} · {MiddlePath(path)} ", ("Open folder", OpenFolder), ("Copy path", () => CopyPath(path)));
             if (S(d, "description") is string de) Row("Description", de);
             if (S(d, "reason") is string r && r.Length > 0) Row("Why", r);
             if (S(d, "git") is string gs) Row("Git", gs + " - not committed yet");
@@ -1713,9 +1733,9 @@ namespace TcAgentBridge
                 return new Line
                 {
                     D = i, C1 = S(i, "name"), C2 = KindName(S(i, "kind")), C3 = S(i, "source"),
-                    C4 = refused ? "✗ not installable" : at.Length > 0 ? "✓ installed (" + at + ")" : "○ not installed",
+                    C4 = refused ? "⊘ not installable" : at.Length > 0 ? "✓ installed (" + at + ")" : "○ not installed",
                     C5 = S(i, "license") + (cls == "accepted" ? "" : " (" + cls + ")"), C6 = Strings(i, "scripts").Count > 0 ? "⚠ yes" : "", C7 = S(i, "description"),
-                    Mark = refused ? Red : at.Length > 0 ? Green : Gray, Tip = S(i, "refusal") ?? S(i, "path")
+                    Mark = refused ? Orange : at.Length > 0 ? Green : Gray, Tip = S(i, "refusal") ?? S(i, "path")
                 };
             }).ToList();
             var list = NewList();

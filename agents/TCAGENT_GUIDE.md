@@ -406,6 +406,13 @@ treat them like project rules for that library.
   It works in every AI client (a card in the TcAgent Chat, otherwise the client's question dialog). Never ask what the project
   or the tools can tell you.
 
+## Changing the TcAgent windows (contributors)
+
+When you change or add a window or dialog of the TcAgent extension (`vsbridge/`), follow
+[docs/UI_GUIDELINES.md](https://github.com/ThorstenBrach/TcAgent/blob/main/docs/UI_GUIDELINES.md): first a mockup with neutral
+data and the owner's approval, then the build; the same vocabulary, keys, state symbols and feedback as the existing
+windows; check light and dark theme and a narrow width.
+
 ## Pipeline
 
 - The same TcAgent.exe runs in CI without an AI: `TcAgent.exe check|build|test|sil|hil|analyze|library|archive|scope ...`
