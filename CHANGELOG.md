@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - `vsbridge\install.ps1` and `uninstall.ps1` without administrator rights stopped with an `UnauthorizedAccessException`
   (uninstall even silently did nothing); both now check the rights before changing anything and say what to do
   (PowerShell "Run as administrator", or the VSIX, which needs no rights).
+- `build-vsix.ps1` could ship an older package: with a `Platform` variable in the console (e.g. `x64`) MSBuild writes to
+  `vsbridge\bin\x64\Release`, but the script only looked in `vsbridge\bin\Release` and took a package left there by an
+  earlier build. It now takes the package this build wrote, wherever it is, and stops if there is none.
+- Build warning IL3000 (`Assembly.Location` in the single-file build) in `TcAgent.exe ci` removed.
 
 ### Added
 - `install-xaeshell.ps1 -BuildOnly`: only builds for the XAE Shell (normal user, nothing installed, no prompt).

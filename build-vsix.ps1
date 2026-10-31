@@ -49,10 +49,15 @@ Copy-Item "$here\LICENSE" "$here\vsbridge\LICENSE.txt" -Force
 Copy-Item "$here\docs\img\icon.png" "$here\vsbridge\icon.png" -Force
 if (Test-Path "$here\vsbridge\tcagent") { Remove-Item "$here\vsbridge\tcagent" -Recurse -Force }
 Copy-Item "$stage\tcagent" "$here\vsbridge\tcagent" -Recurse
+# a "Platform" variable of the console (set by some PCs or developer prompts, e.g. x64) moves MSBuild's output to
+# bin\x64\Release - so the package is taken from wherever this build wrote it, and an older one is never shipped
+$buildStart = Get-Date
 & $msbuild "$here\vsbridge\TcAgentBridge.csproj" /restore /t:Rebuild /p:Configuration=Release /v:minimal /nologo 2>&1 | Tee-Object -FilePath "$here\build-vsix.log" -Append
 if ($LASTEXITCODE -ne 0) { throw "VSIX build failed - see build-vsix.log" }
-$built = Get-ChildItem "$here\vsbridge\bin\Release" -Recurse -Filter 'TcAgent.vsix' | Sort-Object LastWriteTime -Descending | Select-Object -First 1
-if (-not $built) { throw "TcAgent.vsix not found under vsbridge\bin\Release" }
+$built = Get-ChildItem "$here\vsbridge\bin" -Recurse -Filter 'TcAgent.vsix' | Where-Object { $_.LastWriteTime -ge $buildStart } |
+         Sort-Object LastWriteTime -Descending | Select-Object -First 1
+if (-not $built) { throw "TcAgent.vsix of this build not found under vsbridge\bin (only older packages) - see build-vsix.log" }
+Write-Host "Package: $($built.FullName)"
 $vsix = Join-Path $here "bin\TcAgent-$version.vsix"
 Copy-Item $built.FullName $vsix -Force
 Write-Host ""

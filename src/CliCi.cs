@@ -175,7 +175,7 @@ public static partial class Cli
     {
         var exe = Environment.ProcessPath ?? Process.GetCurrentProcess().MainModule?.FileName ?? "TcAgent.exe";
         if (Path.GetFileNameWithoutExtension(exe).Equals("dotnet", StringComparison.OrdinalIgnoreCase))
-            return (exe, typeof(Cli).Assembly.Location);
+            return (exe, Path.Combine(AppContext.BaseDirectory, "TcAgent.dll"));   // started as "dotnet TcAgent.dll" (never single-file)
         return (exe, null);
     }
 
