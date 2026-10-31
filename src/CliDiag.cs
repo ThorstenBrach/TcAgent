@@ -42,9 +42,13 @@ public static partial class Cli
         Line("IDE automation (EnvDTE)", Try(() =>
         {
             var a = typeof(EnvDTE.DTE).Assembly; var b = typeof(EnvDTE80.DTE2).Assembly;
+            // IL3000 does not apply: EnvDTE is loaded from a file of the IDE (InteropResolver), so it has a Location even in the
+            // single-file build; what is built into TcAgent is caught before
+#pragma warning disable IL3000
             string Where(System.Reflection.Assembly x) => x == typeof(Cli).Assembly ? "built into TcAgent"
                                                           : x.Location.Contains("TcXaeShell", StringComparison.OrdinalIgnoreCase) ? "XAE Shell"
                                                           : x.Location.Contains("Microsoft Visual Studio", StringComparison.OrdinalIgnoreCase) ? "Visual Studio" : "TcAgent folder";
+#pragma warning restore IL3000
             return $"EnvDTE {a.GetName().Version} ({Where(a)}), EnvDTE80 {(b == typeof(Cli).Assembly ? "" : b.GetName().Version + " ")}({Where(b)})";
         }));
         Line("IDEs installed", Try(() => string.Join(", ", InstalledIdes()) is { Length: > 0 } s ? s : "none found"));
