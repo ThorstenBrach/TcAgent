@@ -78,7 +78,10 @@ public sealed class TwinCatSession
         Bind((DTE2)pick.Dte, $"{pick.Moniker} | {pick.Solution}");
         lastSolution = pick.Solution;
         AttachedPid = pick.Pid;
-        return InstanceInfo;
+        // a solution still bound to TFS/VSS: the IDE may crash or refuse changes (SourceControlBindings.cs)
+        string scc = null;
+        try { scc = SourceControlBindings.Warning(pick.Solution); } catch { }
+        return scc == null ? InstanceInfo : InstanceInfo + "\n" + scc;
     }
 
     static DteInstance BySolution(List<DteInstance> inst, string hint)

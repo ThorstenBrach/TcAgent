@@ -76,6 +76,24 @@ public sealed class PlainTextRepositoryTests : IDisposable
     }
 
     [Fact]
+    public void Import_from_a_folder_with_another_PLC_name()
+    {
+        // exported from a project "OtherName": the folder name differs from the PLC project
+        foreach (var o in Objects)
+        {
+            var p = Path.Combine(Out, "OtherName", "Library", o.Folder.Replace('\\', Path.DirectorySeparatorChar), o.Name + ".st");
+            Directory.CreateDirectory(Path.GetDirectoryName(p)!);
+            File.WriteAllText(p, Crlf(o.St + "\n"), new UTF8Encoding(false));
+        }
+        var plain = PlainText.Import(Sln, new List<string>(), Out);
+        Assert.Contains(plain.Warnings, w => w.Contains("OtherName") && w.Contains("--from-plc"));
+        Assert.Equal(0, plain.Objects);
+        var imp = PlainText.Import(Sln, new List<string>(), Out, "OtherName");
+        Assert.Empty(imp.Errors);
+        Assert.Equal(Objects.Length, imp.Objects);
+    }
+
+    [Fact]
     public void Changed_property_getter_is_imported_without_the_indentation()
     {
         var o = Objects[0];

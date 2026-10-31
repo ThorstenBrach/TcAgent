@@ -16,6 +16,33 @@ namespace TcAgent;
 
 public static class Guards
 {
+    // IEC 61131-3 keywords, operators, standard functions and elementary types - TwinCAT refuses them as object names
+    // (method "Add" -> "Name mismatch")
+    static readonly HashSet<string> IecReserved = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "IF", "THEN", "ELSE", "ELSIF", "END_IF", "CASE", "OF", "END_CASE", "FOR", "TO", "BY", "DO", "END_FOR", "WHILE", "END_WHILE", "REPEAT",
+        "UNTIL", "END_REPEAT", "EXIT", "RETURN", "CONTINUE", "JMP", "VAR", "VAR_INPUT", "VAR_OUTPUT", "VAR_IN_OUT", "VAR_GLOBAL", "VAR_TEMP",
+        "VAR_STAT", "VAR_INST", "VAR_EXTERNAL", "END_VAR", "CONSTANT", "RETAIN", "PERSISTENT", "TYPE", "END_TYPE", "STRUCT", "END_STRUCT",
+        "UNION", "END_UNION", "FUNCTION", "END_FUNCTION", "FUNCTION_BLOCK", "END_FUNCTION_BLOCK", "PROGRAM", "END_PROGRAM", "METHOD",
+        "END_METHOD", "PROPERTY", "END_PROPERTY", "INTERFACE", "END_INTERFACE", "ACTION", "END_ACTION", "EXTENDS", "IMPLEMENTS", "THIS",
+        "SUPER", "TRUE", "FALSE", "ARRAY", "POINTER", "REFERENCE", "AT", "NOT", "AND", "OR", "XOR", "MOD", "AND_THEN", "OR_ELSE",
+        "ADD", "SUB", "MUL", "DIV", "MOVE", "SEL", "MAX", "MIN", "LIMIT", "MUX", "SHL", "SHR", "ROL", "ROR", "GT", "GE", "EQ", "NE", "LE", "LT",
+        "ABS", "SQRT", "LN", "LOG", "EXP", "EXPT", "SIN", "COS", "TAN", "ASIN", "ACOS", "ATAN", "TRUNC", "SIZEOF", "ADR", "BITADR", "INDEXOF",
+        "BOOL", "BYTE", "WORD", "DWORD", "LWORD", "SINT", "USINT", "INT", "UINT", "DINT", "UDINT", "LINT", "ULINT", "REAL", "LREAL", "TIME",
+        "LTIME", "DATE", "TOD", "TIME_OF_DAY", "DT", "DATE_AND_TIME", "STRING", "WSTRING"
+    };
+
+    /// <summary>Why TwinCAT refused a name: an IEC keyword, operator, standard function or type - with a name that works
+    /// (null if the name is not reserved).</summary>
+    public static string ReservedNameHint(string name)
+    {
+        var n = (name ?? "").Trim();
+        if (!IecReserved.Contains(n)) return null;
+        var other = char.ToUpperInvariant(n[0]) + n.Substring(1).ToLowerInvariant() + "Value";
+        return $"'{n}' is a reserved word of IEC 61131-3 (keyword, operator, standard function or type) and cannot be an object name - " +
+               $"use another name, e.g. '{other}' or 'Do{char.ToUpperInvariant(n[0]) + n.Substring(1).ToLowerInvariant()}'.";
+    }
+
     static readonly Regex Token = new(@"^[A-Za-z0-9._-]+$");
     // feed names of tcpkg may contain blanks ("Beckhoff Stable Feed"): words of [A-Za-z0-9._-] separated by one blank
     static readonly Regex FeedName = new(@"^[A-Za-z0-9._-]+( [A-Za-z0-9._-]+)*$");

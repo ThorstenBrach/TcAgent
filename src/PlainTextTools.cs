@@ -36,6 +36,7 @@ public sealed partial class ToolRegistry
                    P("solution", "string", "Path of the .sln (default: the solution of the connected IDE)"),
                    P("plc", "string", "Only these PLC projects, comma-separated (plcproj name or PLC project name; default: all)"),
                    P("folder", "string", "Text folder (default: <solution folder>\\st)"),
+                   P("fromPlc", "string", "import: the PLC folder in the text folder has another name (exported from a project with another name) - import it into the one PLC project chosen with plc"),
                    P("clean", "boolean", "export: also remove .st files whose object no longer exists"),
                    P("dryRun", "boolean", "import: only list the changes, write nothing")),
             a => PlainTextTool(a));
@@ -70,7 +71,7 @@ public sealed partial class ToolRegistry
             return o.ToString();
         }
 
-        var plan = PlainText.Import(slnDir, plcs, folder);
+        var plan = PlainText.Import(slnDir, plcs, folder, Str(a, "fromPlc"));
         AppendReport(o, plan);
         if (plan.Errors.Count > 0) throw new Exception("NOT imported (nothing changed):\n" + o.ToString().TrimEnd());
         if (plan.Files.Count == 0) return o.AppendLine($"Nothing to change - the project matches {folder}.").ToString();

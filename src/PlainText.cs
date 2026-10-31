@@ -1322,14 +1322,29 @@ public static class PlainText
     }
 
     /// <summary>Plans the import of the text folder into the existing project. Nothing is written here: the files to write
-    /// are in Report.Files (WriteFiles), the changes per object in Report.Changes. With errors nothing may be written.</summary>
-    public static Report Import(string slnDir, IReadOnlyCollection<string> filters, string fromDir)
+    /// are in Report.Files (WriteFiles), the changes per object in Report.Changes. With errors nothing may be written.
+    /// fromPlc: the PLC folder in the text folder has another name (exported from a project with another name) - then
+    /// exactly one PLC project is imported, from &lt;fromDir&gt;\&lt;fromPlc&gt;.</summary>
+    public static Report Import(string slnDir, IReadOnlyCollection<string> filters, string fromDir, string fromPlc = null)
     {
         var rep = new Report();
-        foreach (var p in SelectPlcs(slnDir, filters, rep))
+        var plcs = SelectPlcs(slnDir, filters, rep).ToList();
+        if (!string.IsNullOrWhiteSpace(fromPlc) && plcs.Count != 1)
         {
-            var root = Path.Combine(fromDir, p.Stem);
-            if (!Directory.Exists(root)) { rep.Warnings.Add($"{p.Stem}: no text folder {root} - skipped"); continue; }
+            rep.Errors.Add($"fromPlc needs exactly one PLC project to import into ({plcs.Count} selected) - choose it with plc=<name>");
+            return rep;
+        }
+        foreach (var p in plcs)
+        {
+            var root = Path.Combine(fromDir, string.IsNullOrWhiteSpace(fromPlc) ? p.Stem : fromPlc.Trim());
+            if (!Directory.Exists(root))
+            {
+                // a text folder exported from a project with another name: say how to take it
+                var others = Directory.Exists(fromDir) ? Directory.GetDirectories(fromDir).Select(Path.GetFileName).ToList() : new List<string>();
+                rep.Warnings.Add($"{p.Stem}: no text folder {root} - skipped" +
+                                 (others.Count > 0 ? $" (the folder has {string.Join(", ", others.Take(5))} - import one of them with fromPlc=<name> / --from-plc <name>)" : ""));
+                continue;
+            }
             var byKey = new Dictionary<(string, string), PlcObj>();
             var byName = new Dictionary<string, PlcObj>();
             foreach (var o in p.Objects)

@@ -1421,7 +1421,7 @@ and port 851; `netId` and `port` select others.
 - *"Import FB_Valve.TcPOU into the POUs folder."*
 - *"Add a placeholder for Tc2_Math and freeze all placeholder versions."*
 - *"Save the PLC project as library and install it."*
-- *"Archive the solution as C:\Temp\MyMachine.tszip."*
+- *"Archive the TwinCAT project as C:\Temp\MyMachine.tszip."*
 - *"Which TwinCAT version and target platform does this solution use?"*
 - *"Switch to variant Variant2."*
 - *"Run the static analysis and export SARIF."*
@@ -1485,7 +1485,9 @@ file?"*
 
 ### Archive
 
-`tc_archive file=X.tszip` saves the whole solution as an archive – for support or as a pipeline artifact.
+`tc_archive file=X.tszip` saves the TwinCAT project (configuration with its PLC projects) as an archive – for support or as
+a pipeline artifact. TwinCAT HMI and Scope projects of the solution are not in it; the archive of the whole solution
+(.tnzip) is made in the IDE with File > Save <solution> as Archive.
 
 ### Static analysis (TE1200)
 
@@ -1698,7 +1700,7 @@ GitHub runner with the label `twincat` and starts it at logon (not as a service 
 | `build --solution X.sln` | Builds the solution (`--rebuild`, `--check-all`) |
 | `analyze --solution X.sln --sarif sa.sarif` | Static analysis (TE1200), SARIF for code scanning (4026.20+); `--settings <file.csa>` |
 | `library --solution X.sln --out MyLib.library` | Builds and saves the PLC project as library (`--plc`, `--install`, `--no-build`) |
-| `archive --solution X.sln --out X.tszip` | Archive of the whole solution |
+| `archive --solution X.sln --out X.tszip` | Archive of the TwinCAT project (not HMI/Scope projects) |
 | `sbom --solution X.sln --out sbom/X.cdx.json` | SBOM (CycloneDX 1.6) per PLC project: libraries with version, vendor, purl, SHA-256, git commit (`--plc`) |
 | `lock --solution X.sln [--check]` | Writes `.tcagent\libraries.lock.json`; `--check` compares the resolved library versions with it (exit 1 on differences, 2 without lock file) |
 | `scope --solution X.sln --out signals.csv --seconds 30` | Records with the solution's Scope configuration and exports (PLC must be running) |

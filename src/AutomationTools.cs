@@ -124,7 +124,7 @@ public sealed partial class ToolRegistry
             Schema(P("platform", "string", "Platform to set (empty = show the current one and the available ones)")),
             a => tc.Sta.Run(() => Platform(Str(a, "platform"))));
 
-        Add("tc_archive", "Saves the whole solution as archive (.tszip) - e.g. as pipeline artifact or for support.",
+        Add("tc_archive", "Saves the TwinCAT project (configuration with its PLC projects) as archive (.tszip) - e.g. as pipeline artifact or for support. Not the whole solution: TwinCAT HMI and Scope projects are not included (the solution archive .tnzip is made in the IDE: File > Save <solution> as Archive).",
             Schema(Req(P("file", "string", "Target .tszip file"))),
             a => tc.Sta.Run(() =>
             {

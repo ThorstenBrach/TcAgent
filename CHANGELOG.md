@@ -91,7 +91,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   middle (Copy path copies the full one); red only for errors ("⇅ both changed", a worse trend and "not installable" are
   orange).
 
+### Fixed
+- **`tc_test_results`** showed FAILED details of earlier runs next to the summary of the last one: only the last run counts now
+  (and with TcUnit's per-test lines only tests that failed in it).
+- **`tc_plc_create`** with an IEC keyword, operator, standard function or type as name (e.g. method `Add`) only said "Name
+  mismatch": it now says why and suggests a name.
+- **`tc_archive`** described the archive as the whole solution: `.tszip` is the TwinCAT project (configuration with its PLC
+  projects) - TwinCAT HMI and Scope projects are not in it; the solution archive `.tnzip` is made in the IDE.
+- **`tc_plc_search`** over a large project could run until the client gave up and the IDE connection looked lost: a time
+  budget (default 40 s, `seconds` up to 240) returns the hits so far with a hint (narrow with `path`, or search the
+  exported .st files).
+
 ### Added
+- **Source control bindings warning:** a solution still bound to TFS/VSS (the section in the .sln, `Scc*`/SAK entries in the
+  project files, `.vspscc` files) made the IDE crash or refuse changes ("Cannot insert project") while TcAgent edited it -
+  `tc_attach` and `doctor --solution` now warn and say how to unbind; TcAgent does not change these files.
+- **`tc_plaintext` / `st import`: `fromPlc` / `--from-plc <name>`** - import a text folder that was exported from a PLC
+  project with another name; without it the warning lists the folders found.
 - **Delete feedback reports** in the Feedback tab: **Delete …** (Del) asks first (default No) and then removes the selected
   reports and their status records from the feedback file for good (`TcAgent.exe knowledge feedback --action delete
   --key <ids>`); the file is held exclusively while it is rewritten, other TcAgent processes retry their append.

@@ -27,7 +27,8 @@ a large project takes seconds. Tasks (`.TcTTO`) and other files are not exported
 For example `st\M2XLibrary\references.json` next to `st\M2XLibrary\Core\...`.
 
 `<folder>` is `--out` (export/check) or `--from` (import), default `<solution folder>\st`. `<PLC project>` is the name of
-the `.plcproj` file without extension. The folders below it are the folders of the PLC project
+the `.plcproj` file without extension - a folder exported from a project with another name is imported with
+`--from-plc <name>` (tool: `fromPlc`) into the one PLC project chosen with `--plc`. The folders below it are the folders of the PLC project
 (`<Compile Include="Gpib\GpibSerialFB.TcPOU">` → `st\MyPlc\Gpib\GpibSerialFB.st`). The `.plcproj` files are found by
 searching the solution folder (without `bin`, `obj`, `_Boot`, `_Libraries`, `.git`, `.vs`); `--plc` selects PLC projects
 by `.plcproj` name or PLC project name, also with ` Project` (`--plc MyPlc` or `--plc "MyPlc Project"`).

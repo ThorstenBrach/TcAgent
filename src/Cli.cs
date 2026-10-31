@@ -46,7 +46,7 @@ public static partial class Cli
         public bool CloseDialogs = true;
         public int TimeoutSec = 1800, LoadTimeoutSec = 300;
         public string Config, Only, From; public bool DryRun, Init;      // ci (CliCi.cs); From/DryRun also st import
-        public string Sub; public bool Clean, Force;                      // st export|check|import (CliPlainText.cs)
+        public string Sub, FromPlc; public bool Clean, Force;             // st export|check|import (CliPlainText.cs); --from-plc: other PLC folder name
         public readonly List<string> Tests = new(); public bool TimeoutGiven, Download, BuiltIn;   // tcunit run/report (CliTcUnit.cs)
         public string Approve;                                                                      // tcunit report --approve <id>
         public string Key, Level, Action, Message;                                                  // knowledge ... --key <kind/name> --level <level> --action <git action> --message <text>
@@ -752,6 +752,7 @@ public static partial class Cli
                 case "--config": o.Config = Val(); break;
                 case "--only": o.Only = Val(); break;
                 case "--from": o.From = Val(); break;
+                case "--from-plc": o.FromPlc = Val(); break;
                 case "--dry-run": o.DryRun = true; break;
                 case "--init": o.Init = true; break;
                 case "--clean": o.Clean = true; break;
@@ -863,7 +864,8 @@ public static partial class Cli
       Builds and saves the PLC project as library - e.g. as pipeline artifact.
 
   TcAgent.exe archive --solution <sln> --out <file.tszip>
-      Saves the whole solution as archive.
+      Saves the TwinCAT project (configuration with its PLC projects) as archive (.tszip) -
+      not TwinCAT HMI or Scope projects of the solution (solution archive .tnzip: in the IDE).
 
   TcAgent.exe scope --solution <sln> --out <file.csv|.svdx> [--scope <project/scope>] [--seconds <n>]
       Records with a Scope configuration of the solution (TE130x) for n seconds (default 10) and exports the data.
@@ -914,7 +916,7 @@ public static partial class Cli
 
   TcAgent.exe st export --solution <sln> [--plc <names>] [--out <folder>] [--clean]
   TcAgent.exe st check  --solution <sln> [--plc <names>] [--out <folder>]
-  TcAgent.exe st import --solution <sln> [--plc <names>] [--from <folder>] [--dry-run] [--force]
+  TcAgent.exe st import --solution <sln> [--plc <names>] [--from <folder>] [--from-plc <name>] [--dry-run] [--force]
       PLC code as plain-text ST files (one .st per POU/GVL/DUT/interface with its methods/properties/actions) and back -
       works on the project files, no IDE. Default folder: <solution folder>\st\<PLC project>\<folder>\<name>.st, plus
       <PLC project>\references.json with the library references of the .plcproj (export/check only, import ignores it).

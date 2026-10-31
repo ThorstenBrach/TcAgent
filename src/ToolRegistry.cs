@@ -269,14 +269,16 @@ public sealed partial class ToolRegistry
                    P("dryRun", "boolean", "Only show what would be created")),
             a => tc.Sta.Run(() => PlcCreate(a)));
 
-        Add("tc_plc_search", "Searches declarations and implementations of all PLC objects (full text or regex). Hits with tree path, part and line - e.g. to find usages of an FB, a variable or a call.",
+        Add("tc_plc_search", "Searches declarations and implementations of all PLC objects (full text or regex). Hits with tree path, part and line - e.g. to find usages of an FB, a variable or a call. " +
+                             "Stops after a time budget (default 40 s) with the hits so far - for large projects narrow it with path, or export the code once with tc_plaintext and search the .st files.",
             Schema(Req(P("pattern", "string", "Search text or regular expression")),
                    P("regex", "boolean", "pattern as regex (default false)"),
                    P("caseSensitive", "boolean", "Case-sensitive (default false)"),
                    P("part", "string", "decl, impl or all (default)"),
                    P("path", "string", "Only search below this tree path (default: all PLC projects)"),
-                   P("max", "integer", "Max. hits (default 200)")),
-            a => tc.Sta.Run(() => PlcSearch(a)));
+                   P("max", "integer", "Max. hits (default 200)"),
+                   P("seconds", "integer", "Time budget in seconds (default 40, max 240) - then the hits so far are returned")),
+            a => tc.Sta.Run(() => PlcSearch(a), 300_000));
 
         Add("tc_plc_references", "Lists the library references of the PLC projects with resolved version and vendor (including placeholders). With installed=true also the libraries installed in the repository.",
             Schema(P("plcProjectPath", "string", "Path of the PLC project (default: all)"),
@@ -1058,6 +1060,11 @@ public sealed partial class ToolRegistry
         var rx = new Regex(Bool(a, "regex", false) ? pat : Regex.Escape(pat), opts, TimeSpan.FromSeconds(2));
         var part = (Str(a, "part") ?? "all").ToLowerInvariant();
         int max = Int(a, "max", 200), hits = 0, objects = 0;
+        // a time budget: reading every object over COM takes long in big projects - and a call that never returns made the
+        // IDE connection look lost; better the hits so far and a hint
+        var budget = TimeSpan.FromSeconds(Math.Clamp(Int(a, "seconds", 40), 5, 240));
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        bool outOfTime = false;
         var root = Str(a, "path") is { Length: > 0 } p ? tc.Item(p) : null;
         var o = new StringBuilder();
         void Scan(string path, string label, string text)
@@ -1072,6 +1079,7 @@ public sealed partial class ToolRegistry
         foreach (var it in items)
         {
             if (hits >= max) break;
+            if (sw.Elapsed > budget) { outOfTime = true; break; }
             string path = null;
             try { path = it.PathName; } catch { continue; }
             bool any = false;
@@ -1079,7 +1087,9 @@ public sealed partial class ToolRegistry
             if (part != "decl" && it is ITcPlcImplementation i) { any = true; try { Scan(path, "Impl", i.ImplementationText); } catch { } }
             if (any) objects++;
         }
-        var head = $"{hits} hits in {objects} searched objects" + (hits >= max ? $" (truncated at max={max})" : "") + "\n";
+        var head = $"{hits} hits in {objects} searched objects" + (hits >= max ? $" (truncated at max={max})" : "") +
+                   (outOfTime ? $" - STOPPED after {budget.TotalSeconds:0} s, not every object was searched: narrow it with path=<folder or object>, " +
+                                "raise seconds (max 240), or export the code once with tc_plaintext action=export and search the .st files" : "") + "\n";
         return head + o;
     }
 
@@ -1161,7 +1171,9 @@ public sealed partial class ToolRegistry
             _ => null
         };
         var parent = tc.Item(Str(a, "parentPath"));
-        var item = (ITcSmTreeItem)((dynamic)parent).CreateChild(name, sub, "", vInfo);
+        ITcSmTreeItem item;
+        try { item = (ITcSmTreeItem)((dynamic)parent).CreateChild(name, sub, "", vInfo); }
+        catch (Exception ex) when (Guards.ReservedNameHint(name) is { } why) { throw new Exception(why + " (TwinCAT: " + ex.Message + ")", ex); }
         string w;
         if (sub is 611 or 612)
         {

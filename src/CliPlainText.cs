@@ -35,7 +35,7 @@ public static partial class Cli
         PlainText.Report rep;
         try
         {
-            rep = o.Sub == "import" ? PlainText.Import(slnDir, o.Plc, folder)
+            rep = o.Sub == "import" ? PlainText.Import(slnDir, o.Plc, folder, o.FromPlc)
                                     : PlainText.Export(slnDir, o.Plc, folder, check: o.Sub == "check", clean: o.Clean);
         }
         catch (Exception ex) { return InfraError(o, "st", Msg(ex)); }

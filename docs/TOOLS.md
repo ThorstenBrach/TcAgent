@@ -466,7 +466,7 @@ Saves all modified files of the solution to disk (like Ctrl+Shift+S). Otherwise 
 
 ### `tc_plc_search`
 
-Searches declarations and implementations of all PLC objects (full text or regex). Hits with tree path, part and line - e.g. to find usages of an FB, a variable or a call.
+Searches declarations and implementations of all PLC objects (full text or regex). Hits with tree path, part and line - e.g. to find usages of an FB, a variable or a call. Stops after a time budget (default 40 s) with the hits so far - for large projects narrow it with `path`, or export the code once with `tc_plaintext` and search the .st files.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -476,6 +476,7 @@ Searches declarations and implementations of all PLC objects (full text or regex
 | `part` | string |  | decl, impl or all (default) |
 | `path` | string |  | Only search below this tree path (default: all PLC projects) |
 | `max` | integer |  | Max. hits (default 200) |
+| `seconds` | integer |  | Time budget in seconds (default 40, max 240) - then the hits so far are returned |
 
 ### `tc_sfc`
 
@@ -799,6 +800,7 @@ PLC code as plain-text ST files and back (format: [PLAINTEXT.md](PLAINTEXT.md)).
 | `solution` | string |  | Path of the .sln (default: the solution of the connected IDE) |
 | `plc` | string |  | Only these PLC projects, comma-separated (plcproj name or PLC project name; default: all) |
 | `folder` | string |  | Text folder (default: `<solution folder>\st`) |
+| `fromPlc` | string |  | import: the PLC folder in the text folder has another name (exported from a project with another name) - import it into the one PLC project chosen with `plc` |
 | `clean` | boolean |  | export: also remove .st files whose object no longer exists (references.json is kept) |
 | `dryRun` | boolean |  | import: only list the changes, write nothing |
 
@@ -878,7 +880,7 @@ Shows or sets the target platform of the solution, e.g. 'TwinCAT RT (x64)' or 'T
 
 ### `tc_archive`
 
-Saves the whole solution as archive (.tszip) - e.g. as pipeline artifact or for support.
+Saves the TwinCAT project (configuration with its PLC projects) as archive (.tszip) - e.g. as pipeline artifact or for support. Not the whole solution: TwinCAT HMI and Scope projects are not included (the solution archive .tnzip is made in the IDE: File > Save <solution> as Archive).
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

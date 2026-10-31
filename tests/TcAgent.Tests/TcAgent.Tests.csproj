@@ -14,6 +14,8 @@
     <Compile Include="..\..\src\PlainText.cs" Link="src\PlainText.cs" />
     <Compile Include="..\..\src\TcUnitDiscovery.cs" Link="src\TcUnitDiscovery.cs" />
     <Compile Include="..\..\src\Guards.cs" Link="src\Guards.cs" />
+    <Compile Include="..\..\src\TcUnitResults.cs" Link="src\TcUnitResults.cs" />
+    <Compile Include="..\..\src\SourceControlBindings.cs" Link="src\SourceControlBindings.cs" />
     <Compile Include="..\..\src\AskQuestions.cs" Link="src\AskQuestions.cs" />
     <Compile Include="..\..\src\KnowledgeLayers.cs" Link="src\KnowledgeLayers.cs" />
     <Compile Include="..\..\src\Skills.cs" Link="src\Skills.cs" />

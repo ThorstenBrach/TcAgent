@@ -121,6 +121,15 @@ public static partial class Cli
         }
         catch (Exception ex) { Add(Level.Fail, "Temp", "not writable: " + Msg(ex)); }
 
+        // ---- source control bindings (TFS/VSS) of the solution: the IDE may crash or refuse changes
+        if (!string.IsNullOrEmpty(o.Solution))
+        {
+            var scc = SourceControlBindings.Find(o.Solution);
+            if (scc.Count > 0) Add(Level.Warn, "Source control", string.Join("; ", scc.Take(5)) + (scc.Count > 5 ? $"; and {scc.Count - 5} more" : ""),
+                                   "Remove the TFS/VSS bindings (File > Source Control > Change Source Control > Unbind) - with a server that cannot be reached the IDE may crash or refuse changes.");
+            else Add(Level.Ok, "Source control", "no TFS/VSS bindings in the solution");
+        }
+
         // ---- end to end: open the solution like a pipeline does
         if (!string.IsNullOrEmpty(o.Solution) && !f.Any(x => x.Level == Level.Fail && x.Area is "IDE" or "Interop" or "Session"))
         {

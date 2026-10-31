@@ -357,7 +357,7 @@ treat them like project rules for that library.
   For single changes `tc_plc_write` stays the normal way.
 - Libraries: `tc_library` (references, placeholders, repositories, install), `tc_library_save` (save a PLC project as library).
 - `tc_static_analysis` (TE1200) shows errors/warnings, optionally as SARIF. `tc_mapping_export`/`tc_mapping_import` for I/O mappings,
-  `tc_archive` for a .tszip, `tc_twincat_version` and `tc_platform` for the build environment, `tc_variant` for project variants.
+  `tc_archive` for a .tszip (the TwinCAT project, not HMI/Scope projects), `tc_twincat_version` and `tc_platform` for the build environment, `tc_variant` for project variants.
 - Network: `tc_route_search` (ADS broadcast), `tc_route_add` (runtime action - confirmation), `tc_tccom` (TcCOM module instances).
 
 ## Motion

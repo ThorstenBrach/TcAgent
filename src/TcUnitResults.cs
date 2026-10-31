@@ -60,7 +60,7 @@ public sealed class TcUnitResults
         var failures = new List<(string suite, string test, string text)>();
         Suite current = null;
 
-        foreach (var raw in runtimeTexts)
+        foreach (var raw in LastRun(runtimeTexts))
         {
             if (string.IsNullOrWhiteSpace(raw)) continue;
             var t = raw.Trim();
@@ -112,13 +112,32 @@ public sealed class TcUnitResults
         foreach (var (id, s) in suitesById)
             if (statsById.TryGetValue(id, out var st)) { s.Tests = st.tests; s.Failures = st.failed; s.Duration = st.dur; }
 
+        // with the per-test lines of the last run (LogExtendedResults) a FAILED line only counts for a test that failed in it
+        bool statusKnown = cases.Count > 0;
         foreach (var (suite, test, text) in failures)
         {
+            if (statusKnown && (!cases.TryGetValue(suite + "@" + test, out var known) || !known.Failed)) continue;
             var c = r.GetCase(cases, suite, test);
             c.Failure = c.Failure == null ? text : c.Failure + "\n" + text;
             if (!c.Failed) c.Status = "FAIL";
         }
         return r;
+    }
+
+    /// <summary>The messages of the last run only. The error list keeps the messages of several runs: the FAILED lines of a run
+    /// come before its "TESTS FINISHED RUNNING", its summary and details after it - the last run starts with the first FAILED
+    /// line after the end of the run before (or with its own end when nothing failed). Without this, failures of earlier
+    /// runs were listed next to the summary of the last one.</summary>
+    public static List<string> LastRun(IEnumerable<string> runtimeTexts)
+    {
+        var all = runtimeTexts.Where(x => !string.IsNullOrWhiteSpace(x)).ToList();
+        static bool End(string x) => x.Contains("TESTS FINISHED RUNNING", StringComparison.OrdinalIgnoreCase);
+        int last = all.FindLastIndex(End);
+        int prev = last > 0 ? all.FindLastIndex(last - 1, End) : -1;
+        if (prev < 0) return all;
+        var start = all.FindIndex(prev + 1, x => x.Contains("FAILED TEST", StringComparison.Ordinal));
+        if (start < 0 || start > last) start = last;
+        return all.Skip(start).ToList();
     }
 
     Suite GetSuite(string name)
