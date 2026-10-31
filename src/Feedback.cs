@@ -8,7 +8,8 @@
 //                           (feedback-<yyyyMMdd>-<MACHINE>.jsonl) - no write conflicts; all *.jsonl files there are read
 // Records (one JSON object per line):
 //   entry   {id, time, status:"open", type, severity, tool, summary, details, expected, workaround, serverVersion, client, machine, solution}
-//   status  {kind:"status", id, status: resolved|wontfix|duplicate|open, note, version, time, machine}
+//   status  {kind:"status", id, status: resolved|wontfix|duplicate|deleted|open, note, version, time, machine}
+//           (deleted = hidden everywhere, also from "all"; the entry stays in the file and "open" brings it back)
 // Status changes are appended as own records instead of editing lines - safe with several writers. The newest status wins.
 // Entries of older versions without id get a stable id derived from time, tool and summary.
 //
@@ -25,7 +26,8 @@ public static class Feedback
 {
     static readonly JsonSerializerOptions JsonLine = new() { Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
     static readonly string[] Fields = { "type", "severity", "tool", "summary", "details", "expected", "workaround" };
-    static readonly string[] Statuses = { "open", "resolved", "wontfix", "duplicate" };
+    // "deleted": hidden everywhere (also from "all"), kept in the file - set back to "open" to restore it
+    static readonly string[] Statuses = { "open", "resolved", "wontfix", "duplicate", "deleted" };
 
     public static string DefaultFile => Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "feedback", "feedback.jsonl"));
 
@@ -167,7 +169,7 @@ public static class Feedback
     static IEnumerable<Item> Filter(List<Item> items, string status, string tool)
     {
         status = string.IsNullOrWhiteSpace(status) ? "open" : status.Trim().ToLowerInvariant();
-        return items.Where(i => (status == "all" || string.Equals(i.Status, status, StringComparison.OrdinalIgnoreCase)) &&
+        return items.Where(i => (status == "all" ? i.Status != "deleted" : string.Equals(i.Status, status, StringComparison.OrdinalIgnoreCase)) &&
                                 (string.IsNullOrWhiteSpace(tool) || (i.Tool ?? "").Contains(tool.Trim(), StringComparison.OrdinalIgnoreCase)));
     }
 
@@ -380,7 +382,7 @@ public sealed partial class ToolRegistry
                    P("expected", "string", "report: what should have happened"),
                    P("workaround", "string", "report: how the task was solved anyway (if at all)"),
                    P("severity", "string", "report: blocker | major | minor"),
-                   P("status", "string", "list: open (default), resolved, wontfix, duplicate or all; resolve: new status (default resolved, open = reopen)"),
+                   P("status", "string", "list: open (default), resolved, wontfix, duplicate, deleted or all (all without deleted); resolve: new status (default resolved, open = reopen)"),
                    P("id", "string", "resolve: entry id(s), e.g. FB-1A2B3C4D (several separated by ',')"),
                    P("note", "string", "resolve: what was done / why"),
                    P("version", "string", "resolve: TcAgent version containing the fix, e.g. 0.21.0"),

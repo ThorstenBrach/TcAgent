@@ -155,7 +155,7 @@ namespace TcAgentBridge
         // feedback
         readonly ListView feedbackList = new ListView { BorderThickness = new Thickness(0), SelectionMode = SelectionMode.Extended };
         readonly ComboBox feedbackStatus = new ComboBox { MinWidth = 100, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center,
-                                                          ItemsSource = new[] { "open", "all", "resolved", "wontfix", "duplicate" }, SelectedIndex = 0 };
+                                                          ItemsSource = new[] { "open", "all", "resolved", "wontfix", "duplicate", "deleted" }, SelectedIndex = 0 };
         readonly TextBox feedbackText = new TextBox { AcceptsReturn = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(6),
                                                       FontFamily = new FontFamily("Consolas"), FontSize = 12, BorderThickness = new Thickness(0, 1, 0, 0) };
         readonly TextBlock feedbackInfo = new TextBlock { Margin = new Thickness(8, 0, 8, 4), TextWrapping = TextWrapping.Wrap, Opacity = 0.85 };
@@ -2668,8 +2668,13 @@ namespace TcAgentBridge
                 A("Set status …", "resolved / wontfix / duplicate / open for the selected reports", SetFeedbackStatus, FSel),
                 A("Anonymize again", "Build the text of the selected reports again (names, paths and addresses replaced)", PrepareIssue, FSel),
                 Sep,
+                A("Delete …", "Hide the selected reports everywhere - they stay in the file and come back with Restore (Show: deleted)", DeleteFeedback,
+                  () => FSel() && feedbackStatus.SelectedItem as string != "deleted", "Del"),
+                A("Restore", "Bring the selected deleted reports back as open", () => FeedbackStatusTo("open", "Restore"), () => FSel() && feedbackStatus.SelectedItem as string == "deleted"),
+                Sep,
                 A("Copy diagnostics", "Versions of TcAgent, the extension, TwinCAT and the IDEs for the Diagnostics field of an issue", () => CopyDiagnostics(t => Info(t))) };
             feedbackList.ContextMenu = MenuOf(acts);
+            feedbackList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete && feedbackStatus.SelectedItem as string != "deleted") { DeleteFeedback(); e.Handled = true; } };
             feedbackText.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             feedbackText.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             var show = new WrapPanel { Margin = new Thickness(6, 6, 6, 0) };
@@ -2687,7 +2692,7 @@ namespace TcAgentBridge
         {
             if (data == null) return;
             var st = feedbackStatus.SelectedItem as string ?? "open";
-            feedbackList.ItemsSource = Arr(data.TryGetValue("feedback", out var fo) ? fo : null).Where(f => st == "all" || S(f, "status") == st).Select(f => new Line
+            feedbackList.ItemsSource = Arr(data.TryGetValue("feedback", out var fo) ? fo : null).Where(f => st == "all" ? S(f, "status") != "deleted" : S(f, "status") == st).Select(f => new Line
             {
                 D = f, C1 = S(f, "id"), C2 = S(f, "status") == "open" ? "● open" : "✓ " + S(f, "status"), C3 = $"{S(f, "severity") ?? "–"} / {S(f, "type") ?? "–"}", C4 = S(f, "tool"), C5 = S(f, "summary"),
                 C6 = $"{S(f, "version")} · {(S(f, "time") ?? "").Split('T')[0]}",
@@ -2794,6 +2799,26 @@ namespace TcAgentBridge
                                 "Share with the TcAgent developers", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
             try { Process.Start(new ProcessStartInfo(full) { UseShellExecute = true }); Info("The issue is open in the browser - check the text there and send it yourself."); }
             catch (Exception ex) { Error(ex.Message); }
+        }
+
+        // delete = the status "deleted": hidden everywhere, kept in the file (several PCs may share it), Restore brings it back
+        void DeleteFeedback()
+        {
+            var n = feedbackList.SelectedItems.Count;
+            if (n == 0) { Hint("Select one or more reports first."); return; }
+            if (MessageBox.Show($"Delete {n} report(s)?\n\nThey are hidden everywhere (also from the agent's lists). They stay in the feedback file - " +
+                                "\"Show: deleted\" and Restore bring them back.", "TcAgent Knowledge", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            FeedbackStatusTo("deleted", "Delete");
+        }
+
+        async void FeedbackStatusTo(string state, string what)
+        {
+            var ids = feedbackList.SelectedItems.OfType<Line>().Select(l => S(l.D, "id")).ToList();
+            if (ids.Count == 0) return;
+            var (ok, output) = await Cli($"knowledge feedback --action resolve --key {Quote(string.Join(",", ids))} --message {state}", what == "Delete" ? "Deleting" : "Restoring");
+            Report(ok, output, what);
+            if (ok) Info($"{ids.Count} report(s) {(state == "deleted" ? "deleted - Show: deleted brings them back" : "restored as open")}.");
+            Load();
         }
 
         async void SetFeedbackStatus()

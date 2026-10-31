@@ -92,6 +92,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   orange).
 
 ### Added
+- **Delete feedback reports** in the Feedback tab: **Delete …** (Del) hides the selected reports everywhere (status
+  `deleted`, also left out of `all` and of `tc_feedback action=list`); they stay in the feedback file - several PCs may share
+  it - and **Show: deleted** with **Restore** brings them back.
 - **docs/UI_GUIDELINES.md** – the UI/UX rules for every window and dialog of the extension (tabs and ⋯ menu, 4-6 main
   actions, master-detail, states as symbol and word, long actions in the background, keys, empty states, check boxes,
   visible safety information, vocabulary, privacy, theme colors, narrow windows, mockup before building); CONTRIBUTING.md

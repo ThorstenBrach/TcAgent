@@ -128,7 +128,7 @@ Audit entries now also contain `pid`, `client` and - for late outcomes - `note` 
 
 Reports a problem, missing feature or improvement suggestion to TcAgent development. Always use it when a tool fails, behaves unexpectedly, a task could only be solved via a workaround, or a tool is missing. Without `action` (= `report`) `type` and `summary` are required (backward compatible). Every entry gets a stable id (`FB-1A2B3C4D`), status `open`, the TcAgent version (`serverVersion`), client and machine name.
 
-For maintainers (control loop): `action=list` lists entries grouped by tool (most first) and severity - default the open ones; `action=summary` counts by status, severity, type, tool and version; `action=resolve id=FB-...[,FB-...] note=... version=0.21.0 [status=resolved|wontfix|duplicate|open]` marks entries (status changes are appended as own records; the newest wins). Entries of older versions without id get a stable id derived from time, tool and summary. The Markdown report for GitHub issues comes from the CLI: `TcAgent.exe feedback [--open] [--markdown out.md] [--summary] [--path <file|folder>]`.
+For maintainers (control loop): `action=list` lists entries grouped by tool (most first) and severity - default the open ones; `action=summary` counts by status, severity, type, tool and version; `action=resolve id=FB-...[,FB-...] note=... version=0.21.0 [status=resolved|wontfix|duplicate|deleted|open]` marks entries (deleted hides an entry everywhere, also from `all`; open brings it back) (status changes are appended as own records; the newest wins). Entries of older versions without id get a stable id derived from time, tool and summary. The Markdown report for GitHub issues comes from the CLI: `TcAgent.exe feedback [--open] [--markdown out.md] [--summary] [--path <file|folder>]`.
 
 Store (`TCAGENT_FEEDBACK`): not set = `<install>\..\..\feedback\feedback.jsonl` (VSIX: `%LOCALAPPDATA%\TcAgent\feedback`); a `.jsonl` file = that file; a folder or UNC path (e.g. `\\server\share\tcagent-feedback`) = shared team location: every machine writes its own file per day (`feedback-<yyyyMMdd>-<MACHINE>.jsonl`, no write conflicts), all `*.jsonl` there are read.
 
@@ -142,7 +142,7 @@ Store (`TCAGENT_FEEDBACK`): not set = `<install>\..\..\feedback\feedback.jsonl` 
 | `expected` | string |  | What should have happened |
 | `workaround` | string |  | How the task was solved anyway (if at all) |
 | `severity` | string |  | blocker / major / minor |
-| `status` | string |  | list: open (default), resolved, wontfix, duplicate or all; resolve: new status (default resolved) |
+| `status` | string |  | list: open (default), resolved, wontfix, duplicate, deleted or all (all without deleted); resolve: new status (default resolved, open = reopen) |
 | `id` | string |  | resolve: entry id(s), comma-separated |
 | `note` | string |  | resolve: what was done / why |
 | `version` | string |  | resolve: TcAgent version with the fix |
