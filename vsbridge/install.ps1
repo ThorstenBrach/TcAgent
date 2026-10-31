@@ -18,7 +18,9 @@ if (-not $isAdmin) {
     Write-Host "(-ExecutionPolicy Bypass only allows the script to run, it does not give these rights.) Nothing was changed."
     Write-Host "Either: open PowerShell with 'Run as administrator' (right-click) and run"
     Write-Host "    powershell -ExecutionPolicy Bypass -File `"$PSCommandPath`""
-    Write-Host "or install the VSIX instead (double-click bin\TcAgent-<version>.vsix) - per user, no administrator rights."
+    $vsix = Get-ChildItem (Join-Path $here '..\bin') -Filter 'TcAgent-*.vsix' -ErrorAction SilentlyContinue | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $vsixHint = if ($vsix) { "double-click $($vsix.FullName)" } else { "double-click TcAgent-<version>.vsix (build-vsix.ps1 or the GitHub release)" }
+    Write-Host "or install the VSIX instead ($vsixHint) - per user, no administrator rights."
     exit 1
 }
 if (Get-Process devenv -ErrorAction SilentlyContinue) { throw "Visual Studio is still running - please close it" }
