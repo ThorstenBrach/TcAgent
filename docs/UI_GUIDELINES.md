@@ -108,6 +108,11 @@ Buttons can be reached with Tab.
   **Gate** (why it asks), with one filled primary button (focused, Enter) and Esc for no; the answer stays visible on the
   card; a card closed from outside says why.
 - Nothing runs without the user's explicit yes; no answer is a no.
+- **Gate cards for runtime actions are safe by default:** Enter never confirms (the focus is on the "no" button, Enter and
+  Esc cancel); the confirming button reacts only to a mouse click (no Click event, so neither the keyboard nor UI
+  automation - an agent driving the IDE - can press it); the target (AMS Net ID) is bold, a target that is not this PC
+  gets an extra warning; the card is scrolled into view; where no chat answer runs in a visible chat window the modal
+  dialog (default No) stays.
 
 ## 9. Texts and privacy
 

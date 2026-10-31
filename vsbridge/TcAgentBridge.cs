@@ -140,7 +140,7 @@ namespace TcAgentBridge
             // tc_ask_user: waits for the user's answer in the chat - not on the UI thread (the card is shown there)
             else if (cmd == "ask") r = AskUser(req);
             // confirmation before a runtime action: a gate card in the chat when it is open (waits here, not on the UI thread)
-            else if (cmd == "confirm" && ChatControl.Instance != null) r = ConfirmInChat(Str(req, "title"), Str(req, "text"));
+            else if (cmd == "confirm") r = ConfirmInChat(Str(req, "title"), Str(req, "text"), Str(req, "target"), Str(req, "local") != "False");
             // a test run started elsewhere (tc_test_run from an AI client): its events are handed to the TcUnit Tests window
             // without waiting for the UI - the run never slows the IDE down and the window catches up when it is idle
             else if (cmd == "tcunit_event")
@@ -201,11 +201,11 @@ namespace TcAgentBridge
 
         // ------------------------------------------------------------------ Confirmation before runtime actions
         // TcAgent asks before activating, PLC start/stop, ADS writes ... (TCAGENT_CONFIRM). Default is "No".
-        Dictionary<string, object> ConfirmAction(string title, string text)
+        Dictionary<string, object> ConfirmAction(string title, string text, string target = null, bool local = true)
         {
             System.Windows.MessageBoxResult r;
             var owner = System.Windows.Application.Current?.MainWindow;
-            var msg = (text ?? "") + "\n\nExecute?";
+            var msg = (text ?? "") + (!local ? $"\n\nWARNING: the target {target} is NOT this PC - this acts on a remote PLC." : "") + "\n\nExecute?";
             r = owner != null
                 ? System.Windows.MessageBox.Show(owner, msg, title ?? "TcAgent", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning, System.Windows.MessageBoxResult.No)
                 : System.Windows.MessageBox.Show(msg, title ?? "TcAgent", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Warning, System.Windows.MessageBoxResult.No);
@@ -215,13 +215,14 @@ namespace TcAgentBridge
             return new Dictionary<string, object> { ["confirmed"] = ok };
         }
 
-        // the gate card in the TcAgent Chat (ChatCards.cs): goal, consequence, gate and Execute / Don't execute
-        Dictionary<string, object> ConfirmInChat(string title, string text)
+        // the gate card in the TcAgent Chat (ChatCards.cs): only while a chat answer runs in the open chat window - otherwise
+        // (window closed or hidden, no running chat session) the dialog stays. Only a mouse click on Execute confirms.
+        Dictionary<string, object> ConfirmInChat(string title, string text, string target, bool local)
         {
-            ui.Invoke(new Action(() => ShowChat()));
             var chat = ChatControl.Instance;
-            if (chat == null) return (Dictionary<string, object>)ui.Invoke(new Func<Dictionary<string, object>>(() => ConfirmAction(title, text)));
-            bool ok = chat.AskGate(title, text);
+            bool card = chat != null && (bool)ui.Invoke(new Func<bool>(() => chat.IsVisible && chat.IsBusy));
+            if (!card) return (Dictionary<string, object>)ui.Invoke(new Func<Dictionary<string, object>>(() => ConfirmAction(title, text, target, local)));
+            bool ok = chat.AskGate(title, text, target, local);
             Log("Confirmation '" + text + "': " + (ok ? "yes" : "no"));
             return new Dictionary<string, object> { ["confirmed"] = ok };
         }

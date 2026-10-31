@@ -71,7 +71,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
     writes, compare window). Claude's tool results are read now; Copilot (ACP) reports completed and failed calls.
   - Cards with **Goal**, **Consequence** and **Gate**, a filled primary button with the focus (Enter) and Esc for no;
     **Answer** only when every question is answered; a card closed by New chat / Stop says so.
-  - Runtime confirmations (TCAGENT_CONFIRM) as a gate card in the chat when it is open (Execute / Don't execute).
+  - Runtime confirmations (TCAGENT_CONFIRM) as a gate card in the chat while a chat answer runs in the open window:
+    the target (AMS Net ID) in bold, a warning for a target that is not this PC, Execute / Don't execute. Safe by default:
+    Enter never confirms (the focus is on Don't execute, Enter and Esc cancel), Execute reacts only to a mouse click -
+    not to the keyboard or UI automation, so an agent cannot answer it; the card is scrolled into view. Without an open
+    chat window or a running chat answer the dialog stays (default No, the warning for a remote target as well). The
+    server passes the target and whether it is this PC to the bridge.
   - Input with a placeholder ("Ask Claude Code about this solution …"), a removable chip with the editor context that
     goes with the question, attachments as chips, **📎 Attach …**, the keys below the field in full (wrapped, never cut).
   - ⋯ menu grouped: Chat (editor context, check after changes, New chat, Copy conversation) / Windows / Setup and help

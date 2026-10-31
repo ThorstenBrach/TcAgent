@@ -43,6 +43,7 @@ namespace TcAgentBridge
         static readonly Brush DimBrush = Freeze(new SolidColorBrush(Color.FromArgb(0xC0, 0x80, 0x80, 0x80)));
         static readonly Brush ErrorBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xD1, 0x34, 0x38)));
         static readonly Brush OkBrush = Freeze(new SolidColorBrush(Color.FromRgb(0x2E, 0xA0, 0x43)));
+        static readonly Brush WarnBrush = Freeze(new SolidColorBrush(Color.FromRgb(0xE8, 0x8A, 0x1A)));
         static Brush Freeze(SolidColorBrush b) { b.Freeze(); return b; }
 
         readonly StackPanel msgs = new StackPanel { Margin = new Thickness(8, 4, 8, 4) };

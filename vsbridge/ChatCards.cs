@@ -69,6 +69,8 @@ namespace TcAgentBridge
                 card = build(Close, body);
                 AddMessage(card);
                 scroller.ScrollToEnd();
+                var shown = card;
+                shown.Dispatcher.BeginInvoke(new Action(() => { scroller.ScrollToEnd(); shown.BringIntoView(); }), System.Windows.Threading.DispatcherPriority.Loaded);
                 status.Text = "Waiting for your answer in the chat …";
                 // the primary button gets the focus: Enter answers, Esc says no
                 var primary = body.Children.OfType<WrapPanel>().SelectMany(w => w.Children.OfType<Button>()).FirstOrDefault(b => b.Tag as string == "primary");
@@ -180,24 +182,65 @@ namespace TcAgentBridge
 
         // ------------------------------------------------------------------ gate card
         /// <summary>TcAgent asks before a runtime action (TCAGENT_CONFIRM): the card in the chat instead of a Yes/No box. Call from a
-        /// background thread. true = execute.</summary>
-        internal bool AskGate(string title, string text) =>
+        /// background thread. true = execute.
+        /// Safe by default: the focus is on "Don't execute" (Enter and Esc cancel); Execute reacts only to a mouse click on it -
+        /// not to Enter, Space, Tab or UI automation (an agent driving the IDE cannot confirm it).</summary>
+        internal bool AskGate(string title, string text, string target = null, bool local = true) =>
             WaitForCard<bool>((done, body) =>
             {
                 var tool = Regex.Match(title ?? "", @"(tc_\w+|ads_\w+)").Value;
-                Facts(body, ("Goal", text ?? title),
-                            ("Consequence", Consequence(tool) + (tool.Length > 0 ? $" ({tool})" : "")),
-                            ("Gate", "TcAgent asks before runtime actions (TCAGENT_CONFIRM) - nothing happens without your yes; no answer within 15 minutes is a no."));
+                // the goal with the target in bold
+                var goal = CardText("", 12.5);
+                var what = text ?? title ?? "";
+                var at = string.IsNullOrEmpty(target) ? -1 : what.IndexOf(target, StringComparison.OrdinalIgnoreCase);
+                if (at >= 0)
+                {
+                    goal.Inlines.Add(new System.Windows.Documents.Run(what.Substring(0, at)));
+                    goal.Inlines.Add(new System.Windows.Documents.Run(what.Substring(at, target.Length)) { FontWeight = FontWeights.Bold });
+                    goal.Inlines.Add(new System.Windows.Documents.Run(what.Substring(at + target.Length)));
+                }
+                else goal.Inlines.Add(new System.Windows.Documents.Run(what));
+                goal.Inlines.Add(new System.Windows.Documents.LineBreak());
+                goal.Inlines.Add(new System.Windows.Documents.Run("Target: ") { FontSize = 11.5 });
+                goal.Inlines.Add(new System.Windows.Documents.Run(local ? (string.IsNullOrEmpty(target) ? "this PC (local runtime)" : target + " (this PC)") : target)
+                                     { FontWeight = FontWeights.Bold });
+                body.Children.Add(goal);
+                if (!local)
+                {
+                    var warn = CardText($"⚠ The target {target} is NOT this PC - this acts on a remote PLC and the machine it controls.", 12.5);
+                    warn.Foreground = WarnBrush; warn.FontWeight = FontWeights.SemiBold;   // a warning, not an error: orange warn.Margin = new Thickness(0, 4, 0, 4);
+                    body.Children.Add(warn);
+                }
+                Facts(body, ("Consequence", Consequence(tool) + (tool.Length > 0 ? $" ({tool})" : "")),
+                            ("Gate", "TcAgent asks before runtime actions (TCAGENT_CONFIRM). Only a mouse click on Execute confirms - Enter and Esc " +
+                                     "cancel; no answer within 15 minutes is a no."));
                 var buttons = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
                 var result = CardText("", 11.5, 0.8);
-                void Pick(bool ok) { result.Text = ok ? "✔ Executed" : "✖ Not executed"; buttons.Visibility = Visibility.Collapsed; done(ok); }
+                void Pick(bool ok) { result.Text = ok ? "✔ Executed (confirmed by mouse click)" : "✖ Not executed"; buttons.Visibility = Visibility.Collapsed; done(ok); }
+                // Execute: never the default, no focus, no Click event (keyboard and UI automation raise Click) - a pressed and
+                // released left mouse button over it only
                 var go = CardButton("Execute", true);
-                go.Click += (s, e) => Pick(true);
+                go.Tag = null; go.Focusable = false; go.IsTabStop = false;
+                go.ToolTip = "Confirm with a mouse click";
+                bool pressed = false;
+                go.PreviewMouseLeftButtonDown += (s, e) => { pressed = true; e.Handled = true; };
+                go.PreviewMouseLeftButtonUp += (s, e) =>
+                {
+                    e.Handled = true;
+                    if (pressed && go.IsMouseOver) Pick(true);
+                    pressed = false;
+                };
+                go.MouseLeave += (s, e) => pressed = false;
                 var no = CardButton("Don't execute", no: true);
+                no.Tag = "primary";      // gets the focus: Enter cancels
                 no.Click += (s, e) => Pick(false);
                 buttons.Children.Add(go); buttons.Children.Add(no);
                 body.Children.Add(buttons);
                 body.Children.Add(result);
+                body.PreviewKeyDown += (s, e) =>
+                {
+                    if (e.Key == System.Windows.Input.Key.Escape && buttons.IsVisible) { Pick(false); e.Handled = true; }
+                };
                 return Card("⛔ Confirm - " + (tool.Length > 0 ? tool : "runtime action"), body);
             }, false);
 

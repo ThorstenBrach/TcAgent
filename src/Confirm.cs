@@ -47,7 +47,7 @@ public static class Confirm
     public static bool LastNotShown;
 
     /// <summary>true = go ahead. null = nobody could be asked (no channel).</summary>
-    public static bool? Ask(string tool, string what, int idePid)
+    public static bool? Ask(string tool, string what, int idePid, string target = null, bool local = true)
     {
         LastNotShown = false;
         bool fromChat = (Environment.GetEnvironmentVariable("TCAGENT_CLIENT") ?? "").StartsWith("chat:", StringComparison.OrdinalIgnoreCase)
@@ -56,7 +56,7 @@ public static class Confirm
         {
             try
             {
-                var r = BridgeClient.Call(idePid, "confirm", new JsonObject { ["title"] = "TcAgent - " + tool, ["text"] = what }, 15 * 60_000);
+                var r = BridgeClient.Call(idePid, "confirm", new JsonObject { ["title"] = "TcAgent - " + tool, ["text"] = what, ["target"] = target, ["local"] = local }, 15 * 60_000);
                 return r["confirmed"]?.GetValue<bool>() == true;
             }
             // no answer within the time limit (dialog still open / user away) = no - never run the action unconfirmed

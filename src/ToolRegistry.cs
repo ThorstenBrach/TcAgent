@@ -1615,7 +1615,7 @@ public sealed partial class ToolRegistry
                 string target = null;
                 try { target = TargetOf(name, args); } catch { }
                 var what = Confirm.Describe(name, args, target);
-                var ok = Confirm.Ask(name, what, tc.AttachedPid);
+                var ok = Confirm.Ask(name, what, tc.AttachedPid, target, policy.IsLocal(target));
                 // no answer and nobody to ask are refusals too (Guards.cs) - without a question only with TCAGENT_CONFIRM=off
                 if (Guards.ConfirmRefusal(ok, Confirm.LastNotShown, what) is { } refused)
                 {

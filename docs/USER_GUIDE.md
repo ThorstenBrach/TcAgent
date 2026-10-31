@@ -142,8 +142,12 @@ work without the extension. The extension runs **inside** the IDE process and ad
 - **Library interfaces**, including compiled third-party libraries (`tc_lib_signatures`).
 - **Cursor placement** when opening an object in the editor (`tc_editor_open`).
 - **Confirmations** for runtime actions (activate, PLC start/stop, ADS write – `TCAGENT_CONFIRM`) as a gate card in the chat
-  when the chat window is open (Goal, Consequence, Gate, **Execute** / **Don't execute** – no answer within 15 minutes is a
-  no), otherwise as a dialog; refactoring proposals as a dialog with Apply / Apply all / Reject.
+  while a chat answer runs in the open chat window: what happens with the **target (AMS Net ID) in bold**, a warning if the
+  target is not this PC, Consequence and Gate. **Only a mouse click on Execute confirms** – the focus is on **Don't
+  execute**, Enter and Esc cancel, and neither the keyboard nor UI automation (an agent driving the IDE) can press Execute;
+  no answer within 15 minutes is a no. The card is scrolled into view when it appears. With the chat window closed or no
+  chat answer running, the dialog stays (default No, the same warning for a remote target). Refactoring proposals come as a
+  dialog with Apply / Apply all / Reject.
 
 The chat window opens when Visual Studio starts (unless `"showOnStartup": false` is set in `chat-backends.json`). The
 agent can also open it with `tc_ide command=chat_show`. If you install an AI client later, click **⋯ > Set up clients** in
