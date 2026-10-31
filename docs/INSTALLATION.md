@@ -35,7 +35,8 @@ The remaining sections describe the **manual / developer setup** from source.
 | At least one AI client | see [step 5](#5-install-and-sign-in-to-ai-clients) | |
 
 The TwinCAT XAE Shell works as well (TcAgent attaches to `TcXaeShell.DTE`). The VS extension (step 3, chat window and inline
-question) is built for the shell with `vsbridge\install-xaeshell.ps1` (close the shell first; asks for administrator rights) -
+question) is built for the shell with `vsbridge\install-xaeshell.ps1` (close the shell first; it builds as a normal user and
+then asks for administrator rights for the copy into the shell's folder - `-BuildOnly` only builds, without installing) -
 the VSIX itself only installs into Visual Studio 2022. The server (`TcAgent.exe`) for the shell comes from that VSIX: after an
 update install the VSIX of the same version (double-click) and run `install-xaeshell.ps1`; on its next start the shell copies
 the new server from the VSIX and registers it (the chat window shows "TcAgent server x ≠ extension y" in orange until then -
@@ -71,9 +72,13 @@ go to definition, cross-references, library interfaces (including compiled libra
 # build (normal user)
 powershell -ExecutionPolicy Bypass -File .\vsbridge\build.ps1
 
-# close Visual Studio, then as ADMINISTRATOR:
+# close Visual Studio, then in a PowerShell started with "Run as administrator":
 powershell -ExecutionPolicy Bypass -File .\vsbridge\install.ps1
 ```
+
+`install.ps1` copies into the Visual Studio installation (Program Files) and therefore needs administrator rights;
+without them it stops before changing anything and says so. `-ExecutionPolicy Bypass` only allows the script to run - it
+gives no rights. The VSIX (step 3, double-click) needs none.
 
 The extension is copied to `Common7\IDE\Extensions\TcAgentBridge` of the VS installation. To verify after starting VS:
 log at `%LOCALAPPDATA%\TcAgent\bridge\bridge.log` (first line `==== TcAgentBridge … gestartet`).
@@ -191,6 +196,8 @@ In addition, every client can require confirmation of individual tool calls – 
 | VS asks "Save dataset?" during a Scope change | Only with older TcAgent versions - current versions back the recording up and answer the question themselves. |
 | `tc_hmi action=controls`: "Control package not found" | Build the HMI project once in the IDE (restores the NuGet packages into `<solution>\Packages`). |
 | XAE Shell crashes during HMI/Scope changes (event log: `OutOfMemoryException`, TcXaeShell.exe) | The XAE Shell is a 32-bit process; a large project with HMI and Scope open exhausts its memory, reloading a project then crashes it. Restart the shell regularly, close designers you do not need, or use Visual Studio 2022 (64-bit) for HMI/Scope work. TwinCAT 4026 also offers a 64-bit XAE Shell (TcPkg setting `useTcXaeShell64`, see the TwinCAT installation documentation); TcAgent and `install-xaeshell.ps1` support it. TcAgent refuses unload/reload when the 32-bit shell is close to the limit. |
+| `vsbridge\install.ps1` / `uninstall.ps1`: "Administrator rights are needed" (before 0.48.2: `UnauthorizedAccessException` at `New-Item … Extensions\TcAgentBridge`) | The script writes into the Visual Studio installation. Start PowerShell with "Run as administrator" and run the script again - or install the VSIX instead (per user, no rights needed). |
+| `vsbridge\install-xaeshell.ps1`: CS0234 for `SVsDifferenceService` / `IVsDifferenceService` / `__VSDIFFSERVICEOPTIONS` in `Microsoft.VisualStudio.Shell.Interop` | Fixed in 0.48.2 (the build references `Microsoft.VisualStudio.Shell.Interop.11.0` of the shell). With a newer script and the error still there: is `-ShellIde` the `Common7\IDE` folder of the XAE Shell, and is `PublicAssemblies\Microsoft.VisualStudio.Shell.Interop.11.0.dll` there? `-BuildOnly` tries the build without installing. |
 | `vsbridge\build.ps1`: CS1705 (version conflict) | Several versions of a VS assembly installed; the script uses the highest. Please report as an issue, with output. |
 
 Logs: `%LOCALAPPDATA%\TcAgent\` (`audit.jsonl`, `logs\tcagent-<date>.log`, `bridge\bridge.log`, `libcache\`). Agent feedback:

@@ -4,11 +4,13 @@
 #
 #   powershell -ExecutionPolicy Bypass -File .\install-xaeshell.ps1              build + install (asks for administrator rights)
 #   powershell -ExecutionPolicy Bypass -File .\install-xaeshell.ps1 -Uninstall   remove it again
+#   powershell -ExecutionPolicy Bypass -File .\install-xaeshell.ps1 -BuildOnly   only build into vsbridge\bin-xaeshell
+#                                                                               (normal user, nothing installed, no prompt)
 #   -ShellIde <path>   Common7\IDE folder of the shell (default: found automatically)
 #
-# Close the XAE Shell first. Needs Visual Studio 2022 (or its Build Tools) for the C# compiler.
+# Close the XAE Shell first (not needed for -BuildOnly). Needs Visual Studio 2022 (or its Build Tools) for the C# compiler.
 # SPDX-License-Identifier: MIT
-param([string]$ShellIde, [switch]$Uninstall, [switch]$Elevated)
+param([string]$ShellIde, [switch]$Uninstall, [switch]$Elevated, [switch]$BuildOnly)
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
 
@@ -73,8 +75,11 @@ if (-not $Uninstall) {
             }
     }
     $refs = New-Object System.Collections.Generic.List[string]
+    # Shell.Interop.11.0: IVsDifferenceService (compare window of the knowledge window) - a missing namespace member (CS0234)
+    # is not added by the retry loop below, so every interop assembly the code uses directly is listed here
     foreach ($n in 'Microsoft.VisualStudio.Shell.15.0', 'Microsoft.VisualStudio.Shell.Framework', 'Microsoft.VisualStudio.Shell.Interop',
-                   'Microsoft.VisualStudio.Shell.Interop.8.0', 'Microsoft.VisualStudio.Shell.Interop.10.0', 'Microsoft.VisualStudio.OLE.Interop',
+                   'Microsoft.VisualStudio.Shell.Interop.8.0', 'Microsoft.VisualStudio.Shell.Interop.10.0', 'Microsoft.VisualStudio.Shell.Interop.11.0',
+                   'Microsoft.VisualStudio.OLE.Interop',
                    'Microsoft.VisualStudio.Threading', 'Microsoft.VisualStudio.Validation', 'Microsoft.VisualStudio.Shell.Immutable.10.0',
                    'Microsoft.VisualStudio.Shell.Immutable.11.0', 'Microsoft.VisualStudio.Imaging', 'EnvDTE', 'EnvDTE80',
                    'PresentationFramework', 'PresentationCore', 'WindowsBase', 'System.Xaml', 'System.Web.Extensions', 'System.Windows.Forms',
@@ -105,7 +110,14 @@ if (-not $Uninstall) {
         $missing = [regex]::Matches($output, 'CS0012[^\r\n]*?["''„“]([A-Za-z0-9_.]+), Version=') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique
         $added = 0
         foreach ($m in $missing) { if ($index.ContainsKey($m) -and -not $refs.Contains($index[$m])) { $refs.Add($index[$m]); $added++; Write-Host "  + reference $m" } }
-        if ($added -eq 0) { Write-Host $output -ForegroundColor Red; throw "Build for the XAE Shell failed - please send this output" }
+        if ($added -eq 0) {
+            Write-Host $output -ForegroundColor Red
+            if ($output -match 'CS0234[^\r\n]*Microsoft\.VisualStudio\.Shell\.Interop') {
+                Write-Host ("A type of Microsoft.VisualStudio.Shell.Interop is missing: an interop assembly of the shell was not found " +
+                            "(searched: $ShellIde\PublicAssemblies, PrivateAssemblies, the IDE folder). Is -ShellIde the Common7\IDE folder of the XAE Shell?") -ForegroundColor Yellow
+            }
+            throw "Build for the XAE Shell failed - please send this output"
+        }
     }
     if (-not $built) { throw "Build for the XAE Shell failed" }
     Remove-Item $cto, $resFile -ErrorAction SilentlyContinue
@@ -122,7 +134,9 @@ if (-not $Uninstall) {
     $m = [regex]::Replace($m, '(?s)<Prerequisites>.*?</Prerequisites>', '')
     Set-Content "$out\extension.vsixmanifest" $m -Encoding UTF8
     Write-Host "Built: $out\TcAgentBridge.dll" -ForegroundColor Green
+    if ($BuildOnly) { Write-Host "-BuildOnly: nothing installed. Install with the same command without -BuildOnly (asks for administrator rights)."; return }
 }
+elseif ($BuildOnly) { throw "-BuildOnly and -Uninstall do not go together" }
 
 # ---------------------------------------------------------------- copy + register (administrator)
 if ($isAdmin) { Invoke-Install }

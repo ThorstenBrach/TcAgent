@@ -6,6 +6,20 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+## [0.48.2] – 2026-10-31
+
+### Fixed
+- `vsbridge\install-xaeshell.ps1`: the build for the XAE Shell failed with CS0234 (`SVsDifferenceService`,
+  `IVsDifferenceService`, `__VSDIFFSERVICEOPTIONS` in `Microsoft.VisualStudio.Shell.Interop`) - the compare window of the
+  knowledge window needs `Microsoft.VisualStudio.Shell.Interop.11.0`, which is now referenced from the shell's own
+  assemblies. A missing interop assembly of the shell is explained in the output.
+- `vsbridge\install.ps1` and `uninstall.ps1` without administrator rights stopped with an `UnauthorizedAccessException`
+  (uninstall even silently did nothing); both now check the rights before changing anything and say what to do
+  (PowerShell "Run as administrator", or the VSIX, which needs no rights).
+
+### Added
+- `install-xaeshell.ps1 -BuildOnly`: only builds for the XAE Shell (normal user, nothing installed, no prompt).
+
 ## [0.48.1] – 2026-10-27
 
 Release since v0.28.5: the knowledge of TcAgent in levels (company, user, team, platform, project) with skills,
@@ -578,7 +592,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.48.1...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.48.2...HEAD
+[0.48.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.48.1...v0.48.2
 [0.48.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.28.5...v0.48.1
 [0.28.5]: https://github.com/ThorstenBrach/TcAgent/compare/v0.28.3...v0.28.5
 [0.28.3]: https://github.com/ThorstenBrach/TcAgent/compare/v0.27.0...v0.28.3
