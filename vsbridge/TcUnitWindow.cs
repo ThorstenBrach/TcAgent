@@ -1,7 +1,11 @@
 // TcUnit Tests - tool window in Visual Studio/TwinCAT XAE Shell, laid out like the Test Explorer of Visual Studio
-// (the XAE Shell has none): toolbar with run buttons, status filter buttons with counts and a search box, a tree list
-// PLC project > suite instance > test with the columns Test / Duration / Traits / Error Message (resizable), progress
-// bar, details pane. Test selections can be saved and loaded (.tcunit.json). Double-click opens the test method.
+// (the XAE Shell has none): a tool bar with words (Run all, Run selected, Run failed, Stop, Report, ⋯), the counters as
+// filter chips (All / Passed / Failed / Off) with a search box, the progress bar with "Running · 4 of 18 · <test>" or the
+// result of the run and its target, a tree list PLC project > suite instance > test with the columns Test / Description /
+// Result / Time (suites switched off for the last run as one line "⊘ switched off (n)"), check boxes to choose the tests
+// (a click beside them loses nothing), the details like the HTML report (expected / actual / message, code, enable bool,
+// Run again, Copy failure, the last 5 runs) and the legend of the symbols in the status line. Test selections can be
+// saved and loaded (.tcunit.json). Double-click opens the test method. Rules for the look: CONTRIBUTING.md.
 // The window does no TwinCAT work itself - it starts TcAgent.exe:
 //   tcunit list --solution <sln>               tests from the code (JSON), after a build and when a .TcPOU/.TcGVL changes
 //   tcunit run --attach <pid> [--tests ...]    the run; one JSON event per line, "cancel" on stdin stops it
@@ -39,6 +43,16 @@ namespace TcAgentBridge
             Caption = "TcUnit Tests";
             Content = new TcUnitControl();
         }
+
+        // F5 and Ctrl+F belong to the window while it is active - otherwise the IDE starts debugging or opens its own find
+        protected override bool PreProcessMessage(ref System.Windows.Forms.Message m)
+        {
+            const int WM_KEYDOWN = 0x100;
+            if (m.Msg == WM_KEYDOWN && Content is TcUnitControl c &&
+                c.Shortcut((System.Windows.Forms.Keys)(int)(long)m.WParam & System.Windows.Forms.Keys.KeyCode, System.Windows.Forms.Control.ModifierKeys == System.Windows.Forms.Keys.Control))
+                return true;
+            return base.PreProcessMessage(ref m);
+        }
     }
 
     public sealed class TcUnitControl : UserControl
@@ -51,8 +65,9 @@ namespace TcAgentBridge
             public string Instance, Name, Description, Details, EditorPath, File, Enable;
             public int Line, EditorLine;
             public bool Ordered, Ticked;
-            public string Status = "notrun", Message;
+            public string Status = "notrun", Message, RunInfo;   // RunInfo: "cycle 3/10" of a test that runs over many cycles
             public double? Duration;
+            public DateTime RunningSince;
             public Row Row;
         }
 
@@ -72,10 +87,10 @@ namespace TcAgentBridge
             public SuiteNode Suite; public TestNode Test;
             public event PropertyChangedEventHandler PropertyChanged;
             internal Action<Row, bool?> OnTick;
-            string name, glyph, duration, traits, message, tip, expander;
-            Brush glyphBrush;
+            string name, glyph, duration, description, result, tip, expander;
+            Brush glyphBrush, resultBrush;
             bool? ticked = false;
-            public double Indent { get; set; }
+            public double Indent { get; set; }   // set again by Rebuild (switched-off suites sit one level deeper)
             public bool CanTick { get; set; }
             public Visibility TickVisibility { get; set; } = Visibility.Visible;
             public FontWeight Weight { get; set; } = FontWeights.Normal;
@@ -83,8 +98,9 @@ namespace TcAgentBridge
             public string Glyph { get => glyph; set => Set(ref glyph, value, nameof(Glyph)); }
             public Brush GlyphBrush { get => glyphBrush; set { glyphBrush = value; Raise(nameof(GlyphBrush)); } }
             public string Duration { get => duration; set => Set(ref duration, value, nameof(Duration)); }
-            public string Traits { get => traits; set => Set(ref traits, value, nameof(Traits)); }
-            public string Message { get => message; set => Set(ref message, value, nameof(Message)); }
+            public string Description { get => description; set => Set(ref description, value, nameof(Description)); }
+            public string Result { get => result; set => Set(ref result, value, nameof(Result)); }
+            public Brush ResultBrush { get => resultBrush; set { resultBrush = value; Raise(nameof(ResultBrush)); } }
             public string Tip { get => tip; set => Set(ref tip, value, nameof(Tip)); }
             public string Expander { get => expander; set => Set(ref expander, value, nameof(Expander)); }
             // set by the user (checkbox) -> OnTick; set by the window (SetTicked) -> only shown
@@ -105,32 +121,29 @@ namespace TcAgentBridge
 
         // ------------------------------------------------------------------ view
         static readonly Brush Green = Frozen(Color.FromRgb(0x2E, 0xA0, 0x43)), Red = Frozen(Color.FromRgb(0xD1, 0x34, 0x38)),
-                              Blue = Frozen(Color.FromRgb(0x1E, 0x88, 0xE5)), Gray = Frozen(Color.FromArgb(0xB0, 0x80, 0x80, 0x80));
+                              Blue = Frozen(Color.FromRgb(0x1E, 0x88, 0xE5)), Gray = Frozen(Color.FromArgb(0xB0, 0x80, 0x80, 0x80)),
+                              FailBack = Frozen(Color.FromArgb(0x22, 0xD1, 0x34, 0x38));
         internal static Brush Frozen(Color c) { var b = new SolidColorBrush(c); b.Freeze(); return b; }
         internal static readonly FontFamily Symbols = new FontFamily("Segoe UI Symbol");
 
-        readonly Button runAll = Tool("▶▶", Green, "Run All Tests (all tests of the PLC project)");
-        readonly Button runSel = Tool("▶", Green, "Run (the ticked suites and tests, or the selected line)");
-        readonly Button runFailed = Tool("▶✖", Red, "Run Failed Tests (of the last run)");
-        readonly Button cancel = Tool("■", Red, "Cancel (reset of the PLC; open tests stay \"not run\")");
-        readonly Button refresh = Tool("⟳", null, "Refresh (read the tests from the code again)");
-        readonly Button expandAll = Tool("⊞", null, "Expand all suites");
-        readonly Button collapseAll = Tool("⊟", null, "Collapse all suites");
-        readonly Button report = Tool("\U0001F4C4", null, "Test report (HTML of the last run: the command of \"report\" in .tcagent\\tcunit.json or TcAgent's own report)");
-        readonly Button save = Tool("\U0001F4BE", null, "Save the ticked tests as a test selection (.tcunit.json)");
-        readonly Button load = Tool("\U0001F4C2", null, "Load a test selection (.tcunit.json) - ticks its tests");
-        readonly ToggleButton fAll = Filter("⚗", null, "All tests"), fPassed = Filter("✔", Green, "Passed tests"), fFailed = Filter("✖", Red, "Failed tests"),
-                              fNotRun = Filter("○", Gray, "Tests not run"), fSkipped = Filter("⊘", Gray, "Skipped tests");
+        // tool bar with words: the actions are found without hovering
+        readonly Button runAll = Labeled("▶▶", Green, "Run all", "Run every test of the PLC project");
+        readonly Button runSel = Labeled("▶", Green, "Run selected", "Run the ticked suites and tests - nothing ticked: the selected line");
+        readonly Button runFailed = Labeled("▶✖", Red, "Run failed", "Run the tests that failed in the last run");
+        readonly Button cancel = Labeled("■", Red, "Stop", "Stop the run (reset of the PLC; open tests stay \"not run\")");
+        readonly Button report = Labeled("\U0001F4C4", null, "Report", "HTML test report of the last run (the command of \"report\" in .tcagent\\tcunit.json or TcAgent's own report)");
+        readonly Button more = Tool("⋯", null, "Refresh, expand / collapse, save and load a test selection");
+        // the counters are the filters: a word, the number, several can be combined
+        readonly ToggleButton fAll = Filter(null, null, "All", "All tests"), fPassed = Filter("✔", Green, "Passed", "Only the passed tests"),
+                              fFailed = Filter("✖", Red, "Failed", "Only the failed tests"), fSkipped = Filter("⊘", Gray, "Off", "Only the tests switched off for the last run");
         readonly ComboBox projectBox = new ComboBox { MinWidth = 110, Margin = new Thickness(6, 0, 0, 0), Visibility = Visibility.Collapsed, ToolTip = "PLC project", VerticalAlignment = VerticalAlignment.Center };
         readonly TextBox search = new TextBox { BorderThickness = new Thickness(0), VerticalContentAlignment = VerticalAlignment.Center, Padding = new Thickness(4, 2, 4, 2), Background = Brushes.Transparent };
-        readonly TextBlock selection = new TextBlock { Margin = new Thickness(6, 2, 6, 2), FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
-        readonly ProgressBar progress = new ProgressBar { Height = 5, Margin = new Thickness(6, 0, 6, 0), Minimum = 0, Maximum = 1, BorderThickness = new Thickness(0) };
-        readonly TextBlock progressText = new TextBlock { Margin = new Thickness(6, 0, 6, 2), FontSize = 11, TextTrimming = TextTrimming.CharacterEllipsis };
+        readonly TextBlock selection = new TextBlock { Margin = new Thickness(6, 2, 6, 2), VerticalAlignment = VerticalAlignment.Center };
+        readonly ProgressBar progress = new ProgressBar { Height = 4, Margin = new Thickness(6, 2, 6, 0), Minimum = 0, Maximum = 1, BorderThickness = new Thickness(0) };
+        readonly TextBlock progressText = new TextBlock { Margin = new Thickness(6, 2, 6, 2), FontWeight = FontWeights.SemiBold, TextTrimming = TextTrimming.CharacterEllipsis, FontFamily = Symbols };
         readonly ListView list = new ListView { BorderThickness = new Thickness(0) };
-        readonly TextBox details = new TextBox { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, BorderThickness = new Thickness(0), VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
-                                                  FontFamily = new FontFamily("Consolas"), FontSize = 12, Padding = new Thickness(6) };
-        readonly Button openCode = new Button { Content = "Open code", Padding = new Thickness(8, 1, 8, 1), ToolTip = "Open the selected test in the editor (or double-click it)" };
-        readonly TextBlock status = new TextBlock { Margin = new Thickness(6, 2, 6, 4), Opacity = 0.75, TextTrimming = TextTrimming.CharacterEllipsis };
+        readonly StackPanel detailBox = new StackPanel { Margin = new Thickness(10, 6, 10, 8) };
+        readonly TextBlock status = new TextBlock { Margin = new Thickness(6, 2, 6, 4), Opacity = 0.8, TextTrimming = TextTrimming.CharacterEllipsis };
 
         // flat look of the VS tool bars in the light and the dark theme: translucent hover / pressed backgrounds
         static readonly Brush Hover = Frozen(Color.FromArgb(0x30, 0x80, 0x80, 0x80)), Pressed = Frozen(Color.FromArgb(0x50, 0x1E, 0x88, 0xE5)),
@@ -202,21 +215,42 @@ namespace TcAgentBridge
             return b;
         }
 
-        // status filter like the Test Explorer: glyph + count, several can be pressed (none or "all" = everything)
-        static ToggleButton Filter(string glyph, Brush brush, string what)
+        // a tool bar button with symbol and word
+        static Button Labeled(string glyph, Brush brush, string label, string tip)
         {
             var sp = new StackPanel { Orientation = Orientation.Horizontal };
-            var g = new TextBlock { Text = glyph, FontFamily = Symbols, Margin = new Thickness(0, 0, 4, 0) };
+            var g = new TextBlock { Text = glyph, FontFamily = Symbols, FontSize = 12, Margin = new Thickness(0, 0, 5, 0), VerticalAlignment = VerticalAlignment.Center };
             if (brush != null) g.Foreground = brush; else g.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
-            var n = new TextBlock { Text = "0" };
-            n.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
-            sp.Children.Add(g); sp.Children.Add(n);
-            return new ToggleButton
+            var t = new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center };
+            t.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            sp.Children.Add(g); sp.Children.Add(t);
+            var b = new Button { Content = sp, Padding = new Thickness(6, 2, 8, 2), Margin = new Thickness(0, 0, 2, 0), ToolTip = tip, Template = FlatButton,
+                                 Background = Brushes.Transparent, BorderBrush = Brushes.Transparent };
+            ToolTipService.SetShowOnDisabled(b, true);
+            return b;
+        }
+
+        // status filter chip: symbol, word and count; several can be pressed (none or "All" = everything)
+        static ToggleButton Filter(string glyph, Brush brush, string label, string what)
+        {
+            var sp = new StackPanel { Orientation = Orientation.Horizontal };
+            if (glyph != null)
             {
-                Content = sp, Padding = new Thickness(5, 2, 6, 2), Margin = new Thickness(0, 0, 2, 0), Focusable = false, Tag = n,
+                var g = new TextBlock { Text = glyph, FontFamily = Symbols, Margin = new Thickness(0, 0, 4, 0) };
+                if (brush != null) g.Foreground = brush; else g.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+                sp.Children.Add(g);
+            }
+            var l = new TextBlock { Text = label, Margin = new Thickness(0, 0, 5, 0) };
+            var n = new TextBlock { Text = "0", FontWeight = FontWeights.SemiBold };
+            foreach (var x in new[] { l, n }) x.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            sp.Children.Add(l); sp.Children.Add(n);
+            var b = new ToggleButton
+            {
+                Content = sp, Padding = new Thickness(8, 2, 8, 2), Margin = new Thickness(0, 0, 4, 0), Focusable = false, Tag = n,
                 Template = FlatToggle, Background = Brushes.Transparent, BorderBrush = Brushes.Transparent,
                 ToolTip = what + " - click to show only these (several can be combined), click again to show all"
             };
+            return b;
         }
 
         static void Count(ToggleButton b, int n) => ((TextBlock)b.Tag).Text = n.ToString();
@@ -234,22 +268,46 @@ namespace TcAgentBridge
             SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
 
-            // toolbar: run buttons | refresh | status filters | report, selections, project ... search box on the right
-            var bar = new DockPanel { Margin = new Thickness(4, 4, 4, 2), LastChildFill = true };
-            var left = new StackPanel { Orientation = Orientation.Horizontal };
-            foreach (var e in new UIElement[] { runAll, runSel, runFailed, cancel, Separator(), refresh, expandAll, collapseAll, Separator(), fAll, fPassed, fFailed, fNotRun, fSkipped, Separator(), report, save, load, projectBox })
-                left.Children.Add(e);
-            DockPanel.SetDock(left, Dock.Left);
-            bar.Children.Add(left);
-            bar.Children.Add(SearchBox());
+            // tool bar: Run all, Run selected, Run failed, Stop | Report, ⋯ (PLC project when there are several)
+            var bar = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(4, 4, 4, 2) };
+            foreach (var e in new UIElement[] { runAll, runSel, runFailed, cancel, Separator(), report, more, projectBox }) bar.Children.Add(e);
             cancel.IsEnabled = false;
+            var moreMenu = new ContextMenu { PlacementTarget = more, Placement = PlacementMode.Bottom };
+            MenuItem Item(string header, string key, Action act)
+            {
+                var i = new MenuItem { Header = header, InputGestureText = key ?? "" };
+                i.Click += (s, e) => act();
+                moreMenu.Items.Add(i);
+                return i;
+            }
+            var refreshItem = Item("Refresh", "F5", Discover);
+            moreMenu.Items.Add(new Separator());
+            Item("Expand all", null, () => ExpandAll(true));
+            Item("Collapse all", null, () => ExpandAll(false));
+            moreMenu.Items.Add(new Separator());
+            var saveItem = Item("Save selection …", null, SaveSelection);
+            var loadItem = Item("Load selection …", null, LoadSelection);
+            moreMenu.Opened += (s, e) => { refreshItem.IsEnabled = loadItem.IsEnabled = running == null; saveItem.IsEnabled = TickedItems().Count > 0; };
+            more.Click += (s, e) => moreMenu.IsOpen = true;
 
-            // the list: columns like the Test Explorer, widths resizable at the header
+            // the counters as filters, the search on the right
+            var filters = new DockPanel { Margin = new Thickness(4, 0, 4, 2) };
+            var chips = new StackPanel { Orientation = Orientation.Horizontal };
+            foreach (var f in new[] { fAll, fPassed, fFailed, fSkipped }) chips.Children.Add(f);
+            var sb = SearchBox();
+            DockPanel.SetDock(sb, Dock.Right); filters.Children.Add(sb);
+            filters.Children.Add(chips);
+
+            // the list: Test, Description, Result (symbol and word), Time - widths resizable at the header
             var grid = new GridView { AllowsColumnReorder = false };
-            grid.Columns.Add(new GridViewColumn { Header = "Test", Width = 360, CellTemplate = TestCell() });
-            grid.Columns.Add(new GridViewColumn { Header = "Duration", Width = 80, DisplayMemberBinding = new Binding(nameof(Row.Duration)) });
-            grid.Columns.Add(new GridViewColumn { Header = "Traits", Width = 140, DisplayMemberBinding = new Binding(nameof(Row.Traits)) });
-            grid.Columns.Add(new GridViewColumn { Header = "Error Message", Width = 420, DisplayMemberBinding = new Binding(nameof(Row.Message)) });
+            grid.Columns.Add(new GridViewColumn { Header = "Test", Width = 340, CellTemplate = TestCell() });
+            grid.Columns.Add(new GridViewColumn { Header = "Description", Width = 280, DisplayMemberBinding = new Binding(nameof(Row.Description)) });
+            var res = new FrameworkElementFactory(typeof(TextBlock));
+            res.SetBinding(TextBlock.TextProperty, new Binding(nameof(Row.Result)));
+            res.SetBinding(TextBlock.ForegroundProperty, new Binding(nameof(Row.ResultBrush)) { TargetNullValue = Gray });
+            res.SetValue(TextBlock.FontFamilyProperty, Symbols);   // ✔ and ✖ as symbols, not as colored emoji
+            grid.Columns.Add(new GridViewColumn { Header = "Result", Width = 240, CellTemplate = new DataTemplate { VisualTree = res } });
+            grid.Columns.Add(new GridViewColumn { Header = "Time", Width = 80, DisplayMemberBinding = new Binding(nameof(Row.Duration)) });
             var header = new Style(typeof(GridViewColumnHeader));
             header.Setters.Add(new Setter(Control.TemplateProperty, HeaderTemplate()));
             header.Setters.Add(new Setter(Control.BackgroundProperty, new DynamicResourceExtension(EnvironmentColors.ToolWindowBackgroundBrushKey)));
@@ -266,35 +324,40 @@ namespace TcAgentBridge
             list.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             list.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
 
-            var detailsPanel = new DockPanel();
-            var detailsBar = new DockPanel { Margin = new Thickness(6, 2, 6, 2) };
-            DockPanel.SetDock(openCode, Dock.Right);
-            detailsBar.Children.Add(openCode);
-            var dt = new TextBlock { Text = "Test Detail Summary", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center };
-            dt.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
-            detailsBar.Children.Add(dt);
-            DockPanel.SetDock(detailsBar, Dock.Top);
-            detailsPanel.Children.Add(detailsBar); detailsPanel.Children.Add(details);
-            details.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
-            details.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
-
+            // the details of the selected line, laid out like the HTML report
+            var detailsView = new ScrollViewer { Content = detailBox, VerticalScrollBarVisibility = ScrollBarVisibility.Auto };
             var split = new Grid();
             split.RowDefinitions.Add(new RowDefinition { Height = new GridLength(3, GridUnitType.Star) });
             split.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-            split.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star), MinHeight = 60 });
+            split.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1.4, GridUnitType.Star), MinHeight = 80 });
             var splitter = new GridSplitter { Height = 4, HorizontalAlignment = HorizontalAlignment.Stretch, ResizeDirection = GridResizeDirection.Rows };
             splitter.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBorderBrushKey);
-            Grid.SetRow(list, 0); Grid.SetRow(splitter, 1); Grid.SetRow(detailsPanel, 2);
-            split.Children.Add(list); split.Children.Add(splitter); split.Children.Add(detailsPanel);
+            Grid.SetRow(list, 0); Grid.SetRow(splitter, 1); Grid.SetRow(detailsView, 2);
+            split.Children.Add(list); split.Children.Add(splitter); split.Children.Add(detailsView);
 
-            // progress: bar, "Test 3 of 9: name - about 5 s left" on the left, "3 of 9 done (33 %)" on the right
+            // progress: the bar, "Running · 4 of 18 · <test>" or the result of the run with the target left, the ticked tests right
             var progressRow = new DockPanel();
             DockPanel.SetDock(selection, Dock.Right);
             progressRow.Children.Add(selection); progressRow.Children.Add(progressText);
+            // status line: the last message left, what the symbols mean right
+            var legend = new TextBlock { Margin = new Thickness(12, 2, 6, 4), FontSize = 11 };
+            foreach (var (g, b, w) in new[] { ("✔", Green, "passed"), ("✖", Red, "failed"), ("◐", Blue, "running"), ("○", Gray, "not run"), ("⊘", Gray, "switched off") })
+            {
+                legend.Inlines.Add(new System.Windows.Documents.Run(g + " ") { Foreground = b, FontFamily = Symbols });
+                var word = new System.Windows.Documents.Run(w + "   ");
+                word.SetResourceReference(System.Windows.Documents.TextElement.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+                legend.Inlines.Add(word);
+            }
+            var bottom = new DockPanel();
+            var line = new Border { Height = 1 };
+            line.SetResourceReference(Border.BackgroundProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+            DockPanel.SetDock(line, Dock.Top); bottom.Children.Add(line);
+            DockPanel.SetDock(legend, Dock.Right); bottom.Children.Add(legend);
+            bottom.Children.Add(status);
             var root = new DockPanel();
-            foreach (var top in new UIElement[] { bar, progress, progressRow }) { DockPanel.SetDock(top, Dock.Top); root.Children.Add(top); }
-            DockPanel.SetDock(status, Dock.Bottom);
-            root.Children.Add(status);
+            foreach (var top in new UIElement[] { bar, filters, progress, progressRow }) { DockPanel.SetDock(top, Dock.Top); root.Children.Add(top); }
+            DockPanel.SetDock(bottom, Dock.Bottom);
+            root.Children.Add(bottom);
             root.Children.Add(split);
             Content = root;
             foreach (var t in new[] { selection, progressText, status }) t.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
@@ -303,16 +366,11 @@ namespace TcAgentBridge
             runSel.Click += (s, e) => RunSelected();
             runFailed.Click += (s, e) => RunFailed();
             cancel.Click += (s, e) => Cancel();
-            refresh.Click += (s, e) => Discover();
-            expandAll.Click += (s, e) => ExpandAll(true);
-            collapseAll.Click += (s, e) => ExpandAll(false);
             report.Click += (s, e) => MakeReport();
-            save.Click += (s, e) => SaveSelection();
-            load.Click += (s, e) => LoadSelection();
-            foreach (var f in new[] { fPassed, fFailed, fNotRun, fSkipped })
-                f.Click += (s, e) => { fAll.IsChecked = !(fPassed.IsChecked == true || fFailed.IsChecked == true || fNotRun.IsChecked == true || fSkipped.IsChecked == true); Rebuild(); };
+            foreach (var f in new[] { fPassed, fFailed, fSkipped })
+                f.Click += (s, e) => { fAll.IsChecked = !(fPassed.IsChecked == true || fFailed.IsChecked == true || fSkipped.IsChecked == true); Rebuild(); };
             fAll.IsChecked = true;
-            fAll.Click += (s, e) => { fAll.IsChecked = true; fPassed.IsChecked = fFailed.IsChecked = fNotRun.IsChecked = fSkipped.IsChecked = false; Rebuild(); };
+            fAll.Click += (s, e) => { fAll.IsChecked = true; fPassed.IsChecked = fFailed.IsChecked = fSkipped.IsChecked = false; Rebuild(); };
             search.TextChanged += (s, e) => Rebuild();
             projectBox.SelectionChanged += (s, e) => { if (projectBox.SelectedItem is string p && p != project) { project = p; Discover(); } };
             list.SelectionChanged += (s, e) => ShowDetails();
@@ -329,18 +387,34 @@ namespace TcAgentBridge
                 else if ((e.Key == Key.Left && IsExpanded(r)) || (e.Key == Key.Right && !IsExpanded(r) && r.Test == null)) { Toggle(r); e.Handled = true; }
                 else if (e.Key == Key.Enter && r.Test != null) { OpenSelected(); e.Handled = true; }
             };
-            openCode.Click += (s, e) => OpenSelected();
+            PreviewKeyDown += (s, e) =>
+            {
+                if (Shortcut((System.Windows.Forms.Keys)KeyInterop.VirtualKeyFromKey(e.Key == Key.System ? e.SystemKey : e.Key), Keyboard.Modifiers == ModifierKeys.Control)) e.Handled = true;
+            };
+            // a test that runs over many cycles: its time (or cycle) goes on while it runs
+            runningClock.Tick += (s, e) => { foreach (var t in suites.SelectMany(x => x.Tests).Where(x => x.Status == "running")) UpdateTest(t); };
             IsVisibleChanged += (s, e) => { if (IsVisible && suites.Count == 0 && !discovering) Discover(); };
             Dispatcher.ShutdownStarted += (s, e) => { try { if (running?.HasExited == false) running.StandardInput.WriteLine("cancel"); } catch { } };
             HookIdeEvents();
             Progress(null, 0, 0);
-            status.Text = "Reading the tests from the code ...";
+            ShowDetails();
+            status.Text = "Reading the tests from the code …";
+        }
+
+        readonly System.Windows.Threading.DispatcherTimer runningClock = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(500) };
+
+        /// <summary>F5 = refresh, Ctrl+F = search (the pane hands them over before the IDE takes them).</summary>
+        internal bool Shortcut(System.Windows.Forms.Keys key, bool ctrl)
+        {
+            if (key == System.Windows.Forms.Keys.F5 && !ctrl) { if (running == null) Discover(); return true; }
+            if (key == System.Windows.Forms.Keys.F && ctrl) { search.Focus(); Keyboard.Focus(search); search.SelectAll(); return true; }
+            return false;
         }
 
         /// <summary>Search box with magnifier and placeholder, framed like the one of the Test Explorer.</summary>
         FrameworkElement SearchBox()
         {
-            var hint = new TextBlock { Text = "Search TcUnit Tests", Opacity = 0.55, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+            var hint = new TextBlock { Text = "Search tests (Ctrl+F)", Opacity = 0.55, Margin = new Thickness(6, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
             hint.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             search.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             search.SetResourceReference(TextBoxBase.CaretBrushProperty, EnvironmentColors.ToolWindowTextBrushKey);
@@ -692,12 +766,17 @@ namespace TcAgentBridge
         }
 
         // ------------------------------------------------------------------ list content
-        bool IsExpanded(Row r) => r == projectRow ? projectExpanded : r.Suite != null && r.Test == null && r.Suite.Expanded;
+        // suites whose tests were all switched off for the last run: one line "⊘ switched off (n)" instead of n lines
+        Row offRow;
+        bool offExpanded;
+
+        bool IsExpanded(Row r) => r == projectRow ? projectExpanded : r == offRow ? offExpanded : r.Suite != null && r.Test == null && r.Suite.Expanded;
 
         /// <summary>Opens or closes every suite (the project line stays open).</summary>
         void ExpandAll(bool open)
         {
             projectExpanded = true;
+            offExpanded = open;
             foreach (var s in suites) s.Expanded = open;
             Rebuild();
         }
@@ -705,6 +784,7 @@ namespace TcAgentBridge
         void Toggle(Row r)
         {
             if (r == projectRow) projectExpanded = !projectExpanded;
+            else if (r == offRow) offExpanded = !offExpanded;
             else if (r.Suite != null && r.Test == null) r.Suite.Expanded = !r.Suite.Expanded;
             else return;
             Rebuild();
@@ -713,9 +793,10 @@ namespace TcAgentBridge
         bool StatusShown(TestNode t)
         {
             if (fAll.IsChecked == true) return true;
-            return (fPassed.IsChecked == true && t.Status == "passed") || (fFailed.IsChecked == true && t.Status == "failed")
-                   || (fNotRun.IsChecked == true && t.Status is "notrun" or "running") || (fSkipped.IsChecked == true && t.Status == "skipped");
+            return (fPassed.IsChecked == true && t.Status == "passed") || (fFailed.IsChecked == true && t.Status == "failed") || (fSkipped.IsChecked == true && t.Status == "skipped");
         }
+
+        static bool SwitchedOff(SuiteNode s) => s.Tests.Count > 0 && s.Tests.All(t => t.Status == "skipped");
 
         /// <summary>Visible lines from expansion, status filter and search (the selected line stays selected).</summary>
         void Rebuild()
@@ -728,15 +809,35 @@ namespace TcAgentBridge
             if (!projectExpanded) return;
             var q = (search.Text ?? "").Trim();
             bool Hit(string s) => s != null && s.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0;
+            var shown = new List<(SuiteNode Suite, List<TestNode> Tests)>();
             foreach (var s in suites)
             {
                 bool suiteHit = q.Length > 0 && (Hit(s.Path) || Hit(s.Type) || Hit(s.Description));
                 var tests = s.Tests.Where(t => StatusShown(t) && (q.Length == 0 || suiteHit || Hit(t.Name) || Hit(t.Description))).ToList();
                 bool showEmpty = s.Tests.Count == 0 && fAll.IsChecked == true && (q.Length == 0 || suiteHit);
-                if (tests.Count == 0 && !showEmpty) continue;
+                if (tests.Count > 0 || showEmpty) shown.Add((s, tests));
+            }
+            // grouped only in the full list - the filter "Off" and a search show them where they are
+            var off = fAll.IsChecked == true && q.Length == 0 ? shown.Where(x => SwitchedOff(x.Suite)).ToList() : new List<(SuiteNode Suite, List<TestNode> Tests)>();
+            void Add(SuiteNode s, List<TestNode> tests, double indent)
+            {
+                s.Row.Indent = indent;
                 s.Row.Expander = s.Tests.Count == 0 ? "" : s.Expanded ? "◢" : "▷";
                 rows.Add(s.Row);
-                if (s.Expanded) foreach (var t in tests) rows.Add(t.Row);
+                if (s.Expanded) foreach (var t in tests) { t.Row.Indent = indent + 14; rows.Add(t.Row); }
+            }
+            foreach (var (s, tests) in shown.Except(off)) Add(s, tests, 14);
+            if (off.Count > 0)
+            {
+                offRow ??= new Row { TickVisibility = Visibility.Hidden, Glyph = "⊘", GlyphBrush = Gray, ResultBrush = Gray };
+                offRow.Indent = 14;
+                offRow.Name = $"switched off ({off.Count})";
+                offRow.Result = $"⊘ {off.Sum(x => x.Suite.Tests.Count)} tests switched off";
+                offRow.Description = "suites not run in the last run";
+                offRow.Tip = string.Join("\n", off.Select(x => x.Suite.Path));
+                offRow.Expander = offExpanded ? "◢" : "▷";
+                rows.Add(offRow);
+                if (offExpanded) foreach (var (s, tests) in off) Add(s, tests, 28);
             }
             if (keep != null && rows.Contains(keep)) list.SelectedItem = keep;
         }
@@ -748,8 +849,24 @@ namespace TcAgentBridge
             var (g, b) = Look(t.Status);
             t.Row.Glyph = g; t.Row.GlyphBrush = b;
             t.Row.Duration = t.Duration is double d && t.Status is "passed" or "failed" ? Seconds(d) : "";
-            t.Row.Message = string.IsNullOrEmpty(t.Message) ? "" : t.Message.Split('\n')[0];
-            t.Row.Traits = string.Join(", ", new[] { t.Ordered ? "Ordered" : null, t.Enable == null ? "No bRun_" : null, t.Status == "skipped" ? "Skipped" : null }.Where(x => x != null));
+            t.Row.Description = t.Description ?? "";
+            t.Row.ResultBrush = b;
+            t.Row.Result = t.Status == "running"
+                ? "◐ running · " + (t.RunInfo ?? Seconds((DateTime.Now - t.RunningSince).TotalSeconds))   // a test over many cycles goes on
+                : g + " " + Text(t.Status);
+        }
+
+        // the result of several tests in words: "✖ 1 failed · ✔ 3 passed · ⊘ 2 off"
+        static (string Text, Brush Brush) Sum(List<TestNode> tests)
+        {
+            if (tests.Any(t => t.Status == "running")) return ("◐ running", Blue);
+            int p = tests.Count(t => t.Status == "passed"), f = tests.Count(t => t.Status == "failed"), o = tests.Count(t => t.Status == "skipped"), n = tests.Count(t => t.Status == "notrun");
+            var parts = new List<string>();
+            if (f > 0) parts.Add($"✖ {f} failed");
+            if (p > 0) parts.Add($"✔ {p} passed");
+            if (n > 0) parts.Add($"○ {n} not run");
+            if (o > 0) parts.Add($"⊘ {o} off");
+            return (parts.Count == 0 ? "–" : string.Join(" · ", parts), f > 0 ? Red : p > 0 && n == 0 ? Green : Gray);
         }
 
         void UpdateSuite(SuiteNode sn)
@@ -763,9 +880,8 @@ namespace TcAgentBridge
             var done = sn.Tests.Where(t => t.Status is "passed" or "failed").ToList();
             sn.Row.Name = $"{sn.Path} ({sn.Tests.Count})";
             sn.Row.Duration = done.Count > 0 ? Seconds(done.Sum(t => t.Duration ?? 0)) : "";
-            sn.Row.Traits = string.Join(", ", new[] { sn.Type, sn.RunSuite == null ? "No bRunSuite" : null, !sn.Selectable && sn.Tests.Count > 0 ? "Whole suite" : null, sn.Dynamic ? "Run-time names" : null }.Where(x => x != null));
-            var failed = done.Count(t => t.Status == "failed");
-            sn.Row.Message = failed > 0 ? $"{failed} failed" : "";
+            sn.Row.Description = sn.Description ?? sn.Type;
+            (sn.Row.Result, sn.Row.ResultBrush) = Sum(sn.Tests);
         }
 
         void UpdateProject()
@@ -779,7 +895,8 @@ namespace TcAgentBridge
             projectRow.Name = $"{project} ({all.Count})";
             var done = all.Where(t => t.Status is "passed" or "failed").ToList();
             projectRow.Duration = done.Count > 0 ? Seconds(done.Sum(t => t.Duration ?? 0)) : "";
-            projectRow.Traits = runMode == "sequence" ? "RUN_IN_SEQUENCE" : runMode == "parallel" ? "RUN (parallel)" : "";
+            projectRow.Description = runMode == "sequence" ? "TcUnit.RUN_IN_SEQUENCE" : runMode == "parallel" ? "TcUnit.RUN (all suites at once)" : "";
+            (projectRow.Result, projectRow.ResultBrush) = Sum(all);
         }
 
         void UpdateAll()
@@ -811,52 +928,206 @@ namespace TcAgentBridge
             Count(fAll, all.Count);
             Count(fPassed, all.Count(t => t.Status == "passed"));
             Count(fFailed, all.Count(t => t.Status == "failed"));
-            Count(fNotRun, all.Count(t => t.Status is "notrun" or "running"));
             Count(fSkipped, all.Count(t => t.Status == "skipped"));
             runFailed.IsEnabled = running == null && all.Any(t => t.Status == "failed");
         }
 
         Row Selected() => list.SelectedItem as Row;
 
+        static string Text(string status) => status == "notrun" ? "not run" : status == "skipped" ? "switched off" : status;
+
+        // ------------------------------------------------------------------ details (laid out like the HTML report)
+        TextBlock Words(string text, double size = 12, bool bold = false, Brush brush = null)
+        {
+            var t = new TextBlock { Text = text, FontSize = size, FontWeight = bold ? FontWeights.SemiBold : FontWeights.Normal, TextWrapping = TextWrapping.Wrap };
+            if (brush != null) t.Foreground = brush; else t.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            return t;
+        }
+
+        // label / value lines; a value may hold links
+        Grid Facts(params (string Label, object Value)[] lines)
+        {
+            var g = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(110) });
+            g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            foreach (var (label, value) in lines.Where(l => l.Value != null))
+            {
+                var r = g.RowDefinitions.Count;
+                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var k = Words(label, bold: true); k.Opacity = 0.8; k.Margin = new Thickness(0, 1, 8, 1);
+                var v = value as UIElement ?? Words(value.ToString());
+                if (v is FrameworkElement fe) fe.Margin = new Thickness(0, 1, 0, 1);
+                Grid.SetRow(k, r); Grid.SetRow(v, r); Grid.SetColumn(v, 1);
+                g.Children.Add(k); g.Children.Add(v);
+            }
+            return g;
+        }
+
+        TextBlock Links(params (string Label, Action Act)[] links)
+        {
+            var t = Words("");
+            for (int i = 0; i < links.Length; i++)
+            {
+                if (i > 0) t.Inlines.Add(new System.Windows.Documents.Run(" · "));
+                var act = links[i].Act;
+                var h = new System.Windows.Documents.Hyperlink(new System.Windows.Documents.Run(links[i].Label)) { Foreground = Blue };
+                h.Click += (s, e) => act();
+                t.Inlines.Add(h);
+            }
+            return t;
+        }
+
+        /// <summary>TcUnit's message "EXP: 100, ACT: 101, MSG: text" as expected / actual / message.</summary>
+        static (string Expected, string Actual, string Message) Failure(string m)
+        {
+            m = string.Join("\n", (m ?? "").Split('\n').Distinct()).Trim();
+            string Take(string key)
+            {
+                var i = m.IndexOf(key + ":", StringComparison.Ordinal);
+                if (i < 0) return null;
+                i += key.Length + 1;
+                var ends = new[] { ", EXP:", ", ACT:", ", MSG:", "\nEXP:", "\nACT:", "\nMSG:" }.Select(k => m.IndexOf(k, i, StringComparison.Ordinal)).Where(x => x >= 0).ToList();
+                return m.Substring(i, (ends.Count > 0 ? ends.Min() : m.Length) - i).Trim();
+            }
+            var exp = Take("EXP"); var act = Take("ACT"); var msg = Take("MSG");
+            return exp == null && act == null && msg == null ? (null, null, m) : (exp, act, msg);
+        }
+
         void ShowDetails()
         {
-            var sb = new StringBuilder();
+            detailBox.Children.Clear();
+            detailBox.Tag = null;
             var r = Selected();
             if (r?.Test is TestNode t)
             {
-                sb.AppendLine(t.Instance + " @ " + t.Name);
-                if (t.Description != null) sb.AppendLine(t.Description);
-                if (t.Details != null) { sb.AppendLine(); sb.AppendLine(t.Details); }
-                else if (r.Suite?.Details != null && t.File == null) { sb.AppendLine(); sb.AppendLine(r.Suite.Details); }
-                sb.AppendLine();
-                sb.AppendLine("Status:   " + Text(t.Status) + (t.Duration is double d ? "   (" + Seconds(d) + ")" : ""));
-                if (!string.IsNullOrEmpty(t.Message)) { sb.AppendLine(); sb.AppendLine(t.Message.Replace(", ACT:", "\nACT:").Replace(", MSG:", "\nMSG:")); sb.AppendLine(); }
-                if (t.File != null) sb.AppendLine("Code:     " + Path.GetFileName(t.File) + ":" + t.Line);
-                sb.AppendLine("Enable:   " + (t.Enable ?? "- (runs with its suite)"));
+                var (g, b) = Look(t.Status);
+                var head = Words(t.Name, 14, true);
+                head.Inlines.Add(new System.Windows.Documents.Run("   " + (r.Result ?? g + " " + Text(t.Status)) + (t.Duration is double d && t.Status is "passed" or "failed" ? " · " + Seconds(d) : ""))
+                                     { FontSize = 12, FontWeight = FontWeights.Normal, Foreground = b, FontFamily = Symbols });
+                detailBox.Children.Add(head);
+                if (t.Description != null) detailBox.Children.Add(Words(t.Description));
+                var doc = t.Details ?? (r.Suite?.Details != null && t.File == null ? r.Suite.Details : null);
+                if (doc != null) { var dt = Words(doc); dt.Opacity = 0.85; dt.Margin = new Thickness(0, 4, 0, 0); detailBox.Children.Add(dt); }
+                if (!string.IsNullOrEmpty(t.Message))
+                {
+                    var (exp, act, msg) = Failure(t.Message);
+                    var box = new Border { Background = FailBack, BorderBrush = Red, BorderThickness = new Thickness(3, 0, 0, 0), Padding = new Thickness(8, 4, 8, 4), Margin = new Thickness(0, 8, 0, 0) };
+                    var f = Facts(("Expected", exp), ("Actual", act), ("Message", msg));
+                    f.Margin = new Thickness(0);
+                    foreach (var tb in f.Children.OfType<TextBlock>().Where(x => Grid.GetColumn(x) == 1)) tb.FontFamily = new FontFamily("Consolas");
+                    box.Child = f;
+                    detailBox.Children.Add(box);
+                }
+                var key = CanTick(r.Suite, t) ? t.Instance + "@" + t.Name : r.Suite.Path;
+                detailBox.Children.Add(Facts(
+                    ("Suite", r.Suite.Path + (r.Suite.Type != null ? " : " + r.Suite.Type : "")),
+                    ("Code", t.File != null ? (object)Links((Path.GetFileName(t.File) + ":" + t.Line, OpenSelected)) : "test name built at run time / not found in the code"),
+                    ("Enable bool", t.Enable ?? "– (runs with its suite)"),
+                    ("Order", t.Ordered ? "TEST_ORDERED" : null),
+                    ("Actions", Links(("Open code", OpenSelected), ("Run again", () => StartRun(new List<string> { key }, t.Name)), ("Copy failure", () => CopyFailure(t)))),
+                    ("Last 5 runs", LastRuns(t))));
             }
             else if (r?.Suite is SuiteNode s)
             {
-                sb.AppendLine(s.Path + " : " + s.Type);
-                if (s.Description != null) sb.AppendLine(s.Description);
-                if (s.Details != null) { sb.AppendLine(); sb.AppendLine(s.Details); }
-                sb.AppendLine();
-                sb.AppendLine($"{s.Tests.Count} test(s): {s.Tests.Count(x => x.Status == "passed")} passed, {s.Tests.Count(x => x.Status == "failed")} failed, {s.Tests.Count(x => x.Status == "skipped")} skipped");
-                sb.AppendLine("Enable:   " + (s.RunSuite ?? "- (no bRunSuite: the suite always runs)"));
-                if (!s.Selectable && s.Tests.Count > 0) sb.AppendLine("Single tests cannot be switched off (bRun_<TestMethod> missing) - whole suite only.");
-                if (s.Dynamic) sb.AppendLine("Test names are built at run time; they appear after the first run.");
-                if (s.File != null) sb.AppendLine("Code:     " + Path.GetFileName(s.File) + ":" + s.Line);
+                var (text, brush) = Sum(s.Tests);
+                var head = Words(s.Path, 14, true);
+                head.Inlines.Add(new System.Windows.Documents.Run("   " + text) { FontSize = 12, FontWeight = FontWeights.Normal, Foreground = brush, FontFamily = Symbols });
+                detailBox.Children.Add(head);
+                if (s.Description != null) detailBox.Children.Add(Words(s.Description));
+                if (s.Details != null) { var dt = Words(s.Details); dt.Opacity = 0.85; dt.Margin = new Thickness(0, 4, 0, 0); detailBox.Children.Add(dt); }
+                detailBox.Children.Add(Facts(
+                    ("Type", s.Type),
+                    ("Code", s.File != null ? (object)Links((Path.GetFileName(s.File) + ":" + s.Line, OpenSelected)) : null),
+                    ("Enable bool", s.RunSuite ?? "– (no bRunSuite: the suite always runs)"),
+                    ("Note", !s.Selectable && s.Tests.Count > 0 ? "Single tests cannot be switched off (bRun_<TestMethod> missing) - whole suite only." : s.Dynamic ? "Test names are built at run time; they appear after the first run." : null),
+                    ("Actions", Links(("Open code", OpenSelected), ("Run again", () => StartRun(new List<string> { s.Path }, s.Path))))));
             }
             else if (r != null && r == projectRow)
             {
                 var all = suites.SelectMany(x => x.Tests).ToList();
-                sb.AppendLine(project + "  (" + treePath + ")");
-                sb.AppendLine($"{suites.Count} suite instance(s), {all.Count} test(s): {all.Count(x => x.Status == "passed")} passed, {all.Count(x => x.Status == "failed")} failed");
+                var (text, brush) = Sum(all);
+                var head = Words(project, 14, true);
+                head.Inlines.Add(new System.Windows.Documents.Run("   " + text) { FontSize = 12, FontWeight = FontWeights.Normal, Foreground = brush, FontFamily = Symbols });
+                detailBox.Children.Add(head);
+                detailBox.Children.Add(Facts(("PLC project", treePath), ("Suites", $"{suites.Count} instance(s), {all.Count} test(s)"), ("Run mode", projectRow.Description),
+                                             ("Target", TargetText())));
             }
-            details.Text = sb.ToString();
-            openCode.IsEnabled = r?.Test != null ? r.Test.EditorPath != null : r?.Suite?.EditorPath != null;
+            else if (r != null && r == offRow)
+                detailBox.Children.Add(Words("Suites whose tests were all switched off for the last run - open the line to see them; tick them and \"Run selected\" runs them.", brush: Gray));
+            else
+                detailBox.Children.Add(Words("Select a test - its result, the failure (expected / actual / message), the code, the enable bool and the last runs appear here.", brush: Gray));
         }
 
-        static string Text(string status) => status == "notrun" ? "not run" : status;
+        string TargetText() => string.IsNullOrEmpty(configTarget) || configTarget.Equals("local", StringComparison.OrdinalIgnoreCase) ? "local runtime" : configTarget;
+
+        void CopyFailure(TestNode t)
+        {
+            var text = $"{t.Instance}@{t.Name}: {Text(t.Status)}" + (t.Duration is double d ? $" ({Seconds(d)})" : "") + (string.IsNullOrEmpty(t.Message) ? "" : "\n" + t.Message.Trim());
+            try { Clipboard.SetText(text); status.Text = "Copied: " + t.Name; } catch (Exception ex) { status.Text = "Could not copy: " + ex.Message; }
+        }
+
+        // the last results of a test, newest first: "✔ 12 ms  ✔ 11 ms  ✖ 1.1 s"
+        object LastRuns(TestNode t)
+        {
+            var h = HistoryOf(t.Instance + "@" + t.Name);
+            if (h.Count == 0) return "no run recorded yet";
+            var tb = Words("");
+            foreach (var e in h)
+            {
+                var st = S(e, "s");
+                var (g, b) = Look(st);
+                var d = Get(e, "d") is decimal dd ? (double)dd : Get(e, "d") is int di ? di : (double?)null;
+                var text = g + " " + (d is double x && st is "passed" or "failed" ? Seconds(x) : Text(st));
+                tb.Inlines.Add(new System.Windows.Documents.InlineUIContainer(new TextBlock { Text = text, Foreground = b, FontFamily = Symbols, Margin = new Thickness(0, 0, 14, 0), ToolTip = (S(e, "t") ?? "").Replace('T', ' ') }));
+            }
+            return tb;
+        }
+
+        // ------------------------------------------------------------------ the last 5 results per test (per solution)
+        static readonly string HistoryFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "tcunit", "history.json");
+        Dictionary<string, object> history;
+
+        Dictionary<string, object> Histories()
+        {
+            if (history != null) return history;
+            try { history = File.Exists(HistoryFile) ? new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(File.ReadAllText(HistoryFile)) as Dictionary<string, object> : null; } catch { }
+            return history ??= new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+        }
+
+        Dictionary<string, object> SolutionHistory(bool create)
+        {
+            var sln = (SolutionPath() ?? "").ToLowerInvariant();
+            var all = Histories();
+            if (all.TryGetValue(sln, out var o) && o is Dictionary<string, object> d) return d;
+            if (!create) return null;
+            d = new Dictionary<string, object>(StringComparer.OrdinalIgnoreCase);
+            all[sln] = d;
+            return d;
+        }
+
+        List<Dictionary<string, object>> HistoryOf(string key) =>
+            SolutionHistory(false) is Dictionary<string, object> d && d.TryGetValue(key, out var o) && o is IEnumerable e
+                ? e.OfType<Dictionary<string, object>>().ToList() : new List<Dictionary<string, object>>();
+
+        // after a run: the result of every test that ran goes in front, the last 5 are kept
+        void RememberRun()
+        {
+            try
+            {
+                var d = SolutionHistory(true);
+                var when = DateTime.Now.ToString("yyyy-MM-ddTHH:mm", System.Globalization.CultureInfo.InvariantCulture);
+                foreach (var t in suites.SelectMany(s => s.Tests).Where(t => runFinished.Contains(t.Instance + "@" + t.Name) && t.Status is "passed" or "failed"))
+                {
+                    var key = t.Instance + "@" + t.Name;
+                    var list5 = new List<object> { new Dictionary<string, object> { ["t"] = when, ["s"] = t.Status, ["d"] = t.Duration } };
+                    list5.AddRange(HistoryOf(key).Take(4));
+                    d[key] = list5;
+                }
+                Directory.CreateDirectory(Path.GetDirectoryName(HistoryFile));
+                File.WriteAllText(HistoryFile, new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(Histories()), new UTF8Encoding(false));
+            }
+            catch (Exception ex) { BridgePackage.Instance?.LogLine("TcUnit history: " + ex.Message); }
+        }
 
         void OpenSelected()
         {
@@ -929,8 +1200,10 @@ namespace TcAgentBridge
             expected = 0; runTotal = 0; runFinished.Clear();
             SetRunning(true);
             UpdateSelection();
-            status.Text = "Starting " + what + " ...";
-            Progress("Preparing ...", 0, 1);
+            status.Text = "Starting " + what + " …";
+            Progress("Preparing · " + what + " · target " + TargetText(), 0, 1);
+            progress.Foreground = Blue;
+            runningClock.Start();
             progressText.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             var p = running;
             var err = new StringBuilder();
@@ -956,8 +1229,14 @@ namespace TcAgentBridge
                     int code = -1;
                     try { code = p.ExitCode; } catch { }
                     running = null;
+                    runningClock.Stop();
                     SetRunning(false);
-                    if (!gotDone) { status.Text = $"TcAgent ended without a result (exit {code}): {err.ToString().Trim()}"; Progress(null, 0, 0); }
+                    if (!gotDone)
+                    {
+                        status.Text = $"TcAgent ended without a result (exit {code}): {err.ToString().Trim()}";
+                        Progress($"✖ The run ended without a result (exit {code}) - see the status line", 0, 0);
+                        progressText.Foreground = Red;
+                    }
                     gotDone = false;
                     UpdateCounters();
                 }));
@@ -965,10 +1244,11 @@ namespace TcAgentBridge
         }
 
         bool gotDone;
+        TestNode runningTest;   // the test TcUnit calls now (for "cycle x/y" of the progress block)
 
         void SetRunning(bool on)
         {
-            runAll.IsEnabled = runSel.IsEnabled = refresh.IsEnabled = projectBox.IsEnabled = report.IsEnabled = load.IsEnabled = !on;
+            runAll.IsEnabled = runSel.IsEnabled = projectBox.IsEnabled = report.IsEnabled = !on;
             cancel.IsEnabled = on;
             runFailed.IsEnabled = !on && suites.SelectMany(s => s.Tests).Any(t => t.Status == "failed");
         }
@@ -1097,11 +1377,12 @@ namespace TcAgentBridge
                 externalRun = true;
                 runStarted = DateTime.Now; expected = 0; runTotal = 0; runFinished.Clear();
                 SetRunning(true);
+                runningClock.Start();
                 cancel.IsEnabled = false;                             // the run belongs to the AI client: it is stopped there
-                Progress("Run started from the chat ...", 0, 1);
+                Progress("Running · started from the chat …", 0, 1);
             }
             OnEvent(ev);
-            if (S(ev, "event") == "done") { externalRun = false; SetRunning(false); gotDone = false; UpdateCounters(); }
+            if (S(ev, "event") == "done") { externalRun = false; runningClock.Stop(); SetRunning(false); gotDone = false; UpdateCounters(); }
         }
 
         void OnEvent(Dictionary<string, object> ev)
@@ -1114,13 +1395,20 @@ namespace TcAgentBridge
                         if (Find(S(r, "instance"), S(r, "test"), false) is TestNode t) { t.Status = S(r, "status"); t.Message = null; t.Duration = null; }
                     runTotal = Math.Max(expected, L(ev, "tests").Count(r => S(r, "status") == "notrun"));
                     UpdateAll();
-                    Progress($"0 of {expected} test(s)", 0, expected);
+                    Progress($"Running · 0 of {expected} · target {TargetText()}", 0, expected);
                     break;
                 case "step":
                     status.Text = S(ev, "text");
                     break;
                 case "compile":
-                    if (S(ev, "level") == "ERROR") details.Text += (details.Text.Length > 0 ? "\n" : "") + "Build error: " + S(ev, "text") + (S(ev, "file") != null ? $"  ({Path.GetFileName(S(ev, "file"))}:{I(ev, "line")})" : "");
+                    if (S(ev, "level") == "ERROR")
+                    {
+                        // the build errors in the details area, as the failure of the run
+                        if (!(detailBox.Tag is string)) { detailBox.Children.Clear(); detailBox.Tag = "build"; detailBox.Children.Add(Words("Build errors - the tests did not run", 14, true, Red)); }
+                        var e = Words(S(ev, "text") + (S(ev, "file") != null ? $"  ({Path.GetFileName(S(ev, "file"))}:{I(ev, "line")})" : ""));
+                        e.FontFamily = new FontFamily("Consolas");
+                        detailBox.Children.Add(e);
+                    }
                     break;
                 case "suite":
                     var sn = suites.FirstOrDefault(x => x.Path == S(ev, "instance"));
@@ -1130,12 +1418,17 @@ namespace TcAgentBridge
                 {
                     int index = I(ev, "index"), total = Math.Max(I(ev, "total"), expected);
                     var name = S(ev, "test");
-                    if (name != null && Find(S(ev, "instance"), name, true) is TestNode t && t.Status == "notrun")
+                    if (name != null && Find(S(ev, "instance"), name, true) is TestNode t)
                     {
-                        t.Status = "running"; UpdateTest(t); UpdateSuite(suites.First(x => x.Path == t.Instance)); UpdateProject();
+                        runningTest = t;
+                        if (t.Status == "notrun")
+                        {
+                            t.Status = "running"; t.RunningSince = DateTime.Now; t.RunInfo = null;
+                            UpdateTest(t); UpdateSuite(suites.First(x => x.Path == t.Instance)); UpdateProject();
+                        }
                     }
-                    var rem = Get(ev, "remainingSec") is int r ? $" - about {Seconds(r)} left" : Get(ev, "remainingSec") is decimal rd ? $" - about {Seconds((double)rd)} left" : "";
-                    progressText.Text = name != null ? $"Test {index} of {total}: {name}{rem}" : $"{index} of {total} test(s) finished{rem}";
+                    var rem = Get(ev, "remainingSec") is int r ? $" · about {Seconds(r)} left" : Get(ev, "remainingSec") is decimal rd ? $" · about {Seconds((double)rd)} left" : "";
+                    progressText.Text = name != null ? $"Running · {index} of {total} · {name}{rem}" : $"Running · {index} of {total} finished{rem}";
                     break;
                 }
                 case "progress":
@@ -1143,14 +1436,21 @@ namespace TcAgentBridge
                     // the project's own progress block (tcunit.json "progress") - shown as it is
                     var parts = new[] { "current", "total", "test", "remaining" }.Select(k => Get(ev, k)).ToList();
                     if (parts[1] != null)
-                        progressText.Text = $"Test {Convert.ToInt32(parts[0] ?? 0)} of {Convert.ToInt32(parts[1])}: {parts[2]}" + (parts[3] != null ? $" - remaining {parts[3]}" : "");
+                        progressText.Text = $"Running · {Convert.ToInt32(parts[0] ?? 0)} of {Convert.ToInt32(parts[1])} · {parts[2]}" + (parts[3] != null ? $" · remaining {parts[3]}" : "");
+                    // a test over many cycles: "cycle 3/10" from the progress block (Cycle, Cycles)
+                    if (Get(ev, "cycle") != null && runningTest?.Status == "running")
+                    {
+                        runningTest.RunInfo = "cycle " + Convert.ToString(Get(ev, "cycle"), System.Globalization.CultureInfo.InvariantCulture) +
+                                              (Get(ev, "cycles") != null ? "/" + Convert.ToString(Get(ev, "cycles"), System.Globalization.CultureInfo.InvariantCulture) : "");
+                        UpdateTest(runningTest);
+                    }
                     break;
                 }
                 case "result":
                 {
                     var t = Find(S(ev, "instance"), S(ev, "test"), true);
                     if (t == null) break;
-                    t.Status = S(ev, "status"); t.Message = S(ev, "message");
+                    t.Status = S(ev, "status"); t.Message = S(ev, "message"); t.RunInfo = null;
                     t.Duration = Get(ev, "duration") is decimal d ? (double)d : Get(ev, "duration") is int di ? di : (double?)null;
                     lastResults[t.Instance + "@" + t.Name] = (t.Status, t.Message, t.Duration);
                     UpdateTest(t);
@@ -1174,8 +1474,16 @@ namespace TcAgentBridge
                     Rebuild();
                     status.Text = S(ev, "message");
                     progress.Value = progress.Maximum;
-                    progressText.Text = (st == "passed" ? "✔ " : st == "failed" ? "✖ " : "") + S(ev, "message");
+                    // "✖ 2 failed · 16 passed · 24 switched off · 12.5 s · target local runtime"
+                    int pa = I(ev, "passed"), fa = I(ev, "failed"), sk = I(ev, "skipped"), nr = I(ev, "notRun");
+                    var counts = st is "passed" or "failed"
+                        ? string.Join(" · ", new[] { fa > 0 ? $"✖ {fa} failed" : null, $"{(fa > 0 ? "" : "✔ ")}{pa} passed", nr > 0 ? $"{nr} not run" : null, sk > 0 ? $"{sk} switched off" : null }.Where(x => x != null))
+                        : "✖ " + S(ev, "message");
+                    progressText.Text = counts + (runStarted > DateTime.MinValue ? $" · {Seconds((DateTime.Now - runStarted).TotalSeconds)}" : "") + $" · target {TargetText()}";
                     progressText.Foreground = st == "passed" ? Green : st is "failed" or "error" or "timeout" or "refused" or "build" ? Red : null;
+                    progress.Foreground = st == "passed" ? Green : Red;
+                    runningClock.Stop();
+                    RememberRun();
                     if (progressText.Foreground == null) progressText.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
                     if (Selected() != null) ShowDetails();
                     break;

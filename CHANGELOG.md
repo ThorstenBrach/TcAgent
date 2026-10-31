@@ -44,8 +44,25 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **Dialogs in the colors of the IDE** (light, dark, blue), OK only when the input is valid (checked while typing, the
   reason below the field), the restore choice and the backup list with a filter.
 
+- **TcUnit Tests window in the same style** (`vsbridge/TcUnitWindow.cs`):
+  - Tool bar with words: Run all, Run selected (runs the ticked tests), Run failed, Stop, Report and ⋯ (Refresh F5,
+    Expand/Collapse all, Save/Load selection …).
+  - The counters as labelled filter chips All / Passed / Failed / Off, next to the search (Ctrl+F).
+  - Progress line "Running · 4 of 18 · <test> · about … left", afterwards "✖ 2 failed · 16 passed · 24 switched off ·
+    time · target …" in red or green.
+  - Columns Test / Description / Result / Time instead of Duration / Traits / Error Message; the result as symbol and
+    word, for suites in words ("✖ 1 failed · ✔ 3 passed").
+  - Suites switched off for the run as one line "⊘ switched off (n)".
+  - A test over many cycles shows "◐ running · cycle x/y" (from the progress block) or its running time.
+  - Details like the HTML report: Expected / Actual / Message, code link, enable bool, Run again, Copy failure, the last
+    5 runs of the test; build errors of a run appear there too.
+  - The legend of the symbols in the status line; colors for the light and the dark theme.
+  - Check boxes stay the way to choose tests – a click beside them loses nothing.
+
 ### Added
 - CONTRIBUTING.md: **Windows and dialogs** – the rules every window and dialog of the extension follows.
+- TcUnit progress block: the optional outputs `Cycle` and `Cycles` of the running test (shown as "cycle x/y").
+- The TcUnit window keeps the last 5 results of every test per solution (`%LOCALAPPDATA%\TcAgent\tcunit\history.json`).
 
 ## [0.49.0] – 2026-10-31
 

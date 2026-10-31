@@ -378,7 +378,7 @@ public sealed class TcUnitRun
     {
         var o = new JsonObject { ["event"] = "progress", ["path"] = path };
         bool any = false;
-        foreach (var f in new[] { "Total", "Current", "Done", "Test", "Remaining", "Finished", "Percent" })
+        foreach (var f in new[] { "Total", "Current", "Done", "Test", "Remaining", "Finished", "Percent", "Cycle", "Cycles" })
         {
             var v = ads.Any(path + "." + f);
             if (v == null) continue;

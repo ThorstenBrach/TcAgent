@@ -61,36 +61,44 @@ Contents: [Quick start](#1-quick-start) · [How it works](#2-how-it-works) · [U
 
 ## 3. Using the window
 
-The window is laid out like the Test Explorer: a tool bar, below it the progress bar, then the list with the columns
-**Test**, **Duration**, **Traits** and **Error Message** (drag the column borders in the header to change their width)
-and the **Test Detail Summary** at the bottom.
+The window is laid out like the Test Explorer: a tool bar with words, below it the counters as filter chips and the
+search, the progress bar with the state of the run, then the list with the columns **Test**, **Description**,
+**Result** and **Time** (drag the column borders in the header to change their width) and the details of the selected
+line at the bottom. The status line shows the last message on the left and what the symbols mean on the right.
 
 | Tool bar | What it does |
 |---|---|
-| ▶▶ **Run All Tests** | Runs every test of the PLC project. |
-| ▶ **Run** | Runs the ticked suites/tests – or, if nothing is ticked, the selected line. The others are switched off for this run. |
-| ▶✖ **Run Failed Tests** | Runs the tests that failed in the last run. |
-| ■ **Cancel** | Stops the run: reset of the PLC; tests that have not finished stay "not run". |
-| ⟳ **Refresh** | Reads the tests from the code again. |
-| ⊞ **Expand all** / ⊟ **Collapse all** | Opens or closes all suites. |
-| Status filter buttons ⚗ ✔ ✖ ○ ⊘ | Show the number of all / passed / failed / not run / skipped tests. A click shows only those (several can be combined); ⚗ shows all again. |
-| 📄 **Test report** | HTML test report of the last run, opened in the browser ([section 8](#8-test-report)). |
-| 💾 **Save** / 📂 **Load** | Saves the ticked suites and tests as a test selection `*.tcunit.json` (default folder `.tcagent` of the solution, can be versioned with the project) and ticks them again later. The same file works on the command line: `tcunit run --tests @file`. |
-| Search box (right) | Narrows the list to tests whose name, suite or description contains the text. |
+| ▶▶ **Run all** | Runs every test of the PLC project. |
+| ▶ **Run selected** | Runs the ticked suites/tests – or, if nothing is ticked, the selected line. The others are switched off for this run. |
+| ▶✖ **Run failed** | Runs the tests that failed in the last run. |
+| ■ **Stop** | Stops the run: reset of the PLC; tests that have not finished stay "not run". |
+| 📄 **Report** | HTML test report of the last run, opened in the browser ([section 8](#8-test-report)). |
+| **⋯** | **Refresh** (F5 – reads the tests from the code again), **Expand all** / **Collapse all**, **Save selection …** / **Load selection …** – the ticked suites and tests as a test selection `*.tcunit.json` (default folder `.tcagent` of the solution, can be versioned with the project). The same file works on the command line: `tcunit run --tests @file`. |
+| **All / Passed / Failed / Off** | The counters are filters: a click shows only those tests (several can be combined), **All** shows all again. **Off** = switched off for the last run. |
+| Search box (right, Ctrl+F) | Narrows the list to tests whose name, suite or description contains the text. |
 
-- **Ticking:** a ticked suite ticks all its tests; if only some tests of a suite are ticked, the suite box is partly
-  filled and only those tests run. A greyed-out checkbox means the test has no enable bool – it can only run with its
-  whole suite. Space ticks the selected line.
-- **Opening the code:** double-click a test (or Enter, or **Open code**) opens its method in the TwinCAT editor at the
-  `TEST(...)` line. Double-click on a suite opens/closes it.
-- **Status symbols:** ○ not run, ◐ running, ✔ passed, ✖ failed, ⊘ skipped (switched off for this run, or skipped by TcUnit).
-- **Traits:** of a suite its type, `No bRunSuite`, `Whole suite`; of a test `Ordered` (`TEST_ORDERED`), `No bRun_`, `Skipped`.
-- **Details:** description and test case text ([section 5](#5-describing-tests)), status and duration, failure
-  message (`EXP`, `ACT`, `MSG`), file and line, path of the enable bool.
-- **Progress:** "Test 12 of 87: <name> – about 1:20 min left" on the left, "12 of 87 done (14 %)" on the right; before
-  a run "17 of 1670 test(s) selected". Inside one suite TcUnit calls all `TEST()` tests in the same PLC cycles (only
-  `TEST_ORDERED()` tests run one after the other), so the name shown is the test called last; the results per test are
-  exact anyway. With `TcUnit.RUN()` (all suites at the same time) the bar shows only "n of N tests finished".
+- **Ticking:** the tests are chosen with check boxes – a click beside them loses nothing. A ticked suite ticks all
+  its tests; if only some tests of a suite are ticked, the suite box is partly filled and only those tests run. A
+  greyed-out checkbox means the test has no enable bool – it can only run with its whole suite. Space ticks the
+  selected line.
+- **Opening the code:** double-click a test (or Enter, or **Open code** in the details) opens its method in the TwinCAT
+  editor at the `TEST(...)` line. Double-click on a suite opens/closes it.
+- **Result** as symbol and word: ○ not run, ◐ running, ✔ passed, ✖ failed, ⊘ switched off (for this run, or skipped by
+  TcUnit). A suite shows its tests in words, e.g. "✖ 1 failed · ✔ 3 passed". A test that runs over many cycles shows
+  "◐ running · cycle 37/100" when the progress block of the project reports the cycles (see
+  [section 7](#7-configuration)), otherwise the time it has been running.
+- **Switched off:** after a run the suites whose tests were all switched off are one line **⊘ switched off (n)** – open
+  it to see them. The filter **Off** and a search show them where they are.
+- **Progress:** while running "Running · 12 of 87 · <test> · about 1:20 min left"; after the run its result, e.g.
+  "✖ 2 failed · 16 passed · 24 switched off · 12.5 s · target local runtime" (red or green). On the right the number
+  of ticked tests. Inside one suite TcUnit calls all `TEST()` tests in the same PLC cycles (only `TEST_ORDERED()`
+  tests run one after the other), so the name shown is the test called last; the results per test are exact anyway.
+  With `TcUnit.RUN()` (all suites at the same time) the bar shows only "n of N finished".
+- **Details** (like the HTML report): name, result and time; description and test case text
+  ([section 5](#5-describing-tests)); the failure as **Expected**, **Actual** and **Message**; suite, code (a link),
+  the **Enable bool**; **Open code · Run again · Copy failure**; the **last 5 runs** of the test (kept per solution in
+  `%LOCALAPPDATA%\TcAgent\tcunit\history.json`). Build errors of a run appear here as well.
+- Light and dark theme of the IDE; F5 and Ctrl+F work while the window is active.
 
 ## 4. Selectable tests: the enable bools
 
@@ -296,8 +304,9 @@ Optional, in `<solution folder>\.tcagent\tcunit.json` (versioned in Git with the
 | `report` | TcAgent's own report | a command line of your own that makes the HTML report instead, run in the solution folder; `{junit}` = results of the last run (JUnit XML), `{html}` = file to write, also `{solution}`, `{solutionDir}` |
 
 **Progress block (optional):** if the test project has a block like `TestProgressFB` (`GVL_Progress.Progress` with the
-outputs `Total`, `Current`, `Done`, `Test`, `Remaining`, `Finished`), TcAgent reads it while the run goes and the
-progress bar shows its values. Without it TcAgent takes the running test from TcUnit itself.
+outputs `Total`, `Current`, `Done`, `Test`, `Remaining`, `Finished`, optionally `Cycle` and `Cycles` of the running
+test), TcAgent reads it while the run goes and the progress bar shows its values; with `Cycle`/`Cycles` the running test
+shows "◐ running · cycle 37/100". Without it TcAgent takes the running test from TcUnit itself.
 
 ## 8. Test report
 
