@@ -35,6 +35,7 @@ public static class Confirm
         if (tool == "tc_refactor") return false;     // asks per change itself (Apply / Apply all / Reject / Cancel)
         if (tool == "tc_improve") return false;      // asks itself, with the diff of the change
         if (tool == "tc_sources" && args?["action"]?.ToString() is "install" or "pull" or "promote") return false;   // asks itself: files, scripts, license
+        if (Plugins.Undeclared(tool) && Configured != Level.Off) return true;   // a plugin tool that did not say what it does
         return Configured switch
         {
             Level.Off => false,

@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+### Added
+- **Modules** (`src/Modules.cs`, [docs/PLUGINS.md](docs/PLUGINS.md)): the tools in 13 modules (core, plc-code, test,
+  runtime, io, motion, hmi, scope, safety, docs, knowledge, packages, system) that can be switched on and off in a
+  `modules.json` on the company, team, user and project level – company and team can lock a module, `core` stays on, a
+  module needing a switched-off one is off too. A switched-off module is not in the tool list of the AI client and its
+  tools are refused with the module's name; the command line keeps every tool. `TcAgent.exe modules [enable|disable]`.
+  The server tells the client when the tool list changes with the solution (`tools.listChanged`).
+- **Plugins** (`src/Plugins.cs`): own tools as programs in any language speaking MCP over stdin/stdout, in
+  `<level>\plugins\<id>\plugin.json`, offered as `x_<id>_<tool>`. Every call goes through the policy, the confirmation
+  and the audit log with the class the plugin declares (undeclared = changing, confirmed every time); a plugin uses
+  TwinCAT through `tcagent/call`, i.e. through the built-in tools with all their checks. Plugins of the team and project
+  levels run only after `TcAgent.exe plugins approve` for exactly their content (SHA-256); the company level can allow
+  all, none or listed plugins. Example plugin `docs/plugins/todo-finder` (PowerShell).
+
+### Fixed
+- The MCP server ignores a byte order mark at the start of the input (clients on .NET Framework write one).
+
 ## [0.50.0] – 2026-11-01
 
 0.49.0 was not published as a release of its own; its changes are part of this one.

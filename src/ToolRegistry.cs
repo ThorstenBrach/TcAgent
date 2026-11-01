@@ -19,6 +19,13 @@ public sealed partial class ToolRegistry
     readonly TwinCatSession tc;
     readonly Policy policy = new();
 
+    /// <summary>The MCP server (Program.cs): switched-off modules are left out and refused, plugins are started (Modules.cs,
+    /// Plugins.cs). The command line uses every tool.</summary>
+    public bool UseModules;
+    Plugins.Manager plugins;
+    List<Modules.State> moduleStates;
+    string moduleDir = "\0";       // the solution folder the module states are for (project level)
+
     // TwinCAT subtypes for CreateChild (PLC)
     static readonly Dictionary<string, int> PlcKinds = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -1568,10 +1575,45 @@ public sealed partial class ToolRegistry
         _ => null
     };
 
-    public JsonArray List() => new(tools.Select(t => (JsonNode)new JsonObject
+    public JsonArray List()
     {
-        ["name"] = t.Name, ["description"] = t.Description, ["inputSchema"] = t.Schema.DeepClone()
-    }).ToArray());
+        var shown = tools.AsEnumerable();
+        if (UseModules)
+        {
+            var states = ModuleStates();
+            var off = Modules.Off(states);
+            shown = shown.Where(t => !off.Contains(Modules.Of(t.Name) ?? "")).Concat(pluginTools);
+        }
+        return new(shown.Select(t => (JsonNode)new JsonObject
+        {
+            ["name"] = t.Name, ["description"] = t.Description, ["inputSchema"] = t.Schema.DeepClone()
+        }).ToArray());
+    }
+
+    List<Tool> pluginTools = new();
+
+    /// <summary>The module states for the current solution (project level) - plugins started or stopped when they change.</summary>
+    List<Modules.State> ModuleStates()
+    {
+        var dir = lastSolutionDir;
+        lock (tools)
+        {
+            if (moduleStates != null && dir == moduleDir) return moduleStates;
+            List<Plugins.Plugin> found = new();
+            if (Environment.GetEnvironmentVariable("TCAGENT_PLUGINS") != "0")
+                try { found = Plugins.Found(dir); } catch (Exception ex) { Log.Error("Plugins: " + ex.Message); }
+            var states = Modules.Effective(dir, found.Where(p => p.Ready).Select(p => (p.Id, p.Name, p.Description, p.Tools.Count)));
+            foreach (var p in found.Where(p => !p.Ready)) Log.Info($"Plugin {p.Id} ({p.Level}): {p.Status} - {p.Reason}");
+            plugins ??= new Plugins.Manager((n, a) => Call(n, a));
+            var hosts = plugins.Sync(dir, found, Modules.Off(states));
+            pluginTools = hosts.SelectMany(h => h.Tools.Select(t => new Tool(t.Name, t.Description, t.Schema, a => h.Call(t.Name, a)))).ToList();
+            // a plugin that did not start: its tools are not there - say it in the module list
+            foreach (var p in found.Where(p => p.Ready && !hosts.Any(h => h.Plugin.Hash == p.Hash)))
+                if (states.FirstOrDefault(s => s.Id == "plugin:" + p.Id) is { On: true } s) { s.On = false; s.Reason = "did not start - see the log"; }
+            moduleStates = states; moduleDir = dir;
+            return states;
+        }
+    }
 
     bool rulesSeen;
 
@@ -1590,7 +1632,35 @@ public sealed partial class ToolRegistry
 
     public JsonObject Call(string name, JsonObject args)
     {
-        var t = tools.FirstOrDefault(x => x.Name == name) ?? throw new Exception("Unknown tool: " + name);
+        if (UseModules && Modules.Refusal(name, ModuleStates()) is { } switchedOff)
+            return new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = switchedOff }), ["isError"] = true };
+        var t = tools.FirstOrDefault(x => x.Name == name) ?? (UseModules ? pluginTools.FirstOrDefault(x => x.Name == name) : null)
+                ?? throw new Exception("Unknown tool: " + name);
+        try { return CallTool(t, name, args); }
+        finally
+        {
+            if (UseModules && name is "tc_attach" or "tc_open" or "tc_new_solution") SolutionDir(5000);   // the project level of the new solution
+            // another solution (project level): its modules.json and plugins may change the tool list - tell the client
+            if (UseModules && moduleStates != null && lastSolutionDir != moduleDir)
+            {
+                var before = string.Join(",", List().Select(x => x?["name"]?.ToString()));   // recomputes for the new solution
+                if (before != listedNames) Mcp.Send(new JsonObject { ["jsonrpc"] = "2.0", ["method"] = "notifications/tools/list_changed" });
+            }
+        }
+    }
+
+    string listedNames;
+
+    /// <summary>tools/list of the MCP server: remembers what the client got (for notifications/tools/list_changed).</summary>
+    public JsonArray ListForClient()
+    {
+        var l = List();
+        listedNames = string.Join(",", l.Select(x => x?["name"]?.ToString()));
+        return l;
+    }
+
+    JsonObject CallTool(Tool t, string name, JsonObject args)
+    {
         // Safety net: if there are coding guidelines and the agent has not read them yet, the first writing
         // code call is not executed; the guidelines are returned instead (once per session).
         if (!rulesSeen && (name is "tc_plc_write" or "tc_plc_create" or "tc_test_skeleton" || name == "tc_refactor" && string.Equals(Str(args, "action"), "apply", StringComparison.OrdinalIgnoreCase)

@@ -92,7 +92,8 @@ public sealed class Policy
         string.IsNullOrWhiteSpace(netId) || netId.Trim().Equals("local", StringComparison.OrdinalIgnoreCase) || netId.Trim() == "127.0.0.1.1.1" ||
         (localNetId != null && netId.Trim().Equals(localNetId, StringComparison.OrdinalIgnoreCase));
 
-    public static ToolClass ClassOf(string tool) => Classes.TryGetValue(tool, out var c) ? c : ToolClass.Read;
+    public static ToolClass ClassOf(string tool) =>
+        Classes.TryGetValue(tool, out var c) ? c : Plugins.IsPluginTool(tool) ? Plugins.ClassOf(tool) : ToolClass.Read;   // a plugin tool: its declared class (Plugins.cs)
 
     // read-only actions of otherwise changing tools (tc_task list, tc_realtime show, tc_coe list, tc_scope list ...)
     static readonly HashSet<string> ReadActions = new(StringComparer.OrdinalIgnoreCase) { "list", "show", "info", "read", "runtimes", "controls", "xml", "outline", "memory", "pending", "risks", "analyze", "data", "templates", "template", "result", "search", "platforms", "effective", "why", "runs", "history", "status", "diff" };

@@ -29,6 +29,8 @@
     <Compile Include="..\..\src\LineDiff.cs" Link="src\LineDiff.cs" />
     <Compile Include="..\..\src\TestSkeleton.cs" Link="src\TestSkeleton.cs" />
     <Compile Include="..\..\src\KnowledgeOps.cs" Link="src\KnowledgeOps.cs" />
+    <Compile Include="..\..\src\Modules.cs" Link="src\Modules.cs" />
+    <Compile Include="..\..\src\Plugins.cs" Link="src\Plugins.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

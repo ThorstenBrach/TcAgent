@@ -22,7 +22,9 @@ descriptions need improvement.
 * **One language:** C#. `src/` is .NET 8, `vsbridge/` is .NET Framework 4.8 (Visual Studio extension; the same sources
   are compiled for the XAE Shell by `vsbridge/install-xaeshell.ps1` - stay compatible with the VS 2017 shell API).
 * **New tool:** register it in `src/ToolRegistry.cs` or one of its partial files (`Add(...)`); classify write tools in
-  `src/Policy.cs` as `ProjectWrite` or `RuntimeWrite` so guardrails and audit apply.
+  `src/Policy.cs` as `ProjectWrite` or `RuntimeWrite` so guardrails and audit apply, and add it to its module in
+  `src/Modules.cs` (a test checks that every tool has one). Tools that need no change of TcAgent itself can be a plugin
+  instead ([docs/PLUGINS.md](docs/PLUGINS.md)).
 * **Descriptions are part of the interface:** agents read them. Short, precise, with an example path.
 * **Keep docs in sync:** `agents/TCAGENT_GUIDE.md` and `SKILL.md` (same content), `docs/TOOLS.md`, and add a line to
   `CHANGELOG.md` under "Unreleased".

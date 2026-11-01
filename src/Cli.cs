@@ -31,7 +31,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -59,6 +59,9 @@ public static partial class Cli
     {
         // works on the feedback files only - no solution, no IDE
         if (args[0].Equals("feedback", StringComparison.OrdinalIgnoreCase)) return Feedback.RunCli(args);
+        // modules.json and the plugin folders only (Modules.cs, Plugins.cs)
+        if (args[0].Equals("modules", StringComparison.OrdinalIgnoreCase)) return Modules.RunCli(args);
+        if (args[0].Equals("plugins", StringComparison.OrdinalIgnoreCase)) return Plugins.RunCli(args);
         // the elevated part of tc_packages_change (Packages.cs), started by TcAgent itself through the UAC prompt
         if (args[0].Equals("tcpkg-elevated", StringComparison.Ordinal)) return ToolRegistry.RunElevatedTcpkg(args);
         Options o;
@@ -938,6 +941,17 @@ public static partial class Cli
       event per line (plan, step, suite, running, result, progress, done). Settings: .tcagent\tcunit.json (plcProject,
       target, timeout, progress). --download activates even if the code did not change. A remote target must be in
       TCAGENT_ALLOW_TARGETS. Exit 0 = passed, 1 = failed tests/build, 2 = refused/unknown tests, 3 = infrastructure/timeout.
+
+  TcAgent.exe modules [list] [--solution <sln>] [--json]
+  TcAgent.exe modules enable|disable <module> [--level user|project] [--solution <sln>]
+      The tool groups the AI client sees (core, plc-code, test, runtime, io, motion, hmi, scope, safety, docs, knowledge,
+      packages, system, plugin:<id>). modules.json on the levels company, team, user, project - the later level wins
+      unless company or team locked the module; core cannot be switched off. The command line keeps every tool.
+
+  TcAgent.exe plugins [list] [--solution <sln>]
+  TcAgent.exe plugins approve|revoke <id> [--solution <sln>]
+      Own tools as MCP programs in <level>\plugins\<id>\plugin.json (docs\PLUGINS.md). Plugins of the project and team
+      levels run only after approve (for exactly this content); the company level may allow none or listed ones only.
 
   TcAgent.exe tcunit watch --solution <sln> [--plc <name>] [--target <netid|local>]
       Follows TcUnit runs started elsewhere (IDE, another client, a pipeline) and writes the same JSON events as tcunit

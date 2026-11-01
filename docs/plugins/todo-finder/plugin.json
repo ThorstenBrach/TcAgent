@@ -1,0 +1,10 @@
+{
+  "id": "todo-finder",
+  "name": "TODO finder",
+  "description": "Example plugin: lists the TODO and FIXME comments of the PLC code through TcAgent's tc_plc_search.",
+  "version": "1.0.0",
+  "command": "powershell.exe",
+  "args": ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-File", "server.ps1"],
+  "tools": { "find_todos": "read" },
+  "timeoutSec": 300
+}

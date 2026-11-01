@@ -406,6 +406,14 @@ treat them like project rules for that library.
   It works in every AI client (a card in the TcAgent Chat, otherwise the client's question dialog). Never ask what the project
   or the tools can tell you.
 
+## Modules and plugins
+
+- The user may have switched off groups of tools (modules, `docs/PLUGINS.md`). If a tool you need is missing or refused
+  with "part of the module ... switched off", tell the user which module and that `TcAgent.exe modules enable <module>`
+  switches it on - never work around it with other tools.
+- Tools named `x_<plugin>_<tool>` come from plugins installed by the user or the company. Use them like built-in tools;
+  their description says what they do.
+
 ## Changing the TcAgent windows (contributors)
 
 When you change or add a window or dialog of the TcAgent extension (`vsbridge/`), follow

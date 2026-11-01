@@ -38,11 +38,12 @@ public static class Program
             });
 
         var sta = new StaWorker();
-        var tools = new ToolRegistry(new TwinCatSession(sta));
+        var tools = new ToolRegistry(new TwinCatSession(sta)) { UseModules = true };   // modules.json and plugins (Modules.cs, Plugins.cs)
 
         string line;
         while ((line = Mcp.Next()) != null)
         {
+            line = line.TrimStart((char)0xFEFF);          // a client that writes a byte order mark first (e.g. .NET Framework stdin)
             if (string.IsNullOrWhiteSpace(line)) continue;
             JsonObject req;
             try { req = JsonNode.Parse(line)!.AsObject(); }
@@ -65,7 +66,7 @@ public static class Program
                         result = new JsonObject
                         {
                             ["protocolVersion"] = prm["protocolVersion"]?.GetValue<string>() ?? "2025-06-18",
-                            ["capabilities"] = new JsonObject { ["tools"] = new JsonObject() },
+                            ["capabilities"] = new JsonObject { ["tools"] = new JsonObject { ["listChanged"] = true } },
                             ["serverInfo"] = new JsonObject { ["name"] = "tcagent", ["version"] = ServerVersion },
                             ["instructions"] = "Controls TwinCAT 3 via the Automation Interface. Call tc_attach (running instance) or tc_open first. " +
                                                "Tree paths are TwinCAT paths with ^ as separator, e.g. 'TIPC^MyPlc^MyPlc Project^POUs^MAIN'. " +
@@ -77,7 +78,7 @@ public static class Program
                         result = new JsonObject();
                         break;
                     case "tools/list":
-                        result = new JsonObject { ["tools"] = tools.List() };
+                        result = new JsonObject { ["tools"] = tools.ListForClient() };
                         break;
                     case "tools/call":
                         result = tools.Call(prm["name"]!.GetValue<string>(), prm["arguments"] as JsonObject ?? new JsonObject());
