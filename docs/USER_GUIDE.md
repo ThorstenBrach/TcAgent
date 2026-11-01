@@ -217,7 +217,7 @@ First **what the agent gets in this project** – one entry per kind (coding rul
 documentation sources …); a click shows them in the Files tab. Then **Needs attention** (items from a source changed
 or newer, Git changes, documentation not reachable, open blocker/major feedback), each with a link to its tab. Below
 the tiles for runs, first-time-right, failed checks, corrections and minutes per run and gate stops – the last 10
-workflow runs against the 10 before, with a sparkline; with fewer than 5 runs the rates show "—" (from 5 runs), trends
+workflow runs against the 10 before, with a sparkline; with fewer than 5 runs the rates show "—" (needs 5 runs), trends
 need 20 runs. Then the workflows, open improvement proposals and the most frequent compiler errors. Double-click a
 workflow for its runs over time.
 

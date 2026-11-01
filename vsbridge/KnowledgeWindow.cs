@@ -514,7 +514,7 @@ namespace TcAgentBridge
             Columns(workflows, ("Workflow", 200, nameof(Line.C1)), ("Runs", 60, nameof(Line.C2)), ("First-time-right", 110, nameof(Line.C3)),
                     ("Failed checks / run", 220, "!" + nameof(Line.C4)), ("Corrections / run", 130, nameof(Line.C5)), ("Proposals", 80, nameof(Line.C6)));
             Columns(entries, ("Name", 200, nameof(Line.C1)), ("Kind", 100, nameof(Line.C2)), ("Level", 120, nameof(Line.C3)),
-                    ("State", 190, "!" + nameof(Line.C4)), ("Source / license", 210, nameof(Line.C6)), ("Git", 60, nameof(Line.C7)), ("Why", 260, nameof(Line.C5)));
+                    ("State", 190, "!" + nameof(Line.C4)), ("Source / license", 320, nameof(Line.C6)), ("Git", 60, nameof(Line.C7)), ("Why", 260, nameof(Line.C5)));
             Columns(sourceList, ("Source", 180, nameof(Line.C1)), ("Level", 80, nameof(Line.C2)), ("Repository", 420, nameof(Line.C3)), ("Branch / tag", 100, nameof(Line.C4)));
             Columns(installedList, ("Item", 230, nameof(Line.C1)), ("Level", 80, nameof(Line.C2)), ("State", 190, "!" + nameof(Line.C3)),
                     ("Source @ version", 200, nameof(Line.C4)), ("License", 100, nameof(Line.C5)), ("Installed", 100, nameof(Line.C6)));
@@ -1071,7 +1071,7 @@ namespace TcAgentBridge
             Heading(runsHeading, "Workflow runs", runs == 0 ? "none yet - start a workflow in the chat (e.g. new-feature)"
                                                    : $"{runs} run{(runs == 1 ? "" : "s")} so far" + (runs < 20 ? "; trends appear from 20 runs" : "; the last 10 against the 10 before"));
             string Rate(string v) => few ? "—" : v;
-            var fewNote = $"from {MinRuns} runs";
+            var fewNote = $"needs {MinRuns} runs";
             tiles.Children.Add(Tile("Runs", runs.ToString(CultureInfo.InvariantCulture), null, null, false, null, "all recorded runs of the project (the last 100 are kept)",
                                     Arr(data["workflows"]).Count() == 1 ? S(Arr(data["workflows"]).First(), "name") : null));
             tiles.Children.Add(Tile("First-time-right", Rate(Pct(N(o, "firstTimeRight"))), N(o, "firstTimeRight"), N(o, "firstTimeRightPrev"), true,
@@ -1151,7 +1151,7 @@ namespace TcAgentBridge
             return ((d > 0 ? "▲ " : "▼ ") + Math.Abs(d).ToString("0.0", CultureInfo.InvariantCulture) + " vs. previous 10", better ? Green : Orange);   // red is for errors only
         }
 
-        // a KPI tile; note replaces the change line (e.g. "from 5 runs" while there are fewer)
+        // a KPI tile; note replaces the change line (e.g. "needs 5 runs" while there are fewer)
         Border Tile(string title, string value, double? now, double? prev, bool higherIsBetter, List<double> spark, string tip, string note)
         {
             var sp = new StackPanel { Margin = new Thickness(10, 8, 10, 8), MinWidth = 140 };
@@ -1203,6 +1203,12 @@ namespace TcAgentBridge
                 lines.Add(l);
             }
             entries.ItemsSource = lines;
+            // Git and Why only while a line has something in them - otherwise the room goes to the other columns
+            if (entries.View is GridView gv && gv.Columns.Count >= 7)
+            {
+                gv.Columns[5].Width = lines.Any(x => x.C7.Length > 0) ? 60 : 0;
+                gv.Columns[6].Width = lines.Any(x => x.C5.Length > 0) ? 260 : 0;
+            }
             entries.SelectedItem = lines.FirstOrDefault(x => keep != null && S(x.D, "path") == keep);
             ShowEntry();
             Summary();
@@ -1256,7 +1262,7 @@ namespace TcAgentBridge
             if (S(d, "git") is string gs) Row("Git", gs + " - not committed yet");
             if (S(d, "source") is string so)
             {
-                Row("Source", $"{so} · license {S(d, "license") ?? "unknown"}" + (S(d, "sourceState") is string ss ? " · " + (SourceState(ss).Text ?? ss) : ""));
+                Row("Source", $"{so} · license {S(d, "license") ?? "unknown"}" + (S(d, "sourceState") is string ss ? " · " + (SourceState(ss).Text ?? (ss == "ok" ? "✓ as installed" : ss)) : ""));
                 (string, string) It() => (S(d, "name"), S(d, "installLevel") ?? (S(d, "label") ?? "").Split(' ')[0]);
                 var ssv = S(d, "sourceState") ?? "";
                 if (ssv.Contains("changed locally"))

@@ -16,12 +16,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
     than two runs).
   - Overview starts with **what the agent gets in this project** (each entry opens the Files tab with that kind) and
     **Needs attention** (items from a source changed or newer, Git changes, documentation not reachable, open
-    blocker/major feedback) with links to the tab; rates show "—" until there are 5 runs.
+    blocker/major feedback) with links to the tab; rates show "—" and "needs 5 runs" until there are 5 runs.
   - States as symbol and word instead of a colored dot: ✓ applies, ↷ replaced, ⊘ switched off, ✎ changed locally,
     ↑ newer in the source, ⇅ both changed, ✗ missing, ⚠ not reachable, ○ empty.
   - Files: one toolbar row with **Switch off ▾** (for this project / for me) and **Source ▾**, filters in their own row
     (search with hint and ✕, Ctrl+F), kinds as words, a detail header with the fitting actions as links and the file
-    folded.
+    folded; the columns Git and Why only while a line has something in them (Source / license gets the room).
   - Sources: **Browse and install …** first and highlighted, rare actions under **More ▾**, Check for updates and Update
     all next to the heading, **Copy URL**, the output folded while it is empty, empty states.
   - **Browse and install** dialog: search, kind filter, "Only not installed", state column (installed where, not

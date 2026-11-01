@@ -74,7 +74,8 @@ Buttons can be reached with Tab.
   ⟳ / ◐ running, starting · ○ not run, empty, not installed · ⚠ not reachable, needs attention.
 - **Red only for errors** (failed, not reachable, missing). Changes, warnings and "worse than before" are orange;
   neutral states grey; running blue; good green.
-- Numbers with too little data show **"—"** and a note ("from 5 runs") instead of 0 % or a misleading trend.
+- Numbers with too little data show **"—"** and a note ("needs 5 runs") instead of 0 % or a misleading trend.
+- Columns that are empty for every line are hidden (width 0) and give their room to the others.
 - **Only colors of the VS theme** (`EnvironmentColors`, `ThemedDialogColors`) or translucent tints that work on light
   and dark; test both themes.
 
