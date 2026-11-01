@@ -588,6 +588,20 @@ namespace TcAgentBridge
             return false;
         }
 
+        /// <summary>User folders as variables: %LOCALAPPDATA%, %APPDATA%, %USERPROFILE% - shorter, and no user name on the screen
+        /// (the full path stays in the tooltip and in Copy path).</summary>
+        internal static string UserPath(string s)
+        {
+            if (string.IsNullOrEmpty(s)) return s;
+            foreach (var (folder, name) in new[] { (Environment.SpecialFolder.LocalApplicationData, "%LOCALAPPDATA%"), (Environment.SpecialFolder.ApplicationData, "%APPDATA%"),
+                                                   (Environment.SpecialFolder.UserProfile, "%USERPROFILE%") })
+            {
+                var p = Environment.GetFolderPath(folder);
+                if (!string.IsNullOrEmpty(p) && s.StartsWith(p, StringComparison.OrdinalIgnoreCase)) return name + s.Substring(p.Length);
+            }
+            return s;
+        }
+
         /// <summary>A long path shortened in the middle: "D:\Projekte\…\POUs\MAIN.TcPOU" (the full one stays in Copy path).</summary>
         internal static string MiddlePath(string path, int max = 70)
         {
@@ -911,10 +925,11 @@ namespace TcAgentBridge
             backupList.SelectionChanged += (s, e) =>
             {
                 if (backupList.SelectedItem is Line l)
-                    backupDetail.Text = $"{S(l.D, "zip")}\n\nContents ({S(l.D, "files")}):\n" + string.Join("\n", ((l.D["paths"] as IEnumerable) ?? new object[0]).Cast<object>());
+                    backupDetail.Text = $"{UserPath(S(l.D, "zip"))}\n\nContents ({S(l.D, "files")}):\n" + string.Join("\n", ((l.D["paths"] as IEnumerable) ?? new object[0]).Cast<object>());
             };
             backupList.MouseDoubleClick += (s, e) => DiffBackup(null);
             backupDetail.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            backupDetail.Text = "Select a backup - its file and contents appear here; double-click (or Enter) compares it with the current state.";
             var list = WithEmpty(backupList, "No backup yet - they are made automatically before every change, or now with \"" + BackupLabel + "\".");
             LoadBackups();
             return backupsPage = Rows((hb, AutoH, 0), (bt, AutoH, 0), (list, Star(2), 90), (Splitter(), AutoH, 0), (backupDetail, Star(1), 50));
@@ -1235,7 +1250,7 @@ namespace TcAgentBridge
             detailTitle.Inlines.Add(new System.Windows.Documents.Run(S(d, "name")));
             detailTitle.Inlines.Add(new System.Windows.Documents.Run("   " + state) { FontSize = 12, FontWeight = FontWeights.Normal, Foreground = mark });
             var path = S(d, "path");
-            Row("Level", $"{S(d, "label")} · {KindName(S(d, "kind"))} · {MiddlePath(path)} ", ("Open folder", OpenFolder), ("Copy path", () => CopyPath(path)));
+            Row("Level", $"{S(d, "label")} · {KindName(S(d, "kind"))} · {MiddlePath(UserPath(path))} ", ("Open folder", OpenFolder), ("Copy path", () => CopyPath(path)));
             if (S(d, "description") is string de) Row("Description", de);
             if (S(d, "reason") is string r && r.Length > 0) Row("Why", r);
             if (S(d, "git") is string gs) Row("Git", gs + " - not committed yet");
@@ -2251,8 +2266,8 @@ namespace TcAgentBridge
             string J(Dictionary<string, object> p, string k) => string.Join(", ", Strings(p, k));
             platformList.ItemsSource = Arr(data["platforms"]).Select(p => new Line
             {
-                D = p, C1 = S(p, "name"), C2 = B(p, "active") ? "✓ applies" : "–", C3 = J(p, "libraries"), C4 = J(p, "terms"), C5 = S(p, "file") ?? J(p, "roots"),
-                Mark = B(p, "active") ? Green : Gray, Tip = S(p, "description")
+                D = p, C1 = S(p, "name"), C2 = B(p, "active") ? "✓ applies" : "–", C3 = J(p, "libraries"), C4 = J(p, "terms"), C5 = MiddlePath(UserPath(S(p, "file") ?? J(p, "roots")), 60),
+                Mark = B(p, "active") ? Green : Gray, Tip = S(p, "description") + "\n" + (S(p, "file") ?? J(p, "roots"))
             }).ToList();
         }
 
@@ -2323,8 +2338,8 @@ namespace TcAgentBridge
         FrameworkElement DocsPage()
         {
             if (docsPage != null) { LoadDocs(); return docsPage; }
-            Columns(docsList, ("Source", 380, nameof(Line.C1)), ("Type", 120, nameof(Line.C2)), ("Level", 120, nameof(Line.C3)),
-                    ("State", 220, "!" + nameof(Line.C4)), ("Comment", 200, nameof(Line.C5)), ("Defined in", 320, nameof(Line.C6)));
+            Columns(docsList, ("Source", 300, nameof(Line.C1)), ("Type", 110, nameof(Line.C2)), ("Level", 80, nameof(Line.C3)),
+                    ("State", 200, "!" + nameof(Line.C4)), ("Comment", 170, nameof(Line.C5)), ("Defined in", 300, nameof(Line.C6)));
             Columns(docsHits, ("Hit", 300, nameof(Line.C1)), ("Where", 420, nameof(Line.C2)), ("Text", 600, nameof(Line.C3)));
             bool DSel() => docsList.SelectedItem is Line;
             Dictionary<string, object> Doc() => (docsList.SelectedItem as Line)?.D;
@@ -2385,8 +2400,8 @@ namespace TcAgentBridge
                     var (state, mark) = DocState(d);
                     return new Line
                     {
-                        D = d, C1 = S(d, "value"), C2 = types.TryGetValue(S(d, "type") ?? "", out var t) ? t : S(d, "type"), C3 = S(d, "level"), C4 = state,
-                        C5 = S(d, "note"), C6 = S(d, "origin"), Mark = mark, Tip = S(d, "raw") != S(d, "value") ? S(d, "raw") + " → " + S(d, "value") : S(d, "value")
+                        D = d, C1 = UserPath(S(d, "value")), C2 = types.TryGetValue(S(d, "type") ?? "", out var t) ? t : S(d, "type"), C3 = S(d, "level"), C4 = state,
+                        C5 = S(d, "note"), C6 = MiddlePath(UserPath(S(d, "origin")), 60), Mark = mark, Tip = S(d, "raw") != S(d, "value") ? S(d, "raw") + " → " + S(d, "value") : S(d, "value")
                     };
                 }).ToList();
                 docsSources = list.Count;
