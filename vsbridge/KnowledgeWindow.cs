@@ -11,6 +11,7 @@
 //   Sources        the Git sources (browse and install - license, files and scripts shown first -, add, edit, remove) and the
 //                  items installed from them (pinned commit, license, changed locally, newer upstream; update, merge, diff)
 //   Platforms      the known platforms with their detection, which apply to the project; new, edit platform.md, set / detect
+//   Modules        the groups of tools the agent sees (on/off for me or this project) and the plugins (approve) - KnowledgeModules.cs
 //   Documentation  what tc_docs looks things up in; add links, folders and documents; search like the agent
 //   Feedback       the tc_feedback reports; the selected ones as an anonymized, editable issue text - copy, save, share with
 //                  the TcAgent developers (a new issue in the browser, sent by the user), set the status
@@ -66,7 +67,7 @@ namespace TcAgentBridge
         }
     }
 
-    public sealed class KnowledgeControl : UserControl
+    public sealed partial class KnowledgeControl : UserControl
     {
         // ------------------------------------------------------------------ data (TcAgent.exe knowledge json)
         Dictionary<string, object> data;
@@ -85,6 +86,7 @@ namespace TcAgentBridge
             public string C4 { get; set; } public string C5 { get; set; } public string C6 { get; set; } public string C7 { get; set; }
             public Brush Mark { get; set; }
             public bool On { get; set; }   // ticked in a list with check boxes
+            public bool Can { get; set; } = true;   // the check box can be changed (grey otherwise - the tooltip of the line says why)
             public string Tip { get; set; }
         }
 
@@ -95,8 +97,8 @@ namespace TcAgentBridge
                               InfoBack = TcUnitControl.Frozen(Color.FromArgb(0x30, 0xE8, 0xB0, 0x1A)), InfoBorder = TcUnitControl.Frozen(Color.FromArgb(0x80, 0xE8, 0xB0, 0x1A));
 
         readonly ToggleButton tOverview = Tab("Overview"), tEffective = Tab("Files"), tSources = Tab("Sources"), tPlatforms = Tab("Platforms"), tDocs = Tab("Documentation"),
-                              tFeedback = Tab("Feedback"), tBackups = Tab("Backups"), tHistory = Tab("Workflow runs");
-        ToggleButton[] AllTabs => new[] { tOverview, tEffective, tSources, tPlatforms, tDocs, tFeedback, tBackups, tHistory };
+                              tFeedback = Tab("Feedback"), tBackups = Tab("Backups"), tHistory = Tab("Workflow runs"), tModules = Tab("Modules");
+        ToggleButton[] AllTabs => new[] { tOverview, tEffective, tSources, tPlatforms, tModules, tDocs, tFeedback, tBackups, tHistory };
         readonly ContentControl page = new ContentControl();
         readonly TextBlock status = new TextBlock { Margin = new Thickness(6, 2, 6, 4), Opacity = 0.8, TextTrimming = TextTrimming.CharacterEllipsis };
         readonly TextBlock summary = new TextBlock { Margin = new Thickness(12, 2, 6, 4), Opacity = 0.8 };
@@ -258,6 +260,7 @@ namespace TcAgentBridge
                     var box = new FrameworkElementFactory(typeof(CheckBox));
                     box.SetBinding(ToggleButton.IsCheckedProperty, new Binding(col.Prop.Substring(1)) { Mode = BindingMode.TwoWay, UpdateSourceTrigger = UpdateSourceTrigger.PropertyChanged });
                     box.SetValue(FocusableProperty, false);
+                    box.SetBinding(IsEnabledProperty, new Binding(nameof(Line.Can)));
                     c.CellTemplate = new DataTemplate { VisualTree = box };
                 }
                 else if (col.Prop.StartsWith("!"))
@@ -618,6 +621,7 @@ namespace TcAgentBridge
             Load();
             LoadDocs();
             if (backupsPage != null) LoadBackups();
+            if (modulesPage != null) LoadModules();
         }
 
         void Show(ToggleButton tab)
@@ -627,7 +631,7 @@ namespace TcAgentBridge
             try
             {
                 page.Content = tab == tOverview ? OverviewPage() : tab == tEffective ? EffectivePage() : tab == tSources ? SourcesPage()
-                             : tab == tPlatforms ? PlatformsPage() : tab == tDocs ? DocsPage() : tab == tFeedback ? FeedbackPage() : tab == tBackups ? BackupsPage() : (object)HistoryPage();
+                             : tab == tPlatforms ? PlatformsPage() : tab == tModules ? ModulesPage() : tab == tDocs ? DocsPage() : tab == tFeedback ? FeedbackPage() : tab == tBackups ? BackupsPage() : (object)HistoryPage();
             }
             catch (Exception ex)
             {
@@ -656,6 +660,7 @@ namespace TcAgentBridge
                                $" · {i.Count(x => (S(x.D, "state") ?? "").Contains("newer upstream"))} newer" + read;
             }
             else if (tPlatforms.IsChecked == true) summary.Text = $"{Count(platformList.ItemsSource as IEnumerable<Line>)} platform(s)" + read;
+            else if (tModules.IsChecked == true) summary.Text = ModulesSummary();
             else if (tDocs.IsChecked == true) summary.Text = $"{docsSources} source(s) · {docsDocuments} document(s) in folders" + (docsUnreachable > 0 ? $" · {docsUnreachable} not reachable" : "");
             else if (tFeedback.IsChecked == true) summary.Text = $"{Count(feedbackList.ItemsSource as IEnumerable<Line>)} report(s) shown" + read;
             else if (tBackups.IsChecked == true) summary.Text = $"{Count(backupList.ItemsSource as IEnumerable<Line>)} backup(s) · the last 20 per level are kept";
@@ -1497,14 +1502,17 @@ namespace TcAgentBridge
             if (exe == null) return (false, "TcAgent.exe not found.");
             try
             {
+                // stdin closed at once: a TcAgent.exe that does not know the command (older than the extension) starts the MCP
+                // server - which then ends instead of waiting for input
                 var psi = new ProcessStartInfo(exe, args + (string.IsNullOrEmpty(sln) ? "" : " --solution " + Quote(sln)))
                 {
-                    UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true,
+                    UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true,
                     StandardOutputEncoding = new UTF8Encoding(false), StandardErrorEncoding = new UTF8Encoding(false)
                 };
                 psi.EnvironmentVariables["TCAGENT_CLIENT"] = "window:knowledge";
                 using (var p = Process.Start(psi))
                 {
+                    p.StandardInput.Close();
                     var err = p.StandardError.ReadToEndAsync();
                     var o = p.StandardOutput.ReadToEnd();
                     p.WaitForExit(120_000);

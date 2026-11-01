@@ -44,7 +44,9 @@ TcAgent.exe modules disable hmi                      switches it off for you (us
 TcAgent.exe modules enable scope --level project --solution <sln>
 ```
 
-A running AI client sees a change after TcAgent was restarted. When an agent connects to another solution, TcAgent
+The same in the IDE: tab **Modules** of the TcAgent Knowledge window – a check box per module for you or for this
+project, the plugins with their state and **Approve plugin …** (only a mouse click approves). A running AI client sees
+a change after TcAgent was restarted. When an agent connects to another solution, TcAgent
 reads its project level and tells the client that the tool list changed (`notifications/tools/list_changed`).
 
 ## Plugins
@@ -108,7 +110,7 @@ plugins in general:
 `TCAGENT_PLUGINS=0` starts no plugins at all.
 
 ```
-TcAgent.exe plugins [--solution <sln>]               every plugin with level, status (ready, needs approval, not allowed …) and folder
+TcAgent.exe plugins [--solution <sln>] [--json]      every plugin with level, status (ready, needs approval, not allowed …) and folder
 TcAgent.exe plugins approve <id> --solution <sln>    approves a project plugin (what it runs and its hash are shown)
 TcAgent.exe plugins revoke <id> --solution <sln>
 ```

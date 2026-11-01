@@ -355,8 +355,22 @@ namespace TcAgentBridge
             DockPanel.SetDock(line, Dock.Top); bottom.Children.Add(line);
             DockPanel.SetDock(legend, Dock.Right); bottom.Children.Add(legend);
             bottom.Children.Add(status);
+            // the module Tests switched off (modules.json): the window stays, a hint says that the agent does not see the test tools
+            var moduleClose = Tool("✕", null, "Close");
+            moduleClose.Click += (s, e) => moduleHint.Visibility = Visibility.Collapsed;
+            var moduleLink = new TextBlock { Text = "Switch on (for me)", Foreground = Blue, TextDecorations = TextDecorations.Underline, Cursor = Cursors.Hand,
+                                             Margin = new Thickness(12, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center };
+            moduleLink.MouseLeftButtonUp += (s, e) => SwitchTestsOn();
+            var moduleText = new TextBlock { TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center,
+                                             Text = "The module Tests is switched off – the AI agent does not see tc_test_run and the other test tools. This window works as before." };
+            moduleText.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            var mh = new DockPanel();
+            DockPanel.SetDock(moduleClose, Dock.Right); mh.Children.Add(moduleClose);
+            DockPanel.SetDock(moduleLink, Dock.Right); mh.Children.Add(moduleLink);
+            mh.Children.Add(moduleText);
+            moduleHint.Child = mh;
             var root = new DockPanel();
-            foreach (var top in new UIElement[] { bar, filters, progress, progressRow }) { DockPanel.SetDock(top, Dock.Top); root.Children.Add(top); }
+            foreach (var top in new UIElement[] { bar, moduleHint, filters, progress, progressRow }) { DockPanel.SetDock(top, Dock.Top); root.Children.Add(top); }
             DockPanel.SetDock(bottom, Dock.Bottom);
             root.Children.Add(bottom);
             root.Children.Add(split);
@@ -538,9 +552,11 @@ namespace TcAgentBridge
                     }
                 }
                 catch (Exception ex) { err = ex.Message; }
+                var testsOff = TestsModuleOff(exe, sln);
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     discovering = false;
+                    moduleHint.Visibility = testsOff ? Visibility.Visible : Visibility.Collapsed;
                     if (err != null) status.Text = "tcunit list failed: " + err;
                     else try { Load(json); } catch (Exception ex) { status.Text = "Test list not readable: " + ex.Message; }
                     if (externalQueue.Count > 0 && suites.Count > 0) FlushExternal();   // a run from the chat that started meanwhile
@@ -550,6 +566,50 @@ namespace TcAgentBridge
         }
 
         void Clear() { suites.Clear(); projectRow = null; rows.Clear(); UpdateCounters(); }
+
+        // ------------------------------------------------------------------ the module Tests (modules.json, docs/PLUGINS.md)
+        readonly Border moduleHint = new Border { Background = Frozen(Color.FromArgb(0x30, 0xE8, 0xB0, 0x1A)), BorderBrush = Frozen(Color.FromArgb(0x80, 0xE8, 0xB0, 0x1A)),
+                                                  BorderThickness = new Thickness(1), Padding = new Thickness(8, 3, 2, 3), Margin = new Thickness(6, 2, 6, 2), Visibility = Visibility.Collapsed };
+
+        /// <summary>True if the module Tests is switched off for this solution (TcAgent.exe modules --json). Call in the background.</summary>
+        static bool TestsModuleOff(string exe, string sln)
+        {
+            try
+            {
+                using (var p = Start(exe, "modules --json --solution " + Quote(sln), true))
+                {
+                    p.StandardInput.Close();         // an older TcAgent.exe without "modules" starts the MCP server: it ends at once
+                    var e = p.StandardError.ReadToEndAsync();
+                    var o = p.StandardOutput.ReadToEnd();
+                    p.WaitForExit(30000);
+                    var m = L(new JavaScriptSerializer().DeserializeObject(o), "modules").FirstOrDefault(x => S(x, "id") == "test");
+                    return m != null && !B(m, "on");
+                }
+            }
+            catch { return false; }       // an older TcAgent.exe without modules: nothing to say
+        }
+
+        void SwitchTestsOn()
+        {
+            var exe = TcAgentExe();
+            if (exe == null) return;
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                string o = "";
+                try
+                {
+                    using (var p = Start(exe, "modules enable test", true))
+                    {
+                        p.StandardInput.Close();
+                        var e = p.StandardError.ReadToEndAsync();
+                        o = (p.StandardOutput.ReadToEnd() + " " + e.Result).Trim();
+                        p.WaitForExit(30000);
+                    }
+                }
+                catch (Exception ex) { o = ex.Message; }
+                Dispatcher.BeginInvoke(new Action(() => { status.Text = o.Split('\n')[0]; Discover(); }));
+            });
+        }
 
         static object Get(object o, string k) => o is Dictionary<string, object> d && d.TryGetValue(k, out var v) ? v : null;
         static string S(object o, string k) => Get(o, k) as string;

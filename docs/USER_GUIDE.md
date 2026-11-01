@@ -300,6 +300,19 @@ in the top bar opens this tab.
 (`TCAGENT_TEAM`) and platform repositories (`TCAGENT_PLATFORMS`). They are saved in `settings.json` and used by the
 window at once; **⋯ > Set up clients** in the chat passes them on to the AI clients.
 
+### Modules
+
+Which groups of tools the AI agent sees and which plugins it gets ([docs/PLUGINS.md](PLUGINS.md)). A check box per
+module switches it on or off – for **me** (your user level, the default) or for **this project**
+(`.tcagent\modules.json`, in Git for everybody who works on the solution). A grey box cannot be changed here: the core,
+a module locked by the company or team, or one that needs a module that is off – the tooltip says why. Below, the
+**plugins** of every level with their state; a plugin of the project or team level runs only after **Approve plugin …**:
+the dialog shows the program it runs, its folder, level, tools and hash, and only a mouse click on *Approve* approves
+it (Enter and Esc cancel – an agent cannot approve a plugin). The details of the selected line show its tools, what it
+needs, its window and what the `modules.json` of every level says. A change applies when the AI client starts TcAgent
+again; the command line (`TcAgent.exe check`, `tcunit`, `ci` …) always keeps every tool. When the module Tests is off,
+the TcUnit Tests window stays and says so, with a link to switch it on.
+
 ### Documentation
 
 What the agent looks things up in (`tc_docs`) – Beckhoff InfoSys, the links, folders and network

@@ -214,13 +214,13 @@ public static class Modules
                 if (id == null) throw new Exception($"modules {sub} needs the module, e.g. TcAgent.exe modules {sub} hmi");
                 if (level == "project" && dir == null) throw new Exception("--level project needs --solution");
                 var f = Set(dir, level ?? "user", id, sub == "enable");
-                var st = Effective(dir, Plugins.Found(dir).Select(p => (p.Id, p.Name, p.Description, p.Tools.Count))).FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
+                var st = Effective(dir, Plugins.Found(dir).Where(p => p.Ready).Select(p => (p.Id, p.Name, p.Description, p.Tools.Count))).FirstOrDefault(s => s.Id.Equals(id, StringComparison.OrdinalIgnoreCase));
                 Console.WriteLine($"{(sub == "enable" ? "Switched on" : "Switched off")}: {id} ({f})" +
                                   (st != null && st.On != (sub == "enable") ? $" - still {(st.On ? "on" : "off")}: {st.Reason ?? "a later level decides (" + st.By + ")"}" : "") +
                                   ". Running AI clients see it after a restart of TcAgent.");
                 return Cli.Ok;
             }
-            var states = Effective(dir, Plugins.Found(dir).Select(p => (p.Id, p.Name, p.Description, p.Tools.Count)));
+            var states = Effective(dir, Plugins.Found(dir).Where(p => p.Ready).Select(p => (p.Id, p.Name, p.Description, p.Tools.Count)));
             if (json)
             {
                 Console.WriteLine(new JsonObject
@@ -228,9 +228,20 @@ public static class Modules
                     ["modules"] = new JsonArray(states.Select(s => (JsonNode)new JsonObject
                     {
                         ["id"] = s.Id, ["name"] = s.Name, ["description"] = s.Description, ["on"] = s.On, ["core"] = s.Core, ["locked"] = s.Locked,
-                        ["plugin"] = s.Plugin, ["tools"] = s.Tools, ["by"] = s.By, ["reason"] = s.Reason, ["requires"] = s.Requires, ["dependsOn"] = s.DependsOn
+                        ["plugin"] = s.Plugin, ["tools"] = s.Tools, ["by"] = s.By, ["reason"] = s.Reason, ["requires"] = s.Requires, ["dependsOn"] = s.DependsOn,
+                        ["toolNames"] = new JsonArray(ToolsOf(s.Id).Order().Select(t => (JsonNode)t).ToArray())
                     }).ToArray()),
-                    ["levels"] = new JsonArray(Levels(dir).Select(l => (JsonNode)new JsonObject { ["level"] = l.Name, ["file"] = l.File, ["exists"] = File.Exists(l.File) }).ToArray())
+                    // every level with what its modules.json says (the window shows it per module)
+                    ["levels"] = new JsonArray(Levels(dir).Select(l =>
+                    {
+                        var o = Read(l);
+                        JsonArray Ids(string k) => new(Names(o, k).Select(x => (JsonNode)x).ToArray());
+                        return (JsonNode)new JsonObject
+                        {
+                            ["level"] = l.Name, ["file"] = l.File, ["exists"] = File.Exists(l.File), ["mayLock"] = l.MayLock,
+                            ["on"] = Ids("on"), ["off"] = Ids("off"), ["locked"] = Ids("locked")
+                        };
+                    }).ToArray())
                 }.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
                 return Cli.Ok;
             }

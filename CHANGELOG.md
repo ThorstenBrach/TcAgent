@@ -19,9 +19,18 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   TwinCAT through `tcagent/call`, i.e. through the built-in tools with all their checks. Plugins of the team and project
   levels run only after `TcAgent.exe plugins approve` for exactly their content (SHA-256); the company level can allow
   all, none or listed plugins. Example plugin `docs/plugins/todo-finder` (PowerShell).
+- **Tab Modules in the Knowledge window** (`vsbridge/KnowledgeModules.cs`): a check box per module for me (default) or
+  this project, grey with the reason when it cannot be changed here; the plugins of every level with their state;
+  **Approve plugin …** shows the program, folder, level, tools and hash - only a mouse click on Approve approves (no
+  Enter, no keyboard, no UI automation); details with the tools, dependency, window and the `modules.json` of every
+  level; the status line counts the modules, plugins and tools the agent sees. `TcAgent.exe modules --json` lists the
+  tool names and every level's settings, `TcAgent.exe plugins --json` the plugins.
+- The TcUnit Tests window stays open when the module Tests is switched off and says so, with "Switch on (for me)".
 
 ### Fixed
 - The MCP server ignores a byte order mark at the start of the input (clients on .NET Framework write one).
+- The Knowledge and TcUnit windows close the input of the TcAgent.exe they start: an older TcAgent.exe that does not know
+  a command (and starts the MCP server instead) ends at once instead of waiting.
 
 ## [0.50.0] – 2026-11-01
 

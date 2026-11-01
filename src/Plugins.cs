@@ -355,17 +355,18 @@ public static class Plugins
     }
 
     // ------------------------------------------------------------------ command line
-    // TcAgent.exe plugins [list] [--solution <sln>]
+    // TcAgent.exe plugins [list] [--solution <sln>] [--json]
     // TcAgent.exe plugins approve|revoke <id> [--solution <sln>]
     public static int RunCli(string[] args)
     {
-        string sub = "list", id = null, sln = null;
+        string sub = "list", id = null, sln = null; bool json = false;
         try
         {
             for (int i = 1; i < args.Length; i++)
             {
                 var a = args[i];
                 if (a is "--solution" or "-s") { sln = i + 1 < args.Length ? args[++i] : throw new Exception("--solution needs a value"); continue; }
+                if (a == "--json") { json = true; continue; }
                 if (a.StartsWith("--")) throw new Exception("unknown option " + a);
                 if (i == 1 && a.ToLowerInvariant() is "list" or "approve" or "revoke") sub = a.ToLowerInvariant();
                 else if (id == null) id = a.Trim().ToLowerInvariant();
@@ -393,6 +394,23 @@ public static class Plugins
                     SaveApproved(all);
                     Console.WriteLine($"Approval revoked: {p.Id} ({p.Folder})");
                 }
+                return Cli.Ok;
+            }
+            if (json)
+            {
+                Console.WriteLine(new JsonObject
+                {
+                    ["plugins"] = new JsonArray(found.Select(p => (JsonNode)new JsonObject
+                    {
+                        ["id"] = p.Id, ["name"] = p.Name, ["description"] = p.Description, ["version"] = p.Version, ["level"] = p.Level, ["folder"] = p.Folder,
+                        ["status"] = p.Status, ["reason"] = p.Reason, ["hash"] = p.Hash, ["command"] = string.Join(" ", new[] { p.Command }.Concat(p.Args)),
+                        ["tools"] = new JsonObject(p.Tools.Select(t => KeyValuePair.Create(p.Prefix + t.Key, (JsonNode)(t.Value switch
+                        {
+                            ToolClass.Read => "read", ToolClass.RuntimeWrite => "runtime", _ => "write"
+                        }))))
+                    }).ToArray()),
+                    ["folders"] = new JsonArray(Modules.Levels(dir).Select(l => (JsonNode)new JsonObject { ["level"] = l.Name, ["folder"] = Path.Combine(l.Root, "plugins") }).ToArray())
+                }.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));
                 return Cli.Ok;
             }
             if (found.Count == 0) Console.WriteLine("No plugins. Folders: " + string.Join(", ", Modules.Levels(dir).Select(l => Path.Combine(l.Root, "plugins"))));
