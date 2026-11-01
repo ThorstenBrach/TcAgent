@@ -12,7 +12,10 @@ Lists running Visual Studio 2022 / TcXaeShell instances with an open solution.
 
 ### `tc_attach`
 
-Connects to a running IDE instance (also happens automatically on the first tool call if the choice is unambiguous). Select by pid or part of the solution path. Without either: the IDE TcAgent was started from (TcAgent Chat), then `TCAGENT_SOLUTION`, then the only instance with a solution open. With several open solutions the client shows a selection list (MCP elicitation, if supported); otherwise a list is returned – ask the user and call again with `pid`.
+Connects to a running IDE instance (also happens automatically on the first tool call if the choice is unambiguous). Select by pid or part of the solution path. Without either: the IDE TcAgent was started from (TcAgent Chat), then `TCAGENT_SOLUTION`, then the only instance with a solution open. With several open solutions the client shows a selection list (MCP elicitation, if supported); otherwise a list is returned – ask the user and call again with `pid`. If the solution is still bound to TFS/VSS source
+control (section in the .sln, `Scc*` entries in the project files, `.vspscc` files), the answer warns: such bindings can
+make the IDE crash or refuse changes while TcAgent edits the project – unbind first (TcAgent does not change these files;
+`TcAgent.exe doctor --solution <sln>` shows the same warning).
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -445,6 +448,8 @@ Overwrites declaration and/or implementation of a PLC object (ST text). With dry
 Creates a PLC object and optionally sets declaration/implementation. kind: folder, program, function, function_block, dut_enum, dut_struct, dut_union, action, method, interface_method, property, interface_property, property_get, property_set, gvl, transition, interface, dut_alias
 
 Properties automatically get Get and Set accessors. With `implements` it creates an FB with all methods/properties of the interface as stubs.
+A name that is an IEC keyword, operator, standard function or type (e.g. a method `Add`) is refused by TwinCAT; the answer
+says so and suggests another name.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -1148,6 +1153,7 @@ Reads the IDE error list, split into compiler/project messages and PLC runtime/T
 ### `tc_test_results`
 
 Returns the result of the last TcUnit run (suites, tests, passes, failures with test names and messages) from the PLC runtime messages.
+Only the last run counts: failures of earlier runs that are still in the message list are left out.
 
 ### `tc_test_run`
 

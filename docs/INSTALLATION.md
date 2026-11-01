@@ -229,6 +229,7 @@ In addition, every client can require confirmation of individual tool calls – 
 | `build.ps1` reports the file is locked | A client still has `TcAgent.exe` open – quit the client, build again. |
 | "No running Visual Studio/XAE instance" | Open VS with a TwinCAT solution; with several instances pick one from the list the client shows, or use `tc_attach pid=…` / `solution=…`. |
 | `tc_build` reports 0 errors although the code is wrong | Unused POUs are not compiled during build. Check for compiler errors with `tc_check` ("Check all objects") or `tc_build checkAll=true`. |
+| The IDE crashes or says "Cannot insert project" while TcAgent changes the project | The solution is still bound to TFS/VSS source control. `tc_attach` and `TcAgent.exe doctor --solution <sln>` warn about it. Remove the bindings first (File > Source Control > Change Source Control > Unbind, or delete the `Scc*` entries and `.vspscc` files in your own commit). |
 | TcUnit output appears as errors | These are runtime messages in the error list; `tc_errors kind=compile` or `tc_test_results` separate them. |
 | `tc_ide command=ping` fails | Extension not installed or VS not restarted. Check `bridge.log`. |
 | Yellow bar in VS "stopped responding … TcAgentBridge" | First export of a large library (runs on the UI thread). Do not disable – afterwards everything comes from the cache. |

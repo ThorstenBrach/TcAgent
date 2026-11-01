@@ -876,7 +876,7 @@ call `apply` again for the same changes.
 - `tc_test_run` lists the tests of the code (`action=list`) and runs a selection on the local runtime (or an allowed test
   PLC) with results per test – see [TcUnit Tests window](#tcunit-tests-window).
 - `tc_test_results` returns the result of the last TcUnit run from the PLC runtime messages: suites, tests, passes,
-  failures with test names and messages.
+  failures with test names and messages (only that run – older failures still in the message list are left out).
 - TcUnit output appears in the IDE error list as "errors". These are runtime messages, not compiler errors;
   `tc_errors kind=compile|runtime` separates them.
 
@@ -902,7 +902,9 @@ x/y" for tests over many cycles, and details like the HTML report (expected / ac
 again, Copy failure, the last 5 runs); double-click opens the test method, **Report** makes the HTML test report of the
 last run. The run builds and activates only if the code changed, switches the tests that are not selected off via ADS and
 leaves TwinCAT in Run mode. The same run for the agent (*"Run only the tests of FB_Motor_Test"*, tool `tc_test_run`) and
-on the command line (`TcAgent.exe tcunit list|run`). Use, configuration and how to write tests for it:
+on the command line (`TcAgent.exe tcunit list|run`). Runs started elsewhere – by the agent, in the IDE (activate, login,
+start), by another client or a pipeline on the same target – appear live in the window as well (it only reads them over
+ADS; stop such a run where it was started). Use, configuration and how to write tests for it:
 [TCUNIT_TESTS.md](TCUNIT_TESTS.md).
 ---
 
