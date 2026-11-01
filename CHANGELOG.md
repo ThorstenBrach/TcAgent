@@ -61,6 +61,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
     runs only with its whole suite or Run all").
   - The root line says "runs suites in sequence" / "in parallel" instead of the TcUnit call; top right the state of the
     runs with the target ("Not run yet · 9 tests · target: local runtime").
+  - **Runs started elsewhere are shown too:** a run started in the IDE (activate, login, start), by another client or
+    a pipeline on the target of the window appears live like a run of the window. New command `TcAgent.exe tcunit
+    watch` (the window starts it in the background): reads only over ADS – PLC state, TcUnit's progress and the enable
+    bools that decide which tests run; it writes, resets and starts nothing, and the target must be allowed like for
+    `ads_read`. Before, only runs of the window itself and of `tc_test_run` were shown.
 
 - **TcAgent Chat in the same style** (`vsbridge/ChatView.cs`, `ChatWindow.cs`, `ChatCards.cs`, `ChatAcp.cs`):
   - The result of "Set up clients" as one line in an info bar ("TcAgent x is set up for n clients – restart the open

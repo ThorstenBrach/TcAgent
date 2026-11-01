@@ -395,7 +395,7 @@ namespace TcAgentBridge
             // a test that runs over many cycles: its time (or cycle) goes on while it runs
             runningClock.Tick += (s, e) => { foreach (var t in suites.SelectMany(x => x.Tests).Where(x => x.Status == "running")) UpdateTest(t); };
             IsVisibleChanged += (s, e) => { if (IsVisible && suites.Count == 0 && !discovering) Discover(); };
-            Dispatcher.ShutdownStarted += (s, e) => { try { if (running?.HasExited == false) running.StandardInput.WriteLine("cancel"); } catch { } };
+            Dispatcher.ShutdownStarted += (s, e) => { try { if (running?.HasExited == false) running.StandardInput.WriteLine("cancel"); } catch { } StopFollow(); };
             HookIdeEvents();
             Progress(null, 0, 0);
             ShowDetails();
@@ -617,6 +617,7 @@ namespace TcAgentBridge
             var n = suites.Sum(x => x.Tests.Count);
             status.Text = $"{n} test(s) in {suites.Count} suite instance(s)" + (runMode == "parallel" ? " - TcUnit.RUN(): during a run only the overall progress" : runMode == null ? " - no TcUnit.RUN / RUN_IN_SEQUENCE found" : "") +
                           (string.IsNullOrEmpty(configTarget) || configTarget.Equals("local", StringComparison.OrdinalIgnoreCase) ? "" : " - target " + configTarget);
+            Follow();
         }
 
         static bool CanTick(SuiteNode sn, TestNode t) => sn.Selectable || t.Enable != null;
@@ -1202,8 +1203,9 @@ namespace TcAgentBridge
             if (tests != null) args.Append(" --tests " + Quote(string.Join(",", tests)));
             if (!string.IsNullOrEmpty(configTarget)) args.Append(" --target " + Quote(configTarget));
             foreach (var t in suites.SelectMany(s => s.Tests)) if (t.Status == "running") t.Status = "notrun";
+            StopFollow();                                             // this run is shown from its own events
             try { running = Start(exe, args.ToString(), true); }
-            catch (Exception ex) { status.Text = "TcAgent.exe could not be started: " + ex.Message; return; }
+            catch (Exception ex) { status.Text = "TcAgent.exe could not be started: " + ex.Message; Follow(); return; }
             BridgePackage.Instance?.LogLine("TcUnit run: " + exe + " " + args);
             runStarted = DateTime.Now;
             expected = 0; runTotal = 0; runFinished.Clear();
@@ -1248,6 +1250,7 @@ namespace TcAgentBridge
                     }
                     gotDone = false;
                     UpdateCounters();
+                    Follow();
                 }));
             });
         }
@@ -1361,6 +1364,7 @@ namespace TcAgentBridge
             Dictionary<string, object> ev;
             try { ev = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(json); } catch { return; }
             if (ev == null || running != null) return;            // a run of this window itself has the runtime - nothing else runs
+            followRun = false;                                    // the same run, seen by the follower too: the client's events win
             // the list is not read yet (window just opened): keep the events until it is
             if (discovering || suites.Count == 0)
             {
@@ -1392,6 +1396,80 @@ namespace TcAgentBridge
             }
             OnEvent(ev);
             if (S(ev, "event") == "done") { externalRun = false; runningClock.Stop(); SetRunning(false); gotDone = false; UpdateCounters(); }
+        }
+
+        // ------------------------------------------------------------------ runs started outside TcAgent (IDE: activate + start, a pipeline)
+        Process follower;           // TcAgent.exe tcunit watch: reads over ADS only, writes and starts nothing
+        string followerKey;
+        bool followRun;
+
+        /// <summary>Starts the follower for the shown PLC project (again, if solution, project or target changed). Call on the UI thread.</summary>
+        void Follow()
+        {
+            var sln = SolutionPath();
+            var exe = TcAgentExe();
+            if (running != null || project == null || exe == null || string.IsNullOrEmpty(sln) || !File.Exists(sln)) { StopFollow(); return; }
+            var key = sln + "|" + project + "|" + configTarget;
+            if (follower != null && !follower.HasExited && key == followerKey) return;
+            StopFollow();
+            var args = "tcunit watch --solution " + Quote(sln) + " --plc " + Quote(project) + (string.IsNullOrEmpty(configTarget) ? "" : " --target " + Quote(configTarget));
+            Process p;
+            try { p = Start(exe, args, true); }
+            catch (Exception ex) { BridgePackage.Instance?.LogLine("TcUnit follower: " + ex.Message); return; }
+            follower = p; followerKey = key;
+            p.ErrorDataReceived += (s, e) => { };
+            p.BeginErrorReadLine();
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                var ser = new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
+                try
+                {
+                    for (string line; (line = p.StandardOutput.ReadLine()) != null;)
+                    {
+                        if (!line.StartsWith("{")) continue;
+                        Dictionary<string, object> ev;
+                        try { ev = ser.Deserialize<Dictionary<string, object>>(line); } catch { continue; }
+                        Dispatcher.BeginInvoke(new Action(() => { if (follower == p) FollowEvent(ev); }));
+                    }
+                }
+                catch { }
+                // ended (refused target, no solution ...): a half followed run is not left as "running"
+                Dispatcher.BeginInvoke(new Action(() => { if (follower == p) { follower = null; EndFollowRun(); } }));
+            });
+        }
+
+        void StopFollow()
+        {
+            var p = follower;
+            follower = null; followerKey = null;
+            EndFollowRun();
+            if (p == null) return;
+            try { if (!p.HasExited) { p.StandardInput.WriteLine("cancel"); p.StandardInput.Close(); } } catch { }
+        }
+
+        void EndFollowRun()
+        {
+            if (!followRun) return;
+            followRun = false;
+            runningClock.Stop(); SetRunning(false); gotDone = false; UpdateCounters();
+        }
+
+        void FollowEvent(Dictionary<string, object> ev)
+        {
+            var kind = S(ev, "event");
+            if (kind == "plan")
+            {
+                if (running != null || externalRun) return;           // shown from the events of the run itself
+                followRun = true;
+                runStarted = DateTime.Now; expected = 0; runTotal = 0; runFinished.Clear();
+                SetRunning(true);
+                runningClock.Start();
+                cancel.IsEnabled = false;                             // started elsewhere: it is stopped there
+                Progress("Running · started outside this window …", 0, 1);
+            }
+            if (!followRun) return;
+            OnEvent(ev);
+            if (kind == "done") EndFollowRun();
         }
 
         void OnEvent(Dictionary<string, object> ev)
@@ -1518,7 +1596,7 @@ namespace TcAgentBridge
                 buildEvents.OnBuildDone += (scope, action) => Soon();
                 solutionEvents = dte.Events.SolutionEvents;
                 solutionEvents.Opened += () => { Watch(); project = null; lastResults.Clear(); Dispatcher.BeginInvoke(new Action(() => suites.Clear())); Soon(); };
-                solutionEvents.AfterClosing += () => { Watch(); Dispatcher.BeginInvoke(new Action(() => { Clear(); status.Text = "No solution open."; })); };
+                solutionEvents.AfterClosing += () => { Watch(); Dispatcher.BeginInvoke(new Action(() => { StopFollow(); Clear(); status.Text = "No solution open."; })); };
                 Watch();
             }
             catch (Exception ex) { BridgePackage.Instance?.LogLine("TcUnit window events: " + ex.Message); }

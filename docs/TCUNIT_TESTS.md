@@ -340,6 +340,12 @@ allows no external resources (Content-Security-Policy).
 
 A run started by the AI agent in the chat (`tc_test_run`) is shown live in the window as well – progress, results and the final state, as if it had been started there (the window opens without taking the focus). Cancel it in the chat (Stop).
 
+A run started anywhere else – in the IDE (activate the configuration, login, start), by another client or by a
+pipeline on the same target – is followed too while the window is open: `TcAgent.exe tcunit watch` runs in the
+background, sees the run start over ADS, takes the tests that run from the enable bools in the PLC and shows the
+progress and the results. It only reads (the target must be allowed like for `ads_read`); stop such a run where it was
+started. The window pauses it during its own runs.
+
 - `TcAgent.exe tcunit list --solution <sln> [--plc <name>]` – the tests from the code as JSON: projects, suites,
   instances, tests with file, line, description, test case text (`details`) and the paths of the enable bools. No IDE
   needed.

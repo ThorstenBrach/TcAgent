@@ -5,6 +5,8 @@
 //                                                                    one JSON event per line (TcUnit Tests window)
 //   TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>] [--builtin] [--approve <id>]
 //                                                                    HTML report of the last run (TcUnitReport.cs)
+//   TcAgent.exe tcunit watch --solution <sln> [--plc <name>] [--target ...]
+//                                                                    follows runs started elsewhere, read only (TcUnit window)
 // tcunit run stops when a line "cancel" arrives on stdin (or Ctrl+C): the PLC is reset, open tests stay "notrun".
 //
 // SPDX-License-Identifier: MIT
@@ -17,8 +19,9 @@ public static partial class Cli
 {
     static void ValidateTcUnit(Options o)
     {
-        if (o.Sub is not ("list" or "run" or "report")) throw new Exception("tcunit needs list, run or report, e.g. TcAgent.exe tcunit list --solution <sln>");
-        if (o.Sub is "list" or "report" && o.Solution == null) throw new Exception($"tcunit {o.Sub} needs --solution <path to .sln>");
+        if (o.Sub is not ("list" or "run" or "report" or "watch")) throw new Exception("tcunit needs list, run, report or watch, e.g. TcAgent.exe tcunit list --solution <sln>");
+        if (o.Sub is "list" or "report" or "watch" && o.Solution == null) throw new Exception($"tcunit {o.Sub} needs --solution <path to .sln>");
+        if (o.Sub == "watch" && (o.Tests.Count > 0 || o.Download || o.Junit != null)) throw new Exception("tcunit watch only follows runs - --tests, --download and --junit are options of tcunit run");
         if (o.Sub == "report" && (o.Tests.Count > 0 || o.Download)) throw new Exception("--tests and --download are options of tcunit run");
         if ((o.Out != null || o.BuiltIn || o.Approve != null) && o.Sub != "report") throw new Exception("--out, --builtin and --approve are options of tcunit report");
         if (o.Approve != null && !System.Text.RegularExpressions.Regex.IsMatch(o.Approve, "^[0-9a-f]{16}$")) throw new Exception("--approve: the id shown by tcunit report expected");
@@ -80,6 +83,23 @@ public static partial class Cli
             Console.WriteLine(new JsonObject { ["event"] = "report", ["ok"] = false, ["message"] = Msg(ex) }.ToJsonString(Compact));
             return ex is FileNotFoundException ? Failed : Infra;
         }
+    }
+
+    /// <summary>tcunit watch: follows runs started elsewhere until stdin closes or says "cancel" (the window ends it that way).</summary>
+    static int TcUnitWatchCli(Options o)
+    {
+        var cancel = false;
+        Console.CancelKeyPress += (_, e) => { e.Cancel = true; cancel = true; };
+        new Thread(() =>
+        {
+            try { for (string l; (l = Console.In.ReadLine()) != null;) if (l.Trim().Trim('\uFEFF').Equals("cancel", StringComparison.OrdinalIgnoreCase)) break; }
+            catch { }
+            cancel = true;      // the window closed stdin (or said cancel): stop watching
+        }) { IsBackground = true, Name = "tcunit-watch-stdin" }.Start();
+        var gate = new object();
+        void Emit(JsonObject e) { lock (gate) Console.WriteLine(e.ToJsonString(Compact)); }
+        var ro = new TcUnitRun.Options { Solution = Path.GetFullPath(o.Solution), Plc = o.Plc.FirstOrDefault(), Target = o.Target };
+        return new TcUnitRun(null, Emit, () => cancel).Watch(ro);
     }
 
     static int TcUnitCli(Options o, TwinCatSession tc)

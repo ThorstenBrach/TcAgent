@@ -74,6 +74,7 @@ public static partial class Cli
         if (o.Command is "st") { Program.ClientName = "cli:st"; return PlainTextCli(o); }   // CliPlainText.cs - project files only, no IDE
         if (o.Command is "tcunit" && o.Sub == "list") { Program.ClientName = "cli:tcunit"; return TcUnitList(o); }   // CliTcUnit.cs - project files only
         if (o.Command is "tcunit" && o.Sub == "report") { Program.ClientName = "cli:tcunit"; return TcUnitReportCli(o); }
+        if (o.Command is "tcunit" && o.Sub == "watch") { Program.ClientName = "cli:tcunit"; return TcUnitWatchCli(o); }   // ADS only, no IDE
         if (o.Command is "skills") { Program.ClientName = "cli:skills"; return SkillsCli(o); }   // files only, no IDE
         if (o.Command is "knowledge" or "sources" && WritesKnowledge(o))
         {
@@ -937,6 +938,11 @@ public static partial class Cli
       event per line (plan, step, suite, running, result, progress, done). Settings: .tcagent\tcunit.json (plcProject,
       target, timeout, progress). --download activates even if the code did not change. A remote target must be in
       TCAGENT_ALLOW_TARGETS. Exit 0 = passed, 1 = failed tests/build, 2 = refused/unknown tests, 3 = infrastructure/timeout.
+
+  TcAgent.exe tcunit watch --solution <sln> [--plc <name>] [--target <netid|local>]
+      Follows TcUnit runs started elsewhere (IDE, another client, a pipeline) and writes the same JSON events as tcunit
+      run, one run after the other, until stdin closes or says ""cancel"". Reads only over ADS (PLC state, progress,
+      enable bools); the target must be allowed like for ads_read. The TcUnit Tests window starts it.
 
   TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>] [--builtin] [--approve <id>]
       HTML report of the last tcunit run (or of the JUnit file given): the command of ""report"" in .tcagent\tcunit.json

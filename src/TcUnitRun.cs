@@ -245,6 +245,90 @@ public sealed class TcUnitRun
         }
     }
 
+    // ------------------------------------------------------------------ follow runs started elsewhere
+    /// <summary>Follows TcUnit runs that were started elsewhere (in the IDE: activate + start, by another client, a pipeline) -
+    /// read only: no build, no reset, no enable bool written, no start. Waits until a run is going (PLC in Run, TcUnit has not
+    /// printed its final results), follows it with the same events as Run (plan with the tests the enable bools in the PLC
+    /// switch on, running, result, done), then waits for the next one - until cancelled (the TcUnit Tests window).</summary>
+    public int Watch(Options o)
+    {
+        var sln = o.Solution;
+        if (string.IsNullOrEmpty(sln) || !File.Exists(sln)) return Done("error", Cli.Usage, "Solution not found: " + sln);
+        var cfg = TcUnitConfig.Load(Path.GetDirectoryName(sln));
+        var disc = TcUnitDiscovery.Discover(sln);
+        var project = ChooseProject(disc, o.Plc ?? cfg.PlcProject, out var why);
+        if (project == null) return Done("error", Cli.Usage, why);
+        var wantedRaw = o.Target ?? cfg.Target;
+        string target = string.IsNullOrWhiteSpace(wantedRaw) || wantedRaw.Trim().Equals("local", StringComparison.OrdinalIgnoreCase) ? LocalNetId : wantedRaw.Trim();
+        // reading is checked like ads_read (a target that is not allowed is not even read)
+        try { new Policy().Check("ads_read", () => target); }
+        catch (UnauthorizedAccessException ex) { return Done("refused", Cli.Usage, ex.Message); }
+        const string Printed = "GVL_TcUnit.TcUnitRunner.AdsTestResultLogger.PrintedFinalTestResults";
+        const string CurrentSuite = "GVL_TcUnit.CurrentTestSuiteBeingCalled^.InstancePath";
+        while (!cancelled())
+        {
+            AdsVars ads = null;
+            try
+            {
+                // ---- wait for a run; a restarted runtime invalidates the symbol handles - connect again when it is not in Run
+                while (!cancelled())
+                {
+                    if (ads == null) ads = new AdsVars(target, project.AmsPort);
+                    if (ads.State() != AdsState.Run) { ads.Dispose(); ads = null; Thread.Sleep(2000); continue; }
+                    var printed = ads.Bool(Printed) ?? ads.Bool("GVL_TcUnit.TcUnitRunner.AllTestSuitesFinished");
+                    if (printed == false && ads.Str(CurrentSuite) != null) break;
+                    Thread.Sleep(1000);
+                }
+                if (cancelled() || ads == null) break;
+
+                // ---- which tests run: the enable bools as they are in the PLC (no bool = runs)
+                var items = new List<string>();
+                foreach (var i in project.Instances)
+                {
+                    var s = i.Suite;
+                    if (s.RunSuiteVar != null && ads.Bool(i.Path + "." + s.RunSuiteVar) == false) continue;
+                    var withBool = s.Tests.Where(t => t.EnableVar != null).ToList();
+                    var on = withBool.Where(t => ads.Bool(i.Path + "." + t.EnableVar) != false).ToList();
+                    if (on.Count == withBool.Count) items.Add(i.Path);
+                    else if (on.Count > 0) items.AddRange(on.Select(t => i.Path + "@" + t.Name));
+                    else if (s.Tests.Count > withBool.Count) items.Add(i.Path);   // only the tests without a bool run
+                }
+                var sel = TcUnitDiscovery.Select(project, items.Count > 0 ? items : new List<string> { "-" });
+                Results.Clear();
+                foreach (var i in project.Instances)
+                {
+                    sel.Selected.TryGetValue(i.Path, out var set);
+                    bool inst = sel.Selected.ContainsKey(i.Path);
+                    foreach (var t in i.Suite.Tests)
+                    {
+                        bool s = inst && (set == null || set.Contains(t.Name));
+                        Results.Add(new TestResult { Instance = i.Path, Name = t.Name, Selected = s, Status = s ? "notrun" : "skipped" });
+                    }
+                }
+                var sw = Stopwatch.StartNew();
+                emit(new JsonObject
+                {
+                    ["event"] = "plan", ["solution"] = sln, ["project"] = project.Name, ["treePath"] = project.TreePath, ["target"] = target,
+                    ["runMode"] = project.RunMode, ["expected"] = sel.ExpectedCount, ["timeoutSec"] = (int)cfg.Timeout.TotalSeconds, ["watch"] = true,
+                    ["tests"] = new JsonArray(Results.Select(r => (JsonNode)r.Json()).ToArray()),
+                    ["instances"] = new JsonArray(sel.Selected.Keys.Select(k => (JsonNode)k).ToArray())
+                });
+                Step("A run started outside this window (IDE, another client or a pipeline) - following it, read only.");
+                var outcome = Monitor(ads, project, sel, cfg.Progress, cfg.Timeout);
+                foreach (var r in Results.Where(r => r.Selected && r.Status is "running")) r.Status = "notrun";
+                int failed = Results.Count(r => r.Status == "failed"), passed = Results.Count(r => r.Status == "passed");
+                var tail = string.Create(CultureInfo.InvariantCulture, $"{passed} passed, {failed} failed, {Results.Count(r => r.Status == "skipped")} skipped, {Results.Count(r => r.Selected && r.Status == "notrun")} not run ({sw.Elapsed.TotalSeconds:0.0} s)");
+                if (outcome == "cancelled") break;
+                Done(outcome == "finished" ? (failed == 0 ? "passed" : "failed") : "timeout", outcome == "finished" ? (failed == 0 ? Cli.Ok : Cli.Failed) : Cli.Infra,
+                     outcome == "finished" ? (failed == 0 ? "TESTS OK: " : "TESTS FAILED: ") + tail + " - run started outside the window" : $"Timeout after {cfg.Timeout}: " + tail);
+            }
+            // runtime not reachable (stopped, config mode, no route): try again a little later
+            catch (Exception) { Thread.Sleep(5000); }
+            finally { ads?.Dispose(); }
+        }
+        return Cli.Ok;
+    }
+
     // ------------------------------------------------------------------ live progress
     sealed class Live
     {
