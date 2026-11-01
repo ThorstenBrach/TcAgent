@@ -79,7 +79,7 @@ line at the bottom. The status line shows the last message on the left and what 
 
 - **Ticking:** the tests are chosen with check boxes – a click beside them loses nothing. A ticked suite ticks all
   its tests; if only some tests of a suite are ticked, the suite box is partly filled and only those tests run. A
-  greyed-out checkbox means the test has no enable bool – it can only run with its whole suite. Space ticks the
+  greyed-out checkbox means the test has no enable bool – it runs only with its whole suite or Run all (the tooltip says so). Space ticks the
   selected line.
 - **Opening the code:** double-click a test (or Enter, or **Open code** in the details) opens its method in the TwinCAT
   editor at the `TEST(...)` line. Double-click on a suite opens/closes it.
@@ -90,8 +90,9 @@ line at the bottom. The status line shows the last message on the left and what 
 - **Switched off:** after a run the suites whose tests were all switched off are one line **⊘ switched off (n)** – open
   it to see them. The filter **Off** and a search show them where they are.
 - **Progress:** while running "Running · 12 of 87 · <test> · about 1:20 min left"; after the run its result, e.g.
-  "✖ 2 failed · 16 passed · 24 switched off · 12.5 s · target local runtime" (red or green). On the right the number
-  of ticked tests. Inside one suite TcUnit calls all `TEST()` tests in the same PLC cycles (only `TEST_ORDERED()`
+  "✖ 2 failed · 16 passed · 24 switched off · 12.5 s · target local runtime" (red or green). On the right the state of
+  the runs with the target, e.g. "Not run yet · 9 tests · target: local runtime" or "Last run: 1 failed · 3 of 9 ticked ·
+  target: local runtime". Inside one suite TcUnit calls all `TEST()` tests in the same PLC cycles (only `TEST_ORDERED()`
   tests run one after the other), so the name shown is the test called last; the results per test are exact anyway.
   With `TcUnit.RUN()` (all suites at the same time) the bar shows only "n of N finished".
 - **Details** (like the HTML report): name, result and time; description and test case text

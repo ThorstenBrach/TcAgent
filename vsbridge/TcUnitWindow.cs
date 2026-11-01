@@ -92,6 +92,7 @@ namespace TcAgentBridge
             bool? ticked = false;
             public double Indent { get; set; }   // set again by Rebuild (switched-off suites sit one level deeper)
             public bool CanTick { get; set; }
+            public string TickTip { get; set; }   // why a check box is grey
             public Visibility TickVisibility { get; set; } = Visibility.Visible;
             public FontWeight Weight { get; set; } = FontWeights.Normal;
             public string Name { get => name; set => Set(ref name, value, nameof(Name)); }
@@ -461,6 +462,8 @@ namespace TcAgentBridge
             cb.SetBinding(ToggleButton.IsCheckedProperty, new Binding(nameof(Row.Ticked)) { Mode = BindingMode.TwoWay });
             cb.SetBinding(IsEnabledProperty, new Binding(nameof(Row.CanTick)));
             cb.SetBinding(VisibilityProperty, new Binding(nameof(Row.TickVisibility)));
+            cb.SetBinding(ToolTipProperty, new Binding(nameof(Row.TickTip)));
+            cb.SetValue(ToolTipService.ShowOnDisabledProperty, true);
             cb.SetValue(VerticalAlignmentProperty, VerticalAlignment.Center);
             cb.SetValue(MarginProperty, new Thickness(0, 0, 4, 0));
             cb.SetValue(FocusableProperty, false);
@@ -635,7 +638,8 @@ namespace TcAgentBridge
             t.Row = new Row
             {
                 Suite = sn, Test = t, Name = t.Name, Indent = 28, CanTick = CanTick(sn, t), OnTick = OnTick, Expander = "",
-                Tip = (t.Description ?? t.Name) + (t.Enable == null ? "\nNo bRun_ bool: runs with its suite." : "")
+                Tip = (t.Description ?? t.Name) + (t.Enable == null ? "\nNo bRun_ bool: runs with its suite." : ""),
+                TickTip = CanTick(sn, t) ? "Tick to run this test with \"Run selected\"" : "no enable bool – runs only with its whole suite or Run all"
             };
         }
 
@@ -702,7 +706,12 @@ namespace TcAgentBridge
             }
             var ticked = TickedCount();
             var all = suites.Sum(s => s.Tests.Count);
-            selection.Text = ticked > 0 ? $"{ticked} of {all} test(s) selected" : $"{all} test(s)";
+            // the state of the runs and where they go: "Not run yet · target: local runtime"
+            var tests = suites.SelectMany(s => s.Tests).ToList();
+            var state = tests.Any(t => t.Status is "passed" or "failed")
+                ? (tests.Any(t => t.Status == "failed") ? $"Last run: {tests.Count(t => t.Status == "failed")} failed" : "Last run: passed")
+                : "Not run yet";
+            selection.Text = state + (ticked > 0 ? $" · {ticked} of {all} ticked" : $" · {all} tests") + " · target: " + TargetText();
         }
 
         // ------------------------------------------------------------------ saved test selections (.tcunit.json)
@@ -895,7 +904,7 @@ namespace TcAgentBridge
             projectRow.Name = $"{project} ({all.Count})";
             var done = all.Where(t => t.Status is "passed" or "failed").ToList();
             projectRow.Duration = done.Count > 0 ? Seconds(done.Sum(t => t.Duration ?? 0)) : "";
-            projectRow.Description = runMode == "sequence" ? "TcUnit.RUN_IN_SEQUENCE" : runMode == "parallel" ? "TcUnit.RUN (all suites at once)" : "";
+            projectRow.Description = runMode == "sequence" ? "runs suites in sequence" : runMode == "parallel" ? "runs suites in parallel" : "";
             (projectRow.Result, projectRow.ResultBrush) = Sum(all);
         }
 
@@ -1049,7 +1058,7 @@ namespace TcAgentBridge
                 var head = Words(project, 14, true);
                 head.Inlines.Add(new System.Windows.Documents.Run("   " + text) { FontSize = 12, FontWeight = FontWeights.Normal, Foreground = brush, FontFamily = Symbols });
                 detailBox.Children.Add(head);
-                detailBox.Children.Add(Facts(("PLC project", treePath), ("Suites", $"{suites.Count} instance(s), {all.Count} test(s)"), ("Run mode", projectRow.Description),
+                detailBox.Children.Add(Facts(("PLC project", treePath), ("Suites", $"{suites.Count} instance(s), {all.Count} test(s)"), ("Run mode", runMode == "sequence" ? "runs suites in sequence (TcUnit.RUN_IN_SEQUENCE)" : runMode == "parallel" ? "runs suites in parallel (TcUnit.RUN)" : "–"),
                                              ("Target", TargetText())));
             }
             else if (r != null && r == offRow)

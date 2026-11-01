@@ -57,7 +57,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   - Details like the HTML report: Expected / Actual / Message, code link, enable bool, Run again, Copy failure, the last
     5 runs of the test; build errors of a run appear there too.
   - The legend of the symbols in the status line; colors for the light and the dark theme.
-  - Check boxes stay the way to choose tests – a click beside them loses nothing.
+  - Check boxes stay the way to choose tests – a click beside them loses nothing; a grey one says why ("no enable bool –
+    runs only with its whole suite or Run all").
+  - The root line says "runs suites in sequence" / "in parallel" instead of the TcUnit call; top right the state of the
+    runs with the target ("Not run yet · 9 tests · target: local runtime").
 
 - **TcAgent Chat in the same style** (`vsbridge/ChatView.cs`, `ChatWindow.cs`, `ChatCards.cs`, `ChatAcp.cs`):
   - The result of "Set up clients" as one line in an info bar ("TcAgent x is set up for n clients – restart the open
