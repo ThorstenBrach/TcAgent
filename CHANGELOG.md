@@ -8,7 +8,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [0.50.0] – 2026-11-01
 
+0.49.0 was not published as a release of its own; its changes are part of this one.
+
 ### Added
+- **TcAgent with the TwinCAT XAE Shell alone** (no Visual Studio 2022, no build tools) – preview: tested in the 32-bit shell
+  on a PC that also has Visual Studio 2022 (shell-only simulated with `TCAGENT_IDE_ASSEMBLIES`); a PC without Visual
+  Studio 2022 and the 64-bit shell are not tested yet. Every release gets the package
+  `TcAgent-XaeShell-<version>.zip` (built by `build-vsix.ps1`) with the extension prebuilt for the 32-bit shell
+  (`bridge-vs15`, built against the shell) and the 64-bit shell (`bridge-vs17`, the Visual Studio 2022 build - not tested
+  in that shell yet), the server and `install-xaeshell.ps1`. The script installs from the package without compiling and
+  copies the server into the extension's folder; on its first start the shell sets TcAgent up like Visual Studio does
+  (server to `%LOCALAPPDATA%\TcAgent\app`, interop from TwinCAT, AI clients after asking).
+- `install-xaeshell.ps1 -Vsix <file>`: from the source, the server for the shell comes from a VSIX file instead of the VSIX
+  installed in Visual Studio 2022. `-BuildOnly` also checks a package.
+- `TcAgent.exe diag` names where the IDE automation (EnvDTE) was loaded from.
+- `TCAGENT_IDE_ASSEMBLIES`: further folders with the IDE's automation assemblies (a shell installed elsewhere).
+
 - **Source control bindings warning:** a solution still bound to TFS/VSS (the section in the .sln, `Scc*`/SAK entries in the
   project files, `.vspscc` files) made the IDE crash or refuse changes ("Cannot insert project") while TcAgent edited it -
   `tc_attach` and `doctor --solution` now warn and say how to unbind; TcAgent does not change these files.
@@ -25,6 +40,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - The TcUnit window keeps the last 5 results of every test per solution (`%LOCALAPPDATA%\TcAgent\tcunit\history.json`).
 
 ### Changed
+- `TcAgent.exe` is built against **EnvDTE 8.0** (NuGet EnvDTE 8.0.2 / EnvDTE80 8.0.3 instead of 17.0, plus stdole
+  7.0.3302 - Microsoft, Visual Studio SDK license as before, not shipped): it uses the EnvDTE of Visual Studio 2022 (17.0,
+  compatible) or of the 32-bit XAE Shell (8.0), which it now also finds in the shell's folder. Tested: "check" in a hidden
+  Visual Studio 2022 and in a hidden XAE Shell with the shell's own EnvDTE.
+- Messages without a server name the XAE Shell way too.
+
 - **Knowledge window reworked after a UX review** (`vsbridge/KnowledgeWindow.cs`):
   - Top bar with real tabs (the selected one underlined, a badge counts what needs attention there), the platform as a
     short link, ⟳ (F5) and a ⋯ menu with Levels …, Backup now …, Restore …, Refresh and Copy diagnostics.
@@ -116,6 +137,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   orange).
 
 ### Fixed
+- `build-vsix.ps1` could ship an older package: with a `Platform` variable in the console (e.g. `x64`) MSBuild writes to
+  `vsbridge\bin\x64\Release`, but the script only looked in `vsbridge\bin\Release` and took a package left there by an
+  earlier build. It now takes the package this build wrote, wherever it is, and stops if there is none.
+- Build warning IL3000 (`Assembly.Location` in the single-file build) in `TcAgent.exe ci` removed.
+
 - **`tc_test_results`** showed FAILED details of earlier runs next to the summary of the last one: only the last run counts now
   (and with TcUnit's per-test lines only tests that failed in it).
 - **`tc_plc_create`** with an IEC keyword, operator, standard function or type as name (e.g. method `Add`) only said "Name
@@ -125,35 +151,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **`tc_plc_search`** over a large project could run until the client gave up and the IDE connection looked lost: a time
   budget (default 40 s, `seconds` up to 240) returns the hits so far with a hint (narrow with `path`, or search the
   exported .st files).
-
-## [0.49.0] – 2026-10-31
-
-### Added
-- **TcAgent with the TwinCAT XAE Shell alone** (no Visual Studio 2022, no build tools) – preview: tested in the 32-bit shell
-  on a PC that also has Visual Studio 2022 (shell-only simulated with `TCAGENT_IDE_ASSEMBLIES`); a PC without Visual
-  Studio 2022 and the 64-bit shell are not tested yet. Every release gets the package
-  `TcAgent-XaeShell-<version>.zip` (built by `build-vsix.ps1`) with the extension prebuilt for the 32-bit shell
-  (`bridge-vs15`, built against the shell) and the 64-bit shell (`bridge-vs17`, the Visual Studio 2022 build - not tested
-  in that shell yet), the server and `install-xaeshell.ps1`. The script installs from the package without compiling and
-  copies the server into the extension's folder; on its first start the shell sets TcAgent up like Visual Studio does
-  (server to `%LOCALAPPDATA%\TcAgent\app`, interop from TwinCAT, AI clients after asking).
-- `install-xaeshell.ps1 -Vsix <file>`: from the source, the server for the shell comes from a VSIX file instead of the VSIX
-  installed in Visual Studio 2022. `-BuildOnly` also checks a package.
-- `TcAgent.exe diag` names where the IDE automation (EnvDTE) was loaded from.
-- `TCAGENT_IDE_ASSEMBLIES`: further folders with the IDE's automation assemblies (a shell installed elsewhere).
-
-### Changed
-- `TcAgent.exe` is built against **EnvDTE 8.0** (NuGet EnvDTE 8.0.2 / EnvDTE80 8.0.3 instead of 17.0, plus stdole
-  7.0.3302 - Microsoft, Visual Studio SDK license as before, not shipped): it uses the EnvDTE of Visual Studio 2022 (17.0,
-  compatible) or of the 32-bit XAE Shell (8.0), which it now also finds in the shell's folder. Tested: "check" in a hidden
-  Visual Studio 2022 and in a hidden XAE Shell with the shell's own EnvDTE.
-- Messages without a server name the XAE Shell way too.
-
-### Fixed
-- `build-vsix.ps1` could ship an older package: with a `Platform` variable in the console (e.g. `x64`) MSBuild writes to
-  `vsbridge\bin\x64\Release`, but the script only looked in `vsbridge\bin\Release` and took a package left there by an
-  earlier build. It now takes the package this build wrote, wherever it is, and stops if there is none.
-- Build warning IL3000 (`Assembly.Location` in the single-file build) in `TcAgent.exe ci` removed.
 
 ## [0.48.2] – 2026-10-31
 
@@ -742,8 +739,7 @@ coding rules, documentation sources, agent feedback, the TcAgent Chat window and
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
 [Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.50.0...HEAD
-[0.50.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.49.0...v0.50.0
-[0.49.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.48.2...v0.49.0
+[0.50.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.48.2...v0.50.0
 [0.48.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.48.1...v0.48.2
 [0.48.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.28.5...v0.48.1
 [0.28.5]: https://github.com/ThorstenBrach/TcAgent/compare/v0.28.3...v0.28.5
