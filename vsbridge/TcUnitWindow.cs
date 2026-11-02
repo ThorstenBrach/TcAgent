@@ -1629,6 +1629,17 @@ namespace TcAgentBridge
                     UpdateSelection();
                     break;
                 }
+                case "finishing":
+                {
+                    // TcUnit is done; TcAgent still reads the failure texts from the error list - the numbers now, the texts follow
+                    runningLine = null;
+                    int fp = I(ev, "passed"), ff = I(ev, "failed");
+                    progressText.Text = $"✖ {ff} failed · {fp} passed · {Seconds((DateTime.Now - runStarted).TotalSeconds)} · reading the failure messages …";
+                    progress.Value = progress.Maximum;
+                    status.Text = S(ev, "text");
+                    UpdateCounters();
+                    break;
+                }
                 case "done":
                 {
                     gotDone = true;

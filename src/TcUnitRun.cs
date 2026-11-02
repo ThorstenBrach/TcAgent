@@ -207,8 +207,17 @@ public sealed class TcUnitRun
             Step("PLC started - TcUnit is running ...");
             var outcome = Monitor(ads, project, sel, cfg.Progress, timeout);
 
-            // failure texts with EXP/ACT from the runtime messages (the PLC knows only MSG)
-            if (outcome == "finished" && tc != null) MergeLog(runStart);
+            // failure texts with EXP/ACT from the runtime messages (the PLC knows only MSG) - only if a test failed, and in a
+            // time budget: reading a large error list through the IDE takes long (thousands of tests: minutes before)
+            if (outcome == "finished" && tc != null && Results.Any(r => r.Status == "failed"))
+            {
+                emit(new JsonObject
+                {
+                    ["event"] = "finishing", ["passed"] = Results.Count(r => r.Status == "passed"), ["failed"] = Results.Count(r => r.Status == "failed"),
+                    ["text"] = "TcUnit finished - reading the failure messages from the error list ..."
+                });
+                MergeLog(runStart, TimeSpan.FromSeconds(15));
+            }
             ads.Control(AdsState.Reset);
             started = false;
 
@@ -472,10 +481,11 @@ public sealed class TcUnitRun
     }
 
     // ------------------------------------------------------------------ results from the runtime messages
-    void MergeLog(DateTime since)
+    void MergeLog(DateTime since, TimeSpan budget)
     {
         TcUnitResults log = null;
-        for (int i = 0; i < 15; i++)
+        var sw = Stopwatch.StartNew();
+        for (int i = 0; i < 15 && sw.Elapsed < budget; i++)
         {
             try
             {
@@ -485,9 +495,10 @@ public sealed class TcUnitRun
                 if (log.Finished && Results.Where(r => r.Status == "failed").All(r => Failure(log, r) != null)) break;
             }
             catch { }
+            if (sw.Elapsed + TimeSpan.FromSeconds(1) >= budget) break;
             Thread.Sleep(1000);
         }
-        if (log == null) return;
+        if (log == null) { Step("The failure messages could not be read from the error list - the messages of the PLC are shown."); return; }
         foreach (var r in Results.Where(r => r.Status == "failed"))
             if (Failure(log, r) is string f && f != r.Message) { r.Message = f; emit(Event(r)); }
     }

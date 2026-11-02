@@ -45,6 +45,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **TcUnit Tests window: the time of a suite and the total stood still while a test ran** - they only counted finished tests.
   Now they count the running test too and go on every half second, like the line of the test itself; the progress line
   shows the time of the run as well ("Running · 120 of 3751 · <test> · 2:13 min"), so a long test does not look like a hang.
+- **TcUnit run: up to a minute (and more) between the end of TcUnit and the result in the window.** After every run TcAgent
+  read the IDE error list (up to 20,000 entries, up to 15 times) for the failure texts - slow with thousands of tests, and
+  even without a failed test. Now only when a test failed, within 15 s; the window shows the numbers at once ("reading the
+  failure messages …") and the texts follow.
 - The MCP server ignores a byte order mark at the start of the input (clients on .NET Framework write one).
 - The Knowledge and TcUnit windows close the input of the TcAgent.exe they start: an older TcAgent.exe that does not know
   a command (and starts the MCP server instead) ends at once instead of waiting.
