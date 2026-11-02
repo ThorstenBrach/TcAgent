@@ -43,7 +43,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   installing (also with `-BuildOnly`) and says what to do: Unblock the ZIP, extract it again, run it again. It never removes
   the mark itself - that stays the user's decision.
 - **TcUnit Tests window: the time of a suite and the total stood still while a test ran** - they only counted finished tests.
-  Now they count the running test too and go on every half second, like the line of the test itself.
+  Now they count the running test too and go on every half second, like the line of the test itself; the progress line
+  shows the time of the run as well ("Running · 120 of 3751 · <test> · 2:13 min"), so a long test does not look like a hang.
 - The MCP server ignores a byte order mark at the start of the input (clients on .NET Framework write one).
 - The Knowledge and TcUnit windows close the input of the TcAgent.exe they start: an older TcAgent.exe that does not know
   a command (and starts the MCP server instead) ends at once instead of waiting.

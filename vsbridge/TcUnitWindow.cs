@@ -413,6 +413,8 @@ namespace TcAgentBridge
                 var running = suites.Where(x => x.Tests.Any(t => t.Status == "running")).ToList();
                 foreach (var sn in running) { foreach (var t in sn.Tests.Where(x => x.Status == "running")) UpdateTest(t); UpdateSuite(sn); }
                 if (running.Count > 0) UpdateProject();
+                // the progress line with the time of the run - it goes on even while one test takes long
+                if (runningLine != null && runStarted > DateTime.MinValue) progressText.Text = runningLine + " · " + Seconds((DateTime.Now - runStarted).TotalSeconds);
             };
             IsVisibleChanged += (s, e) => { if (IsVisible && suites.Count == 0 && !discovering) Discover(); };
             Dispatcher.ShutdownStarted += (s, e) => { try { if (running?.HasExited == false) running.StandardInput.WriteLine("cancel"); } catch { } StopFollow(); };
@@ -1237,6 +1239,7 @@ namespace TcAgentBridge
         // ------------------------------------------------------------------ run
         Process running;
         DateTime runStarted;
+        string runningLine;     // "Running · 4 of 18 · <test>" - the clock adds the time of the run
         int expected;
 
         void RunSelected()
@@ -1283,7 +1286,7 @@ namespace TcAgentBridge
             try { running = Start(exe, args.ToString(), true); }
             catch (Exception ex) { status.Text = "TcAgent.exe could not be started: " + ex.Message; Follow(); return; }
             BridgePackage.Instance?.LogLine("TcUnit run: " + exe + " " + args);
-            runStarted = DateTime.Now;
+            runStarted = DateTime.Now; runningLine = null;
             expected = 0; runTotal = 0; runFinished.Clear();
             SetRunning(true);
             UpdateSelection();
@@ -1464,7 +1467,7 @@ namespace TcAgentBridge
             if (!externalRun && S(ev, "event") != "done")
             {
                 externalRun = true;
-                runStarted = DateTime.Now; expected = 0; runTotal = 0; runFinished.Clear();
+                runStarted = DateTime.Now; runningLine = null; expected = 0; runTotal = 0; runFinished.Clear();
                 SetRunning(true);
                 runningClock.Start();
                 cancel.IsEnabled = false;                             // the run belongs to the AI client: it is stopped there
@@ -1537,7 +1540,7 @@ namespace TcAgentBridge
             {
                 if (running != null || externalRun) return;           // shown from the events of the run itself
                 followRun = true;
-                runStarted = DateTime.Now; expected = 0; runTotal = 0; runFinished.Clear();
+                runStarted = DateTime.Now; runningLine = null; expected = 0; runTotal = 0; runFinished.Clear();
                 SetRunning(true);
                 runningClock.Start();
                 cancel.IsEnabled = false;                             // started elsewhere: it is stopped there
@@ -1559,6 +1562,7 @@ namespace TcAgentBridge
                     runTotal = Math.Max(expected, L(ev, "tests").Count(r => S(r, "status") == "notrun"));
                     UpdateAll();
                     Progress($"Running · 0 of {expected} · target {TargetText()}", 0, expected);
+                    runningLine = progressText.Text;
                     break;
                 case "step":
                     status.Text = S(ev, "text");
@@ -1591,7 +1595,7 @@ namespace TcAgentBridge
                         }
                     }
                     var rem = Get(ev, "remainingSec") is int r ? $" · about {Seconds(r)} left" : Get(ev, "remainingSec") is decimal rd ? $" · about {Seconds((double)rd)} left" : "";
-                    progressText.Text = name != null ? $"Running · {index} of {total} · {name}{rem}" : $"Running · {index} of {total} finished{rem}";
+                    progressText.Text = runningLine = name != null ? $"Running · {index} of {total} · {name}{rem}" : $"Running · {index} of {total} finished{rem}";
                     break;
                 }
                 case "progress":
@@ -1599,7 +1603,7 @@ namespace TcAgentBridge
                     // the project's own progress block (tcunit.json "progress") - shown as it is
                     var parts = new[] { "current", "total", "test", "remaining" }.Select(k => Get(ev, k)).ToList();
                     if (parts[1] != null)
-                        progressText.Text = $"Running · {Convert.ToInt32(parts[0] ?? 0)} of {Convert.ToInt32(parts[1])} · {parts[2]}" + (parts[3] != null ? $" · remaining {parts[3]}" : "");
+                        progressText.Text = runningLine = $"Running · {Convert.ToInt32(parts[0] ?? 0)} of {Convert.ToInt32(parts[1])} · {parts[2]}" + (parts[3] != null ? $" · remaining {parts[3]}" : "");
                     // a test over many cycles: "cycle 3/10" from the progress block (Cycle, Cycles)
                     if (Get(ev, "cycle") != null && runningTest?.Status == "running")
                     {
