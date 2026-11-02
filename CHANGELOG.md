@@ -31,8 +31,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **XAE Shell: no TcAgent window after installing from a ZIP that was not unblocked.** Every extracted file kept the mark
   "downloaded from the internet" (Zone.Identifier), `install-xaeshell.ps1` copied it along, and the shell (.NET Framework,
   no `loadFromRemoteSources`) refused to load the marked `TcAgentBridge.dll` (0x80131515) - no window, no setup on the
-  first start, `%LOCALAPPDATA%\TcAgent\app` empty, while the script reported success. The script now removes the mark from
-  what it installs and says so; `-BuildOnly` warns about a marked package; `vsbridge\install.ps1` removes it as well.
+  first start, `%LOCALAPPDATA%\TcAgent\app` empty, while the script reported success. The script now stops before
+  installing (also with `-BuildOnly`) and says what to do: Unblock the ZIP, extract it again, run it again. It never removes
+  the mark itself - that stays the user's decision.
 - The MCP server ignores a byte order mark at the start of the input (clients on .NET Framework write one).
 - The Knowledge and TcUnit windows close the input of the TcAgent.exe they start: an older TcAgent.exe that does not know
   a command (and starts the MCP server instead) ends at once instead of waiting.

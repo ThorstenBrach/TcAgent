@@ -26,8 +26,6 @@ if (-not $isAdmin) {
 if (Get-Process devenv -ErrorAction SilentlyContinue) { throw "Visual Studio is still running - please close it" }
 New-Item -ItemType Directory -Force -Path $target | Out-Null
 Copy-Item "$here\bin\*" $target -Force
-# a marked file (source downloaded as a ZIP and not unblocked) is not loaded by Visual Studio - remove the mark
-Get-ChildItem $target -Recurse -File | Unblock-File
 Write-Host "Copied to $target"
 Write-Host "devenv /updateconfiguration ..."
 Start-Process (Join-Path $ide 'devenv.exe') -ArgumentList '/updateconfiguration' -Wait
