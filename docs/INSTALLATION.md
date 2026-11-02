@@ -50,8 +50,16 @@ Since 0.49 TcAgent is meant to work on a PC that has the TwinCAT XAE Shell alone
 .NET SDK (**preview**: see "Tested" below). Each release has a package for it: `TcAgent-XaeShell-<version>.zip`.
 
 1. Close the XAE Shell. Download the ZIP; in the Explorer right-click it > Properties > **Unblock**, then extract it into a
-   folder of its own. Without Unblock every file keeps the mark "downloaded from the internet" and the shell does not load
-   the extension - the script then stops and says so (up to 0.50.0 it installed anyway: see Troubleshooting).
+   folder of its own. The same in PowerShell, in the download folder (`<version>` as in the file name):
+
+   ```powershell
+   Unblock-File .\TcAgent-XaeShell-<version>.zip
+   Expand-Archive .\TcAgent-XaeShell-<version>.zip .\TcAgent-XaeShell
+   ```
+
+   Without Unblock every file keeps the mark "downloaded from the internet" and the shell does not load the extension -
+   the script then stops and says so (up to 0.50.0 it installed anyway: see Troubleshooting). Unblock only a ZIP you
+   downloaded from the TcAgent releases yourself.
 2. In that folder, in PowerShell:
 
    ```powershell
@@ -234,7 +242,7 @@ In addition, every client can require confirmation of individual tool calls – 
 | `tc_hmi action=controls`: "Control package not found" | Build the HMI project once in the IDE (restores the NuGet packages into `<solution>\Packages`). |
 | XAE Shell crashes during HMI/Scope changes (event log: `OutOfMemoryException`, TcXaeShell.exe) | The XAE Shell is a 32-bit process; a large project with HMI and Scope open exhausts its memory, reloading a project then crashes it. Restart the shell regularly, close designers you do not need, or use Visual Studio 2022 (64-bit) for HMI/Scope work. TwinCAT 4026 also offers a 64-bit XAE Shell (TcPkg setting `useTcXaeShell64`, see the TwinCAT installation documentation); TcAgent and `install-xaeshell.ps1` support it. TcAgent refuses unload/reload when the 32-bit shell is close to the limit. |
 | `vsbridge\install.ps1` / `uninstall.ps1`: "Administrator rights are needed" (before 0.48.2: `UnauthorizedAccessException` at `New-Item … Extensions\TcAgentBridge`) | The script writes into the Visual Studio installation. Start PowerShell with "Run as administrator" and run the script again - or install the VSIX instead (per user, no rights needed). |
-| XAE Shell: the installation ran without errors, but there is no TcAgent window and `%LOCALAPPDATA%\TcAgent\app` stays empty | The ZIP was extracted without **Unblock** first: every file kept the mark "downloaded from the internet" and the shell (.NET Framework) does not load a marked `TcAgentBridge.dll`. After 0.50.0 the script stops in this case instead of installing. Fix: close the shell, Unblock the ZIP (right-click > Properties), extract it again into an empty folder and run `install-xaeshell.ps1` again. Still no window: start `TcXaeShell.exe /log` and look into `ActivityLog.xml` (in `%APPDATA%\Microsoft\`, folder of the shell). |
+| XAE Shell: the installation ran without errors, but there is no TcAgent window and `%LOCALAPPDATA%\TcAgent\app` stays empty | The ZIP was extracted without **Unblock** first: every file kept the mark "downloaded from the internet" and the shell (.NET Framework) does not load a marked `TcAgentBridge.dll`. After 0.50.0 the script stops in this case instead of installing. Fix: close the shell, Unblock the ZIP (right-click > Properties, or `Unblock-File .\TcAgent-XaeShell-<version>.zip`), extract it again into an empty folder and run `install-xaeshell.ps1` again. Already installed with 0.50.0: in PowerShell as administrator `Get-ChildItem "${env:ProgramFiles(x86)}\Beckhoff\TcXaeShell\Common7\IDE\Extensions\TcAgent" -Recurse -File \| Unblock-File` also works (then start the shell). Still no window: start `TcXaeShell.exe /log` and look into `ActivityLog.xml` (in `%APPDATA%\Microsoft\`, folder of the shell). |
 | XAE Shell alone: `TcAgent.exe … EnvDTE.dll not found` | The automation assemblies are searched in Visual Studio 2022 and in the XAE Shell (`…\Beckhoff\TcXaeShell\Common7\IDE\PublicAssemblies`, also `C:\TwinCAT\TcXaeShell`). A shell in another folder: set `TCAGENT_IDE_ASSEMBLIES` to its `Common7\IDE\PublicAssemblies`. `TcAgent.exe diag` shows what was found. |
 | `vsbridge\install-xaeshell.ps1`: CS0234 for `SVsDifferenceService` / `IVsDifferenceService` / `__VSDIFFSERVICEOPTIONS` in `Microsoft.VisualStudio.Shell.Interop` | Fixed in 0.48.2 (the build references `Microsoft.VisualStudio.Shell.Interop.11.0` of the shell). With a newer script and the error still there: is `-ShellIde` the `Common7\IDE` folder of the XAE Shell, and is `PublicAssemblies\Microsoft.VisualStudio.Shell.Interop.11.0.dll` there? `-BuildOnly` tries the build without installing. |
 | `vsbridge\build.ps1`: CS1705 (version conflict) | Several versions of a VS assembly installed; the script uses the highest. Please report as an issue, with output. |

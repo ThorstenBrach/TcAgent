@@ -66,8 +66,9 @@ function Assert-NotBlocked([string[]]$paths) {
                  Where-Object { Get-Item $_.FullName -Stream Zone.Identifier -ErrorAction SilentlyContinue })
     if ($blocked.Count -eq 0) { return }
     throw ("$($blocked.Count) file(s) of the package are marked 'downloaded from the internet' (e.g. $($blocked[0].Name)) - the XAE Shell " +
-           "does not load the extension like that. Nothing was installed. Right-click the downloaded ZIP > Properties > Unblock, " +
-           "extract it again into an empty folder and run this script there.")
+           "does not load the extension like that. Nothing was installed. Right-click the downloaded ZIP > Properties > Unblock " +
+           "(or in PowerShell: Unblock-File <path of the ZIP>), extract it again into an empty folder and run this script there " +
+           "(docs/INSTALLATION.md, XAE Shell).")
 }
 
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
