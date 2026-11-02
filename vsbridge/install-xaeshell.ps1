@@ -57,6 +57,18 @@ function Write-ShellManifest([string]$src, [string]$dst) {
 
 function Get-ManifestVersion([string]$text) { ([regex]::Match($text, '<Identity [^>]*Version="([^"]+)"')).Groups[1].Value }
 
+# Files from a ZIP downloaded from the internet carry its mark (Zone.Identifier) when the ZIP was not unblocked before
+# extracting - Copy-Item keeps it. The shell (.NET Framework, no loadFromRemoteSources) then does not load a marked
+# TcAgentBridge.dll (0x80131515): no TcAgent window, no setup on the first start. Remove the mark from what is installed.
+function Get-Blocked([string]$path) {
+    @(Get-ChildItem $path -Recurse -File -ErrorAction SilentlyContinue | Where-Object { Get-Item $_.FullName -Stream Zone.Identifier -ErrorAction SilentlyContinue })
+}
+function Unblock-Tree([string]$path) {
+    $blocked = Get-Blocked $path
+    $blocked | Unblock-File
+    if ($blocked.Count -gt 0) { Write-Host "$($blocked.Count) file(s) carried the mark 'downloaded from the internet' - removed in $path (the shell does not load marked files)" }
+}
+
 $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
 
 function Invoke-Install {
@@ -74,6 +86,7 @@ function Invoke-Install {
             Copy-Item $serverDir (Join-Path $target 'tcagent') -Recurse -Force
             Write-Host "Server copied to $target\tcagent"
         }
+        Unblock-Tree $target
     }
     # the isolated VS 2017 shell has no /updateconfiguration switch - touching this file makes it rebuild
     # its configuration (pkgdef merge) on the next start
@@ -99,7 +112,11 @@ if (-not $Uninstall -and $package) {
     Write-ShellManifest (Join-Path $out 'extension.vsixmanifest') (Join-Path $out 'extension.vsixmanifest')
     Write-Host "Prebuilt extension for the shell base VS $shellMajor`: $out"
     if (-not (Test-Path (Join-Path $serverDir 'TcAgent.exe'))) { throw "The package has no server (folder tcagent next to this script) - extract the whole ZIP" }
-    if ($BuildOnly) { Write-Host "-BuildOnly: package checked (extension and server found), nothing installed."; return }
+    if ($BuildOnly) {
+        $blocked = (Get-Blocked $out).Count + (Get-Blocked $serverDir).Count
+        if ($blocked -gt 0) { Write-Host "$blocked file(s) of the package are marked 'downloaded from the internet' (the ZIP was not unblocked) - the installation removes the mark from what it installs." -ForegroundColor Yellow }
+        Write-Host "-BuildOnly: package checked (extension and server found), nothing installed."; return
+    }
 }
 elseif (-not $Uninstall) {
     if (-not (Test-Path (Join-Path $here 'TcAgentBridge.csproj'))) {
