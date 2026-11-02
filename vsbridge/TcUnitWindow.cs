@@ -407,7 +407,13 @@ namespace TcAgentBridge
                 if (Shortcut((System.Windows.Forms.Keys)KeyInterop.VirtualKeyFromKey(e.Key == Key.System ? e.SystemKey : e.Key), Keyboard.Modifiers == ModifierKeys.Control)) e.Handled = true;
             };
             // a test that runs over many cycles: its time (or cycle) goes on while it runs
-            runningClock.Tick += (s, e) => { foreach (var t in suites.SelectMany(x => x.Tests).Where(x => x.Status == "running")) UpdateTest(t); };
+            // the running test, its suite and the project count on while the test runs (not only when it is done)
+            runningClock.Tick += (s, e) =>
+            {
+                var running = suites.Where(x => x.Tests.Any(t => t.Status == "running")).ToList();
+                foreach (var sn in running) { foreach (var t in sn.Tests.Where(x => x.Status == "running")) UpdateTest(t); UpdateSuite(sn); }
+                if (running.Count > 0) UpdateProject();
+            };
             IsVisibleChanged += (s, e) => { if (IsVisible && suites.Count == 0 && !discovering) Discover(); };
             Dispatcher.ShutdownStarted += (s, e) => { try { if (running?.HasExited == false) running.StandardInput.WriteLine("cancel"); } catch { } StopFollow(); };
             HookIdeEvents();
@@ -947,9 +953,8 @@ namespace TcAgentBridge
                    : sn.Tests.Count > 0 && sn.Tests.All(t => t.Status is "passed" or "skipped") ? "passed" : "notrun";
             var (g, b) = Look(st);
             sn.Row.Glyph = g; sn.Row.GlyphBrush = b;
-            var done = sn.Tests.Where(t => t.Status is "passed" or "failed").ToList();
             sn.Row.Name = $"{sn.Path} ({sn.Tests.Count})";
-            sn.Row.Duration = done.Count > 0 ? Seconds(done.Sum(t => t.Duration ?? 0)) : "";
+            sn.Row.Duration = Time(sn.Tests);
             sn.Row.Description = sn.Description ?? sn.Type;
             (sn.Row.Result, sn.Row.ResultBrush) = Sum(sn.Tests);
         }
@@ -963,10 +968,21 @@ namespace TcAgentBridge
             var (g, b) = Look(st);
             projectRow.Glyph = g; projectRow.GlyphBrush = b;
             projectRow.Name = $"{project} ({all.Count})";
-            var done = all.Where(t => t.Status is "passed" or "failed").ToList();
-            projectRow.Duration = done.Count > 0 ? Seconds(done.Sum(t => t.Duration ?? 0)) : "";
+            projectRow.Duration = Time(all);
             projectRow.Description = runMode == "sequence" ? "runs suites in sequence" : runMode == "parallel" ? "runs suites in parallel" : "";
             (projectRow.Result, projectRow.ResultBrush) = Sum(all);
+        }
+
+        // the time of several tests: the finished ones plus the one running now (so far)
+        static string Time(IEnumerable<TestNode> tests)
+        {
+            double sum = 0; bool any = false;
+            foreach (var t in tests)
+            {
+                if (t.Status is "passed" or "failed") { sum += t.Duration ?? 0; any = true; }
+                else if (t.Status == "running" && t.RunningSince > DateTime.MinValue) { sum += Math.Max(0, (DateTime.Now - t.RunningSince).TotalSeconds); any = true; }
+            }
+            return any ? Seconds(sum) : "";
         }
 
         void UpdateAll()
