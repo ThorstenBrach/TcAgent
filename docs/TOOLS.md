@@ -4,6 +4,9 @@ All tools of the MCP server `tcagent`. Depending on the client they appear with 
 Write tools are recorded in the audit log; runtime tools only access target systems listed in `TCAGENT_ALLOW_TARGETS`.
 This file is generated from `src/ToolRegistry.cs`.
 
+Every tool belongs to a module (`src/Modules.cs`) that can be switched off – then the AI client does not get it, and a
+call is refused with the module's name. Plugins add tools named `x_<plugin>_<tool>`. Both: [PLUGINS.md](PLUGINS.md).
+
 ## Connection and status
 
 ### `tc_instances`

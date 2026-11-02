@@ -38,6 +38,9 @@ TcUnit did not finish in time). Pipelines can treat `3` as "retry" and `1` as "r
 
 Without arguments `TcAgent.exe` is the MCP server as before; `TcAgent.exe help` lists all options.
 
+Modules switched off in a `modules.json` ([PLUGINS.md](PLUGINS.md)) only shorten the tool list of the AI clients – the
+command line always has every function, so a pipeline does not depend on them.
+
 ## Pipeline configuration in the repository: `.tcagent/pipeline.json` and `TcAgent.exe ci`
 
 Instead of spelling out every TcAgent call in the YAML of each CI system, the PLC repository can describe its pipeline

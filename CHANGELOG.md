@@ -33,7 +33,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - Documentation: the TcUnit window follows runs started elsewhere (user guide, README), `tc_test_results` reports only
   the last run, `tc_plc_create` explains reserved names, the warning about TFS/VSS source control bindings (`tc_attach`,
   troubleshooting); the XAE Shell installation shows how to unblock the ZIP in PowerShell (`Unblock-File`) before
-  extracting it.
+  extracting it; modules and plugins in the README, TOOLS.md, KNOWLEDGE_LAYERS.md, PIPELINE.md and the agent skill;
+  the live times of the TcUnit window in TCUNIT_TESTS.md.
 
 ### Fixed
 - **XAE Shell: no TcAgent window after installing from a ZIP that was not unblocked.** Every extracted file kept the mark

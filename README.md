@@ -56,8 +56,9 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 | **Self-improvement** | Local run logs of the workflows (counts only), KPIs and trends, improvement proposals found by fixed rules – applied only after you agree, measured over the next 10 runs, reverted if they did not help; window **TcAgent Knowledge** with overview, effective knowledge, sources and history | `tc_improve` |
 | **Skill sources** | Skills, workflows and rules from Git repositories with lock file, license check and overlay; `TcAgent.exe sources sync` restores the pinned set in a pipeline | `tc_sources` |
 | **Documentation** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
+| **Modules & plugins** | Switch groups of tools on or off per user, project, team or company (a shorter tool list for the agent; the command line keeps everything); your own tools as plugins – any program that speaks MCP, with the same policy, confirmation and audit, project plugins only after your approval; tab **Modules** in the Knowledge window | `TcAgent.exe modules`, `TcAgent.exe plugins` – [docs/PLUGINS.md](docs/PLUGINS.md) |
 
-All 96 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 97 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 What you can do, explained step by step with example prompts: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 

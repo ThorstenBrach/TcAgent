@@ -89,12 +89,18 @@ line at the bottom. The status line shows the last message on the left and what 
   [section 7](#7-configuration)), otherwise the time it has been running.
 - **Switched off:** after a run the suites whose tests were all switched off are one line **⊘ switched off (n)** – open
   it to see them. The filter **Off** and a search show them where they are.
-- **Progress:** while running "Running · 12 of 87 · <test> · about 1:20 min left"; after the run its result, e.g.
+- **Progress:** while running "Running · 12 of 87 · <test> · about 1:20 min left · 2:13 min" – the time of the run, of
+  the running test, its suite and the total go on every half second, also while one test takes long; after the run its
+  result, e.g.
   "✖ 2 failed · 16 passed · 24 switched off · 12.5 s · target local runtime" (red or green). On the right the state of
   the runs with the target, e.g. "Not run yet · 9 tests · target: local runtime" or "Last run: 1 failed · 3 of 9 ticked ·
   target: local runtime". Inside one suite TcUnit calls all `TEST()` tests in the same PLC cycles (only `TEST_ORDERED()`
   tests run one after the other), so the name shown is the test called last; the results per test are exact anyway.
-  With `TcUnit.RUN()` (all suites at the same time) the bar shows only "n of N finished".
+  With `TcUnit.RUN()` (all suites at the same time) the bar shows only "n of N finished". When tests failed, the
+  numbers appear as soon as TcUnit is done ("… reading the failure messages …") and the failure texts with expected and
+  actual values follow from the error list within a few seconds.
+- **Module Tests switched off** ([PLUGINS.md](PLUGINS.md)): the window works as before and says at the top that the AI
+  agent does not get the test tools, with "Switch on (for me)".
 - **Details** (like the HTML report): name, result and time; description and test case text
   ([section 5](#5-describing-tests)); the failure as **Expected**, **Actual** and **Message**; suite, code (a link),
   the **Enable bool**; **Open code · Run again · Copy failure**; the **last 5 runs** of the test (kept per solution in

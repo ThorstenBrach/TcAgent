@@ -63,6 +63,9 @@ coding-rules\   risk-rules\   skills\<name>\SKILL.md   workflows\<name>\WORKFLOW
 lessons\        knowledge\    doc-templates\           platform.md (platform folders only)
 ```
 
+The company, team, user and project levels can also hold a `modules.json` (which groups of tools the agent gets) and a
+`plugins\` folder (own tools as MCP programs) – see [PLUGINS.md](PLUGINS.md).
+
 ### Which platform a project belongs to
 
 1. Explicitly in `<solution>\.tcagent\config.json`: `{ "platforms": ["framework-a"] }`.
