@@ -6,6 +6,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+## [0.51.0] – 2026-11-02
+
 ### Added
 - **Modules** (`src/Modules.cs`, [docs/PLUGINS.md](docs/PLUGINS.md)): the tools in 13 modules (core, plc-code, test,
   runtime, io, motion, hmi, scope, safety, docs, knowledge, packages, system) that can be switched on and off in a
@@ -26,6 +28,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   level; the status line counts the modules, plugins and tools the agent sees. `TcAgent.exe modules --json` lists the
   tool names and every level's settings, `TcAgent.exe plugins --json` the plugins.
 - The TcUnit Tests window stays open when the module Tests is switched off and says so, with "Switch on (for me)".
+
+### Changed
+- Documentation: the TcUnit window follows runs started elsewhere (user guide, README), `tc_test_results` reports only
+  the last run, `tc_plc_create` explains reserved names, the warning about TFS/VSS source control bindings (`tc_attach`,
+  troubleshooting); the XAE Shell installation shows how to unblock the ZIP in PowerShell (`Unblock-File`) before
+  extracting it.
 
 ### Fixed
 - **XAE Shell: no TcAgent window after installing from a ZIP that was not unblocked.** Every extracted file kept the mark
@@ -770,7 +778,8 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.50.0...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.51.0...HEAD
+[0.51.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.50.0...v0.51.0
 [0.50.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.48.2...v0.50.0
 [0.48.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.48.1...v0.48.2
 [0.48.1]: https://github.com/ThorstenBrach/TcAgent/compare/v0.28.5...v0.48.1
