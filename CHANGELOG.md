@@ -33,10 +33,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **Newer versions in the repo sources**: once a day the sources in use are fetched (no pull, no sign-in window) and a line in the
   chat leads to the tab Sources.
 - **About TcAgent** (⋯ > About TcAgent, `TcAgent.exe about --json`): author, license, the versions of the extension, server, IDE and
-  TwinCAT, the components with their licenses, the update switches. ⋯ also has **Check for updates**.
+  TwinCAT, the components with their licenses (the license texts in a window), the update switches. ⋯ also has **Check for updates**, which
+  always answers in a dialog.
 - **Answer language in the TcAgent Chat** (⋯ > Answer language): the language of Windows (new default), the language of the
   question, or one of the languages of the Windows user (`answerLanguage` in `chat-backends.json`). Before, the answer
   followed the question, so prepared prompts in English gave English answers.
+- Prompt list: it keeps one height while it is open, also with another category or a longer preview, so the categories stay under
+  the mouse. Many categories wrap and scroll from the fourth row on.
 - **Prompt library** (`src/Prompts.cs`, `vsbridge/ChatPrompts.cs`, [docs/KNOWLEDGE_LAYERS.md](docs/KNOWLEDGE_LAYERS.md#prompts)):
   prepared prompts as a new kind of the knowledge - `prompts\<name>.md` on every level, kind *Prompts* in the Files tab
   of the knowledge window, from repositories through Sources, in the backups. In the TcAgent Chat `/` at the start of a

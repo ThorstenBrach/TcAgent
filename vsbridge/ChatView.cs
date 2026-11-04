@@ -318,7 +318,7 @@ namespace TcAgentBridge
                 mi.Foreground = AccentBrush; mi.FontWeight = FontWeights.SemiBold;
                 menu.Items.Add(mi);
             }
-            menu.Items.Add(Item("Check for updates", CheckNow, "Ask GitHub for a new version of TcAgent now"));
+            menu.Items.Add(Item("Check for updates", () => _ = CheckNow(), "Ask GitHub for a new version of TcAgent now"));
             menu.Items.Add(Item("About TcAgent …", ShowAbout, "Author, versions, components and licenses"));
             menu.Items.Add(new Separator());
             menu.Items.Add(new MenuItem { Header = versionLabel.Text?.Length > 0 && versionLabel.Visibility == Visibility.Visible ? versionLabel.Text

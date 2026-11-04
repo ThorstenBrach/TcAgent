@@ -113,26 +113,68 @@ namespace TcAgentBridge
             return new Border { Child = line, Background = AgentBubble, BorderBrush = edge, BorderThickness = new Thickness(3, 0, 0, 0), Padding = new Thickness(6, 3, 4, 3), Margin = new Thickness(6, 2, 6, 0) };
         }
 
-        async void CheckNow()
+        // asked by the user, so the answer is a dialog in any case - never only the small status line
+        async Task CheckNow()
         {
             status.Text = "Looking for a new version …";
             var r = await Ask("update check --json --force --current " + BridgePackage.BridgeVersion);
-            if (r == null) { status.Text = "Could not check for updates: this TcAgent.exe has no update command."; return; }
+            status.Text = "";
+            if (r == null) { Message("TcAgent update", "Could not check for updates: this TcAgent.exe has no update command."); return; }
             r["notify"] = B(r, "available");         // asked for it: a skipped version counts again
             ShowUpdate(r);
-            status.Text = S(r, "error") is string e ? "Could not check for updates: " + e
-                        : B(r, "available") ? $"TcAgent {S(r, "latest")} is available." : $"TcAgent {BridgePackage.BridgeVersion} is up to date.";
-            if (S(r, "error") == null && B(r, "available")) ShowWhatsNew();
+            if (S(r, "error") is string e) Message("TcAgent update", "Could not check for updates:\n" + e);
+            else if (B(r, "available")) ShowWhatsNew();
+            else Message("TcAgent update", $"TcAgent {BridgePackage.BridgeVersion} is up to date.");
         }
+
+        // above the dialog that is open (About), otherwise above the IDE
+        static Window ActiveOwner => Application.Current?.Windows.OfType<Window>().FirstOrDefault(x => x.IsActive) ?? Application.Current?.MainWindow;
 
         static Window Dialog(string title, double width, double height)
         {
-            var w = new Window { Title = title, Width = width, Height = height, MinWidth = 380, MinHeight = 300, ShowInTaskbar = false, Owner = Application.Current?.MainWindow,
+            var w = new Window { Title = title, Width = width, Height = height, MinWidth = 380, MinHeight = 300, ShowInTaskbar = false, Owner = ActiveOwner,
                                  WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResizeWithGrip };
             if (Application.Current != null) ThemedDialogStyleLoader.SetUseDefaultThemedDialogStyles(w, true);
             w.SetResourceReference(BackgroundProperty, ThemedDialogColors.WindowPanelBrushKey);
             w.SetResourceReference(ForegroundProperty, ThemedDialogColors.WindowPanelTextBrushKey);
             return w;
+        }
+
+        static Button OkButton(Window w)
+        {
+            var ok = CardButton("OK", true);
+            ok.IsCancel = true; ok.IsDefault = true; ok.Margin = new Thickness(0); ok.MinWidth = 76;
+            ok.Click += (s, e) => w.Close();
+            return ok;
+        }
+
+        // a short answer with OK
+        static void Message(string title, string text)
+        {
+            var w = Dialog(title, 380, 160);
+            w.MinHeight = 0; w.SizeToContent = SizeToContent.Height; w.ResizeMode = ResizeMode.NoResize;
+            var sp = new StackPanel { Margin = new Thickness(14, 12, 14, 10) };
+            sp.Children.Add(new TextBlock { Text = text, TextWrapping = TextWrapping.Wrap });
+            var ok = OkButton(w);
+            ok.HorizontalAlignment = HorizontalAlignment.Right; ok.Margin = new Thickness(0, 14, 0, 0);
+            sp.Children.Add(ok);
+            w.Content = sp;
+            w.ShowDialog();
+        }
+
+        // a long text to read and copy, with OK
+        static void TextDialog(string title, string text)
+        {
+            var w = Dialog(title, 720, 560);
+            var box = new TextBox { Text = text, IsReadOnly = true, TextWrapping = TextWrapping.Wrap, FontFamily = new FontFamily("Consolas"), FontSize = 12, BorderThickness = new Thickness(0),
+                                    Background = Brushes.Transparent, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(12, 10, 12, 6) };
+            box.SetResourceReference(ForegroundProperty, ThemedDialogColors.WindowPanelTextBrushKey);
+            var ok = OkButton(w);
+            ok.HorizontalAlignment = HorizontalAlignment.Right; ok.Margin = new Thickness(12, 4, 12, 10);
+            var root = new DockPanel();
+            DockPanel.SetDock(ok, Dock.Bottom); root.Children.Add(ok); root.Children.Add(box);
+            w.Content = root;
+            w.ShowDialog();
         }
 
         static void Open(string target, Action<string> fail)
@@ -317,11 +359,17 @@ namespace TcAgentBridge
             }
 
             var now = CardButton("Check now");
-            now.Click += (s, e) => { w.Close(); CheckNow(); };
+            now.Click += async (s, e) =>
+            {
+                now.IsEnabled = false;
+                await CheckNow();
+                Show(await Ask("update check --json --current " + BridgePackage.BridgeVersion));    // the time of the last check
+                now.IsEnabled = true;
+            };
             var license = CardButton("License");
-            license.Click += (s, e) => OpenPackaged("LICENSE", RepoUrl + "/blob/main/LICENSE");
+            license.Click += (s, e) => ShowPackaged("TcAgent license", "LICENSE");
             var notices3 = CardButton("Third-party notices");
-            notices3.Click += (s, e) => OpenPackaged("THIRD-PARTY-NOTICES.md", RepoUrl + "/blob/main/THIRD-PARTY-NOTICES.md");
+            notices3.Click += (s, e) => ShowPackaged("Third-party notices", "THIRD-PARTY-NOTICES.md", "THIRD-PARTY-NOTICES-DOTNET.TXT");
             var copy = CardButton("Copy");
             copy.Click += (s, e) =>
             {
@@ -333,10 +381,7 @@ namespace TcAgentBridge
                 }
                 catch (Exception ex) { status.Text = "Could not copy: " + ex.Message; }
             };
-            var close = CardButton("Close", true);
-            close.IsCancel = true; close.IsDefault = true;
-            close.Margin = new Thickness(0);
-            close.Click += (s, e) => w.Close();
+            var close = OkButton(w);
             var bar = new DockPanel { Margin = new Thickness(12, 4, 12, 10), LastChildFill = false };
             foreach (var b in new[] { now, license, notices3, copy }) { b.MinWidth = 0; DockPanel.SetDock(b, Dock.Left); bar.Children.Add(b); }
             DockPanel.SetDock(close, Dock.Right); bar.Children.Add(close);
@@ -364,12 +409,13 @@ namespace TcAgentBridge
             await Task.CompletedTask;
         }
 
-        // the texts that came with the package; a .md may have no program here - then the page on GitHub
-        void OpenPackaged(string name, string url)
+        // the texts that came with the package, next to the TcAgent.exe that runs
+        static void ShowPackaged(string title, params string[] names)
         {
-            var f = System.IO.Path.Combine(Installer.AppDir, name);
-            if (File.Exists(f) && name == "LICENSE") { try { Process.Start("notepad.exe", "\"" + f + "\""); return; } catch { } }
-            Open(File.Exists(f) && !name.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ? f : url, t => status.Text = t);
+            var dir = System.IO.Path.GetDirectoryName(TcUnitControl.TcAgentExe() ?? Installer.Exe);
+            var parts = names.Select(n => System.IO.Path.Combine(dir, n)).Where(File.Exists).Select(f => File.ReadAllText(f, Encoding.UTF8).Replace("\r\n", "\n").Replace("\n", "\r\n")).ToList();
+            if (parts.Count == 0) Message(title, $"{names[0]} was not found in {dir}.\nIt is also in the repository: {RepoUrl}");
+            else TextDialog(title, string.Join("\r\n\r\n", parts));
         }
     }
 }

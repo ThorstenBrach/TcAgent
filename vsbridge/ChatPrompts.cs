@@ -48,7 +48,7 @@ namespace TcAgentBridge
         readonly WrapPanel promptCategories = new WrapPanel { Margin = new Thickness(6, 5, 6, 3) };
         readonly ListBox promptList = new ListBox { BorderThickness = new Thickness(0), MaxHeight = 200, Background = Brushes.Transparent, Focusable = false };
         readonly TextBlock promptOrigin = new TextBlock { FontSize = 11, Opacity = 0.65, TextTrimming = TextTrimming.CharacterEllipsis };
-        readonly TextBlock promptPreview = new TextBlock { TextWrapping = TextWrapping.Wrap, MaxHeight = 110, TextTrimming = TextTrimming.CharacterEllipsis };
+        readonly TextBlock promptPreview = new TextBlock { TextWrapping = TextWrapping.Wrap, Height = 84, TextTrimming = TextTrimming.CharacterEllipsis };
         readonly StackPanel promptForm = new StackPanel { Margin = new Thickness(8, 6, 8, 8), Visibility = Visibility.Collapsed };
         readonly StackPanel promptChoose = new StackPanel();
         readonly Button promptsButton = new Button { Content = "Prompts", Padding = new Thickness(6, 1, 6, 1), Margin = new Thickness(0, 0, 4, 0), ToolTip = "Prepared prompts (or type / at the start of a line)" };
@@ -69,7 +69,8 @@ namespace TcAgentBridge
             previewText.Children.Add(promptOrigin); previewText.Children.Add(promptPreview);
             var preview = new Border { Background = AgentBubble, Child = previewText };
             foreach (var t in new[] { hint, promptOrigin, promptPreview }) t.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
-            promptChoose.Children.Add(promptCategories);
+            // many categories: they wrap, from the fourth row on they scroll - the list stays where it is
+            promptChoose.Children.Add(new ScrollViewer { Content = promptCategories, MaxHeight = 68, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Focusable = false });
             promptChoose.Children.Add(promptList);
             promptChoose.Children.Add(Line()); promptChoose.Children.Add(preview);
             promptChoose.Children.Add(Line()); promptChoose.Children.Add(hint);
@@ -113,7 +114,12 @@ namespace TcAgentBridge
         {
             var first = !PromptsOpen;
             promptTokenStart = tokenStart;
-            if (first) { promptCategory = null; LoadPrompts(); }
+            if (first)
+            {
+                promptCategory = null; LoadPrompts();
+                // one height while the list is open, the height of "All": changing the category must not move the chips under the mouse
+                promptList.Height = Math.Min(promptList.MaxHeight, prompts.Count * 22 + 44);
+            }
             FillPrompts(query);
             if (promptList.Items.OfType<ListBoxItem>().Any(i => i.Tag is PromptItem) || prompts.Count == 0 && first)
             {
