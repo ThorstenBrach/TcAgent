@@ -31,7 +31,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -62,6 +62,7 @@ public static partial class Cli
         // modules.json and the plugin folders only (Modules.cs, Plugins.cs)
         if (args[0].Equals("modules", StringComparison.OrdinalIgnoreCase)) return Modules.RunCli(args);
         if (args[0].Equals("plugins", StringComparison.OrdinalIgnoreCase)) return Plugins.RunCli(args);
+        if (args[0].Equals("prompts", StringComparison.OrdinalIgnoreCase)) return Prompts.RunCli(args);   // Prompts.cs - files only, the list for the chat
         // the elevated part of tc_packages_change (Packages.cs), started by TcAgent itself through the UAC prompt
         if (args[0].Equals("tcpkg-elevated", StringComparison.Ordinal)) return ToolRegistry.RunElevatedTcpkg(args);
         Options o;
@@ -947,6 +948,9 @@ public static partial class Cli
       The tool groups the AI client sees (core, plc-code, test, runtime, io, motion, hmi, scope, safety, docs, knowledge,
       packages, system, plugin:<id>). modules.json on the levels company, team, user, project - the later level wins
       unless company or team locked the module; core cannot be switched off. The command line keeps every tool.
+
+  TcAgent.exe prompts [list] [--solution <sln>] [--json]
+      The prompts of the prompt library that apply (prompts\<name>.md on the knowledge levels), chosen in the chat with /.
 
   TcAgent.exe plugins [list] [--solution <sln>]
   TcAgent.exe plugins approve|revoke <id> [--solution <sln>]

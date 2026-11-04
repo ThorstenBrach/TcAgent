@@ -4,7 +4,7 @@
 //   Overview       what the agent gets in this project (each count leads to the Files tab), what needs attention, KPI tiles
 //                  (runs, first-time-right, failed checks, corrections, minutes per run, gate stops - the last 10 runs
 //                  against the 10 before, with a sparkline), the workflows, open improvement proposals, frequent errors
-//   Files          coding rules, risk rules, skills, workflows, lessons and templates of every level with their state
+//   Files          coding rules, risk rules, skills, workflows, lessons, templates and prompts of every level with their state
 //                  (✓ applies, ↷ replaced, ⊘ switched off, ✎ changed locally ...) - filter by kind and level; new (from a
 //                  template), open, open the folder, move to another level, delete (own levels), switch off / on - toolbar,
 //                  context menu, Del; per level kept in Git: local changes, commits behind/ahead, Fetch / Pull / Commit / Push
@@ -122,9 +122,9 @@ namespace TcAgentBridge
         readonly StackPanel proposals = new StackPanel { Margin = new Thickness(8, 0, 8, 6) };
         readonly TextBlock facts = new TextBlock { Margin = new Thickness(8, 4, 8, 8), TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
         // files
-        static readonly string[] KindIds = { "coding-rules", "risk-rules", "skills", "workflows", "lessons", "doc-templates" };
+        static readonly string[] KindIds = { "coding-rules", "risk-rules", "skills", "workflows", "lessons", "doc-templates", "prompts" };
         static readonly Dictionary<string, string> KindNames = new Dictionary<string, string>
-            { ["coding-rules"] = "Coding rules", ["risk-rules"] = "Risk rules", ["skills"] = "Skill", ["workflows"] = "Workflow", ["lessons"] = "Lessons", ["doc-templates"] = "Doc template" };
+            { ["coding-rules"] = "Coding rules", ["risk-rules"] = "Risk rules", ["skills"] = "Skill", ["workflows"] = "Workflow", ["lessons"] = "Lessons", ["doc-templates"] = "Doc template", ["prompts"] = "Prompt" };
         static string KindName(string k) => k != null && KindNames.TryGetValue(k, out var n) ? n : k;
         readonly ComboBox kindBox = new ComboBox { MinWidth = 120, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center, ToolTip = "Filter by kind" };
         readonly CheckBox onlyApplied = new CheckBox { Content = "Only what applies", Margin = new Thickness(4, 0, 10, 0), VerticalAlignment = VerticalAlignment.Center, IsChecked = false };
@@ -524,7 +524,7 @@ namespace TcAgentBridge
             Columns(changes, ("Change", 150, nameof(Line.C1)), ("Date", 90, nameof(Line.C2)), ("What", 360, nameof(Line.C3)),
                     ("Before", 110, nameof(Line.C4)), ("After (runs)", 130, nameof(Line.C5)), ("Result", 110, "!" + nameof(Line.C6)));
 
-            kindBox.ItemsSource = new[] { "All kinds", "Coding rules", "Risk rules", "Skills", "Workflows", "Lessons", "Doc templates" };
+            kindBox.ItemsSource = new[] { "All kinds", "Coding rules", "Risk rules", "Skills", "Workflows", "Lessons", "Doc templates", "Prompts" };
             kindBox.SelectedIndex = 0;
             kindBox.SelectionChanged += (s, e) => FillEntries();
             onlyApplied.Click += (s, e) => FillEntries();
@@ -1322,7 +1322,7 @@ namespace TcAgentBridge
         {
             var levels = Levels(true);
             if (levels.Count == 0) { Hint("No level to create files at."); return; }
-            var kinds = new[] { "coding-rules", "risk-rules", "skills", "workflows", "lessons" };
+            var kinds = new[] { "coding-rules", "risk-rules", "skills", "workflows", "lessons", "prompts" };
             var names = kinds.Select(KindName).ToArray();
             var kind0 = KindName(kinds.Contains(KindFilter) ? KindFilter : "skills");
             var level0 = levels.Any(x => x.Level == "project") ? levels.First(x => x.Level == "project").Label : levels[0].Label;
@@ -1524,7 +1524,7 @@ namespace TcAgentBridge
 
         // ------------------------------------------------------------------ dialogs
         /// <summary>A dialog in the colors of the IDE (light, dark, blue theme).</summary>
-        static Window Dialog(string title, double minWidth, bool fixedSize = true)
+        internal static Window Dialog(string title, double minWidth, bool fixedSize = true)
         {
             var w = new Window { Title = title, MinWidth = minWidth, WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Application.Current?.MainWindow, ShowInTaskbar = false,
                                  ResizeMode = fixedSize ? ResizeMode.NoResize : ResizeMode.CanResizeWithGrip, SizeToContent = fixedSize ? SizeToContent.WidthAndHeight : SizeToContent.Manual };
@@ -1535,7 +1535,7 @@ namespace TcAgentBridge
         }
 
         // OK and Cancel at the bottom right
-        static StackPanel Buttons(Window w, Button ok, params Button[] more)
+        internal static StackPanel Buttons(Window w, Button ok, params Button[] more)
         {
             var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 12, 0, 0) };
             ok.MinWidth = 86; ok.IsDefault = true; ok.Margin = new Thickness(0, 0, 6, 0);

@@ -60,7 +60,8 @@ project          <solution>\.tcagent\   – belongs to 0…n platforms, has no p
 
 ```
 coding-rules\   risk-rules\   skills\<name>\SKILL.md   workflows\<name>\WORKFLOW.md
-lessons\        knowledge\    doc-templates\           platform.md (platform folders only)
+lessons\        knowledge\    doc-templates\           prompts\<name>.md
+platform.md (platform folders only)
 ```
 
 The company, team, user and project levels can also hold a `modules.json` (which groups of tools the agent gets) and a
@@ -151,6 +152,25 @@ everything.
 | Knowledge sources, documentation templates | one file per source / template | collected; platform sources only if the project belongs to that platform |
 
 `locked` stops a replacement in every row.
+
+## Prompts
+
+Prepared prompts for people (skills and workflows are for the agent), chosen in the TcAgent Chat with `/` or **Prompts**.
+One file `prompts\<name>.md` per prompt on any level; the file name is the name in the chat, and a later level replaces a
+prompt of the same name. They can be switched off, locked, backed up and installed from a source like every other kind.
+
+```markdown
+---
+description: TcUnit tests for the open function block
+metadata:
+  tcagent-category: Tests
+  tcagent-tags: tcunit, test
+---
+Write TcUnit tests for {object}. Cover the normal sequence, the error path and {input:extra cases to cover}.
+```
+
+Placeholders: `{object}` (open object), `{selection}`, `{solution}`, `{input:<question>}` (asked before inserting). A value
+that is not there stays visible in the text. `TcAgent.exe prompts [--solution <sln>] [--json]` lists what applies.
 
 ## Skills
 

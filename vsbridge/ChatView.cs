@@ -111,15 +111,16 @@ namespace TcAgentBridge
             scroller.SizeChanged += (s, e) => UpdateBubbleWidths();
             BuildEmptyState();
             var area = new Grid();
-            area.Children.Add(scroller); area.Children.Add(emptyState);
+            area.Children.Add(scroller); area.Children.Add(emptyState); area.Children.Add(BuildPromptPanel());
 
             // input in a rounded frame: chips (editor context, attachments), the text with a placeholder, the buttons; the keys below
             var row = new DockPanel { Margin = new Thickness(4, 2, 4, 4) };
             var right = new StackPanel { Orientation = Orientation.Horizontal };
             right.Children.Add(stop); right.Children.Add(send);
             DockPanel.SetDock(right, Dock.Right);
+            DockPanel.SetDock(promptsButton, Dock.Left);
             DockPanel.SetDock(attach, Dock.Left);
-            row.Children.Add(right); row.Children.Add(attach);
+            row.Children.Add(right); row.Children.Add(promptsButton); row.Children.Add(attach);
             row.Children.Add(new FrameworkElement());
             chips.Children.Add(contextChip);
             BuildContextChip();
@@ -132,7 +133,7 @@ namespace TcAgentBridge
             var frame = new Border { CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1), Margin = new Thickness(6, 2, 6, 0), Child = box };
             frame.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
             // the keys in full, wrapped when the window is narrow (never cut off)
-            var keys = new TextBlock { Text = "Enter send · Shift+Enter new line · ↑/↓ earlier prompts · Esc stop (while working) or back to the editor · Ctrl+V pastes files and screenshots",
+            var keys = new TextBlock { Text = "Enter send · Shift+Enter new line · / prepared prompts · ↑/↓ earlier prompts · Esc stop (while working) or back to the editor · Ctrl+V pastes files and screenshots",
                                        Opacity = 0.55, FontSize = 11, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(10, 2, 8, 0) };
             keys.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
 
@@ -364,6 +365,12 @@ namespace TcAgentBridge
             if (where != null || fromCode)
                 panel.Children.Add(Selectable((fromCode ? "from code" + (where != null ? " · " : "") : "") + (where ?? ""), 11, 0.6));
             foreach (var tb in panel.Children.OfType<TextBox>()) tb.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            if (!fromCode && !string.IsNullOrWhiteSpace(text))
+            {
+                var save = new Hyperlink(new Run("Save as prompt …")) { ToolTip = "Keep this message in the prompt library" };
+                save.Click += (s, e) => SaveAsPrompt(text);
+                panel.Children.Add(new TextBlock(save) { FontSize = 11, Opacity = 0.7, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 2, 0, 0) });
+            }
             AddMessage(new Border
             {
                 Tag = "user", HorizontalAlignment = HorizontalAlignment.Right, MaxWidth = BubbleMax, Margin = new Thickness(40, 6, 0, 6),
@@ -755,6 +762,7 @@ namespace TcAgentBridge
         bool InputKey(KeyEventArgs e)
         {
             var mods = Keyboard.Modifiers;
+            if (PromptKey(e)) return true;
             if (e.Key == Key.Enter && (mods & ModifierKeys.Shift) == 0) { Send(); return true; }
             if (e.Key == Key.V && (mods & ModifierKeys.Control) != 0 && PasteSpecial()) return true;
             if (e.Key == Key.Up && mods == ModifierKeys.None && input.GetLineIndexFromCharacterIndex(input.CaretIndex) <= 0) return HistoryStep(-1);

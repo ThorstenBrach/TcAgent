@@ -30,7 +30,7 @@ public static class KnowledgeBackup
     /// <summary>What belongs to the knowledge of a level (folders and files directly below its root).</summary>
     public static readonly string[] Parts =
     {
-        "coding-rules", "coding-rules.md", "risk-rules", "risk-rules.md", "skills", "workflows", "lessons", "lessons.md", "doc-templates",
+        "coding-rules", "coding-rules.md", "risk-rules", "risk-rules.md", "skills", "workflows", "lessons", "lessons.md", "doc-templates", "prompts",
         "platforms", "platform.md", "knowledge.md", "sources.json", "skills.lock.json", "disabled.json", "config.json"
     };
 

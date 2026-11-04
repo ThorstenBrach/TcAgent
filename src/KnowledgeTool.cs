@@ -16,18 +16,18 @@ namespace TcAgent;
 
 public sealed partial class ToolRegistry
 {
-    internal static readonly string[] KnowledgeKinds = { "coding-rules", "risk-rules", "skills", "workflows", "lessons", "doc-templates" };
+    internal static readonly string[] KnowledgeKinds = { "coding-rules", "risk-rules", "skills", "workflows", "lessons", "doc-templates", Prompts.Kind };
 
     void RegisterKnowledge()
     {
         Add("tc_knowledge", "The knowledge the agent gets and where it comes from - levels company / user / project and the platform " +
                             "(automation framework) of the project: action=platforms (which platform, why; ambiguous = ask the user with tc_ask_user), " +
-                            "set_platform platforms=<names> (store it in .tcagent\\config.json), list kind=coding-rules|risk-rules|lessons|doc-templates " +
+                            "set_platform platforms=<names> (store it in .tcagent\\config.json), list kind=coding-rules|risk-rules|lessons|doc-templates|prompts " +
                             "(every file with its level and status), effective (what applies here and why), why name=<kind/name or name>, " +
                             "disable/enable key=<kind/name> scope=user|project (switch a file off without changing it), " +
                             "split kind=... scope=project|personal (one file per topic instead of a former single file; dryRun first).",
             Schema(Req(P("action", "string", "platforms, set_platform, list, effective, why, disable, enable or split")),
-                   P("kind", "string", "list/split: coding-rules, risk-rules, skills, lessons or doc-templates (list: default all)"),
+                   P("kind", "string", "list/split: coding-rules, risk-rules, skills, lessons, doc-templates or prompts (list: default all)"),
                    P("platforms", "string", "set_platform: comma-separated platform names, or 'none'"),
                    P("name", "string", "why: name of a file (e.g. naming or coding-rules/naming)"),
                    P("key", "string", "disable/enable: <kind>/<name>, e.g. coding-rules/naming"),
@@ -138,6 +138,7 @@ public sealed partial class ToolRegistry
         "workflows" => Workflows.Entries(dir, pi.Active),
         "lessons" => KnowledgeLayers.Resolve("lessons", dir, pi.Active, false),
         "doc-templates" => KnowledgeLayers.Resolve("doc-templates", dir, pi.Active, false, pattern: "*.*"),
+        Prompts.Kind => Prompts.Entries(dir, pi.Active),
         _ => throw new Exception("kind: " + string.Join(", ", KnowledgeKinds))
     };
 }

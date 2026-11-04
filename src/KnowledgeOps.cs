@@ -19,7 +19,7 @@ namespace TcAgent;
 
 public static class KnowledgeOps
 {
-    public static readonly string[] NewKinds = { "coding-rules", "risk-rules", "skills", "workflows", "lessons" };
+    public static readonly string[] NewKinds = { "coding-rules", "risk-rules", "skills", "workflows", "lessons", "prompts" };
 
     /// <summary>The root of a level name: built-in, company, user, team, team:&lt;folder&gt;, platform:&lt;name&gt; (the user's), project.</summary>
     public static string RootOf(string solutionDir, string level)
@@ -87,6 +87,10 @@ public static class KnowledgeOps
             case "lessons":
                 file = Path.Combine(root, "lessons", $"{DateTime.Now:yyyy-MM-dd}-{slug}.md");
                 text = $"## {title}\n- id: L{DateTime.Now:yyyyMMdd-HHmmss} · date: {DateTime.Now:yyyy-MM-dd} · tags:  · tool: \n- **Symptom:** what exactly happened (error text, behaviour)\n- **Cause:** why it happens\n- **Solution:** exactly what fixed it\n";
+                break;
+            case "prompts":
+                file = Path.Combine(root, "prompts", slug + ".md");
+                text = $"---\ndescription: {title}\nmetadata:\n  tcagent-category: General\n  tcagent-tags: \n---\nThe prompt. Placeholders: {{object}} (open object), {{selection}}, {{solution}}, {{input:question asked before inserting}}.\n";
                 break;
             case "risk-rules":
                 file = Path.Combine(root, "risk-rules", slug + ".md");

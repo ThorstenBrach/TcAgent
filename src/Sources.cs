@@ -29,7 +29,7 @@ public static class Sources
     public const string LockFile = "skills.lock.json";
     public const string ConfigName = "sources.json";
     public static readonly Dictionary<string, string> FolderKinds = new() { ["skills"] = Skills.MainFile, ["workflows"] = Workflows.MainFile };
-    public static readonly string[] FileKinds = { "coding-rules", "risk-rules", "lessons" };
+    public static readonly string[] FileKinds = { "coding-rules", "risk-rules", "lessons", "prompts" };
     static readonly string[] ScriptExt = { ".ps1", ".psm1", ".py", ".sh", ".bash", ".js", ".mjs", ".ts", ".bat", ".cmd", ".exe", ".dll", ".vbs" };
 
     public sealed class Source

@@ -31,6 +31,7 @@
     <Compile Include="..\..\src\KnowledgeOps.cs" Link="src\KnowledgeOps.cs" />
     <Compile Include="..\..\src\Modules.cs" Link="src\Modules.cs" />
     <Compile Include="..\..\src\Plugins.cs" Link="src\Plugins.cs" />
+    <Compile Include="..\..\src\Prompts.cs" Link="src\Prompts.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

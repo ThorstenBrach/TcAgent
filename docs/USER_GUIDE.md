@@ -116,6 +116,12 @@ work without the extension. The extension runs **inside** the IDE process and ad
   New chat, Copy conversation), *Windows* (TcUnit Tests, Knowledge), *Setup and help* (Set up clients, Copy diagnostics,
   Open user guide) and the version. The result of **Set up clients** is one line at the top ("TcAgent x is set up for n
   clients – restart the open ones") with **Details** (the files written, user folders as %LOCALAPPDATA% / %USERPROFILE%).
+- **Prepared prompts** – type **/** at the start of a line in the input, or click **Prompts**: a list above the input with
+  search (name, description, tags), categories and a preview. Arrow keys or a click choose, writing the name works too;
+  Enter puts the prompt into the input so you can adapt it, Ctrl+Enter inserts and sends, Esc closes. `{object}`,
+  `{selection}` and `{solution}` are filled from the editor, `{input:…}` is asked first. **Save as prompt …** under your
+  own message keeps it. The prompts are files of the knowledge: kind *Prompts* in the Files tab of the knowledge window,
+  from repositories through the Sources tab like skills ([KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md#prompts)).
 - **TcAgent Knowledge** – a tool window with everything the agent knows about your work and where it comes
   from: see [The knowledge window](#the-knowledge-window).
 - **Documents in the chat** – paste (Ctrl+V), drop or attach (**📎 Attach …**) manuals, data sheets, screenshots and long texts. Text files

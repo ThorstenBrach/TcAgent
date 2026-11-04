@@ -161,7 +161,7 @@ The knowledge the agent gets and where it comes from – levels company (`TCAGEN
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `action` | string | yes | `platforms`, `set_platform`, `list`, `effective`, `why`, `disable`, `enable` or `split` |
-| `kind` | string |  | list/split: `coding-rules`, `risk-rules`, `lessons` or `doc-templates` (list: default all) |
+| `kind` | string |  | list/split: `coding-rules`, `risk-rules`, `lessons`, `doc-templates` or `prompts` (list: default all) |
 | `platforms` | string |  | set_platform: comma-separated names or `none` |
 | `name` | string |  | why: file name, e.g. `naming` or `coding-rules/naming` |
 | `key` | string |  | disable/enable: `<kind>/<name>` |

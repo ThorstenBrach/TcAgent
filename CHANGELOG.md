@@ -6,6 +6,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+### Added
+- **Prompt library** (`src/Prompts.cs`, `vsbridge/ChatPrompts.cs`, [docs/KNOWLEDGE_LAYERS.md](docs/KNOWLEDGE_LAYERS.md#prompts)):
+  prepared prompts as a new kind of the knowledge - `prompts\<name>.md` on every level, kind *Prompts* in the Files tab
+  of the knowledge window, from repositories through Sources, in the backups. In the TcAgent Chat `/` at the start of a
+  line or the button **Prompts** opens a list above the input with search, categories and a preview; Enter inserts the
+  prompt (it is not sent, it can be adapted), Ctrl+Enter inserts and sends. `{object}`, `{selection}`, `{solution}` are
+  filled from the editor, `{input:…}` is asked in a short form; recently used prompts come first; **Save as prompt …** under
+  an own message. Five neutral prompts are shipped. `TcAgent.exe prompts [--json]`.
+
 ## [0.51.0] – 2026-11-02
 
 ### Added

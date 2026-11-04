@@ -26,7 +26,7 @@ public sealed partial class ToolRegistry
                    P("url", "string", "add: Git URL or path of the repository"),
                    P("ref", "string", "add: branch or tag (default HEAD)"),
                    P("item", "string", "install/pull/diff: <source>/<name> or <name>; promote: <kind>/<name>, e.g. skills/driver-fb"),
-                   P("kind", "string", "install: skills, workflows, coding-rules, risk-rules or lessons (when a name exists in several kinds)"),
+                   P("kind", "string", "install: skills, workflows, coding-rules, risk-rules, lessons or prompts (when a name exists in several kinds)"),
                    P("query", "string", "search: words in name or description"),
                    P("scope", "string", "add: personal (default) or project; install: personal (default), project, team, company, platform:<name> or company-platform:<name>; changes/merge/propose/revert/detach/uninstall: the level if installed on several; promote: personal, team, platform:<name> or company"),
                    P("acceptLicense", "boolean", "install/pull: take over an item whose license is neither accepted nor refused (e.g. copyleft) - after the user checked it"),
