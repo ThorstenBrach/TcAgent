@@ -488,7 +488,9 @@ namespace TcAgentBridge
                                   A(RestoreLabel, "Restore a level, a file or a skill from a backup", RestoreBackup),
                                   Sep,
                                   A("Refresh", "Read the knowledge and the run logs again", RefreshAll, null, "F5"),
-                                  A("Copy diagnostics", "Versions of TcAgent, the extension, TwinCAT and the IDEs for the Diagnostics field of an issue", () => CopyDiagnostics(t => Info(t))));
+                                  A("Copy diagnostics", "Versions of TcAgent, the extension, TwinCAT and the IDEs for the Diagnostics field of an issue", () => CopyDiagnostics(t => Info(t))),
+                                  Sep,
+                                  A("Reset TcAgent …", "Back to a fresh installation, to choose levels, platforms, sources and plugins again - nothing is deleted", ResetTcAgent));
             moreMenu.PlacementTarget = more; moreMenu.Placement = PlacementMode.Bottom;
             more.Click += (s, e) => moreMenu.IsOpen = true;
             foreach (var e in new UIElement[] { platform, refresh, more }) right.Children.Add(e);
@@ -2322,6 +2324,56 @@ namespace TcAgentBridge
             var f = S((platformList.SelectedItem as Line)?.D, "file");
             if (f == null || !File.Exists(f)) { Hint("This platform has no platform.md of its own (only a folder) - \"New …\" creates one."); return; }
             OpenInEditor(f);
+        }
+
+        // back to a fresh installation (src/Reset.cs). Only a mouse click on the red button after typing the words: no Enter
+        async void ResetTcAgent()
+        {
+            var (read, plan) = await Cli("reset --json", "Reading");
+            if (!read) { Error("This TcAgent.exe cannot reset yet: " + plan); return; }
+            var d = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(plan);
+            var items = Strings(d, "items");
+            var connections = Strings(d, "connections");
+            if (items.Count + connections.Count == 0) { Info("Nothing to reset: TcAgent is as freshly installed."); return; }
+            var w = Dialog("Reset TcAgent", 500);
+            var sp = new StackPanel { Margin = new Thickness(14, 12, 14, 10), MaxWidth = 520 };
+            TextBlock Text(string t, double opacity = 1, double top = 0) => new TextBlock { Text = t, TextWrapping = TextWrapping.Wrap, Opacity = opacity, Margin = new Thickness(0, top, 0, 0) };
+            sp.Children.Add(new TextBlock { Text = "TcAgent goes back to a fresh installation", FontSize = 15, FontWeight = FontWeights.SemiBold });
+            sp.Children.Add(Text("Afterwards you choose levels, platforms, sources and plugins again.", 1, 4));
+            sp.Children.Add(Text("MOVED AWAY, NOT DELETED", 0.7, 10));
+            sp.Children.Add(Text(string.Join(", ", items) + "\nThey go to %LOCALAPPDATA%\\TcAgent\\reset-<date>\\ and no longer take effect."));
+            if (connections.Count > 0)
+            {
+                sp.Children.Add(Text("CONNECTIONS REMOVED", 0.7, 10));
+                sp.Children.Add(Text(string.Join(", ", connections) + "\nThe connected folders themselves stay as they are."));
+            }
+            sp.Children.Add(Text("STAYS", 0.7, 10));
+            sp.Children.Add(Text("The program with its built-in knowledge, your projects with their .tcagent, feedback, run logs, chat settings."));
+            sp.Children.Add(Text("Close other AI clients first: a running plugin cannot be moved.", 0.8, 10));
+            sp.Children.Add(Text("Type delete all to confirm:", 1, 12));
+            var box = new TextBox { Margin = new Thickness(0, 4, 0, 0), Padding = new Thickness(3) };
+            sp.Children.Add(box);
+            var go = new Button { Content = "Reset", MinWidth = 86, IsEnabled = false, Margin = new Thickness(0, 0, 6, 0), Padding = new Thickness(8, 2, 8, 2) };
+            box.TextChanged += (s, e) =>
+            {
+                go.IsEnabled = box.Text == "delete all";
+                if (go.IsEnabled) { go.Background = new SolidColorBrush(Color.FromRgb(0xD1, 0x34, 0x38)); go.Foreground = Brushes.White; }
+                else { go.ClearValue(BackgroundProperty); go.ClearValue(ForegroundProperty); }
+            };
+            go.Click += (s, e) => w.DialogResult = true;
+            var bar = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(0, 14, 0, 0) };
+            bar.Children.Add(go);
+            bar.Children.Add(new Button { Content = "Cancel", MinWidth = 86, IsCancel = true });
+            sp.Children.Add(bar);
+            w.Content = sp;
+            w.Loaded += (s, e) => box.Focus();
+            if (w.ShowDialog() != true) return;
+            ChatControl.Instance?.EndSession();          // the chat's server holds its plugins open
+            await System.Threading.Tasks.Task.Delay(1500);
+            var (ok, output) = await Cli("reset --confirm " + Quote("delete all"), "Resetting");
+            Report(ok, output, "Reset TcAgent");
+            Load();
+            if (ok) Info("TcAgent is reset. Run \"Set up clients\" in the chat so the AI clients get it too.");
         }
 
         // the folders of TCAGENT_PLATFORMS in settings.json: repositories of their own, connected to TcAgent

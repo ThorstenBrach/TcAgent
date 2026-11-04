@@ -31,7 +31,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "about" or "shared" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "about" or "shared" or "reset" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -65,6 +65,7 @@ public static partial class Cli
         if (args[0].Equals("update", StringComparison.OrdinalIgnoreCase)) return UpdateCli(args);       // Updates.cs - no solution, no IDE
         if (args[0].Equals("about", StringComparison.OrdinalIgnoreCase)) return AboutCli();
         if (args[0].Equals("shared", StringComparison.OrdinalIgnoreCase)) return SharedCli(args);       // SharedFolders.cs - files only
+        if (args[0].Equals("reset", StringComparison.OrdinalIgnoreCase)) return ResetCli(args);         // Reset.cs - files only
         if (args[0].Equals("prompts", StringComparison.OrdinalIgnoreCase)) return Prompts.RunCli(args);   // Prompts.cs - files only, the list for the chat
         // the elevated part of tc_packages_change (Packages.cs), started by TcAgent itself through the UAC prompt
         if (args[0].Equals("tcpkg-elevated", StringComparison.Ordinal)) return ToolRegistry.RunElevatedTcpkg(args);
@@ -963,6 +964,11 @@ public static partial class Cli
   TcAgent.exe shared [list|check|add|keep|remove] [--path <folder or file>] [--all | --solution <sln>] [--json]
       Folders the agent may read in the TcAgent Chat, also searched by tc_docs. add keeps a folder for the solution or --all,
       keep a copy of a file, check says why a folder may not be shared (drive, user profile, system folders).
+
+  TcAgent.exe reset [--json]
+  TcAgent.exe reset --confirm ""delete all""
+      Back to a fresh installation: without --confirm it lists what would change. Your knowledge, plugins and modules move to
+      %LOCALAPPDATA%\TcAgent\reset-<date>\ and the connections leave settings.json, nothing is deleted. Projects stay as they are.
 
   TcAgent.exe about --json
       Versions of the server, TwinCAT and the components with their licenses.

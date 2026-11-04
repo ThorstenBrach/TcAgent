@@ -137,6 +137,9 @@ work without the extension. The extension runs **inside** the IDE process and ad
   their licenses, and the two switches for the daily checks. What they send: [SECURITY.md](../SECURITY.md).
 - **Edit a prompt** – right-click it in the list. Your own prompt opens as it is. A built-in, company or team prompt stays unchanged:
   **Edit my copy** puts a copy into your folder (`%LOCALAPPDATA%\TcAgent\prompts\`), which replaces it for you.
+- **Reset TcAgent** – Knowledge window, **⋯ > Reset TcAgent**: back to a fresh installation, when levels, platforms, sources or plugins should be
+  chosen again. Type `delete all` to confirm. Nothing is deleted: your files move to `%LOCALAPPDATA%\TcAgent\reset-<date>\` and the connections
+  leave `settings.json`. Projects stay as they are. Run **Set up clients** afterwards.
 - **Prepared prompts** – type **/** at the start of a line in the input, or click **Prompts**: a list above the input with
   search (name, description, tags), categories and a preview. Arrow keys or a click choose, writing the name works too;
   Enter puts the prompt into the input so you can adapt it, Ctrl+Enter inserts and sends, Esc closes. `{object}`,
@@ -1966,6 +1969,7 @@ Output next to it, outside `.tcagent`:
 | `logs\tcagent-<date>.log` | Daily log of every tool call |
 | `chat-backends.json` | TcAgent Chat backends, `askHotkey`, `showOnStartup`, `answerLanguage` |
 | `shared-folders.json`, `shared-files\` | Folders shared in the chat for longer than one chat, kept files |
+| `reset-<date>\` | What **Reset TcAgent** moved away: move it back by hand if you need it |
 | `update-state.json`, `updates\` | Daily checks: switches, last answer, skipped version; the downloaded `.vsix` |
 | `bridge\bridge.log` | Log of the VS extension |
 | `libcache\` | Cached library signatures |

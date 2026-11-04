@@ -34,6 +34,7 @@
     <Compile Include="..\..\src\Prompts.cs" Link="src\Prompts.cs" />
     <Compile Include="..\..\src\Updates.cs" Link="src\Updates.cs" />
     <Compile Include="..\..\src\SharedFolders.cs" Link="src\SharedFolders.cs" />
+    <Compile Include="..\..\src\Reset.cs" Link="src\Reset.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

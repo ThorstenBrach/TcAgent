@@ -132,6 +132,33 @@ public static partial class Cli
         }
     }
 
+    static int ResetCli(string[] args)
+    {
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+        var confirm = Array.IndexOf(args, "--confirm") is var i and >= 0 && i + 1 < args.Length ? args[i + 1] : null;
+        if (confirm == null)
+        {
+            var (items, connections) = Reset.Plan();
+            if (args.Contains("--json"))
+                Console.WriteLine(new JsonObject
+                {
+                    ["items"] = new JsonArray(items.Select(x => (JsonNode)x).ToArray()),
+                    ["connections"] = new JsonArray(connections.Select(x => (JsonNode)x).ToArray())
+                }.ToJsonString());
+            else
+            {
+                Console.WriteLine(items.Count + connections.Count == 0 ? "Nothing to reset." : "A reset would move: " + string.Join(", ", items));
+                if (connections.Count > 0) Console.WriteLine("and remove the connections: " + string.Join(", ", connections));
+            }
+            return Ok;
+        }
+        if (confirm != Reset.Confirmation) { Console.Error.WriteLine($"--confirm needs exactly: {Reset.Confirmation}"); return Usage; }
+        var (folder, moved, failed) = Reset.Run(DateTime.Now);
+        Console.WriteLine($"Reset: {moved.Count} moved to {folder}. Nothing was deleted.");
+        foreach (var f in failed) Console.WriteLine("Still in use, close the AI clients and reset again: " + f);
+        return failed.Count == 0 ? Ok : Failed;
+    }
+
     // versions as built in, licenses as in THIRD-PARTY-NOTICES.md
     static int AboutCli()
     {

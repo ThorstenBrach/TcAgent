@@ -622,6 +622,8 @@ namespace TcAgentBridge
             return parts.Count > 0 ? string.Join(", ", parts) : null;
         }
 
+        internal void EndSession() => KillSession();
+
         void KillSession()
         {
             var s = sess; sess = null;
