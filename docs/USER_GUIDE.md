@@ -128,6 +128,9 @@ work without the extension. The extension runs **inside** the IDE process and ad
   Reference sources (`tc_docs`), with every AI client. Claude Code uses a change at once, GitHub Copilot with the next New chat.
   The list goes with Backup and Restore, the content of the folders does not. A whole drive, your user profile and system
   folders are refused: what the agent reads goes to your AI provider, and they hold keys and passwords.
+
+  <img src="img/chat/share-question.png" width="400" alt="The question when sharing: only this chat, or kept in the knowledge">
+
 - **New versions** – once a day, after the IDE has loaded, a line above the conversation says when a newer TcAgent is out, and ⋯ gets a
   blue dot. **What's new …** shows the release notes down to your version: **Download** fetches the `.vsix` and checks it against
   `SHA256SUMS.txt`, **Install …** then opens the VSIX installer (Visual Studio must be closed, so save first), **Skip this version**
