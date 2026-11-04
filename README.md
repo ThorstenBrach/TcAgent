@@ -230,7 +230,7 @@ diagnostics** in the chat) gives the versions an issue needs.
 ## Build from source
 
 ```powershell
-git clone https://github.com/ThorstenBrach/TcAgent.git
+git clone --recurse-submodules https://github.com/ThorstenBrach/TcAgent.git
 cd TcAgent
 
 # developer build (TcAgent + extension), then install the extension as administrator

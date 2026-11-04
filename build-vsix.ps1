@@ -8,6 +8,8 @@
 # Requirements on the BUILD machine: .NET 8 SDK, Visual Studio 2022, TwinCAT 3.1 XAE (for the interop at compile time).
 $ErrorActionPreference = 'Stop'
 $here = $PSScriptRoot
+# the built-in knowledge is the submodule knowledge\ (TcAgent_Knowledge): without it the package would have no skills
+if (-not (Test-Path "$here\knowledge\prompts")) { throw "knowledge\ is empty - run: git submodule update --init" }
 Set-Location $here
 Add-Type -AssemblyName System.IO.Compression, System.IO.Compression.FileSystem
 
@@ -38,6 +40,7 @@ New-Item -ItemType Directory -Force "$stage\tcagent\agents" | Out-Null
 Copy-Item "$here\agents\TCAGENT_GUIDE.md" "$stage\tcagent\agents\"
 # built-in knowledge (skills ...) next to TcAgent.exe - the single-file publish does not take content folders along
 if (-not (Test-Path "$stage\tcagent\knowledge")) { Copy-Item "$here\knowledge" "$stage\tcagent\knowledge" -Recurse }
+Remove-Item "$stage\tcagent\knowledge\.git" -Force -ErrorAction SilentlyContinue     # the link of the submodule, not content
 
 # 3) Visual Studio extension + VSIX, built with the Visual Studio SDK build tools (Visual Studio's MSBuild)
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"

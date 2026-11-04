@@ -26,6 +26,10 @@ descriptions need improvement.
   `src/Modules.cs` (a test checks that every tool has one). Tools that need no change of TcAgent itself can be a plugin
   instead ([docs/PLUGINS.md](docs/PLUGINS.md)).
 * **Descriptions are part of the interface:** agents read them. Short, precise, with an example path.
+* **Built-in knowledge:** `knowledge/` is the Git submodule [TcAgent_Knowledge](https://github.com/ThorstenBrach/TcAgent_Knowledge): clone with
+  `--recurse-submodules`, or run `git submodule update --init` afterwards. Skills, prompts, workflows and risk rules are changed there,
+  with a line in its `CHANGELOG.md`; the new state then needs a commit here, because this repository pins the version that ships.
+  If Windows reports `could not open ... knowledge/.git for writing`, add `-c core.hideDotFiles=false` to the git command.
 * **Keep docs in sync:** `agents/TCAGENT_GUIDE.md` and `SKILL.md` (same content), `docs/TOOLS.md`, and add a line to
   `CHANGELOG.md` under "Unreleased".
 * **Versions:** server (`src/Program.cs`), extension (`vsbridge/TcAgentBridge.cs`, `extension.vsixmanifest`,

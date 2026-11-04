@@ -20,6 +20,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - `tc_delete` without `name` or `parentPath` says what is missing instead of "Value cannot be null (source)".
 
 ### Changed
+- The built-in knowledge (skills, prompts, workflows, risk rules) now lives in its own repository
+  [TcAgent_Knowledge](https://github.com/ThorstenBrach/TcAgent_Knowledge), included as the Git submodule `knowledge/`: every TcAgent version
+  ships a known state of it. Nothing changes in the package; clone with `--recurse-submodules`.
 - Knowledge window: the tab Documentation is now **Reference** ("Manuals, datasheets and library docs the agent searches",
   `tc_docs`) - it is not documentation of TcAgent and not the templates. The texts of the window say "reference source".
 
