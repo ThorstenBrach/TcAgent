@@ -319,7 +319,7 @@ needs, its window and what the `modules.json` of every level says. A change appl
 again; the command line (`TcAgent.exe check`, `tcunit`, `ci` …) always keeps every tool. When the module Tests is off,
 the TcUnit Tests window stays and says so, with a link to switch it on.
 
-### Documentation
+### Reference docs
 
 What the agent looks things up in (`tc_docs`) – Beckhoff InfoSys, the links, folders and network
 shares of the `knowledge.md` of every level and the document folders `knowledge\`, each with type, level, state
