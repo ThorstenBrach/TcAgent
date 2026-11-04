@@ -1,6 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 848" width="1200" height="848" role="img" aria-label="Where TcAgent keeps its knowledge: six levels from built-in to project, the same folder names on every level, and the files that are not layered">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 908" width="1200" height="908" role="img" aria-label="Where TcAgent keeps its knowledge: six levels from built-in to project, the same folder names on every level, and the files that are not layered">
 <style>text{font-family:"Segoe UI",system-ui,-apple-system,"DejaVu Sans",sans-serif}.t{font-size:15px;font-weight:700;fill:#0f172a}.s{font-size:12px;fill:#475569}.m{font-family:Consolas,"DejaVu Sans Mono",monospace;font-size:12.5px;fill:#334155}.tool{font-family:Consolas,"DejaVu Sans Mono",monospace;font-size:11.5px;fill:#6366f1}.h{font-size:14px;font-weight:700;fill:#0f172a}.hs{font-size:11.5px;fill:#475569}.v{font-size:11px;fill:#64748b;font-style:italic}.n{font-size:11px;font-weight:700;fill:#ffffff}.ar{font-size:22px;fill:#94a3b8}</style>
-<rect x="0" y="0" width="1200" height="848" rx="14" fill="#f8fafc"/>
+<rect x="0" y="0" width="1200" height="908" rx="14" fill="#f8fafc"/>
 <rect x="24" y="18" width="1152" height="56" rx="10" fill="#ffffff" stroke="#94a3b8" stroke-width="1.5"/>
 <text x="40" y="41" class="t">Agent guide (skill) – how the agent works with TcAgent</text>
 <text x="40" y="61" class="s">The same for every project. Installed into your AI client by Set up clients: SKILL.md (Claude skill), AGENTS.md, CLAUDE.md, GEMINI.md, copilot-instructions.md</text>
@@ -84,44 +84,52 @@
 <text x="686" y="486" class="tool">tc_workflow · tc_improve</text>
 <text x="926" y="486" class="hs">check-ok, build-ok (0 errors), tests-ok</text>
 <rect x="24" y="514" width="300" height="54" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
-<text x="38" y="536" class="t">Lessons learned</text><text x="38" y="554" class="s">hard-won solutions, recalled on errors</text>
+<text x="38" y="536" class="t">Prompts</text><text x="38" y="554" class="s">prepared requests, chosen with /</text>
 <rect x="334" y="514" width="330" height="54" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.35"/>
 <rect x="674" y="514" width="230" height="54" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.35"/>
 <rect x="914" y="514" width="262" height="54" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.35"/>
-<text x="346" y="546" class="m">lessons\&lt;topic&gt;.md</text>
-<text x="686" y="546" class="tool">tc_lessons</text>
-<text x="926" y="546" class="hs">promoted upwards after a name check</text>
+<text x="346" y="546" class="m">prompts\&lt;name&gt;.md</text>
+<text x="686" y="546" class="tool">TcAgent Chat · prompts</text>
+<text x="926" y="546" class="hs">for people; values asked in a card</text>
 <rect x="24" y="574" width="300" height="54" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
-<text x="38" y="596" class="t">Documentation</text><text x="38" y="614" class="s">manuals, data sheets, URLs</text>
+<text x="38" y="596" class="t">Lessons learned</text><text x="38" y="614" class="s">hard-won solutions, recalled on errors</text>
 <rect x="334" y="574" width="330" height="54" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.35"/>
 <rect x="674" y="574" width="230" height="54" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.35"/>
 <rect x="914" y="574" width="262" height="54" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.35"/>
-<text x="346" y="606" class="m">knowledge.md · knowledge\</text>
-<text x="686" y="606" class="tool">tc_docs</text>
-<text x="926" y="606" class="hs">Beckhoff InfoSys is built in</text>
+<text x="346" y="606" class="m">lessons\&lt;topic&gt;.md</text>
+<text x="686" y="606" class="tool">tc_lessons</text>
+<text x="926" y="606" class="hs">promoted upwards after a name check</text>
 <rect x="24" y="634" width="300" height="54" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
-<text x="38" y="656" class="t">Manual templates</text><text x="38" y="674" class="s">your style for user manuals</text>
+<text x="38" y="656" class="t">Reference</text><text x="38" y="674" class="s">manuals, data sheets, URLs</text>
 <rect x="334" y="634" width="330" height="54" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.35"/>
 <rect x="674" y="634" width="230" height="54" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.35"/>
 <rect x="914" y="634" width="262" height="54" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.35"/>
-<text x="346" y="666" class="m">doc-templates\</text>
-<text x="686" y="666" class="tool">tc_userdoc</text>
-<text x="28" y="716" class="h">Not layered</text><text x="120" y="716" class="hs">kept in one place</text>
-<rect x="24" y="728" width="279" height="70" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
-<text x="36" y="750" class="t" style="font-size:14px">Program memory</text>
-<text x="36" y="769" class="m" style="font-size:11.5px">&lt;solution&gt;\.tcagent\doc-summaries.json</text>
-<text x="36" y="787" class="v">tc_doc – explanations of your program</text>
-<rect x="315" y="728" width="279" height="70" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
-<text x="327" y="750" class="t" style="font-size:14px">Run logs</text>
-<text x="327" y="769" class="m" style="font-size:11.5px">%LOCALAPPDATA%\TcAgent\runs\</text>
-<text x="327" y="787" class="v">tc_improve – how the workflows develop</text>
-<rect x="606" y="728" width="279" height="70" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
-<text x="618" y="750" class="t" style="font-size:14px">Sources lock</text>
-<text x="618" y="769" class="m" style="font-size:11.5px">&lt;level&gt;\skills.lock.json</text>
-<text x="618" y="787" class="v">tc_sources – installed items at a commit</text>
-<rect x="897" y="728" width="279" height="70" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
-<text x="909" y="750" class="t" style="font-size:14px">Feedback</text>
-<text x="909" y="769" class="m" style="font-size:11.5px">feedback\ or TCAGENT_FEEDBACK</text>
-<text x="909" y="787" class="v">tc_feedback – shared as a GitHub issue</text>
-<text x="24" y="826" class="s">Plain Markdown / JSON with front matter – editable by hand. Project files belong in Git; company and team levels can be Git repositories as well.</text>
+<text x="346" y="666" class="m">knowledge.md · knowledge\</text>
+<text x="686" y="666" class="tool">tc_docs</text>
+<text x="926" y="666" class="hs">Beckhoff InfoSys is built in</text>
+<rect x="24" y="694" width="300" height="54" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<text x="38" y="716" class="t">Manual templates</text><text x="38" y="734" class="s">your style for user manuals</text>
+<rect x="334" y="694" width="330" height="54" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.35"/>
+<rect x="674" y="694" width="230" height="54" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.35"/>
+<rect x="914" y="694" width="262" height="54" rx="8" fill="#ffffff" stroke="#6366f1" stroke-opacity="0.35"/>
+<text x="346" y="726" class="m">doc-templates\</text>
+<text x="686" y="726" class="tool">tc_userdoc</text>
+<text x="28" y="776" class="h">Not layered</text><text x="120" y="776" class="hs">kept in one place</text>
+<rect x="24" y="788" width="279" height="70" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+<text x="36" y="810" class="t" style="font-size:14px">Program memory</text>
+<text x="36" y="829" class="m" style="font-size:11.5px">&lt;solution&gt;\.tcagent\doc-summaries.json</text>
+<text x="36" y="847" class="v">tc_doc – explanations of your program</text>
+<rect x="315" y="788" width="279" height="70" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+<text x="327" y="810" class="t" style="font-size:14px">Run logs</text>
+<text x="327" y="829" class="m" style="font-size:11.5px">%LOCALAPPDATA%\TcAgent\runs\</text>
+<text x="327" y="847" class="v">tc_improve – how the workflows develop</text>
+<rect x="606" y="788" width="279" height="70" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+<text x="618" y="810" class="t" style="font-size:14px">Sources lock</text>
+<text x="618" y="829" class="m" style="font-size:11.5px">&lt;level&gt;\skills.lock.json</text>
+<text x="618" y="847" class="v">tc_sources – installed items at a commit</text>
+<rect x="897" y="788" width="279" height="70" rx="8" fill="#ffffff" stroke="#cbd5e1"/>
+<text x="909" y="810" class="t" style="font-size:14px">Feedback</text>
+<text x="909" y="829" class="m" style="font-size:11.5px">feedback\ or TCAGENT_FEEDBACK</text>
+<text x="909" y="847" class="v">tc_feedback – shared as a GitHub issue</text>
+<text x="24" y="886" class="s">Plain Markdown / JSON with front matter – editable by hand. Project files belong in Git; company and team levels can be Git repositories as well.</text>
 </svg>

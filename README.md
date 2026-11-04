@@ -171,7 +171,7 @@ Everything TcAgent learns about your project and your way of working lives in pl
 (built-in, company, you, team, platform, project), so the company standard, your personal style, your team, the automation
 framework and the project's conventions (in Git) work together:
 
-<p align="center"><img src="docs/img/knowledge-files.svg" width="900" alt="Where TcAgent keeps coding rules, risk rules, skills, workflows, lessons learned, reference sources and manual templates on six levels from built-in to project, and the files that are not layered"></p>
+<p align="center"><img src="docs/img/knowledge-files.svg" width="900" alt="Where TcAgent keeps coding rules, risk rules, skills, workflows, prompts, lessons learned, reference sources and manual templates on six levels from built-in to project, and the files that are not layered"></p>
 
 ## Knowledge window
 

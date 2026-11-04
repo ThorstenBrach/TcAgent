@@ -2050,7 +2050,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 96 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 97 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
