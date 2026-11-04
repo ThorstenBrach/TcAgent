@@ -103,7 +103,7 @@ built-in setting). Format and examples: [risk-rules.example.md](risk-rules.examp
 
 ### `tc_docs`
 
-Looks up documentation, read-only: InfoSys, enabled URLs, document folders and network drives.
+Looks up documentation, read-only: InfoSys, enabled URLs, document folders and network drives. The tab **Reference** of the knowledge window shows these sources.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

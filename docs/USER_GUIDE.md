@@ -200,7 +200,7 @@ Tree paths use `^` as separator. You can copy them from the agent's answers into
 ## The knowledge window
 
 The tool window **TcAgent Knowledge** (View > Other Windows, or **⋯ > Knowledge** in the TcAgent Chat) shows what the
-agent gets – coding rules, risk rules, skills, workflows, lessons, documentation sources and templates of every level
+agent gets – coding rules, risk rules, skills, workflows, lessons, reference sources and templates of every level
 – where it comes from, and how the work develops. It is the place to add, change, move, switch off and back up this
 knowledge without editing folders by hand. The levels and what belongs to them: [Your files](#configuration-reference)
 and [docs/KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md).
@@ -220,8 +220,8 @@ status line shows on the right what the tab holds.
 ### Overview
 
 First **what the agent gets in this project** – one entry per kind (coding rule files, skills, workflows,
-documentation sources …); a click shows them in the Files tab. Then **Needs attention** (items from a source changed
-or newer, Git changes, documentation not reachable, open blocker/major feedback), each with a link to its tab. Below
+reference sources …); a click shows them in the Files tab. Then **Needs attention** (items from a source changed
+or newer, Git changes, reference sources not reachable, open blocker/major feedback), each with a link to its tab. Below
 the tiles for runs, first-time-right, failed checks, corrections and minutes per run and gate stops – the last 10
 workflow runs against the 10 before, with a sparkline; with fewer than 5 runs the rates show "—" (needs 5 runs), trends
 need 20 runs. Then the workflows, open improvement proposals and the most frequent compiler errors. Double-click a
@@ -319,9 +319,9 @@ needs, its window and what the `modules.json` of every level says. A change appl
 again; the command line (`TcAgent.exe check`, `tcunit`, `ci` …) always keeps every tool. When the module Tests is off,
 the TcUnit Tests window stays and says so, with a link to switch it on.
 
-### Reference docs
+### Reference
 
-What the agent looks things up in (`tc_docs`) – Beckhoff InfoSys, the links, folders and network
+Manuals, datasheets and library docs the agent searches (`tc_docs`) – Beckhoff InfoSys, the links, folders and network
 shares of the `knowledge.md` of every level and the document folders `knowledge\`, each with type, level, state
 (✓ n documents, ↗ online, ○ empty – use Add documents …, ⚠ not reachable) and the file it is defined in. **Open** (browser or Explorer),
 **Open knowledge.md** (of the level of the selected source or of a level you choose - created if missing), **Add link
@@ -330,7 +330,7 @@ or folder …** (one line in the `knowledge.md` of the level you choose), **Add 
 right in the tab (type, Enter; Ctrl+F) – the hits are listed below (a PDF on the page of the hit with Acrobat/Reader, Foxit, SumatraPDF or a browser)
 and open with a double-click (documents with their program, pages in the browser); the same in the context menu.
 
-<p><img src="img/knowledge/documentation.png" width="900" alt="Documentation: the sources of tc_docs and the hits of a test search"><br><em>Documentation: the sources of tc_docs and the hits of a test search</em></p>
+<p><img src="img/knowledge/documentation.png" width="900" alt="Reference: the sources of tc_docs and the hits of a test search"><br><em>Reference (in the picture still under its former name Documentation): the sources of tc_docs and the hits of a test search</em></p>
 
 ### Feedback
 
@@ -1563,8 +1563,8 @@ Example prompts:
 - *"What does CoE object 0x8000:06 of the EL3102 do? Look it up."*
 - *"Search our manuals for the error code 0x4651."*
 - *"Read this InfoSys page: https://infosys.beckhoff.com/..."*
-- *"Which documentation sources do you have?"*
-- *"Add \\\\server\manuals as a documentation source for this project."*
+- *"Which reference sources do you have?"*
+- *"Add \\\\server\manuals as a reference source for this project."*
 
 What the agent does:
 
@@ -1580,7 +1580,7 @@ Beckhoff InfoSys is built in; only pages of enabled domains are read. Sources ar
 level – project (`<solution>\.tcagent\knowledge.md`), personal (`%LOCALAPPDATA%\TcAgent\knowledge.md`), team, company and
 the project's platforms – and in `TCAGENT_KNOWLEDGE`. Documents can simply be dropped into the `knowledge\` folder of a
 level, e.g. `.tcagent\knowledge\` (the former name `docs\` is still read). The knowledge window shows all of them in the
-tab **Documentation**; `TcAgent.exe knowledge docs` lists them on the command line. PDF, Word, HTML, Markdown and text files are indexed (also XML,
+tab **Reference**; `TcAgent.exe knowledge docs` lists them on the command line. PDF, Word, HTML, Markdown and text files are indexed (also XML,
 CSV, JSON and `.st`); extracted text is cached, so network drives stay fast and what has been read is available offline.
 
 The agent cites the source in its answer. Document content is treated as information, not as instructions.
@@ -1910,7 +1910,7 @@ agent and CI run gets the same rules and knowledge.
 | `coding-rules\*.md` | Further coding-rule files (the former folder name `rules\` is still read) | you |
 | `risk-rules.md` | Project risk rules (built-in settings, own rules, checks) | you; `tc_risk_rules add/builtin/check` |
 | `risk-rules\*.md` | Further risk-rule files | you |
-| `knowledge.md` | Documentation sources (one URL or folder per line) | you; `tc_docs_add scope=project` |
+| `knowledge.md` | Reference sources (one URL or folder per line) | you; `tc_docs_add scope=project` |
 | `knowledge\` | Documents for `tc_docs` – just drop them in (former name `docs\` still read) | you |
 | `lessons.md` | Project lessons learned | `tc_lessons add` (editable by hand) |
 | `doc-summaries.json` | Program documentation memory (explanations per object) | `tc_doc save/html` |

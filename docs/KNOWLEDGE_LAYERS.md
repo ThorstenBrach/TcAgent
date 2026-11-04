@@ -6,11 +6,11 @@
 > mirror into the agent CLIs). Since 0.32: workflows with checkpoints (`tc_workflow`, built-in `new-feature`) and the
 > hard gate "`tc_activate` only after a build with 0 errors". Since 0.33: run logs and `tc_improve` (proposals by fixed rules,
 > apply after asking, evaluation over 10 runs, revert, promote with name check). Since 0.34: sources (`tc_sources`, `skills.lock.json`, license check, overlay
-> `tcagent-extends`, `TcAgent.exe sources sync`). Since 0.35: the knowledge manager window (Overview, Effective, Sources, History; since 0.50 Overview, Files, Sources, Platforms, Documentation, Feedback, Backups, Workflow runs) and
+> `tcagent-extends`, `TcAgent.exe sources sync`). Since 0.35: the knowledge manager window (Overview, Effective, Sources, History; now Overview, Files, Sources, Platforms, Modules, Reference, Feedback, Backups, Workflow runs) and
 > `TcAgent.exe knowledge json|disable|enable`. Since 0.37: the team level between user and platform (`TCAGENT_TEAM`). Since 0.38: the chat window speaks ACP (GitHub Copilot). Since 0.40–0.42: the
 > knowledge window manages the files (tab Files instead of Effective: new, move between levels, delete, switch off, Git),
 > sources (add, edit, browse and install, updates), platforms (new for you or the company, set, detect, delete), the levels
-> and the `tc_feedback` reports (anonymized, shared as a GitHub issue). Since 0.43: `TcAgent.exe diag`. Since 0.44: the tab Documentation (the sources of `tc_docs` of every level). Since 0.47: backups of every level before
+> and the `tc_feedback` reports (anonymized, shared as a GitHub issue). Since 0.43: `TcAgent.exe diag`. Since 0.44: the tab Reference (until 0.51 Documentation; the sources of `tc_docs` of every level). Since 0.47: backups of every level before
 > every change and restore (`knowledgebase`), the state of installed items (locally changed / upstream newer / both) with
 > compare, revert, keep as own version, propose upstream and update-and-merge, install into every level. Since 0.36: first "deterministic first" conversions
 > ([DETERMINISTIC_FIRST.md](DETERMINISTIC_FIRST.md)). The rest of this document is still a concept. It describes how TcAgent shall organise the knowledge it

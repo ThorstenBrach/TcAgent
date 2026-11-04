@@ -12,7 +12,7 @@
 //                  items installed from them (pinned commit, license, changed locally, newer upstream; update, merge, diff)
 //   Platforms      the known platforms with their detection, which apply to the project; new, edit platform.md, set / detect
 //   Modules        the groups of tools the agent sees (on/off for me or this project) and the plugins (approve) - KnowledgeModules.cs
-//   Reference docs what tc_docs looks things up in; add links, folders and documents; search like the agent
+//   Reference      what tc_docs looks things up in; add links, folders and documents; search like the agent
 //   Feedback       the tc_feedback reports; the selected ones as an anonymized, editable issue text - copy, save, share with
 //                  the TcAgent developers (a new issue in the browser, sent by the user), set the status
 //   Backups        the backups of the knowledge levels (KnowledgeBackup.cs): back up, compare, restore, delete
@@ -96,7 +96,7 @@ namespace TcAgentBridge
                               Gray = TcUnitControl.Frozen(Color.FromArgb(0xB0, 0x80, 0x80, 0x80)), TileBack = TcUnitControl.Frozen(Color.FromArgb(0x18, 0x80, 0x80, 0x80)),
                               InfoBack = TcUnitControl.Frozen(Color.FromArgb(0x30, 0xE8, 0xB0, 0x1A)), InfoBorder = TcUnitControl.Frozen(Color.FromArgb(0x80, 0xE8, 0xB0, 0x1A));
 
-        readonly ToggleButton tOverview = Tab("Overview"), tEffective = Tab("Files"), tSources = Tab("Sources"), tPlatforms = Tab("Platforms"), tDocs = Tab("Reference docs"),
+        readonly ToggleButton tOverview = Tab("Overview"), tEffective = Tab("Files"), tSources = Tab("Sources"), tPlatforms = Tab("Platforms"), tDocs = Tab("Reference"),
                               tFeedback = Tab("Feedback"), tBackups = Tab("Backups"), tHistory = Tab("Workflow runs"), tModules = Tab("Modules");
         ToggleButton[] AllTabs => new[] { tOverview, tEffective, tSources, tPlatforms, tModules, tDocs, tFeedback, tBackups, tHistory };
         readonly ContentControl page = new ContentControl();
@@ -145,7 +145,7 @@ namespace TcAgentBridge
         // platforms
         readonly ListView platformList = NewList();
         readonly TextBlock platformInfo = new TextBlock { Margin = new Thickness(8, 8, 8, 2), TextWrapping = TextWrapping.Wrap };
-        // documentation sources (tc_docs)
+        // reference sources (tc_docs)
         readonly ListView docsList = NewList();
         readonly TextBlock docsInfo = new TextBlock { Margin = new Thickness(8, 2, 8, 4), TextWrapping = TextWrapping.Wrap, Opacity = 0.8 };
         string[] docsLevels = { "user" };
@@ -212,7 +212,7 @@ namespace TcAgentBridge
                                       Background = Brushes.Transparent, BorderBrush = Brushes.Transparent };
         }
 
-        const string RefDocsTip = "What the agent looks things up in (tc_docs): manuals, web pages, folders";
+        const string RefDocsTip = "Manuals, datasheets and library docs the agent searches (tc_docs)";
 
         static void Badge(ToggleButton tab, int n, string tip, string idleTip = null)
         {
@@ -571,7 +571,7 @@ namespace TcAgentBridge
             status.Text = "Reading the knowledge …";
         }
 
-        /// <summary>F5 = refresh, Ctrl+F = the search box of the tab (Files, Reference docs).</summary>
+        /// <summary>F5 = refresh, Ctrl+F = the search box of the tab (Files, Reference).</summary>
         internal bool Shortcut(System.Windows.Forms.Keys key, bool ctrl)
         {
             if (key == System.Windows.Forms.Keys.F5 && !ctrl) { RefreshAll(); return true; }
@@ -1048,7 +1048,7 @@ namespace TcAgentBridge
                 var k = kind;
                 gets.Children.Add(Chip(text, null, "Show them in the Files tab", () => ShowKind(k)));
             }
-            if (docsSources > 0) gets.Children.Add(Chip($"{docsSources} documentation source{(docsSources == 1 ? "" : "s")}", null, "What tc_docs looks things up in", () => Show(tDocs)));
+            if (docsSources > 0) gets.Children.Add(Chip($"{docsSources} reference source{(docsSources == 1 ? "" : "s")}", null, RefDocsTip, () => Show(tDocs)));
             if (gets.Children.Count == 0) gets.Children.Add(Chip("nothing yet - only the built-in knowledge", Gray, null, null));
 
             // what needs attention, each with a link to its tab
@@ -1065,7 +1065,7 @@ namespace TcAgentBridge
                     if (ch > 0 || N(g, "behind") > 0 || N(g, "ahead") > 0)
                         attention.Children.Add(Chip($"⇵ {S(l, "label")}: Git changes to commit, pull or push - Files", Orange, "The Git bar of the Files tab", () => Show(tEffective)));
                 }
-            if (docsUnreachable > 0) attention.Children.Add(Chip($"⚠ {docsUnreachable} documentation source(s) not reachable - Reference docs", Orange, "A folder or share the agent cannot read", () => Show(tDocs)));
+            if (docsUnreachable > 0) attention.Children.Add(Chip($"⚠ {docsUnreachable} reference source(s) not reachable - Reference", Orange, "A folder or share the agent cannot read", () => Show(tDocs)));
             var urgent = Arr(data.TryGetValue("feedback", out var fo) ? fo : null).Count(f => S(f, "status") == "open" && S(f, "severity") is "blocker" or "major");
             if (urgent > 0) attention.Children.Add(Chip($"! {urgent} open blocker/major feedback report(s) - Feedback", Orange, "Share them with the TcAgent developers", () => Show(tFeedback)));
             if (attention.Children.Count == 0) attention.Children.Add(Chip("✓ nothing - everything is up to date", Green, null, null));
@@ -1143,7 +1143,7 @@ namespace TcAgentBridge
                         Arr(data?["layers"]).Count(l => l.TryGetValue("git", out var go) && go is Dictionary<string, object> g && !B(g, "same") && S(l, "level") != null &&
                                                         (((g.TryGetValue("changes", out var c) ? c as Dictionary<string, object> : null)?.Count ?? 0) > 0 || N(g, "behind") > 0 || N(g, "ahead") > 0));
             Badge(tEffective, files, $"{files} file(s) changed locally or level(s) with Git changes");
-            Badge(tDocs, docsUnreachable, $"{docsUnreachable} documentation source(s) not reachable", RefDocsTip);
+            Badge(tDocs, docsUnreachable, $"{docsUnreachable} reference source(s) not reachable", RefDocsTip);
         }
 
         static string F(double? v) => v?.ToString("0.0", CultureInfo.InvariantCulture) ?? "—";
@@ -2395,7 +2395,7 @@ namespace TcAgentBridge
                                           A("Open folder", "The folder of the document", OpenHitFolder, () => HSel() && S((docsHits.SelectedItem as Line)?.D, "kind") == "file"),
                                           Sep,
                                           A("Copy path", "Copy the path or the address", () => CopyPath(S((docsHits.SelectedItem as Line)?.D, "where")), HSel));
-            var list = WithEmpty(docsList, "No documentation source yet - \"Add link or folder …\" or \"Add documents …\".");
+            var list = WithEmpty(docsList, "No reference yet - \"Add link or folder …\" or \"Add documents …\".");
             var hits = WithEmpty(docsHits, "Type words above and press Enter - the hits are listed here and open with a double-click.");
             return docsPage = Rows((tools, AutoH, 0), (docsInfo, AutoH, 0), (list, Star(3), 80), (search, AutoH, 0), (docsHitsHeading, AutoH, 0), (hits, Star(2), 70));
         }
@@ -2405,7 +2405,7 @@ namespace TcAgentBridge
         {
             docsLoaded = true;
             var (ok, output) = await Cli("knowledge docs");
-            if (!ok) { status.Text = "Documentation sources: " + output.Trim(); return; }
+            if (!ok) { status.Text = "Reference sources: " + output.Trim(); return; }
             try
             {
                 var r = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(output);
@@ -2427,7 +2427,7 @@ namespace TcAgentBridge
                 if (data != null) { Badges(); FillOverview(); }
                 Summary();
             }
-            catch (Exception ex) { Error("Documentation sources: " + ex.Message); }
+            catch (Exception ex) { Error("Reference sources: " + ex.Message); }
         }
 
         // a link is read online; a folder is reachable (with its documents), empty or not reachable
@@ -2461,10 +2461,10 @@ namespace TcAgentBridge
             if (d != null)
             {
                 var (rok, rout) = await Cli($"knowledge docs --action remove --path {Quote(S(d, "origin"))} --url {Quote(S(d, "raw"))}", "Saving");
-                if (!rok) { Report(false, rout, "Edit documentation source"); return; }
+                if (!rok) { Report(false, rout, "Edit reference source"); return; }
             }
             var (ok, output) = await Cli($"knowledge docs --action add --level {Quote(r[2])} --url {Quote(r[0].Trim())}" + (r[1].Trim().Length > 0 ? " --message " + Quote(r[1].Trim()) : ""), "Saving");
-            Report(ok, output, d == null ? "Add documentation source" : "Edit documentation source");
+            Report(ok, output, d == null ? "Add reference source" : "Edit reference source");
             LoadDocs();
         }
 
@@ -2539,7 +2539,7 @@ namespace TcAgentBridge
             if (MessageBox.Show($"Delete this source from {S(d, "origin")}?\n\n{S(d, "raw")}\n\n(the documents themselves stay where they are)", "TcAgent Knowledge",
                                 MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
             var (ok, output) = await Cli($"knowledge docs --action remove --path {Quote(S(d, "origin"))} --url {Quote(S(d, "raw"))}", "Deleting");
-            Report(ok, output, "Delete documentation source");
+            Report(ok, output, "Delete reference source");
             LoadDocs();
         }
 

@@ -7,8 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Changed
-- Knowledge window: the tab Documentation is now **Reference docs** - it is what the agent looks things up in (`tc_docs`),
-  not documentation of TcAgent and not the templates.
+- Knowledge window: the tab Documentation is now **Reference** ("Manuals, datasheets and library docs the agent searches",
+  `tc_docs`) - it is not documentation of TcAgent and not the templates. The texts of the window say "reference source".
 
 ### Added
 - **Prompt library** (`src/Prompts.cs`, `vsbridge/ChatPrompts.cs`, [docs/KNOWLEDGE_LAYERS.md](docs/KNOWLEDGE_LAYERS.md#prompts)):
