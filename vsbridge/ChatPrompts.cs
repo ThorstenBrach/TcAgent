@@ -27,7 +27,7 @@ namespace TcAgentBridge
     {
         sealed class PromptItem
         {
-            public string Name, Description, Category, Level, Source, Body;
+            public string Name, Description, Category, Level, Source, Body, Path;
             public bool Send;
             public List<string> Tags = new List<string>();
             public List<PromptParam> Params = new List<PromptParam>();
@@ -172,7 +172,7 @@ namespace TcAgentBridge
                         list.Add(new PromptItem
                         {
                             Name = d["name"] as string, Description = d["description"] as string, Category = d["category"] as string, Level = d["level"] as string,
-                            Source = d["source"] as string, Body = d["body"] as string, Send = d.TryGetValue("send", out var snd) && snd is bool sb && sb, Tags = Strings(d["tags"]),
+                            Source = d["source"] as string, Body = d["body"] as string, Path = d.TryGetValue("path", out var pp) ? pp as string : null, Send = d.TryGetValue("send", out var snd) && snd is bool sb && sb, Tags = Strings(d["tags"]),
                             Params = Dicts(d.TryGetValue("params", out var ps) ? ps : null).Select(x => new PromptParam
                             {
                                 Name = x["name"] as string, Ask = x["ask"] as string, Type = x["type"] as string, Default = x["default"] as string, Help = x["help"] as string,
@@ -208,8 +208,61 @@ namespace TcAgentBridge
             if (recent.Count > 0 && rest.Count > 0 || q.Length > 0 && rest.Count > 0) promptList.Items.Add(PromptHeader(q.Length > 0 ? $"Matching \"{q}\"" : "All prompts"));
             foreach (var p in rest) promptList.Items.Add(PromptRow(p));
             var rows = promptList.Items.OfType<ListBoxItem>().Where(i => i.Tag is PromptItem).ToList();
+            foreach (var r in rows) r.ContextMenu = PromptMenu(r);
             promptList.SelectedItem = rows.FirstOrDefault(i => i.Tag == keep) ?? rows.FirstOrDefault();
             ShowPromptPreview();
+        }
+
+        // right click on a prompt. Your own file opens as it is; the others (built-in, company, team) belong to their level: you edit
+        // a copy on your level, which replaces the prompt of the same name for you
+        static bool OwnPrompt(PromptItem p) => p.Level == "user" || p.Level == "project";
+
+        ContextMenu PromptMenu(ListBoxItem row)
+        {
+            var p = (PromptItem)row.Tag;
+            var edit = new MenuItem { Header = OwnPrompt(p) ? "Edit" : "Edit my copy",
+                                      ToolTip = OwnPrompt(p) ? p.Path : $"The {p.Level} prompt stays as it is: a copy in your folder replaces it for you" };
+            edit.Click += (s, e) => EditPrompt(p);
+            var menu = new ContextMenu();
+            menu.Items.Add(edit);
+            menu.Opened += (s, e) => promptList.SelectedItem = row;
+            return menu;
+        }
+
+        void EditPrompt(PromptItem p)
+        {
+            ClosePrompts();
+            if (string.IsNullOrEmpty(p.Path)) { status.Text = "This TcAgent.exe does not name the file of the prompt - update it first."; return; }
+            void Open(string file)
+            {
+                try { (Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ItemOperations.OpenFile(file); status.Text = "Opened: " + file; }
+                catch (Exception ex) { Info("Edit prompt", ex.Message, true); }
+            }
+            if (OwnPrompt(p)) { Open(p.Path); return; }
+            var mine = Path.Combine(Dir, "prompts", p.Name + ".md");
+            if (File.Exists(mine)) { Open(mine); return; }
+            var exe = TcUnitControl.TcAgentExe();
+            var sln = TcUnitControl.SolutionPath();
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                string said = null;
+                try
+                {
+                    var args = $"knowledge new --key \"prompts/{p.Name}\" --path \"{p.Path}\" --level user" + (string.IsNullOrEmpty(sln) ? "" : $" --solution \"{sln}\"");
+                    var psi = new ProcessStartInfo(exe, args) { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true,
+                                                                StandardOutputEncoding = new UTF8Encoding(false), StandardErrorEncoding = new UTF8Encoding(false) };
+                    using (var pr = Process.Start(psi))
+                    {
+                        pr.StandardInput.Close();
+                        var err = pr.StandardError.ReadToEndAsync();
+                        var o = pr.StandardOutput.ReadToEnd();
+                        pr.WaitForExit(30000);
+                        if (pr.ExitCode != 0 || !File.Exists(mine)) said = (o + " " + err.Result).Trim();
+                    }
+                }
+                catch (Exception ex) { said = ex.Message; }
+                Dispatcher.BeginInvoke(new Action(() => { if (said == null) Open(mine); else Info("Edit prompt", said, true); }));
+            });
         }
 
         UIElement CategoryChip(string text, string category)

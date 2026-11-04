@@ -38,6 +38,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **Answer language in the TcAgent Chat** (⋯ > Answer language): the language of Windows (new default), the language of the
   question, or one of the languages of the Windows user (`answerLanguage` in `chat-backends.json`). Before, the answer
   followed the question, so prepared prompts in English gave English answers.
+- Prompt list: right click **Edit** opens your own prompt, **Edit my copy** a copy of a built-in, company or team prompt on your level.
 - Prompt list: it keeps one height while it is open, also with another category or a longer preview, so the categories stay under
   the mouse. Many categories wrap and scroll from the fourth row on.
 - **Prompt library** (`src/Prompts.cs`, `vsbridge/ChatPrompts.cs`, [docs/KNOWLEDGE_LAYERS.md](docs/KNOWLEDGE_LAYERS.md#prompts)):

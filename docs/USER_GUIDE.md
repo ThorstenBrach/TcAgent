@@ -127,6 +127,8 @@ work without the extension. The extension runs **inside** the IDE process and ad
   to the tab Sources; updating them stays your decision there.
 - **About TcAgent** – **⋯ > About TcAgent**: author, license, the versions of extension, server, IDE and TwinCAT, the components with
   their licenses, and the two switches for the daily checks. What they send: [SECURITY.md](../SECURITY.md).
+- **Edit a prompt** – right-click it in the list. Your own prompt opens as it is. A built-in, company or team prompt stays unchanged:
+  **Edit my copy** puts a copy into your folder (`%LOCALAPPDATA%\TcAgent\prompts\`), which replaces it for you.
 - **Prepared prompts** – type **/** at the start of a line in the input, or click **Prompts**: a list above the input with
   search (name, description, tags), categories and a preview. Arrow keys or a click choose, writing the name works too;
   Enter puts the prompt into the input so you can adapt it, Ctrl+Enter inserts and sends, Esc closes. `{object}`,
