@@ -46,7 +46,7 @@ namespace TcAgentBridge
 
         readonly Border promptPanel = new Border { BorderThickness = new Thickness(1), Margin = new Thickness(6, 0, 6, 2), VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed };
         readonly WrapPanel promptCategories = new WrapPanel { Margin = new Thickness(6, 5, 6, 3) };
-        readonly ListBox promptList = new ListBox { BorderThickness = new Thickness(0), MaxHeight = 170, Background = Brushes.Transparent, Focusable = false };
+        readonly ListBox promptList = new ListBox { BorderThickness = new Thickness(0), MaxHeight = 200, Background = Brushes.Transparent, Focusable = false };
         readonly TextBlock promptOrigin = new TextBlock { FontSize = 11, Opacity = 0.65, TextTrimming = TextTrimming.CharacterEllipsis };
         readonly TextBlock promptPreview = new TextBlock { TextWrapping = TextWrapping.Wrap, MaxHeight = 110, TextTrimming = TextTrimming.CharacterEllipsis };
         readonly StackPanel promptForm = new StackPanel { Margin = new Thickness(8, 6, 8, 8), Visibility = Visibility.Collapsed };
@@ -65,8 +65,9 @@ namespace TcAgentBridge
             promptPanel.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             promptPanel.BorderBrush = AccentBrush;
             var hint = new TextBlock { Text = "↑↓ choose · Enter insert · Ctrl+Enter insert and send · Esc close", FontSize = 11, Opacity = 0.6, Margin = new Thickness(8, 3, 8, 3), TextWrapping = TextWrapping.Wrap };
-            var preview = new StackPanel { Margin = new Thickness(8, 5, 8, 5) };
-            preview.Children.Add(promptOrigin); preview.Children.Add(promptPreview);
+            var previewText = new StackPanel { Margin = new Thickness(8, 5, 8, 6) };
+            previewText.Children.Add(promptOrigin); previewText.Children.Add(promptPreview);
+            var preview = new Border { Background = AgentBubble, Child = previewText };
             foreach (var t in new[] { hint, promptOrigin, promptPreview }) t.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             promptChoose.Children.Add(promptCategories);
             promptChoose.Children.Add(promptList);
@@ -75,7 +76,9 @@ namespace TcAgentBridge
             var all = new StackPanel();
             all.Children.Add(promptChoose); all.Children.Add(promptForm);
             promptPanel.Child = all;
-            promptList.SelectionChanged += (s, e) => ShowPromptPreview();
+            Grid.SetIsSharedSizeScope(promptList, true);          // the descriptions start in one column
+            ScrollViewer.SetHorizontalScrollBarVisibility(promptList, ScrollBarVisibility.Disabled);
+            promptList.SelectionChanged += (s, e) => { MarkPromptRows(); ShowPromptPreview(); };
             promptList.PreviewMouseLeftButtonUp += (s, e) =>
             {
                 if ((e.OriginalSource as DependencyObject) is DependencyObject d && ItemsControl.ContainerFromElement(promptList, d) is ListBoxItem i && i.Tag is PromptItem p) { promptList.SelectedItem = i; ChoosePrompt(p, false); e.Handled = true; }
@@ -225,16 +228,53 @@ namespace TcAgentBridge
             return new ListBoxItem { Content = t, IsEnabled = false, Focusable = false };
         }
 
+        // a row without the theme's pale selection: the selected row is filled, so it stands out while the focus stays in the input
+        static readonly ControlTemplate PromptRowTemplate = MakePromptRowTemplate();
+
+        static ControlTemplate MakePromptRowTemplate()
+        {
+            var border = new FrameworkElementFactory(typeof(Border));
+            border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(BackgroundProperty));
+            border.SetValue(Border.PaddingProperty, new TemplateBindingExtension(PaddingProperty));
+            border.AppendChild(new FrameworkElementFactory(typeof(ContentPresenter)));
+            return new ControlTemplate(typeof(ListBoxItem)) { VisualTree = border };
+        }
+
         static ListBoxItem PromptRow(PromptItem p)
         {
-            var name = new TextBlock { Text = "/" + p.Name, FontFamily = new FontFamily("Consolas"), Margin = new Thickness(0, 0, 8, 0) };
-            var level = new TextBlock { Text = p.Level, FontSize = 11, Opacity = 0.65, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
-            var desc = new TextBlock { Text = p.Description ?? "", Opacity = 0.7, TextTrimming = TextTrimming.CharacterEllipsis };
-            foreach (var t in new[] { name, level, desc }) t.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
-            var row = new DockPanel();
-            DockPanel.SetDock(name, Dock.Left); DockPanel.SetDock(level, Dock.Right);
-            row.Children.Add(name); row.Children.Add(level); row.Children.Add(desc);
-            return new ListBoxItem { Content = row, Tag = p, HorizontalContentAlignment = HorizontalAlignment.Stretch, Focusable = false, ToolTip = p.Description };
+            var name = new TextBlock { Text = "/" + p.Name, FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 0, 12, 0) };
+            var desc = new TextBlock { Text = p.Description ?? "", TextTrimming = TextTrimming.CharacterEllipsis };
+            var row = new Grid();
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto, SharedSizeGroup = "PromptName" });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            Grid.SetColumn(desc, 1);
+            row.Children.Add(name); row.Children.Add(desc);
+            // the level only where it says something: built-in is the normal case, the preview names it anyway
+            if (p.Level != "built-in")
+            {
+                var level = new TextBlock { Text = p.Level, FontSize = 11, Margin = new Thickness(8, 0, 0, 0), VerticalAlignment = VerticalAlignment.Center };
+                Grid.SetColumn(level, 2);
+                row.Children.Add(level);
+            }
+            var item = new ListBoxItem { Content = row, Tag = p, Template = PromptRowTemplate, Padding = new Thickness(8, 3, 8, 3), Focusable = false, ToolTip = p.Description, Background = Brushes.Transparent };
+            TintPromptRow(item, false);
+            return item;
+        }
+
+        void MarkPromptRows()
+        {
+            foreach (var i in promptList.Items.OfType<ListBoxItem>().Where(x => x.Tag is PromptItem)) TintPromptRow(i, i == promptList.SelectedItem);
+        }
+
+        static void TintPromptRow(ListBoxItem item, bool selected)
+        {
+            item.Background = selected ? AccentBrush : Brushes.Transparent;
+            foreach (var t in ((Grid)item.Content).Children.OfType<TextBlock>())
+            {
+                if (selected) t.Foreground = Brushes.White; else t.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+                t.Opacity = selected || Grid.GetColumn(t) == 0 ? 1 : 0.8;
+            }
         }
 
         PromptItem SelectedPrompt => (promptList.SelectedItem as ListBoxItem)?.Tag as PromptItem;
@@ -272,7 +312,7 @@ namespace TcAgentBridge
                 var param = p.Params.FirstOrDefault(x => x.Token == m.Value);
                 var value = param != null ? Expand(param.Default, values) : Expand(m.Value, values);
                 var known = !string.IsNullOrEmpty(value) && !Editor.IsMatch(value);
-                promptPreview.Inlines.Add(new Run(known ? value : m.Value) { Foreground = known ? OkBrush : WarnBrush });
+                promptPreview.Inlines.Add(new Run(known ? value : m.Value) { Foreground = known ? AccentBrush : WarnBrush, FontWeight = FontWeights.SemiBold });
                 i = m.Index + m.Length;
             }
             if (i < p.Body.Length) promptPreview.Inlines.Add(new Run(p.Body.Substring(i)));
