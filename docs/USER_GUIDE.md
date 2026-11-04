@@ -159,7 +159,9 @@ work without the extension. The extension runs **inside** the IDE process and ad
   chat answer running, the dialog stays (default No, the same warning for a remote target). Refactoring proposals come as a
   dialog with Apply / Apply all / Reject.
 
-The chat window opens when Visual Studio starts (unless `"showOnStartup": false` is set in `chat-backends.json`). The
+The chat window opens when Visual Studio starts (unless `"showOnStartup": false` is set in `chat-backends.json`) and shows
+"starting" until the agent is ready: the agent starts in the background once the IDE has loaded, or at once with your first
+question. The
 agent can also open it with `tc_ide command=chat_show`. If you install an AI client later, click **⋯ > Set up clients** in
 the chat window.
 
@@ -1940,7 +1942,7 @@ Output next to it, outside `.tcagent`:
 | `knowledge\`, `doc-templates\` | Personal documents and example manuals |
 | `audit.jsonl` | Audit log |
 | `logs\tcagent-<date>.log` | Daily log of every tool call |
-| `chat-backends.json` | TcAgent Chat backends, `askHotkey`, `showOnStartup` |
+| `chat-backends.json` | TcAgent Chat backends, `askHotkey`, `showOnStartup`, `answerLanguage` |
 | `bridge\bridge.log` | Log of the VS extension |
 | `libcache\` | Cached library signatures |
 | `doccache\` | Cached text of documents and web pages |
