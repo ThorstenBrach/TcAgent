@@ -4,4 +4,4 @@ metadata:
   tcagent-category: Review
   tcagent-tags: review, quality, rules
 ---
-Review {object} with the skill plc-code-review: the coding rules, the risk rules and the TwinCAT checklist. List the findings with their place and severity, most severe first. Change nothing.
+Review {object} with the skill plc-code-review, focus on {input:Focus|everything|naming and structure|risks only}: the coding rules, the risk rules and the TwinCAT checklist. List the findings with their place and severity, most severe first. Change nothing.

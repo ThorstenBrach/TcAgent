@@ -169,10 +169,30 @@ metadata:
 Write TcUnit tests for {object}. Cover the normal sequence, the error path and {input:extra cases to cover}.
 ```
 
-Placeholders: `{object}` (open object), `{selection}`, `{solution}`, `{input:<question>}` (asked before inserting),
-`{input:<question>|a|b}` (a choice), `{input:<question>=value}` (a default). A value that is not there stays visible in the
-text. With `tcagent-send: true` under `metadata` the prompt is sent as soon as it is complete, without the step through the
-input - unless a placeholder is still open. `TcAgent.exe prompts [--solution <sln>] [--json]` lists what applies.
+`{object}` (open object), `{selection}` and `{solution}` come from the editor; a value that is not there stays visible in the
+text. Other values are asked in a card before inserting. Two ways to write them, one model:
+
+| Short, in the text | Asks |
+|---|---|
+| `{input:Question}` | a text |
+| `{input:Question\|a\|b}` | a choice |
+| `{input:Question=value}` | a text with a default |
+
+The long form is a list in the header, in the text `{name}` - for more types and a help text:
+
+```yaml
+params:
+  - name: target
+    ask: Which object?
+    type: pou            # text, number, choice, bool, pou (search list of POUs, GVLs and tasks)
+    default: {object}    # also {selection}
+    options: a, b        # choice
+    required: true
+    help: Shown below the field
+```
+
+With `tcagent-send: true` under `metadata` the prompt is sent right after the card, without the step through the input,
+unless a placeholder is still open. The default is inserting. `TcAgent.exe prompts` also reports mistakes in `params:`. `TcAgent.exe prompts [--solution <sln>] [--json]` lists what applies.
 
 ## Skills
 

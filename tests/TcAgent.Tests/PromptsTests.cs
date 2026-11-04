@@ -55,6 +55,71 @@ public sealed class PromptsTests : IDisposable
     }
 
     [Fact]
+    public void ShortFormsBecomeTheSameModel()
+    {
+        var body = "A {input:Which cases?} B {input:Target|local|test PLC} C {input:Timeout=30 s} D {input:Which cases?}";
+        var p = Prompts.ParamsOf(body, body);
+        Assert.Equal(3, p.Count);                                   // the same question once
+        Assert.Equal(("Which cases?", "text", (string)null), (p[0].Ask, p[0].Type, p[0].Default));
+        Assert.Equal("{input:Target|local|test PLC}", p[1].Token);
+        Assert.Equal(("choice", "local"), (p[1].Type, p[1].Default));
+        Assert.Equal(new[] { "local", "test PLC" }, p[1].Options);
+        Assert.Equal(("Timeout", "30 s"), (p[2].Ask, p[2].Default));
+    }
+
+    const string Long = "---\ndescription: x\nparams:\n  - name: target\n    ask: Which object?\n    type: pou\n    default: {object}\n    required: true\n    help: POU, GVL or task\n" +
+                        "  - name: depth\n    type: number\n    default: 2\n  - name: deep\n    ask: Deep?\n    type: bool\n  - name: format\n    type: choice\n    options: [list, table]\n" +
+                        "  - name: unused\n    ask: never\nmetadata:\n  tcagent-category: Tests\n---\n";
+
+    [Fact]
+    public void LongFormFromTheHeaderInTheOrderOfTheText()
+    {
+        var body = "{format} of {target} depth {depth}, deep {deep}, and {input:More?}";
+        var warnings = new List<string>();
+        var p = Prompts.ParamsOf(Long + body, body, warnings);
+        Assert.Equal(new[] { "format", "target", "depth", "deep", "More?" }, p.Select(x => x.Name));
+        var t = p[1];
+        Assert.Equal(("Which object?", "pou", "{object}", true, "POU, GVL or task", "{target}"), (t.Ask, t.Type, t.Default, t.Required, t.Help, t.Token));
+        Assert.Equal(new[] { "list", "table" }, p[0].Options);
+        Assert.Equal("depth", p[2].Ask);                            // no ask: the name
+        Assert.Contains(warnings, w => w.Contains("unused"));
+    }
+
+    [Fact]
+    public void BadParamsAreReportedAndDoNotBreakThePrompt()
+    {
+        var text = "---\nparams:\n  - name: object\n  - name: a\n    type: colour\n  - name: b\n    type: choice\n---\n";
+        var warnings = new List<string>();
+        var p = Prompts.ParamsOf(text + "{object} {a} {b}", "{object} {a} {b}", warnings);
+        Assert.Equal(new[] { "a", "b" }, p.Select(x => x.Name));    // {object} stays the editor's
+        Assert.All(p, x => Assert.Equal("text", x.Type));
+        Assert.Equal(3, warnings.Count);
+    }
+
+    [Fact]
+    public void LongFormInAFileAndHeaderStillRead()
+    {
+        Write(@"user\prompts\long.md", Long + "Show {target}.\n");
+        var i = Assert.Single(Prompts.Active(Sln, Array.Empty<string>()));
+        Assert.Equal("Tests", i.Category);
+        Assert.Equal("Show {target}.", i.Body);
+        Assert.Equal("target", Assert.Single(i.Params).Name);
+    }
+
+    [Fact]
+    public void ObjectsFromTheFilesOfTheSolution()
+    {
+        Write(@"MachineX\Plc\POUs\MAIN.TcPOU", "x");
+        Write(@"MachineX\Plc\GVLs\GVL_Io.TcGVL", "x");
+        Write(@"MachineX\Plc\_Boot\Old.TcPOU", "x");
+        Write(@"MachineX\Plc\PlcTask.TcTTO", "x");
+        Write(@"MachineX\Machine.tsproj", "<Tasks><Task Id=\"1\"><Name>FastTask</Name></Task></Tasks>");
+        var o = Prompts.Objects(Sln);
+        Assert.Equal(new[] { "FastTask", "GVL_Io", "MAIN", "PlcTask" }, o.Select(x => x.Name));
+        Assert.Equal("Task", o[0].Kind);
+    }
+
+    [Fact]
     public void SendFlagFromTheFrontMatter()
     {
         Write(@"user\prompts\go.md", "---\ndescription: x\nmetadata:\n  tcagent-send: true\n---\nDo it.\n");

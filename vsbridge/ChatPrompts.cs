@@ -1,8 +1,8 @@
 // TcAgent Chat: the prompt library (server: Prompts.cs). "/" at the start of a line of the input, or the button Prompts, opens a
 // list above the input: typing filters by name, description and tags; arrow keys or a click choose, Enter puts the prompt into
 // the input (never sent without the user: it can be adapted), Ctrl+Enter inserts and sends. A preview shows the text with the
-// placeholders filled from the editor - {object}, {selection}, {solution}; {input:<question>} is asked in a small form first
-// ({input:<question>|a|b} a choice, {input:<question>=value} a default). A prompt with tcagent-send: true goes off when complete.
+// placeholders filled from the editor - {object}, {selection}, {solution}. The values of a prompt (Prompts.Param: {input:…} in the
+// text or params: in its header - text, number, choice, bool, pou) are asked in a card. tcagent-send: true sends after the card.
 // "Save as prompt …" under an own message keeps it as a prompt (a file of the knowledge, TcAgent.exe knowledge new).
 //
 // SPDX-License-Identifier: MIT
@@ -30,11 +30,18 @@ namespace TcAgentBridge
             public string Name, Description, Category, Level, Source, Body;
             public bool Send;
             public List<string> Tags = new List<string>();
+            public List<PromptParam> Params = new List<PromptParam>();
+        }
+
+        sealed class PromptParam
+        {
+            public string Name, Ask, Type, Default, Help, Token;
+            public bool Required;
+            public List<string> Options = new List<string>();
         }
 
         const int MaxRecentPrompts = 5;
-        static readonly Regex InputPlaceholder = new Regex(@"\{input:([^}]*)\}");
-        static readonly Regex Placeholders = new Regex(@"\{(object|selection|solution|input:[^}]*)\}");
+        static readonly Regex Editor = new Regex(@"\{(object|selection|solution)\}");
         static string RecentPromptsFile => Path.Combine(Dir, "prompts-recent.json");
 
         readonly Border promptPanel = new Border { BorderThickness = new Thickness(1), Margin = new Thickness(6, 0, 6, 2), VerticalAlignment = VerticalAlignment.Bottom, Visibility = Visibility.Collapsed };
@@ -48,7 +55,9 @@ namespace TcAgentBridge
         List<PromptItem> prompts = new List<PromptItem>();
         string promptCategory;          // null = all
         int promptTokenStart = -1;      // where "/…" starts in the input; -1 = opened with the button, inserted at the cursor
-        bool promptFilling;             // the form for {input:…} is open
+        bool promptFilling;             // the card with the values is open
+        List<string> promptObjects;     // the names for the type pou
+        string promptObjectsOf;         // ... of this solution
         bool PromptsOpen => promptPanel.Visibility == Visibility.Visible;
 
         FrameworkElement BuildPromptPanel()
@@ -117,6 +126,27 @@ namespace TcAgentBridge
             promptFilling = false;
         }
 
+        // TcAgent.exe prompts ... - files only, stdin closed
+        static string PromptsCli(string exe, string args, string sln)
+        {
+            var psi = new ProcessStartInfo(exe, args + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""))
+            {
+                UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true,
+                StandardOutputEncoding = new UTF8Encoding(false), StandardErrorEncoding = new UTF8Encoding(false)
+            };
+            using (var p = Process.Start(psi))
+            {
+                p.StandardInput.Close();
+                var err = p.StandardError.ReadToEndAsync();
+                var json = p.StandardOutput.ReadToEnd();
+                p.WaitForExit(15000);
+                return json;
+            }
+        }
+
+        static IEnumerable<Dictionary<string, object>> Dicts(object o) => (o as System.Collections.IEnumerable ?? new object[0]).OfType<Dictionary<string, object>>();
+        static List<string> Strings(object o) => (o as System.Collections.IEnumerable)?.Cast<object>().Select(x => x.ToString()).ToList() ?? new List<string>();
+
         // the list from TcAgent.exe prompts --json - in the background, the list shown so far stays until it is there
         void LoadPrompts()
         {
@@ -128,26 +158,18 @@ namespace TcAgentBridge
                 var list = new List<PromptItem>();
                 try
                 {
-                    var psi = new ProcessStartInfo(exe, "prompts --json" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""))
-                    {
-                        UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true,
-                        StandardOutputEncoding = new UTF8Encoding(false), StandardErrorEncoding = new UTF8Encoding(false)
-                    };
-                    using (var p = Process.Start(psi))
-                    {
-                        p.StandardInput.Close();
-                        var err = p.StandardError.ReadToEndAsync();
-                        var json = p.StandardOutput.ReadToEnd();
-                        p.WaitForExit(15000);
-                        var root = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(json) as Dictionary<string, object>;
-                        foreach (var d in (root?["prompts"] as System.Collections.IEnumerable ?? new object[0]).OfType<Dictionary<string, object>>())
-                            list.Add(new PromptItem
+                    var root = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(PromptsCli(exe, "prompts --json", sln)) as Dictionary<string, object>;
+                    foreach (var d in Dicts(root?["prompts"]))
+                        list.Add(new PromptItem
+                        {
+                            Name = d["name"] as string, Description = d["description"] as string, Category = d["category"] as string, Level = d["level"] as string,
+                            Source = d["source"] as string, Body = d["body"] as string, Send = d.TryGetValue("send", out var snd) && snd is bool sb && sb, Tags = Strings(d["tags"]),
+                            Params = Dicts(d.TryGetValue("params", out var ps) ? ps : null).Select(x => new PromptParam
                             {
-                                Name = d["name"] as string, Description = d["description"] as string, Category = d["category"] as string, Level = d["level"] as string,
-                                Source = d["source"] as string, Body = d["body"] as string, Send = d.TryGetValue("send", out var snd) && snd is bool sb && sb,
-                                Tags = (d["tags"] as System.Collections.IEnumerable)?.Cast<object>().Select(x => x.ToString()).ToList() ?? new List<string>()
-                            });
-                    }
+                                Name = x["name"] as string, Ask = x["ask"] as string, Type = x["type"] as string, Default = x["default"] as string, Help = x["help"] as string,
+                                Token = x["token"] as string, Required = x["required"] is bool rq && rq, Options = Strings(x["options"])
+                            }).ToList()
+                        });
                 }
                 catch { return; }                                  // an older TcAgent.exe without prompts: no list
                 Dispatcher.BeginInvoke(new Action(() =>
@@ -231,6 +253,10 @@ namespace TcAgentBridge
             return v;
         }
 
+        // a default may hold {object} / {selection}
+        static string Expand(string text, Dictionary<string, string> values) =>
+            string.IsNullOrEmpty(text) ? text : Editor.Replace(text, m => values.TryGetValue(m.Groups[1].Value, out var v) ? v : m.Value);
+
         void ShowPromptPreview()
         {
             promptPreview.Inlines.Clear();
@@ -238,12 +264,15 @@ namespace TcAgentBridge
             if (p == null) { promptOrigin.Text = ""; return; }
             promptOrigin.Text = "Preview · " + p.Level + (string.IsNullOrEmpty(p.Source) ? "" : " · from " + p.Source);
             var values = PromptValues();
+            var tokens = string.Join("|", p.Params.Select(x => Regex.Escape(x.Token)).Concat(new[] { Editor.ToString() }));
             int i = 0;
-            foreach (Match m in Placeholders.Matches(p.Body))
+            foreach (Match m in Regex.Matches(p.Body, tokens))
             {
                 if (m.Index > i) promptPreview.Inlines.Add(new Run(p.Body.Substring(i, m.Index - i)));
-                var known = values.TryGetValue(m.Groups[1].Value, out var v);
-                promptPreview.Inlines.Add(new Run(known ? v : m.Value) { Foreground = known ? OkBrush : WarnBrush });
+                var param = p.Params.FirstOrDefault(x => x.Token == m.Value);
+                var value = param != null ? Expand(param.Default, values) : Expand(m.Value, values);
+                var known = !string.IsNullOrEmpty(value) && !Editor.IsMatch(value);
+                promptPreview.Inlines.Add(new Run(known ? value : m.Value) { Foreground = known ? OkBrush : WarnBrush });
                 i = m.Index + m.Length;
             }
             if (i < p.Body.Length) promptPreview.Inlines.Add(new Run(p.Body.Substring(i)));
@@ -274,63 +303,124 @@ namespace TcAgentBridge
         void ChoosePrompt(PromptItem p, bool send)
         {
             send |= p.Send;
-            var questions = InputPlaceholder.Matches(p.Body).Cast<Match>().Select(m => m.Groups[1].Value.Trim()).Distinct().ToList();
-            if (questions.Count == 0) { InsertPrompt(p, new Dictionary<string, string>(), send); return; }
-            // the values to ask for: a short form in the panel; Enter in the last field or Insert goes on, Esc cancels
+            if (p.Params.Count == 0) { InsertPrompt(p, new Dictionary<string, string>(), send); return; }
+            // the card: one field per value; Enter goes on, Insert completes, Esc cancels
             promptFilling = true;
             promptChoose.Visibility = Visibility.Collapsed; promptForm.Visibility = Visibility.Visible;
             promptForm.Children.Clear();
             var head = new TextBlock { Margin = new Thickness(0, 0, 0, 4) };
             head.Inlines.Add(new Bold(new Run("/" + p.Name)));
-            head.Inlines.Add(new Run(questions.Count == 1 ? " needs one value" : $" needs {questions.Count} values"));
+            head.Inlines.Add(new Run(p.Params.Count == 1 ? " needs one value" : $" needs {p.Params.Count} values"));
             head.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             promptForm.Children.Add(head);
-            var boxes = new List<Control>();
-            foreach (var q in questions)
+            var values = PromptValues();
+            var ok = new Button { Content = send ? "Send" : "Insert", MinWidth = 70, Margin = new Thickness(0, 2, 6, 0), Background = AccentBrush, Foreground = Brushes.White };
+            var no = new Button { Content = "Cancel", MinWidth = 70, Margin = new Thickness(0, 2, 0, 0) };
+            var fields = new List<(PromptParam P, Control C, Func<string> Get)>();
+            bool Valid() => fields.All(f => (!f.P.Required || f.Get().Length > 0) &&
+                                            (f.P.Type != "number" || f.Get().Length == 0 || double.TryParse(f.Get().Replace(',', '.'), System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _)));
+            void Check() => ok.IsEnabled = Valid();
+            foreach (var q in p.Params)
             {
-                // "Target|local|test PLC": a choice; "Timeout=30 s": a default
-                var parts = q.Split('|').Select(x => x.Trim()).ToArray();
-                var eq = parts.Length == 1 ? q.IndexOf('=') : -1;
-                var l = new TextBlock { Text = eq > 0 ? q.Substring(0, eq).Trim() : parts[0], Margin = new Thickness(0, 2, 0, 1), TextWrapping = TextWrapping.Wrap };
-                l.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
-                Control b = parts.Length > 1
-                    ? new ComboBox { ItemsSource = parts.Skip(1).ToList(), SelectedIndex = 0, Margin = new Thickness(0, 0, 0, 4), Tag = q }
-                    : (Control)new TextBox { Padding = new Thickness(2), Margin = new Thickness(0, 0, 0, 4), Tag = q, Text = eq > 0 ? q.Substring(eq + 1).Trim() : "" };
-                promptForm.Children.Add(l); promptForm.Children.Add(b); boxes.Add(b);
+                var value = Expand(q.Default, values);
+                if (value != null && Editor.IsMatch(value)) value = "";          // {selection} without a selection: empty, the user fills it
+                if (q.Type != "bool")
+                {
+                    var l = new TextBlock { Text = q.Ask + (q.Required ? " *" : ""), Margin = new Thickness(0, 2, 0, 1), TextWrapping = TextWrapping.Wrap };
+                    l.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+                    promptForm.Children.Add(l);
+                }
+                Control c; Func<string> get;
+                if (q.Type == "choice")
+                {
+                    var b = new ComboBox { ItemsSource = q.Options, SelectedItem = q.Options.Contains(value ?? "") ? value : q.Options.FirstOrDefault(), Margin = new Thickness(0, 0, 0, 4) };
+                    c = b; get = () => b.SelectedItem as string ?? "";
+                }
+                else if (q.Type == "bool")
+                {
+                    var b = new CheckBox { Content = q.Ask, IsChecked = (value ?? "").Equals("true", StringComparison.OrdinalIgnoreCase), Margin = new Thickness(0, 3, 0, 5) };
+                    b.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+                    c = b; get = () => b.IsChecked == true ? "true" : "false";
+                }
+                else
+                {
+                    var b = new TextBox { Padding = new Thickness(2), Margin = new Thickness(0, 0, 0, 4), Text = value ?? "" };
+                    b.TextChanged += (s, e) => Check();
+                    c = b; get = () => b.Text.Trim();
+                }
+                promptForm.Children.Add(c);
+                if (q.Type == "pou") promptForm.Children.Add(ObjectList((TextBox)c));
+                if (!string.IsNullOrEmpty(q.Help))
+                {
+                    var h = new TextBlock { Text = q.Help, FontSize = 11, Opacity = 0.65, Margin = new Thickness(0, 0, 0, 4), TextWrapping = TextWrapping.Wrap };
+                    h.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+                    promptForm.Children.Add(h);
+                }
+                fields.Add((q, c, get));
             }
             void Done()
             {
-                var values = boxes.ToDictionary(b => (string)b.Tag, b => b is ComboBox c ? c.SelectedItem as string : ((TextBox)b).Text.Trim());
+                if (!Valid()) return;
+                var answers = fields.ToDictionary(f => f.P.Token, f => f.Get());
                 promptFilling = false;
-                InsertPrompt(p, values, send);
+                InsertPrompt(p, answers, send);
             }
             void Cancel() { promptFilling = false; ClosePrompts(); input.Focus(); }
-            var ok = new Button { Content = "Insert", MinWidth = 70, Margin = new Thickness(0, 2, 6, 0), Background = AccentBrush, Foreground = Brushes.White };
-            var no = new Button { Content = "Cancel", MinWidth = 70, Margin = new Thickness(0, 2, 0, 0) };
             ok.Click += (s, e) => Done();
             no.Click += (s, e) => Cancel();
-            foreach (var b in boxes)
-                b.PreviewKeyDown += (s, e) =>
+            foreach (var f in fields)
+            {
+                var c = f.C;
+                c.PreviewKeyDown += (s, e) =>
                 {
                     if (e.Key == Key.Escape) { e.Handled = true; Cancel(); }
-                    else if (e.Key == Key.Enter) { e.Handled = true; if (b == boxes[boxes.Count - 1]) Done(); else boxes[boxes.IndexOf(b) + 1].Focus(); }
+                    else if (e.Key == Key.Enter)
+                    {
+                        e.Handled = true;
+                        var at = fields.FindIndex(x => x.C == c);
+                        if (at == fields.Count - 1) Done(); else fields[at + 1].C.Focus();
+                    }
                 };
+            }
             var bar = new StackPanel { Orientation = Orientation.Horizontal };
             bar.Children.Add(ok); bar.Children.Add(no);
             promptForm.Children.Add(bar);
+            Check();
             promptPanel.Visibility = Visibility.Visible;
-            Dispatcher.BeginInvoke(new Action(() => boxes[0].Focus()), System.Windows.Threading.DispatcherPriority.Input);
+            Dispatcher.BeginInvoke(new Action(() => fields[0].C.Focus()), System.Windows.Threading.DispatcherPriority.Input);
+        }
+
+        // the type pou: the names of POUs, GVLs and tasks below the field, filtered by what is typed; a click takes the name
+        ListBox ObjectList(TextBox box)
+        {
+            var list = new ListBox { MaxHeight = 96, Margin = new Thickness(0, 0, 0, 4), Focusable = false };
+            list.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
+            list.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            void Fill()
+            {
+                var q = box.Text.Trim();
+                list.ItemsSource = (promptObjects ?? new List<string>()).Where(o => q.Length == 0 || o.IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0).Take(100).ToList();
+            }
+            box.TextChanged += (s, e) => Fill();
+            list.SelectionChanged += (s, e) => { if (list.SelectedItem is string n && n != box.Text) { box.Text = n; box.CaretIndex = n.Length; } };
+            var sln = TcUnitControl.SolutionPath();
+            var exe = TcUnitControl.TcAgentExe();
+            if (promptObjects != null && promptObjectsOf == sln) { Fill(); return list; }
+            if (exe != null)
+                System.Threading.Tasks.Task.Run(() =>
+                {
+                    var names = new List<string>();
+                    try { names = Dicts(new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.DeserializeObject(PromptsCli(exe, "prompts objects", sln))).Select(d => d["name"] as string).ToList(); } catch { }
+                    Dispatcher.BeginInvoke(new Action(() => { promptObjects = names; promptObjectsOf = sln; Fill(); }));
+                });
+            return list;
         }
 
         void InsertPrompt(PromptItem p, Dictionary<string, string> answers, bool send)
         {
-            var values = PromptValues();
-            var text = Placeholders.Replace(p.Body, m =>
-            {
-                var key = m.Groups[1].Value;
-                if (key.StartsWith("input:")) return answers.TryGetValue(key.Substring(6).Trim(), out var a) ? a : m.Value;
-                return values.TryGetValue(key, out var v) ? v : m.Value;
-            });
+            var text = p.Body;
+            foreach (var a in answers) text = text.Replace(a.Key, a.Value);
+            text = Expand(text, PromptValues());
             // replaces "/te"; opened with the button: at the cursor
             var start = promptTokenStart >= 0 ? promptTokenStart : input.CaretIndex;
             var end = promptTokenStart >= 0 ? Math.Max(start, input.CaretIndex) : input.CaretIndex + input.SelectionLength;
@@ -342,7 +432,7 @@ namespace TcAgentBridge
             RememberRecentPrompt(p.Name);
             input.Focus();
             // something still open ({selection} without a selection): the user decides, it is not sent like that
-            if (send && Placeholders.IsMatch(text)) status.Text = "Not sent: the prompt still has an open placeholder - complete it, then Enter.";
+            if (send && Editor.IsMatch(text)) status.Text = "Not sent: the prompt still has an open placeholder - complete it, then Enter.";
             else if (send) Send();
         }
 
