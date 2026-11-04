@@ -85,11 +85,13 @@
 
 ## Checks
 
-<!-- The AI agent verifies these by reading the code - a regular expression cannot decide them. -->
+<!-- The AI agent verifies these by reading the code - a regular expression cannot decide them.
+     Several checks are based on the Top 20 Secure PLC Coding Practices (https://plc-security.com),
+     Copyright (c) 2026 admeritia GmbH, Langenfeld/Rheinland, Germany; worded here for TwinCAT. -->
 
 - Asynchronous function blocks (ADS, file, TCP, CoE ...): Busy and Error are evaluated, Execute is used as an edge and a new request starts only after the last one ended.
 - EtherCAT: WcState and State of important devices are monitored, and the program has a defined reaction when the bus or a device fails.
-- Outputs that move hardware go to a defined safe state on error and stop - no output stays TRUE after an error.
+- Outputs that move hardware go to a defined safe state on error, on stop and after a restart of the PLC - no output stays TRUE after an error, and nothing moves by itself after the restart.
 - Every wait on an external signal (sensor, drive, communication) has a timeout.
 - Every state machine has an error state that can be reached from every state.
 - No WHILE/REPEAT loop waits for a signal inside one call - waiting belongs in a state machine over several cycles.
@@ -99,4 +101,12 @@
 - References that are not fixed at startup are checked with __ISVALIDREF before use; pointers and interfaces are checked against 0 (a pointer can also be valid but point to the wrong or a freed object).
 - Persistent and retain data are checked for plausibility after loading, and a change of their structure is handled.
 - Standard PLC logic does not override or bypass safety signals - it only reads them for diagnosis and sequence control.
-- Symbols writable from outside (ADS, OPC UA, HMI) do not start motion without a plausibility check in the PLC.
+- Symbols writable from outside (ADS, OPC UA, HMI) do not start motion without a plausibility check in the PLC, and their values are limited to a valid range there - the limits of the HMI are not enough.
+- Array indexes and pointer offsets that are calculated or come from outside are checked against the bounds before use.
+- Interlocks, limits and totals are evaluated in the PLC, not only in the HMI or a supervisory system.
+- The program knows its operating mode (automatic, manual, setup) and notices an unexpected change of it, also a stop or restart of the PLC.
+- Timer and counter presets from outside are checked against a valid range, and a timer or counter that does not behave as expected is noticed.
+- Signals that belong together (forward and reverse, open and closed, start and stop) are checked against each other: an impossible combination is an error.
+- Measured values are checked for physical plausibility: range, rate of change and a value that no longer changes.
+- Cycle time and exceeded cycles of important tasks are monitored, so that a slowly growing load is noticed.
+- Memory use is monitored where the program allocates memory at run time, so that a leak is noticed before an allocation fails.

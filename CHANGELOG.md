@@ -24,8 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `tc_docs`) - it is not documentation of TcAgent and not the templates. The texts of the window say "reference source".
 
 ### Added
-- **General TwinCAT risk rules** shipped with TcAgent (`knowledge/risk-rules/twincat-general.md`): 12 rules and 13 agent checks for
-  every project, in addition to the rules in the code. **Pipelines:** three of them are `high` (password in the code, `__NEW`
+- **General TwinCAT risk rules** shipped with TcAgent (`knowledge/risk-rules/twincat-general.md`): 12 rules and 21 agent checks for
+  every project (several based on the Top 20 Secure PLC Coding Practices), in addition to the rules in the code. **Pipelines:** three of them are `high` (password in the code, `__NEW`
   without `__DELETE`, R_TRIG/F_TRIG in the variables of a method), so `doc --risks --fail-on high` can fail where it passed before.
 - **New versions in the TcAgent Chat** (`src/Updates.cs`, `vsbridge/ChatUpdates.cs`, `TcAgent.exe update`): once a day, after the
   IDE has loaded, the extension asks GitHub for the releases (an anonymous request; pipelines and the agent never do). A newer
