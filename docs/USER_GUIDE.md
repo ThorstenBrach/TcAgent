@@ -114,11 +114,19 @@ work without the extension. The extension runs **inside** the IDE process and ad
   status line shows the state of the backend, while working "◐ Claude Code is working · 3 tool calls · 12 s · tc_check",
   afterwards "✓ Done in 14 s · 6 tool calls". The **⋯** menu is grouped: *Chat* (send editor context, check after changes, **Answer language**,
   New chat, Copy conversation), *Windows* (TcUnit Tests, Knowledge), *Setup and help* (Set up clients, Copy diagnostics,
-  Open user guide) and the version. The result of **Set up clients** is one line at the top ("TcAgent x is set up for n
+  Open user guide, Check for updates, About TcAgent) and the version. The result of **Set up clients** is one line at the top ("TcAgent x is set up for n
   clients – restart the open ones") with **Details** (the files written, user folders as %LOCALAPPDATA% / %USERPROFILE%).
 - **Answer language** – **⋯ > Answer language**: the language of Windows (the default), the language of the question, or one
   of the languages of your Windows user. It also holds for the prepared prompts, which are written in English. Code and
   identifiers stay as they are.
+- **New versions** – once a day, after the IDE has loaded, a line above the conversation says when a newer TcAgent is out, and ⋯ gets a
+  blue dot. **What's new …** shows the release notes down to your version: **Download** fetches the `.vsix` and checks it against
+  `SHA256SUMS.txt`, **Install …** then opens the VSIX installer (Visual Studio must be closed, so save first), **Skip this version**
+  ends the notice until the next one. In the XAE Shell, **Open on GitHub** leads to the ZIP; install it as in
+  [INSTALLATION.md](INSTALLATION.md). A second line says when installed items have newer versions in their sources and leads
+  to the tab Sources; updating them stays your decision there.
+- **About TcAgent** – **⋯ > About TcAgent**: author, license, the versions of extension, server, IDE and TwinCAT, the components with
+  their licenses, and the two switches for the daily checks. What they send: [SECURITY.md](../SECURITY.md).
 - **Prepared prompts** – type **/** at the start of a line in the input, or click **Prompts**: a list above the input with
   search (name, description, tags), categories and a preview. Arrow keys or a click choose, writing the name works too;
   Enter puts the prompt into the input so you can adapt it, Ctrl+Enter inserts and sends, Esc closes. `{object}`,
@@ -1943,6 +1951,7 @@ Output next to it, outside `.tcagent`:
 | `audit.jsonl` | Audit log |
 | `logs\tcagent-<date>.log` | Daily log of every tool call |
 | `chat-backends.json` | TcAgent Chat backends, `askHotkey`, `showOnStartup`, `answerLanguage` |
+| `update-state.json`, `updates\` | Daily checks: switches, last answer, skipped version; the downloaded `.vsix` |
 | `bridge\bridge.log` | Log of the VS extension |
 | `libcache\` | Cached library signatures |
 | `doccache\` | Cached text of documents and web pages |

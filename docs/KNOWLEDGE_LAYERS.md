@@ -194,6 +194,12 @@ params:
 With `tcagent-send: true` under `metadata` the prompt is sent right after the card, without the step through the input,
 unless a placeholder is still open. The default is inserting. `TcAgent.exe prompts` also reports mistakes in `params:`. `TcAgent.exe prompts [--solution <sln>] [--json]` lists what applies.
 
+## Daily checks
+
+`updates.json` on the company or team level decides about the checks of the VS extension for everybody, e.g.
+`{ "check": false, "sources": false }`: `check` for new TcAgent versions, `sources` for newer versions in the repo sources. A value
+there locks the switch in **⋯ > About TcAgent**; without one each user decides, and both are on by default.
+
 ## Skills
 
 A skill describes **how a kind of task is done** (as opposed to coding rules, which describe what the code must look

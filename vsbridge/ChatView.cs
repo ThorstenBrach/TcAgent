@@ -85,7 +85,10 @@ namespace TcAgentBridge
         {
             // top bar: backend (short name and a status dot) | (version only if something is wrong) New chat, ⋯
             var top = new DockPanel { Margin = new Thickness(6, 6, 6, 2) };
-            var menuButton = new Button { Content = "⋯", Width = 28, Padding = new Thickness(0, 0, 0, 2), Margin = new Thickness(6, 0, 0, 0), FontSize = 14,
+            var menuGlyph = new Grid { Width = 24 };
+            menuGlyph.Children.Add(new TextBlock { Text = "⋯", HorizontalAlignment = HorizontalAlignment.Center });
+            menuGlyph.Children.Add(updateDot);
+            var menuButton = new Button { Content = menuGlyph, Width = 28, Padding = new Thickness(0, 0, 0, 2), Margin = new Thickness(6, 0, 0, 0), FontSize = 14,
                                           ToolTip = "Chat options, the TcAgent windows, set up clients and help" };
             menuButton.Click += (s, e) => ShowMenu(menuButton);
             DockPanel.SetDock(menuButton, Dock.Right);
@@ -146,8 +149,8 @@ namespace TcAgentBridge
             bottom.Children.Add(frame);
 
             var root = new DockPanel();
-            DockPanel.SetDock(top, Dock.Top); DockPanel.SetDock(infoBar, Dock.Top); DockPanel.SetDock(bottom, Dock.Bottom);
-            root.Children.Add(top); root.Children.Add(infoBar); root.Children.Add(bottom); root.Children.Add(area);
+            DockPanel.SetDock(top, Dock.Top); DockPanel.SetDock(notices, Dock.Top); DockPanel.SetDock(infoBar, Dock.Top); DockPanel.SetDock(bottom, Dock.Bottom);
+            root.Children.Add(top); root.Children.Add(notices); root.Children.Add(infoBar); root.Children.Add(bottom); root.Children.Add(area);
 
             input.BorderThickness = new Thickness(0);
             input.Padding = new Thickness(4);
@@ -309,6 +312,14 @@ namespace TcAgentBridge
                                 "Versions of TcAgent, the extension, TwinCAT and the IDEs for the Diagnostics field of an issue"));
             menu.Items.Add(Item("Open user guide", () => { try { System.Diagnostics.Process.Start(UserGuideUrl); } catch (Exception ex) { status.Text = "Could not open the user guide: " + ex.Message; } },
                                 "The user guide of TcAgent in the browser"));
+            if (B(update, "available"))
+            {
+                var mi = Item($"Update to {S(update, "latest")} …", ShowWhatsNew, "The release notes, download and installation");
+                mi.Foreground = AccentBrush; mi.FontWeight = FontWeights.SemiBold;
+                menu.Items.Add(mi);
+            }
+            menu.Items.Add(Item("Check for updates", CheckNow, "Ask GitHub for a new version of TcAgent now"));
+            menu.Items.Add(Item("About TcAgent …", ShowAbout, "Author, versions, components and licenses"));
             menu.Items.Add(new Separator());
             menu.Items.Add(new MenuItem { Header = versionLabel.Text?.Length > 0 && versionLabel.Visibility == Visibility.Visible ? versionLabel.Text
                                                     : $"TcAgent {BridgePackage.BridgeVersion}" + (Installer.RegisteredServerVersion() is string srv && srv != BridgePackage.BridgeVersion ? $" (server {srv})" : ""),

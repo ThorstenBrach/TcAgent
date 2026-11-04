@@ -18,6 +18,9 @@ All commands are in **PowerShell**. Steps that need administrator rights say so 
 Updates: install the newer VSIX – clients are re-registered automatically. Uninstall: *Extensions > Manage Extensions*;
 `%LOCALAPPDATA%\TcAgent\` and the client entries stay (backups `*.bak-*` next to each config file).
 
+Later versions: the TcAgent Chat says when one is out (**⋯ > Check for updates** asks right away). **What's new** downloads and checks
+the `.vsix` and opens the installer. Nothing installs by itself.
+
 If you previously installed the extension with `vsbridge\install.ps1`, run `vsbridge\uninstall.ps1` as administrator
 first – otherwise Visual Studio sees the extension twice.
 

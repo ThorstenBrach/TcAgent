@@ -31,7 +31,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "about" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -62,6 +62,8 @@ public static partial class Cli
         // modules.json and the plugin folders only (Modules.cs, Plugins.cs)
         if (args[0].Equals("modules", StringComparison.OrdinalIgnoreCase)) return Modules.RunCli(args);
         if (args[0].Equals("plugins", StringComparison.OrdinalIgnoreCase)) return Plugins.RunCli(args);
+        if (args[0].Equals("update", StringComparison.OrdinalIgnoreCase)) return UpdateCli(args);       // Updates.cs - no solution, no IDE
+        if (args[0].Equals("about", StringComparison.OrdinalIgnoreCase)) return AboutCli();
         if (args[0].Equals("prompts", StringComparison.OrdinalIgnoreCase)) return Prompts.RunCli(args);   // Prompts.cs - files only, the list for the chat
         // the elevated part of tc_packages_change (Packages.cs), started by TcAgent itself through the UAC prompt
         if (args[0].Equals("tcpkg-elevated", StringComparison.Ordinal)) return ToolRegistry.RunElevatedTcpkg(args);
@@ -948,6 +950,16 @@ public static partial class Cli
       The tool groups the AI client sees (core, plc-code, test, runtime, io, motion, hmi, scope, safety, docs, knowledge,
       packages, system, plugin:<id>). modules.json on the levels company, team, user, project - the later level wins
       unless company or team locked the module; core cannot be switched off. The command line keeps every tool.
+
+  TcAgent.exe update [check] [--force] [--json]
+  TcAgent.exe update sources [--force] [--solution <sln>] [--json]
+  TcAgent.exe update download | skip <version> | set check|sources on|off
+      New versions of TcAgent (GitHub releases, at most once a day unless --force) and of the repo sources in use. download
+      fetches the .vsix and checks it against SHA256SUMS.txt. The TcAgent Chat uses these; updates.json on the company or team
+      level locks a switch: { ""check"": false, ""sources"": false }.
+
+  TcAgent.exe about --json
+      Versions of the server, TwinCAT and the components with their licenses.
 
   TcAgent.exe prompts [list] [--solution <sln>] [--json]
       The prompts of the prompt library that apply (prompts\<name>.md on the knowledge levels), chosen in the chat with /.

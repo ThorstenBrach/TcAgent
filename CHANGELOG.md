@@ -24,6 +24,16 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `tc_docs`) - it is not documentation of TcAgent and not the templates. The texts of the window say "reference source".
 
 ### Added
+- **New versions in the TcAgent Chat** (`src/Updates.cs`, `vsbridge/ChatUpdates.cs`, `TcAgent.exe update`): once a day, after the
+  IDE has loaded, the extension asks GitHub for the releases (an anonymous request; pipelines and the agent never do). A newer
+  version shows a line above the conversation and a dot on ⋯, **What's new** the release notes down to the installed version,
+  with Download, Install, Open on GitHub, Skip this version and Later. The download only starts on a click and must match
+  SHA256SUMS.txt of the release; Install opens the VSIX installer, nothing installs silently. The XAE Shell keeps the browser
+  download and the documented steps of the ZIP. Switches in About; `updates.json` on the company or team level locks them.
+- **Newer versions in the repo sources**: once a day the sources in use are fetched (no pull, no sign-in window) and a line in the
+  chat leads to the tab Sources.
+- **About TcAgent** (⋯ > About TcAgent, `TcAgent.exe about --json`): author, license, the versions of the extension, server, IDE and
+  TwinCAT, the components with their licenses, the update switches. ⋯ also has **Check for updates**.
 - **Answer language in the TcAgent Chat** (⋯ > Answer language): the language of Windows (new default), the language of the
   question, or one of the languages of the Windows user (`answerLanguage` in `chat-backends.json`). Before, the answer
   followed the question, so prepared prompts in English gave English answers.

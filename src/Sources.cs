@@ -61,12 +61,16 @@ public static class Sources
     static readonly JsonSerializerOptions Json = new() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
 
     // ------------------------------------------------------------------ git
+    /// <summary>The daily check (Updates.cs) runs without the user: no sign-in window may appear for it.</summary>
+    public static bool NoSignInDialog;
+
     public static string Git(string dir, string args, int timeoutMs = 300_000)
     {
         // own stdin, closed at once: under MCP the inherited stdin is the client's pipe - git (or a credential helper) would wait on it
         var psi = new ProcessStartInfo("git", args) { RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true, UseShellExecute = false, CreateNoWindow = true };
         if (dir != null) psi.WorkingDirectory = dir;
         psi.Environment["GIT_TERMINAL_PROMPT"] = "0";     // never wait for credentials in the background
+        if (NoSignInDialog) psi.Environment["GCM_INTERACTIVE"] = "never";   // nor a window of the credential manager
         using var p = Process.Start(psi) ?? throw new InvalidOperationException("git not found - install Git for Windows");
         p.StandardInput.Close();
         var err = p.StandardError.ReadToEndAsync();

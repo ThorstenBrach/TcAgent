@@ -20,6 +20,14 @@ activate configurations, start and stop the PLC, write variables. Use it accordi
 * **Choose a mode:** `TCAGENT_MODE=propose` returns code changes only as a diff; `ask` allows read-only access.
 * **Audit log** (`%LOCALAPPDATA%\TcAgent\audit.jsonl`) records every write call with its arguments.
 * **Stay local:** TcAgent runs as a local process (stdio). Do not expose it over a network or as a public URL.
+* **Connections it makes by itself:** the VS extension asks `api.github.com` for the releases of TcAgent once a day, after the IDE
+  has loaded: an anonymous GET, with the TcAgent version in the User-Agent and nothing about the solution or the user. It also
+  fetches the Git repositories of the sources in use once a day (`git fetch`, no pull, no sign-in window). Pipelines, the
+  command line and the agent do not check. Both switches are in **⋯ > About TcAgent**; `updates.json` on the company or team
+  level locks them, e.g. `{ "check": false, "sources": false }`.
+* **Updates are never installed silently.** A download starts on a click; the `.vsix` must match `SHA256SUMS.txt` of the release and
+  **Install** opens the VSIX installer. The checksum shows a damaged download. It lies in the same release, so it does not
+  protect against a taken-over repository: the packages are not signed.
 * **Secrets:** No passwords, customer data or license keys in prompts or `tc_feedback` reports.
   Keep in mind that code and context are sent to your chosen AI provider – check whether that is acceptable for your
   project.

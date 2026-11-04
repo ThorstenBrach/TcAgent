@@ -131,6 +131,9 @@ or a CLI in your terminal use the very same tools.
 The ChatGPT desktop app only connects to MCP servers by URL. TcAgent deliberately stays local (stdio): a tool that
 changes PLC code and starts and stops controllers does not belong on the network.
 
+The VS extension looks for new versions once a day (an anonymous request to GitHub, nothing about your solution). It can be
+switched off in **⋯ > About TcAgent**, or for everybody on the company level: [SECURITY.md](SECURITY.md).
+
 ## How it works
 
 <p align="center"><img src="docs/img/architecture.svg" width="900" alt="Architecture: AI clients talk MCP to TcAgent; TcAgent drives Visual Studio via COM, the TcAgentBridge extension via a named pipe and the runtime via ADS"></p>

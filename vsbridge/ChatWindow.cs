@@ -266,7 +266,7 @@ namespace TcAgentBridge
                 KillSession(); UpdateVersionLabel(); ShowEmptyState(); UpdateContextChip(); status.Text = "New conversation."; WarmUp();
             };
             // Pre-start the Claude session as soon as the window becomes visible or the backend changes
-            IsVisibleChanged += (s, e) => { if (IsVisible) WarmUp(); };
+            IsVisibleChanged += (s, e) => { if (IsVisible) { WarmUp(); StartChecks(); } };
             backendBox.SelectionChanged += (s, e) => { SaveDefaultBackend(Current?.Key); UpdatePlaceholder(); if (IsVisible && !busy) WarmUp(); };
             Dispatcher.ShutdownStarted += (s, e) => KillSession();
             input.PreviewKeyDown += (s, e) =>

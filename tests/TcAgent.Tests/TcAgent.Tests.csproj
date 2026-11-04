@@ -32,6 +32,7 @@
     <Compile Include="..\..\src\Modules.cs" Link="src\Modules.cs" />
     <Compile Include="..\..\src\Plugins.cs" Link="src\Plugins.cs" />
     <Compile Include="..\..\src\Prompts.cs" Link="src\Prompts.cs" />
+    <Compile Include="..\..\src\Updates.cs" Link="src\Updates.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

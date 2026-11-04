@@ -1,0 +1,105 @@
+// TcAgent.exe update (Updates.cs) and TcAgent.exe about - for the TcAgent Chat of the extension, which shows the answers.
+//
+// SPDX-License-Identifier: MIT
+using System.Reflection;
+using System.Text.Json.Nodes;
+
+namespace TcAgent;
+
+public static partial class Cli
+{
+    static int UpdateCli(string[] args)
+    {
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+        bool json = false, force = false;
+        string current = Program.ServerVersion, sln = null;
+        var words = new List<string>();
+        try
+        {
+            for (int i = 1; i < args.Length; i++)
+            {
+                var a = args[i];
+                if (a == "--json") json = true;
+                else if (a == "--force") force = true;
+                else if (a == "--current") current = i + 1 < args.Length ? args[++i] : throw new ArgumentException("--current needs a value");
+                else if (a is "--solution" or "-s") sln = i + 1 < args.Length ? args[++i] : throw new ArgumentException("--solution needs a value");
+                else if (a.StartsWith('-')) throw new ArgumentException("unknown option " + a);
+                else words.Add(a.ToLowerInvariant());
+            }
+            var dir = sln != null ? Path.GetDirectoryName(Path.GetFullPath(sln)) : null;
+            switch (words.FirstOrDefault() ?? "check")
+            {
+                case "check":
+                {
+                    var r = Updates.Check(current, force);
+                    Console.WriteLine(json ? r.ToJsonString() : r["error"] != null ? "Could not check: " + r["error"]
+                                      : r["available"]?.GetValue<bool>() == true ? $"TcAgent {r["latest"]} is available (you have {current})."
+                                      : $"TcAgent {current} is up to date.");
+                    return Ok;
+                }
+                case "sources":
+                {
+                    var r = Updates.CheckSources(dir, force);
+                    if (json) Console.WriteLine(r.ToJsonString());
+                    else foreach (var x in r["items"].AsArray()) Console.WriteLine($"{x["item"]} ({x["level"]}): newer version in {x["source"]}");
+                    return Ok;
+                }
+                case "download":
+                {
+                    var file = Updates.Download(current);
+                    Console.WriteLine(json ? new JsonObject { ["file"] = file }.ToJsonString() : file);
+                    return Ok;
+                }
+                case "skip":
+                {
+                    var st = Updates.LoadState();
+                    st["skipped"] = words.ElementAtOrDefault(1) ?? throw new ArgumentException("update skip <version>");
+                    Updates.SaveState(st);
+                    return Ok;
+                }
+                case "set":
+                {
+                    if (words.ElementAtOrDefault(1) is not ("check" or "sources") || words.ElementAtOrDefault(2) is not ("on" or "off"))
+                        throw new ArgumentException("update set check|sources on|off");
+                    var st = Updates.LoadState();
+                    if (Updates.Setting(words[1], st).LockedBy is { } by) throw new Exception($"locked on the {by} level");
+                    st[words[1]] = words[2] == "on";
+                    Updates.SaveState(st);
+                    return Ok;
+                }
+                default: throw new ArgumentException("update [check|sources|download|skip <version>|set check|sources on|off]");
+            }
+        }
+        catch (ArgumentException ex) { Console.Error.WriteLine(ex.Message); return Usage; }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+            if (json) Console.WriteLine(new JsonObject { ["error"] = ex.Message }.ToJsonString());
+            return Failed;
+        }
+    }
+
+    // versions as built in, licenses as in THIRD-PARTY-NOTICES.md
+    static int AboutCli()
+    {
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+        static string Of(Type t)
+        {
+            var v = t.Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion ?? t.Assembly.GetName().Version?.ToString() ?? "?";
+            return v.Split('+')[0];
+        }
+        static JsonObject C(string name, string version, string license) => new() { ["name"] = name, ["version"] = version, ["license"] = license };
+        string twincat;
+        try { twincat = TwinCatVersion() ?? "not installed"; } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Security.SecurityException) { twincat = "?"; }
+        Console.WriteLine(new JsonObject
+        {
+            ["version"] = Program.ServerVersion, ["twincat"] = twincat,
+            ["components"] = new JsonArray(
+                C(".NET runtime and libraries", Environment.Version.ToString(), "MIT"),
+                C("Beckhoff.TwinCAT.Ads", Of(typeof(TwinCAT.Ads.AdsClient)), "MIT"),
+                C("PdfPig", Of(typeof(UglyToad.PdfPig.PdfDocument)), "Apache 2.0"),
+                C("Adobe Core 14 AFM files", "in PdfPig", "Adobe AFM"))
+        }.ToJsonString());
+        return Ok;
+    }
+}

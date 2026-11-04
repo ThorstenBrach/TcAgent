@@ -465,8 +465,12 @@ namespace TcAgentBridge
             return b;
         }
 
+        internal static KnowledgeControl Instance;
+        internal void ShowSources() => Show(tSources);
+
         public KnowledgeControl()
         {
+            Instance = this;
             SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             foreach (var t in new[] { platform, status, summary, facts, infoText, platformInfo, docsInfo, feedbackInfo, detailTitle })
