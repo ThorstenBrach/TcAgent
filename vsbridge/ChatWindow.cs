@@ -378,7 +378,7 @@ namespace TcAgentBridge
                     def = js.TryGetValue("default", out var d) ? d as string : null;
                     if (js.TryGetValue("historyChars", out var hc) && hc is int h) historyChars = h;
                     if (js.TryGetValue("sendContext", out var sc) && sc is bool b0) contextBox.IsChecked = b0;
-            answerLanguage = js.TryGetValue("answerLanguage", out var al) ? al as string : null;
+                    answerLanguage = js.TryGetValue("answerLanguage", out var al) ? al as string : null;
                     if (js.TryGetValue("buildAfterChange", out var ba) && ba is bool b1) buildBox.IsChecked = b1;
                     if (js.TryGetValue("backends", out var bo) && bo is Dictionary<string, object> bs)
                         foreach (var kv in bs)
@@ -436,14 +436,14 @@ namespace TcAgentBridge
             return (f, (prefix + " " + a).Trim());
         }
 
-        static ProcessStartInfo Psi(string file, string args, Backend be)
+        static ProcessStartInfo Psi(string file, string args, Backend be, string workDir)
         {
             var psi = new ProcessStartInfo(file, args)
             {
                 UseShellExecute = false, CreateNoWindow = true,
                 RedirectStandardInput = true, RedirectStandardOutput = true, RedirectStandardError = true,
                 StandardOutputEncoding = new UTF8Encoding(false), StandardErrorEncoding = new UTF8Encoding(false),
-                WorkingDirectory = SolutionDir() ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
+                WorkingDirectory = workDir ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)
             };
             psi.EnvironmentVariables["TCAGENT_CLIENT"] = "chat:" + be.Key;
             psi.EnvironmentVariables["NO_COLOR"] = "1";
@@ -456,22 +456,48 @@ namespace TcAgentBridge
         }
 
         // Start the persistent session (also in advance once the window is visible -> first question without startup time)
-        Session EnsureSession(Backend be)
+        // Never on the UI thread: on a cold start Process.Start can wait for seconds (a big program, the virus scanner), and
+        // Visual Studio blames the extension for that time. A warm-up and a question share one start.
+        Task<Session> starting;
+        Backend startingBe;
+        volatile int startGeneration;       // KillSession: a start still under way is no longer wanted
+
+        async Task<Session> EnsureSession(Backend be)
         {
             if (sess != null && !sess.Exited && sess.Be == be) return sess;
+            if (starting != null && startingBe == be) return await starting;
             KillSession();
-            var (file, args) = CommandLine(be, null);
-            var s = new Session { Be = be, Acp = IsAcp(be) ? new AcpState() : null, Server = Installer.RegisteredServerVersion() };
-            s.P = Process.Start(Psi(file, args, be));
-            s.In = s.P.StandardInput.BaseStream;
-            Task.Run(() =>
+            var t = StartSession(be, SolutionDir(), startGeneration);
+            starting = t; startingBe = be;
+            try { return await t; }
+            finally { if (starting == t) { starting = null; startingBe = null; } }
+        }
+
+        async Task<Session> StartSession(Backend be, string workDir, int generation)
+        {
+            var sw = Stopwatch.StartNew();
+            var s = await Task.Run(() =>
+            {
+                var (file, args) = CommandLine(be, null);
+                var n = new Session { Be = be, Acp = IsAcp(be) ? new AcpState() : null, Server = Installer.RegisteredServerVersion() };
+                n.P = Process.Start(Psi(file, args, be, workDir));
+                n.In = n.P.StandardInput.BaseStream;
+                return n;
+            });
+            BridgePackage.Instance?.LogLine($"Chat: {be.Key} started in {sw.ElapsedMilliseconds} ms");
+            if (generation != startGeneration)
+            {
+                try { Process.Start(new ProcessStartInfo("taskkill", $"/T /F /PID {s.P.Id}") { CreateNoWindow = true, UseShellExecute = false }); } catch { }
+                throw new OperationCanceledException("The chat session was closed while it started.");
+            }
+            _ = Task.Run(() =>
             {
                 string line;
                 try { while ((line = s.P.StandardOutput.ReadLine()) != null) if (s.Acp != null) OnAcpLine(s, line); else OnSessionLine(s, line); } catch { }
                 s.Exited = true;
                 s.Turn?.TrySetResult(null);
             });
-            Task.Run(() => { string line; try { while ((line = s.P.StandardError.ReadLine()) != null) lock (s.Err) s.Err.AppendLine(line); } catch { } });
+            _ = Task.Run(() => { string line; try { while ((line = s.P.StandardError.ReadLine()) != null) lock (s.Err) s.Err.AppendLine(line); } catch { } });
             sess = s;
             return s;
         }
@@ -592,6 +618,7 @@ namespace TcAgentBridge
         void KillSession()
         {
             var s = sess; sess = null;
+            startGeneration++; starting = null; startingBe = null;
             CancelOpenCards();          // a card that is still open counts as "deny" / "not answered"
             if (s == null) return;
             SetState(s.Be, "idle");
@@ -601,28 +628,48 @@ namespace TcAgentBridge
             try { Process.Start(new ProcessStartInfo("taskkill", $"/T /F /PID {s.P.Id}") { CreateNoWindow = true, UseShellExecute = false }); } catch { }
         }
 
-        void WarmUp()
+        // The first warm-up waits until the IDE has loaded: the window is there at once and shows "starting", the agent and its
+        // server do not compete with the solution load. A question sent before that starts the session right away.
+        Task ideLoaded;
+
+        async Task WaitForIde()
+        {
+            await Task.Delay(3000);
+            await Dispatcher.InvokeAsync(() => { }, System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+        }
+
+        async void WarmUp()
         {
             var be = Current;
-            if (be != null && !IsPersistent(be))
-            {
-                // a backend that starts per question: ready if its program is there
-                try { Resolve(be.Exe); SetState(be, "ready", "starts with each question"); } catch (Exception ex) { SetState(be, "error", ex.Message); }
-                return;
-            }
-            if (be == null || !IsPersistent(be) || (sess != null && !sess.Exited && sess.Be == be)) return;
+            if (be == null) return;
             try
             {
-                var s = EnsureSession(be);
+                if (ideLoaded == null || !ideLoaded.IsCompleted)
+                {
+                    SetState(be, "starting", "as soon as the IDE has loaded");
+                    await (ideLoaded = ideLoaded ?? WaitForIde());
+                    if (be != Current) { SetState(be, "idle"); return; }    // the warm-up of the new backend is under way
+                    if (busy) return;               // a question was faster
+                }
+                if (!IsPersistent(be))
+                {
+                    // a backend that starts per question: ready if its program is there
+                    await Task.Run(() => Resolve(be.Exe));
+                    SetState(be, "ready", "starts with each question");
+                    return;
+                }
+                if (sess != null && !sess.Exited && sess.Be == be) return;
                 SetState(be, "starting");
-                if (s.Acp != null) AcpOpen(s).ContinueWith(t => SetState(be, t.IsFaulted || s.Exited ? "error" : "ready", t.Exception?.GetBaseException().Message));
-                else Task.Delay(2500).ContinueWith(_ =>
+                var s = await EnsureSession(be);
+                if (s.Acp != null) _ = AcpOpen(s).ContinueWith(t => SetState(be, t.IsFaulted || s.Exited ? "error" : "ready", t.Exception?.GetBaseException().Message));
+                else _ = Task.Delay(2500).ContinueWith(t =>
                 {
                     if (sess != s) return;
                     string err; lock (s.Err) err = s.Err.ToString().Trim();
                     SetState(be, s.Exited ? "error" : "ready", s.Exited ? Tail(err, 300) : null);
                 });
             }
+            catch (OperationCanceledException) { }
             catch (Exception ex) { SetState(be, "error", ex.Message); }
         }
 
@@ -696,6 +743,7 @@ namespace TcAgentBridge
                 SystemLine($"{be.Name} could not be started: {ex.Message}\nIs the CLI installed and signed in? If needed, enter its path in chat-backends.json.", true);
                 SetState(be, "error", ex.Message);
             }
+            catch (OperationCanceledException) { }          // stopped while the session started
             catch (Exception ex) { failed = true; SystemLine(ex.Message, true); }
             finally
             {
@@ -713,7 +761,8 @@ namespace TcAgentBridge
         {
             if (IsAcp(be)) { await SendAcp(be, text, ctx); return; }
             var warm = sess != null && !sess.Exited && sess.Be == be;
-            var s = EnsureSession(be);
+            if (!warm) status.Text = $"{be.Name} is starting ...";
+            var s = await EnsureSession(be);
             s.Answer.Clear(); s.Summary = null;
             s.TurnSw = Stopwatch.StartNew();
             s.Turn = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
@@ -752,11 +801,18 @@ namespace TcAgentBridge
         async Task SendOnce(Backend be, string text, string ctx)
         {
             var prompt = BuildPrompt(text, ctx, followUp: false);
-            var (file, args) = CommandLine(be, prompt);
+            var workDir = SolutionDir();
             var answer = new StringBuilder();
             var errors = new StringBuilder();
             var sw = Stopwatch.StartNew();
-            proc = Process.Start(Psi(file, args, be));
+            status.Text = $"{be.Name} is starting ...";
+            string file = null;
+            proc = await Task.Run(() =>
+            {
+                var (f, args) = CommandLine(be, prompt);
+                file = f;
+                return Process.Start(Psi(f, args, be, workDir));
+            });
             try
             {
                 status.Text = $"{be.Name} is working ... ({Path.GetFileName(file)})";
@@ -868,6 +924,12 @@ namespace TcAgentBridge
 
         void Stop()
         {
+            if (starting != null)
+            {
+                KillSession();          // the question is dropped; the next one starts a new session
+                SystemLine("⊘ Stopped by you.");
+                return;
+            }
             if (sess != null && sess.Turn != null && sess.Acp?.SessionId != null)
             {
                 AcpCancel(sess);        // the agent ends the turn; the session stays open

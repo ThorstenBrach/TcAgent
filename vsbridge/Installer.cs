@@ -94,7 +94,8 @@ namespace TcAgentBridge
         public static string Exe => Path.Combine(AppDir, "TcAgent.exe");
         public static bool IsVsixInstall => File.Exists(Path.Combine(Source, "TcAgent.exe"));
 
-        /// <summary>On extension startup (UI thread, idle). On the very first run, asks whether the AI clients should be set up.</summary>
+        /// <summary>On extension startup, on a background thread (it reads the extension folders). On the very first run, asks
+        /// on the UI thread whether the AI clients should be set up.</summary>
         public static void OnStartup(Action<string> log, Action<string> notify)
         {
             if (!IsVsixInstall) return;
@@ -104,11 +105,12 @@ namespace TcAgentBridge
             bool newVersion = !(state.TryGetValue("version", out var v) && (v as string) == BridgePackage.BridgeVersion);
             if (!asked)
             {
-                var r = System.Windows.MessageBox.Show(
+                var r = System.Windows.Application.Current.Dispatcher.Invoke(() => System.Windows.MessageBox.Show(
                     "TcAgent is installed.\n\nRegister TcAgent in the AI clients installed on this PC now?\n" +
                     "(Claude Desktop/Code, GitHub Copilot in VS and CLI, Gemini CLI, Codex CLI - only those found; " +
                     "every changed config file is backed up first)\n\nYou can do this later with \"Set up clients\" in the TcAgent Chat window.",
-                    "Set up TcAgent", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question);
+                    "Set up TcAgent", System.Windows.MessageBoxButton.YesNo, System.Windows.MessageBoxImage.Question),
+                    System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 consent = r == System.Windows.MessageBoxResult.Yes;
                 state["consent"] = consent;
                 SaveState(state);

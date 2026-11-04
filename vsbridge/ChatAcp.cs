@@ -227,7 +227,8 @@ namespace TcAgentBridge
         async Task SendAcp(Backend be, string text, string ctx)
         {
             var warm = sess != null && !sess.Exited && sess.Be == be && sess.Acp?.SessionId != null;
-            var s = EnsureSession(be);
+            if (!warm) status.Text = $"{be.Name} is starting ...";
+            var s = await EnsureSession(be);
             await AcpOpen(s);
             s.Answer.Clear(); s.Summary = null; s.Acp.LastNewline = true; s.Acp.Usage = null;
             s.TurnSw = Stopwatch.StartNew();

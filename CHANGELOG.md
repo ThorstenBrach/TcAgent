@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+### Fixed
+- **Visual Studio start: the bar saying that TcAgent does not respond.** The chat window started the agent while it was
+  created, on the UI thread of the IDE, and creating the window took up to 9 s on a cold start. The agent, the search for its
+  program and the setup check at the start now run in the background; the window opens at once and shows "starting", the agent follows when the IDE has loaded (a question
+  sent before that starts it right away). The stall monitor of the extension ticks every 250 ms instead of 50 ms and no longer
+  names a tool of a server that has ended; the log says how long the chat window and the agent start took.
+
 ### Changed
 - Knowledge window: the tab Documentation is now **Reference** ("Manuals, datasheets and library docs the agent searches",
   `tc_docs`) - it is not documentation of TcAgent and not the templates. The texts of the window say "reference source".

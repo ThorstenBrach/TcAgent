@@ -51,10 +51,10 @@ namespace TcAgentBridge
                 // Hotkey "ask from code" (default Ctrl+Shift+Q, "askHotkey" in chat-backends.json)
                 ui?.BeginInvoke(new Action(InstallHotkey), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 // VSIX installation: deploy TcAgent, generate interop, set up AI clients (first time after confirmation)
-                ui?.BeginInvoke(new Action(() =>
+                System.Threading.Tasks.Task.Run(() =>
                 {
                     try { Installer.OnStartup(Log, Notify); } catch (Exception ex) { Log("Installer: " + ex.Message); }
-                }), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
+                });
                 // Show chat window on startup (can be disabled: "showOnStartup": false in chat-backends.json)
                 if (ShowChatOnStartup() && ui != null)
                     ui.BeginInvoke(new Action(() =>
@@ -321,7 +321,7 @@ namespace TcAgentBridge
             catch (Exception ex) { Log("Hotkey: " + Inner(ex)); }
         }
 
-        // Diagnostics: measures how long the VS UI thread is blocked (ticks every 50 ms). Stalls > 150 ms are logged,
+        // Diagnostics: measures how long the VS UI thread is blocked (ticks every 250 ms). Stalls > 150 ms are logged,
         // together with what the bridge was doing - this separates the causes: TcAgent, TwinCAT itself or something else.
         internal static volatile string CurrentOp;
         // Log status bar changes ("statusLog": true in chat-backends.json) - for diagnosing stalls
@@ -329,10 +329,10 @@ namespace TcAgentBridge
         void StartStallMonitor()
         {
             var last = System.Diagnostics.Stopwatch.StartNew();
-            var t = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(50) };
+            var t = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(250) };
             t.Tick += (s, e) =>
             {
-                var ms = last.ElapsedMilliseconds - 50;
+                var ms = last.ElapsedMilliseconds - 250;
                 if (ms > 150)
                 {
                     string fg = "";
@@ -341,6 +341,7 @@ namespace TcAgentBridge
                     try
                     {
                         var busy = Directory.GetFiles(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent"), "busy.*.txt")
+                                            .Where(ServerAlive)     // a server that was killed leaves its file behind
                                             .Select(f => { try { return File.ReadAllText(f); } catch { return null; } }).Where(x => x != null).ToList();
                         if (busy.Count > 0) agent = string.Join(",", busy);
                     }
@@ -357,6 +358,12 @@ namespace TcAgentBridge
                 last.Restart();
             };
             t.Start();
+        }
+
+        static bool ServerAlive(string busyFile)
+        {
+            try { using (System.Diagnostics.Process.GetProcessById(int.Parse(Path.GetFileName(busyFile).Split('.')[1]))) return true; }
+            catch { return false; }
         }
 
         // Text of the VS status bar - often shows what TwinCAT/VS is doing in the background
@@ -455,13 +462,15 @@ namespace TcAgentBridge
             catch (Exception ex) { Log("FindToolWindow: " + Inner(ex) + " - creating window directly"); }
             // 2) Create directly via the VS shell
             var shell = (IVsUIShell)GetService(typeof(SVsUIShell)) ?? throw new Exception("SVsUIShell not available");
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             var pane = new ChatPane();
+            var built = sw.ElapsedMilliseconds;
             Guid empty = Guid.Empty, persist = typeof(ChatPane).GUID, auto = Guid.Empty;
             Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(shell.CreateToolWindow(
                 (uint)__VSCREATETOOLWIN.CTW_fInitNew, 0, pane, ref empty, ref persist, ref auto, null, "TcAgent Chat", null, out var frame));
             chatFrame = frame;
             Microsoft.VisualStudio.ErrorHandler.ThrowOnFailure(activate ? frame.Show() : frame.ShowNoActivate());
-            Log("Chat window created (IVsUIShell)");
+            Log($"Chat window created (IVsUIShell), content {built} ms, frame {sw.ElapsedMilliseconds - built} ms");
         }
 
         // ------------------------------------------------------------------ TcUnit Tests window (TcUnitWindow.cs)
