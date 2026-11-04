@@ -1018,10 +1018,9 @@ indices, pointers, endless loops, multi-task access – extended with **your own
 
 ### The built-in rules
 
-Besides the rules below, TcAgent ships 12 general rules and 21 agent checks for every project (`risk-rules\twincat-general.md` on the
-level built-in): passwords in the code, `__NEW` without `__DELETE`, edge detection in the variables of a method, memory functions
-without `SIZEOF`, fixed addresses, comparisons of decimals and times, `JMP` and others. Switch single rules off or replace the file
-with one of the same name on your level. Three of them are `high`, so `--fail-on high` also fails on them.
+Besides the rules below, TcAgent ships 11 general rules and 21 agent checks for every project (`risk-rules\twincat-general.md` on the
+level built-in): passwords in the code, `__NEW` without `__DELETE`, memory functions without `SIZEOF`, fixed addresses, comparisons of decimals and times, `JMP` and others. Switch single rules off or replace the file
+with one of the same name on your level. Two of them are `high`, so `--fail-on high` also fails on them.
 
 `tc_doc action=risks` (options `minSeverity=high|medium|low`, `filter=<object or rule id>`, `max`) runs text-based rules
 on the ST code – no compiler. Each entry has severity, object, line (`(decl)` = declaration), rule id and explanation.

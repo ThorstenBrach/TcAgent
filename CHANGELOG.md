@@ -24,9 +24,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `tc_docs`) - it is not documentation of TcAgent and not the templates. The texts of the window say "reference source".
 
 ### Added
-- **General TwinCAT risk rules** shipped with TcAgent (`knowledge/risk-rules/twincat-general.md`): 12 rules and 21 agent checks for
-  every project (several based on the Top 20 Secure PLC Coding Practices), in addition to the rules in the code. **Pipelines:** three of them are `high` (password in the code, `__NEW`
-  without `__DELETE`, R_TRIG/F_TRIG in the variables of a method), so `doc --risks --fail-on high` can fail where it passed before.
+- **General TwinCAT risk rules** shipped with TcAgent (`knowledge/risk-rules/twincat-general.md`): 11 rules and 21 agent checks for
+  every project (several based on the Top 20 Secure PLC Coding Practices), in addition to the rules in the code. **Pipelines:** two of them are `high` (password in the code, `__NEW`
+  without `__DELETE`), so `doc --risks --fail-on high` can fail where it passed before.
 - **New versions in the TcAgent Chat** (`src/Updates.cs`, `vsbridge/ChatUpdates.cs`, `TcAgent.exe update`): once a day, after the
   IDE has loaded, the extension asks GitHub for the releases (an anonymous request; pipelines and the agent never do). A newer
   version shows a line above the conversation and a dot on ⋯, **What's new** the release notes down to the installed version,
@@ -46,6 +46,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **Answer language in the TcAgent Chat** (⋯ > Answer language): the language of Windows (new default), the language of the
   question, or one of the languages of the Windows user (`answerLanguage` in `chat-backends.json`). Before, the answer
   followed the question, so prepared prompts in English gave English answers.
+- Prepared prompt `/check-coding-rules`: compares the open object with the coding rules, apart from the risk analysis.
 - Prompt list: right click **Edit** opens your own prompt, **Edit my copy** a copy of a built-in, company or team prompt on your level.
 - Prompt list: it keeps one height while it is open, also with another category or a longer preview, so the categories stay under
   the mouse. Many categories wrap and scroll from the fourth row on.

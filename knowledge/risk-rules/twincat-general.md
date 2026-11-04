@@ -20,15 +20,6 @@
 - message: __NEW without __DELETE in this object - check who frees the memory, otherwise the router memory of the runtime runs out.
 - why: A leak in a cyclic PLC runs until an allocation fails, often weeks after commissioning.
 
-## Rule trigger-in-method
-- severity: high
-- find: `:\s*(R_TRIG|F_TRIG)\b`
-- in: decl
-- kinds: METHOD
-- unlessInObject: `\bVAR_INST\b`
-- message: R_TRIG/F_TRIG in the VAR block of a method - it is initialised on every call and cannot keep the previous state. Use VAR_INST or an instance in the function block.
-- why: Method variables live for one call only, so the edge detection does not work as intended.
-
 ## Rule memcpy-without-sizeof
 - severity: medium
 - find: `\b(MEMCPY|MEMSET|MEMMOVE)\s*\(`
