@@ -31,7 +31,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "about" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "about" or "shared" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -64,6 +64,7 @@ public static partial class Cli
         if (args[0].Equals("plugins", StringComparison.OrdinalIgnoreCase)) return Plugins.RunCli(args);
         if (args[0].Equals("update", StringComparison.OrdinalIgnoreCase)) return UpdateCli(args);       // Updates.cs - no solution, no IDE
         if (args[0].Equals("about", StringComparison.OrdinalIgnoreCase)) return AboutCli();
+        if (args[0].Equals("shared", StringComparison.OrdinalIgnoreCase)) return SharedCli(args);       // SharedFolders.cs - files only
         if (args[0].Equals("prompts", StringComparison.OrdinalIgnoreCase)) return Prompts.RunCli(args);   // Prompts.cs - files only, the list for the chat
         // the elevated part of tc_packages_change (Packages.cs), started by TcAgent itself through the UAC prompt
         if (args[0].Equals("tcpkg-elevated", StringComparison.Ordinal)) return ToolRegistry.RunElevatedTcpkg(args);
@@ -957,6 +958,10 @@ public static partial class Cli
       New versions of TcAgent (GitHub releases, at most once a day unless --force) and of the repo sources in use. download
       fetches the .vsix and checks it against SHA256SUMS.txt. The TcAgent Chat uses these; updates.json on the company or team
       level locks a switch: { ""check"": false, ""sources"": false }.
+
+  TcAgent.exe shared [list|check|add|keep|remove] [--path <folder or file>] [--all | --solution <sln>] [--json]
+      Folders the agent may read in the TcAgent Chat, also searched by tc_docs. add keeps a folder for the solution or --all,
+      keep a copy of a file, check says why a folder may not be shared (drive, user profile, system folders).
 
   TcAgent.exe about --json
       Versions of the server, TwinCAT and the components with their licenses.

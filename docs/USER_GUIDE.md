@@ -119,6 +119,12 @@ work without the extension. The extension runs **inside** the IDE process and ad
 - **Answer language** – **⋯ > Answer language**: the language of Windows (the default), the language of the question, or one
   of the languages of your Windows user. It also holds for the prepared prompts, which are written in English. Code and
   identifiers stay as they are.
+- **Shared folders** – **Attach … > Share a folder**, drop a folder on the input, or **⋯ > Shared folders**: the agent reads the folder
+  without asking; changing a file there still asks you. A question decides, also for attached files: **only this chat**, or
+  **keep in the knowledge** for this solution or all your solutions (a file as a copy). Kept folders are also found through the
+  Reference sources (`tc_docs`), with every AI client. Claude Code uses a change at once, GitHub Copilot with the next New chat.
+  The list goes with Backup and Restore, the content of the folders does not. A whole drive, your user profile and system
+  folders are refused: what the agent reads goes to your AI provider, and they hold keys and passwords.
 - **New versions** – once a day, after the IDE has loaded, a line above the conversation says when a newer TcAgent is out, and ⋯ gets a
   blue dot. **What's new …** shows the release notes down to your version: **Download** fetches the `.vsix` and checks it against
   `SHA256SUMS.txt`, **Install …** then opens the VSIX installer (Visual Studio must be closed, so save first), **Skip this version**
@@ -1953,6 +1959,7 @@ Output next to it, outside `.tcagent`:
 | `audit.jsonl` | Audit log |
 | `logs\tcagent-<date>.log` | Daily log of every tool call |
 | `chat-backends.json` | TcAgent Chat backends, `askHotkey`, `showOnStartup`, `answerLanguage` |
+| `shared-folders.json`, `shared-files\` | Folders shared in the chat for longer than one chat, kept files |
 | `update-state.json`, `updates\` | Daily checks: switches, last answer, skipped version; the downloaded `.vsix` |
 | `bridge\bridge.log` | Log of the VS extension |
 | `libcache\` | Cached library signatures |

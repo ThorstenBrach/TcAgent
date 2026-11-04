@@ -160,14 +160,10 @@ namespace TcAgentBridge
             input.PreviewDragOver += (s, e) => { if (e.Data.GetDataPresent(DataFormats.FileDrop)) { e.Effects = DragDropEffects.Copy; e.Handled = true; } };
             input.PreviewDrop += (s, e) =>
             {
-                if (e.Data.GetData(DataFormats.FileDrop) is string[] files) { foreach (var f in files) AddFile(f); e.Handled = true; }
+                if (e.Data.GetData(DataFormats.FileDrop) is string[] files) { AddFiles(files); e.Handled = true; }
             };
             input.GotKeyboardFocus += (s, e) => UpdateContextChip();
-            attach.Click += (s, e) =>
-            {
-                var dlg = new Microsoft.Win32.OpenFileDialog { Multiselect = true, Title = "Attach documents for the agent" };
-                if (dlg.ShowDialog() == true) foreach (var f in dlg.FileNames) AddFile(f);
-            };
+            attach.Click += (s, e) => ShowAttachMenu();
             send.Content = "Send";
             stop.Content = "Stop";
             send.ToolTip = "Send (Enter)";
@@ -298,6 +294,7 @@ namespace TcAgentBridge
             language.Items.Add(new Separator());
             foreach (var c in InstalledLanguages()) Language(Title(c), c.Name);
             menu.Items.Add(language);
+            menu.Items.Add(Item("Shared folders …", ShowSharedFolders, "Folders the agent may read without asking"));
             menu.Items.Add(Item("New chat", () => clear.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), clear.ToolTip as string));
             menu.Items.Add(Item("Copy conversation", CopyConversation, "The questions and answers of this chat as text"));
             menu.Items.Add(new Separator());
@@ -870,7 +867,6 @@ namespace TcAgentBridge
 
         void AddFile(string path)
         {
-            if (Directory.Exists(path)) { status.Text = "Folders cannot be attached - attach the files."; return; }
             if (!File.Exists(path)) return;
             if (attachments.Any(a => string.Equals(a.Path, path, StringComparison.OrdinalIgnoreCase))) return;
             var ext = System.IO.Path.GetExtension(path).ToLowerInvariant();
@@ -899,7 +895,8 @@ namespace TcAgentBridge
         List<Attachment> TakeAttachments()
         {
             var list = attachments.ToList();
-            attachments.Clear(); chips.Children.Clear();
+            attachments.Clear();
+            foreach (var c in chips.Children.OfType<Border>().Where(b => b != contextChip && !folderChips.ContainsValue(b)).ToList()) chips.Children.Remove(c);
             return list;
         }
 

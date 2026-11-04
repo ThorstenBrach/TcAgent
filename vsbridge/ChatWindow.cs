@@ -263,7 +263,7 @@ namespace TcAgentBridge
             clear.Click += (s, e) =>
             {
                 history.Clear(); msgs.Children.Clear(); cur = null; lock (toolCalls) toolCalls.Clear(); contextOff = false;
-                KillSession(); UpdateVersionLabel(); ShowEmptyState(); UpdateContextChip(); status.Text = "New conversation."; WarmUp();
+                KillSession(); ClearSessionFolders(); UpdateVersionLabel(); ShowEmptyState(); UpdateContextChip(); status.Text = "New conversation."; WarmUp();
             };
             // Pre-start the Claude session as soon as the window becomes visible or the backend changes
             IsVisibleChanged += (s, e) => { if (IsVisible) { WarmUp(); StartChecks(); } };
@@ -417,7 +417,7 @@ namespace TcAgentBridge
 
         Backend Current => (backendBox.SelectedItem as ComboBoxItem)?.Tag as Backend;
 
-        (string file, string args) CommandLine(Backend be, string prompt)
+        (string file, string args) CommandLine(Backend be, string prompt, string workDir)
         {
             var a = be.Args ?? "";
             a = a.Replace("{mcpClaude}", Quote(Path.Combine(Dir, "mcp-claude.json")))
@@ -432,6 +432,7 @@ namespace TcAgentBridge
                 // instead of being refused silently - only the persistent session can answer them (stdin stays open)
                 if (IsPersistent(be) && !a.Contains("--permission-prompt-tool")) a += " --permission-prompt-tool stdio";
             }
+            a += SharedArgs(be, workDir);
             var (f, prefix) = Resolve(be.Exe);
             return (f, (prefix + " " + a).Trim());
         }
@@ -478,7 +479,7 @@ namespace TcAgentBridge
             var sw = Stopwatch.StartNew();
             var s = await Task.Run(() =>
             {
-                var (file, args) = CommandLine(be, null);
+                var (file, args) = CommandLine(be, null, workDir);
                 var n = new Session { Be = be, Acp = IsAcp(be) ? new AcpState() : null, Server = Installer.RegisteredServerVersion() };
                 n.P = Process.Start(Psi(file, args, be, workDir));
                 n.In = n.P.StandardInput.BaseStream;
@@ -540,6 +541,12 @@ namespace TcAgentBridge
                 var what = req.TryGetValue("description", out var de) ? de as string : null;
                 var why = req.TryGetValue("decision_reason", out var dr) ? dr as string : null;
                 var suggestions = req.TryGetValue("permission_suggestions", out var ps) ? ps as IEnumerable : null;
+                if (SharedRead(req.TryGetValue("tool_name", out var tr) ? tr as string : null, input))
+                {
+                    WriteControl(s, new Dictionary<string, object> { ["subtype"] = "success", ["request_id"] = id,
+                        ["response"] = new Dictionary<string, object> { ["behavior"] = "allow", ["updatedInput"] = input } });
+                    return true;
+                }
                 // follow-up question of the agent (tool AskUserQuestion): options to click or a free answer
                 if ((req.TryGetValue("tool_name", out var tq) ? tq as string : null) == "AskUserQuestion" && input != null)
                 {
@@ -809,7 +816,7 @@ namespace TcAgentBridge
             string file = null;
             proc = await Task.Run(() =>
             {
-                var (f, args) = CommandLine(be, prompt);
+                var (f, args) = CommandLine(be, prompt, workDir);
                 file = f;
                 return Process.Start(Psi(f, args, be, workDir));
             });
@@ -956,7 +963,7 @@ namespace TcAgentBridge
             if (followUp)
             {
                 // running session: Claude already knows the instructions and history
-                sb.AppendLine("[Note] " + buildRule + " " + LanguageRule());
+                sb.AppendLine("[Note] " + buildRule + " " + LanguageRule() + (SharedNote() is string shared ? " " + shared : ""));
                 if (ctx != null) sb.AppendLine("\n[User's editor context]\n" + ctx);
                 sb.AppendLine("\n[Request]\n" + text);
                 return sb.ToString();
@@ -974,6 +981,7 @@ namespace TcAgentBridge
             if (askTool) sb.AppendLine("Tool calls your permissions do not cover (e.g. files outside the working folder) are shown to the user in this chat as a permission question " +
                                        "(allow once / for this session / deny); you only see the outcome. A denied call is the user's decision - do not try it another way; " +
                                        "an error after an allowed call is a real error of the tool, not a missing permission.");
+            if (SharedNote() is string folders) sb.AppendLine(folders);
             if (ctx != null) sb.AppendLine("\n[User's editor context]\n" + ctx);
             if (history.Count > 0)
             {

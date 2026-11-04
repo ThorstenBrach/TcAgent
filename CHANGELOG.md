@@ -35,6 +35,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **About TcAgent** (⋯ > About TcAgent, `TcAgent.exe about --json`): author, license, the versions of the extension, server, IDE and
   TwinCAT, the components with their licenses (the license texts in a window), the update switches. ⋯ also has **Check for updates**, which
   always answers in a dialog.
+- **Shared folders in the TcAgent Chat** (`src/SharedFolders.cs`, `vsbridge/ChatShared.cs`, `TcAgent.exe shared`): Attach … > Share a
+  folder, a folder dropped on the input, or ⋯ > Shared folders. The agent reads these folders without asking; changing a file there
+  still asks. A question decides for folders and files: only this chat, or kept in the knowledge for this solution or all
+  solutions (a file as a copy). The list stays on this PC, goes with Backup and Restore, and kept folders are also Reference
+  sources for `tc_docs`. Drives, the user profile, its key folders and system folders are refused, with the reason.
 - **Answer language in the TcAgent Chat** (⋯ > Answer language): the language of Windows (new default), the language of the
   question, or one of the languages of the Windows user (`answerLanguage` in `chat-backends.json`). Before, the answer
   followed the question, so prepared prompts in English gave English answers.

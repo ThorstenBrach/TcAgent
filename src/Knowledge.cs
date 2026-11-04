@@ -61,6 +61,8 @@ public static class Knowledge
     public static List<Entry> Inventory(string solutionDir)
     {
         var o = new List<Entry> { new("web", InfoSys, InfoSys, "built-in", "built-in", null, "Beckhoff Information System") };
+        foreach (var f in SharedFolders.Active(solutionDir))        // kept in the chat: changed there, no knowledge.md behind it
+            o.Add(new(f.Path.StartsWith(@"\\") ? "share" : "folder", f.Path, f.Path, "user", "user", null, "shared in the TcAgent Chat (⋯ > Shared folders)"));
         foreach (var l in KnowledgeLayers.Layers(solutionDir, KnowledgeLayers.Platforms(solutionDir).Active).Where(l => l.Level != "built-in"))
         {
             var levelName = l.Platform != null ? (l.Level == "company" ? "company-platform:" : "platform:") + l.Platform

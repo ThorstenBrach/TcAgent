@@ -79,6 +79,58 @@ public static partial class Cli
         }
     }
 
+    static int SharedCli(string[] args)
+    {
+        Console.OutputEncoding = new System.Text.UTF8Encoding(false);
+        bool json = false, all = false;
+        string path = null, sln = null, verb = "list";
+        try
+        {
+            for (int i = 1; i < args.Length; i++)
+            {
+                var a = args[i];
+                if (a == "--json") json = true;
+                else if (a == "--all") all = true;
+                else if (a == "--path") path = i + 1 < args.Length ? args[++i] : throw new ArgumentException("--path needs a value");
+                else if (a is "--solution" or "-s") sln = i + 1 < args.Length ? args[++i] : throw new ArgumentException("--solution needs a value");
+                else if (a.StartsWith('-')) throw new ArgumentException("unknown option " + a);
+                else verb = a.ToLowerInvariant();
+            }
+            var dir = sln != null ? Path.GetDirectoryName(Path.GetFullPath(sln)) : null;
+            if (verb is "add" or "keep" or "remove" or "check" && string.IsNullOrEmpty(path)) throw new ArgumentException("--path is required");
+            if (verb is "add" or "keep" && dir == null && !all) throw new ArgumentException("--solution or --all is required");
+            var target = all ? null : dir;
+            if (verb is "add" or "keep" or "remove")
+            {
+                KnowledgeBackup.Version = Program.ServerVersion;
+                KnowledgeBackup.BeforeWrite(dir, "shared " + verb);
+            }
+            var r = new JsonObject();
+            switch (verb)
+            {
+                case "list":
+                    r["folders"] = new JsonArray((dir != null ? SharedFolders.Active(dir) : SharedFolders.Load()).Select(e => (JsonNode)new JsonObject { ["path"] = e.Path, ["solution"] = e.Solution }).ToArray());
+                    break;
+                case "check":
+                    if (SharedFolders.Refused(path) is { } why) r["error"] = why;
+                    break;
+                case "add": SharedFolders.Add(path, target); break;
+                case "keep": r["file"] = SharedFolders.KeepFile(path, target); break;
+                case "remove": if (!SharedFolders.Remove(path)) r["error"] = "not in the list: " + path; break;
+                default: throw new ArgumentException("shared [list|check|add|keep|remove]");
+            }
+            Console.WriteLine(json ? r.ToJsonString() : r["error"]?.ToString() ?? r.ToJsonString());
+            return r["error"] != null ? Failed : Ok;
+        }
+        catch (ArgumentException ex) { Console.Error.WriteLine(ex.Message); return Usage; }
+        catch (Exception ex) when (ex is InvalidOperationException or IOException or UnauthorizedAccessException)
+        {
+            Console.Error.WriteLine(ex.Message);
+            if (json) Console.WriteLine(new JsonObject { ["error"] = ex.Message }.ToJsonString());
+            return Failed;
+        }
+    }
+
     // versions as built in, licenses as in THIRD-PARTY-NOTICES.md
     static int AboutCli()
     {

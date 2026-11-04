@@ -28,6 +28,9 @@ activate configurations, start and stop the PLC, write variables. Use it accordi
 * **Updates are never installed silently.** A download starts on a click; the `.vsix` must match `SHA256SUMS.txt` of the release and
   **Install** opens the VSIX installer. The checksum shows a damaged download. It lies in the same release, so it does not
   protect against a taken-over repository: the packages are not signed.
+* **Shared folders:** in the TcAgent Chat the user can let the agent read folders outside the solution without asking; what it reads goes
+  to the AI provider. Changing a file there still asks. Drives, the user profile, `AppData`, key folders such as `.ssh` and
+  system folders are refused. The list is `%LOCALAPPDATA%\TcAgent\shared-folders.json`.
 * **Secrets:** No passwords, customer data or license keys in prompts or `tc_feedback` reports.
   Keep in mind that code and context are sent to your chosen AI provider – check whether that is acceptable for your
   project.
