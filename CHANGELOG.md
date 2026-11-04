@@ -12,6 +12,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   program and the setup check at the start now run in the background; the window opens at once and shows "starting", the agent follows when the IDE has loaded (a question
   sent before that starts it right away). The stall monitor of the extension ticks every 250 ms instead of 50 ms and no longer
   names a tool of a server that has ended; the log says how long the chat window and the agent start took.
+- **`tc_find_references` in big projects: no answer within 60 s, the IDE hung** (one report ended with a crash of the IDE, its cause
+  is not known). The text search read every object through the Automation Interface, on the UI thread of the IDE. It now reads
+  the project files (unsaved changes are not included, the result says so), the tree paths come from the same files, and the
+  whole call answers within about 45 s: the cross references get 25 s and 8 s for reading them, a second query does not queue
+  behind one still running, and the text search is returned in any case.
+- `tc_delete` without `name` or `parentPath` says what is missing instead of "Value cannot be null (source)".
 
 ### Changed
 - Knowledge window: the tab Documentation is now **Reference** ("Manuals, datasheets and library docs the agent searches",

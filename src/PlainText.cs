@@ -1195,6 +1195,91 @@ public static class PlainText
 
     /// <summary>check=false: writes the .st files that differ (clean: removes .st files without object). check=true: writes
     /// nothing, lists the differences between the text folder and the project.</summary>
+    // ------------------------------------------------------------------ search in the project files
+    /// <summary>A line found in the project files. Path is the tree path, Part "declaration" or "implementation".</summary>
+    public sealed record FileHit(string Path, string Part, int Line, string Text);
+
+    public sealed class FileSearch
+    {
+        public readonly List<FileHit> Hits = new();
+        /// <summary>Name and tree path of every object, method, property and action read.</summary>
+        public readonly List<(string Name, string Path)> Index = new();
+        public int Objects;
+        public bool OutOfTime;
+    }
+
+    /// <summary>Searches the code line by line in the project files, without the IDE: reading a big project object by object
+    /// through the Automation Interface runs on the UI thread of the IDE. Null without a PLC project below slnDir. Unsaved
+    /// changes in the editor are not seen, graphical implementations not searched. treeRoot: tree path of a PLC project.</summary>
+    public static FileSearch SearchFiles(string slnDir, Regex rx, int max, TimeSpan budget, Func<PlcProj, string> treeRoot)
+    {
+        var plcs = SelectPlcs(slnDir, null, new Report());
+        if (plcs.Count == 0) return null;
+        var res = new FileSearch();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        void Scan(string path, string part, string text)
+        {
+            if (string.IsNullOrEmpty(text) || res.Hits.Count >= max) return;
+            var lines = N(text).Split('\n');
+            for (int n = 0; n < lines.Length && res.Hits.Count < max; n++)
+                if (rx.IsMatch(lines[n])) res.Hits.Add(new FileHit(path, part, n + 1, lines[n]));
+        }
+        void Walk(Block b, string path)
+        {
+            res.Index.Add((b.Name, path));
+            Scan(path, "declaration", b.Decl);
+            Scan(path, "implementation", b.Impl);
+            foreach (var s in b.Subs) Walk(s, path + "^" + s.Name);
+        }
+        foreach (var p in plcs)
+        {
+            var root = treeRoot(p);
+            foreach (var o in p.Objects)
+            {
+                if (sw.Elapsed > budget) { res.OutOfTime = true; return res; }
+                if (!File.Exists(o.FullPath)) continue;
+                try
+                {
+                    var obj = ObjectFromXml(ReadText(o.FullPath).Text);
+                    Walk(obj, root + string.Concat(o.Folder.Split('\\', StringSplitOptions.RemoveEmptyEntries).Select(x => "^" + x)) + "^" + obj.Name);
+                    res.Objects++;
+                }
+                catch (Exception ex) when (ex is PlainTextException or DecoderFallbackException or IOException) { }
+            }
+        }
+        return res;
+    }
+
+    /// <summary>Tree paths for names like "FB_Motor", "FB_Motor.Run" or "Motor.TcPOU", most specific first. FB.Method hits are
+    /// unambiguous and beat plain name hits.</summary>
+    public static List<string> ResolveNames(IEnumerable<string> rawNames, IEnumerable<(string Name, string Path)> index)
+    {
+        var wanted = new List<string[]>();
+        foreach (var raw in rawNames)
+        {
+            if (string.IsNullOrWhiteSpace(raw) || raw.StartsWith("(")) continue;
+            var n = raw.Trim().TrimEnd('*').Trim();
+            foreach (var cut in new[] { " [", " (", " - " }) { var i = n.IndexOf(cut, StringComparison.Ordinal); if (i > 0) n = n[..i]; }
+            foreach (var ext in new[] { ".TcPOU", ".TcDUT", ".TcGVL", ".TcIO", ".TcTTO" })
+                if (n.EndsWith(ext, StringComparison.OrdinalIgnoreCase)) n = n[..^ext.Length];
+            if (n.Length > 0) wanted.Add(n.Split('.'));
+        }
+        var found = new List<string>(); var qualified = new List<string>();
+        if (wanted.Count == 0) return found;
+        foreach (var (name, path) in index)
+        {
+            foreach (var w in wanted)
+            {
+                bool hit = w.Length == 1 ? name == w[0]
+                         : name == w[^1] && path.Contains("^" + w[^2] + "^", StringComparison.Ordinal);
+                if (hit && !found.Contains(path)) found.Add(path);
+                if (hit && w.Length > 1 && !qualified.Contains(path)) qualified.Add(path);
+            }
+        }
+        if (qualified.Count > 0) found = qualified;
+        return found.OrderByDescending(p => p.Count(c => c == '^')).ToList();
+    }
+
     public static Report Export(string slnDir, IReadOnlyCollection<string> filters, string outDir, bool check, bool clean)
     {
         var rep = new Report();

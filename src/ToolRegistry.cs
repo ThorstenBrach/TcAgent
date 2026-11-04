@@ -177,8 +177,10 @@ public sealed partial class ToolRegistry
             Schema(Req(P("parentPath", "string", "Path of the parent item")), Req(P("name", "string", "Name of the child"))),
             a => tc.Sta.Run(() =>
             {
-                var backup = BackupBeforeDelete(Str(a, "parentPath"), Str(a, "name"));
-                ((dynamic)tc.Item(Str(a, "parentPath"))).DeleteChild(Str(a, "name"));
+                var parent = Str(a, "parentPath") ?? throw new Exception("parentPath is required: the path of the parent item");
+                var child = Str(a, "name") ?? throw new Exception("name is required: the name of the child to delete, without its path");
+                var backup = BackupBeforeDelete(parent, child);
+                ((dynamic)tc.Item(parent)).DeleteChild(child);
                 return "deleted" + (backup != null ? $" - backup: {backup}" : " (no backup possible)");
             }));
 
@@ -308,7 +310,8 @@ public sealed partial class ToolRegistry
                    P("open", "boolean", "Also open the resolved object in the IDE editor at the declaration line (like F12). Library objects cannot be opened.")),
             a => GotoDefinition(a));
 
-        Add("tc_find_references", "Finds all usages of a symbol: cross references as in TwinCAT's cross reference list plus a whole-word text search as a cross-check.",
+        Add("tc_find_references", "Finds all usages of a symbol: cross references as in TwinCAT's cross reference list plus a whole-word text search in the project files " +
+                                    "as a cross-check (unsaved changes are not in the files: tc_save first). Answers within about 45 s, also if the IDE is too slow for the cross references.",
             Schema(Req(P("symbol", "string", "Name of the symbol (variable, FB, method, type)")), P("max", "integer", "Max. hits per source (default 300)")),
             a => FindReferences(a));
 
@@ -977,13 +980,38 @@ public sealed partial class ToolRegistry
     // Cross references: semantically from the project model (with access type), line/code via text search in the same object
     sealed record Hit(string Path, string Part, int Line, string Text);
 
-    List<Hit> WordHits(string word, int max) => tc.Sta.Run(() =>
+    // The project files first: every object read through the Automation Interface is a call on the UI thread of the IDE, and in
+    // a big project that hung the IDE (with the cross references on top, which the IDE cannot give up once they run).
+    (List<Hit> Hits, List<(string Name, string Path)> Index, string Note) TextHits(string word, int max)
     {
         var rx = new Regex($@"\b{Regex.Escape(word)}\b", RegexOptions.IgnoreCase);
+        var budget = TimeSpan.FromSeconds(15);
+        try
+        {
+            var dir = SolutionDir(5000) ?? lastSolutionDir;
+            if (dir != null)
+            {
+                var items = tc.Sta.Run(() => tc.PlcProjects().Select(p => (p.Name, p.PathName)).ToList());
+                var r = PlainText.SearchFiles(dir, rx, max, budget, p => PlcTreeRoot(p, items));
+                if (r != null)
+                    return (r.Hits.Select(h => new Hit(h.Path, h.Part, h.Line, h.Text)).ToList(), r.Index,
+                            $"Text search: project files, {r.Objects} objects - unsaved changes are not included (tc_save first)." +
+                            (r.OutOfTime ? $" STOPPED after {budget.TotalSeconds:0} s, not every file was searched." : ""));
+            }
+        }
+        catch (Exception ex) { Log.Info("tc_find_references, project files: " + ex.Message); }
+        var (hits, outOfTime) = WordHits(rx, max, budget);
+        return (hits, null, outOfTime ? $"Text search: STOPPED after {budget.TotalSeconds:0} s, not every object was searched." : null);
+    }
+
+    (List<Hit> Hits, bool OutOfTime) WordHits(Regex rx, int max, TimeSpan budget) => tc.Sta.Run(() =>
+    {
         var hits = new List<Hit>();
+        var sw = System.Diagnostics.Stopwatch.StartNew();
         foreach (var it in tc.PlcObjects())
         {
             if (hits.Count >= max) break;
+            if (sw.Elapsed > budget) return (hits, true);
             string path = null;
             try { path = it.PathName; } catch { continue; }
             void Scan(string part, string text)
@@ -996,7 +1024,7 @@ public sealed partial class ToolRegistry
             try { if (it is ITcPlcDeclaration d) Scan("declaration", d.DeclarationText); } catch { }
             try { if (it is ITcPlcImplementation i) Scan("implementation", i.ImplementationText); } catch { }
         }
-        return hits;
+        return (hits, false);
     });
 
     string FindReferences(JsonObject a)
@@ -1004,27 +1032,30 @@ public sealed partial class ToolRegistry
         var name = Str(a, "symbol");
         int max = Int(a, "max", 300);
         var plain = name.Contains('.') ? name[(name.LastIndexOf('.') + 1)..] : name;
-        var hits = WordHits(plain, Math.Max(2000, max * 10));   // Text search wider than the display, so every reference gets its line
+        var (hits, index, note) = TextHits(plain, Math.Max(2000, max * 10));   // wider than the display, so every reference gets its line
         var used = new HashSet<Hit>();
         var pid = tc.Sta.Run(() => { try { tc.RequireDte(); } catch { } return tc.AttachedPid; });
         var o = new StringBuilder();
         static string Access(string acc) => acc switch { "Declarative" => "declaration", "Read" => "read", "Write" => "write", "ReadWrite" => "read+write", "Call" => "call", _ => acc };
         try
         {
-            var r = BridgeClient.Call(pid, "xref", new JsonObject { ["name"] = name, ["max"] = max }, 120000);
+            // answer before the client gives up (often 60 s): the IDE cannot stop the query, the text search below still helps
+            var r = BridgeClient.Call(pid, "xref", new JsonObject { ["name"] = name, ["max"] = max }, 25000);
             var entries = r["entries"] as JsonArray ?? new JsonArray();
             int total = entries.Sum(e => (e?["refs"] as JsonArray)?.Count ?? 0);
-            o.AppendLine($"Cross references to '{name}' (like TwinCAT's cross reference list): {total}");
+            o.AppendLine($"Cross references to '{name}' (like TwinCAT's cross reference list): {total}" +
+                         (r["truncated"]?.GetValue<bool>() == true ? " - STOPPED early, the IDE took too long: not all of them" : ""));
             foreach (var e in entries)
                 foreach (var x in (e?["refs"] as JsonArray ?? new JsonArray()).Take(max))
                 {
                     var loc = x?["location"]?.ToString();
-                    var paths = string.IsNullOrEmpty(loc) ? new List<string>() : tc.Sta.Run(() => tc.ResolvePlcPathsPublic(loc));
+                    var paths = string.IsNullOrEmpty(loc) ? new List<string>()
+                              : index != null ? PlainText.ResolveNames(new[] { loc }, index) : tc.Sta.Run(() => tc.ResolvePlcPathsPublic(loc));
                     var path = paths.FirstOrDefault();
                     var part = x?["part"]?.ToString();
                     int.TryParse(x?["column"]?.ToString(), out var col);
                     // matching text line in the same object/part whose hit is closest to the column
-                    var cand = hits.Where(h => !used.Contains(h) && h.Path == path && (part == null || h.Part == part))
+                    var cand = hits.Where(h => !used.Contains(h) && string.Equals(h.Path, path, StringComparison.OrdinalIgnoreCase) && (part == null || h.Part == part))
                                    .OrderBy(h => Math.Abs(h.Text.IndexOf(plain, StringComparison.OrdinalIgnoreCase) + 1 - col)).FirstOrDefault();
                     if (cand != null) used.Add(cand);
                     o.AppendLine($"  {Access(x?["Access"]?.ToString()),-15} {path ?? loc ?? "(location unknown)"}" +
@@ -1032,7 +1063,9 @@ public sealed partial class ToolRegistry
                                  (cand != null ? "  " + cand.Text.Trim() : ""));
                 }
         }
+        catch (TimeoutException) { o.AppendLine("Cross references not available: the IDE did not answer in time and may stay busy for a while - text search only:"); }
         catch (Exception ex) { o.AppendLine("Cross references not available: " + ex.Message + " - text search only:"); }
+        if (note != null) o.AppendLine(note);
         var rest = hits.Where(h => !used.Contains(h)).Take(max).ToList();
         if (rest.Count > 0)
         {

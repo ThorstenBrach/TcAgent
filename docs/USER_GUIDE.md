@@ -403,7 +403,7 @@ written, jumping to a definition.
 | Find out what you mean by "this" | `tc_editor_context` | Active document, tree path, part (declaration/implementation), cursor line, selection and the selected text with a code excerpt |
 | Read the object | `tc_plc_read` | Declaration and implementation, including child objects (methods, properties, actions) |
 | Resolve a name | `tc_goto_definition` | For variables: type, declaration site and resolved type. For types/POUs: tree path in the project or the library |
-| Find usages | `tc_find_references` | All usages with access kind (declaration / read / write), tree path and line – TwinCAT's cross references plus a whole-word text search as cross-check |
+| Find usages | `tc_find_references` | All usages with access kind (declaration / read / write), tree path and line – TwinCAT's cross references plus a whole-word text search in the project files as cross-check (save first: unsaved changes are not in the files) |
 | Free text / regex search | `tc_plc_search` | Hits with tree path, part and line |
 | Show you the place | `tc_editor_open` | Opens the object in the editor, cursor on the line |
 

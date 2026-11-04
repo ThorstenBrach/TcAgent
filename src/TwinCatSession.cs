@@ -775,32 +775,8 @@ public sealed class TwinCatSession
 
     List<string> ResolvePlcPaths(IEnumerable<string> rawNames)
     {
-        var wanted = new List<string[]>();
-        foreach (var raw in rawNames)
-        {
-            if (string.IsNullOrWhiteSpace(raw) || raw.StartsWith("(")) continue;
-            var n = raw.Trim().TrimEnd('*').Trim();
-            foreach (var cut in new[] { " [", " (", " - " }) { var i = n.IndexOf(cut, StringComparison.Ordinal); if (i > 0) n = n[..i]; }
-            foreach (var ext in new[] { ".TcPOU", ".TcDUT", ".TcGVL", ".TcIO", ".TcTTO" })
-                if (n.EndsWith(ext, StringComparison.OrdinalIgnoreCase)) n = n[..^ext.Length];
-            if (n.Length > 0) wanted.Add(n.Split('.'));
-        }
-        var found = new List<string>(); var qualified = new List<string>();
-        if (wanted.Count == 0) return found;
-        foreach (var (name, path) in PlcIndex())
-        {
-            foreach (var w in wanted)
-            {
-                bool hit = w.Length == 1 ? name == w[0]
-                         : name == w[^1] && path.Contains("^" + w[^2] + "^", StringComparison.Ordinal);
-                if (hit && !found.Contains(path)) found.Add(path);
-                if (hit && w.Length > 1 && !qualified.Contains(path)) qualified.Add(path);
-            }
-        }
-        // qualified hits (FB.Method) are unambiguous and beat plain name hits
-        if (qualified.Count > 0) found = qualified;
-        // most specific hits (method before FB) first
-        return found.OrderByDescending(p => p.Count(c => c == '^')).ToList();
+        var names = rawNames.ToList();
+        return names.Any(n => !string.IsNullOrWhiteSpace(n) && !n.StartsWith("(")) ? PlainText.ResolveNames(names, PlcIndex()) : new List<string>();
     }
 
     // Calls CheckAllObjects of the PLC project by name (IDispatch, late binding). Not through the newest ITcPlcIECProject*

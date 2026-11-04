@@ -662,7 +662,9 @@ With TcAgentBridge (bridge actions `open` and `caret`) the cursor is set in the 
 
 ### `tc_find_references`
 
-Finds all usages of a symbol: cross-references as in TwinCAT's cross-reference list, plus a whole-word text search as a cross-check.
+Finds all usages of a symbol: cross-references as in TwinCAT's cross-reference list, plus a whole-word text search in the project
+files as a cross-check (unsaved changes are not in the files: `tc_save` first). Answers within about 45 s, with the text search
+alone if the IDE is too slow for the cross-references.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

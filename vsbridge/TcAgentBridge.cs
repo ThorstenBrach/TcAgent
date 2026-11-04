@@ -157,6 +157,9 @@ namespace TcAgentBridge
                 }), System.Windows.Threading.DispatcherPriority.Background);
                 r = new Dictionary<string, object> { ["queued"] = true };
             }
+            // the IDE cannot stop a running query: a client that gave up must not queue the next one behind it on the UI thread
+            else if (cmd == "xref" && Interlocked.CompareExchange(ref xrefBusy, 1, 0) != 0)
+                throw new Exception("an earlier cross reference query is still running in the IDE");
             else
                 r = (Dictionary<string, object>)ui.Invoke(new Func<Dictionary<string, object>>(() =>
                 {
@@ -175,7 +178,9 @@ namespace TcAgentBridge
                                                  int.TryParse(Str(req, "column"), out var oc) ? oc : 1);
                         case "caret": return Caret(Str(req, "path"), Str(req, "part"), int.TryParse(Str(req, "line"), out var cl2) ? cl2 : 0,
                                                    int.TryParse(Str(req, "column"), out var cc2) ? cc2 : 1);
-                        case "xref": return Xref(Str(req, "name"), int.TryParse(Str(req, "max"), out var xm) ? xm : 300);
+                        case "xref":
+                            try { return Xref(Str(req, "name"), int.TryParse(Str(req, "max"), out var xm) ? xm : 300); }
+                            finally { Interlocked.Exchange(ref xrefBusy, 0); }
                         case "lm_call": return LmCall(Str(req, "target"), Str(req, "method"), req.TryGetValue("args", out var ar) ? ar as ArrayList ?? new ArrayList((ar as object[]) ?? new object[0]) : new ArrayList());
                         case "lm_export": return LmExport(Str(req, "library"), int.TryParse(Str(req, "max"), out var mx) ? mx : 100000);
                         default: throw new Exception("Unknown command: " + cmd);
@@ -1367,6 +1372,8 @@ namespace TcAgentBridge
             return Enumerable.Empty<object>();
         }
 
+        int xrefBusy;
+
         Dictionary<string, object> Xref(string name, int max)
         {
             if (string.IsNullOrWhiteSpace(name)) throw new Exception("name missing");
@@ -1375,15 +1382,20 @@ namespace TcAgentBridge
             var rx = new System.Text.RegularExpressions.Regex("^" + System.Text.RegularExpressions.Regex.Escape(name) + "$", System.Text.RegularExpressions.RegexOptions.IgnoreCase);
             var res = Call(lm, "GetPrecompiledCrossReferences", rx);
             var list = new List<object>();
+            // this all runs on the UI thread: reading the references one by one must not hold the IDE for long
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            bool truncated = false;
             if (res is IDictionary dict)
                 foreach (DictionaryEntry de in dict)
                 {
+                    if (sw.ElapsedMilliseconds > 8000) { truncated = true; break; }
                     var entry = new Dictionary<string, object> { ["key"] = Short(de.Key, 200) };
                     var refs = new List<object>();
                     if (de.Value is IEnumerable e && !(de.Value is string))
                         foreach (var x in e)
                         {
                             if (refs.Count >= max) break;
+                            if (sw.ElapsedMilliseconds > 8000) { truncated = true; break; }
                             var d = Serialize(x, 1);
                             foreach (var kv in Members(x, "(?i)pos|line|offset|object|guid|sign")) if (!d.ContainsKey(kv.Key)) d[kv.Key] = kv.Value;
                             // Resolve location: object containing the access
@@ -1412,7 +1424,7 @@ namespace TcAgentBridge
                     entry["refs"] = refs;
                     list.Add(entry);
                 }
-            return new Dictionary<string, object> { ["resultType"] = res?.GetType().FullName, ["entries"] = list };
+            return new Dictionary<string, object> { ["resultType"] = res?.GetType().FullName, ["entries"] = list, ["truncated"] = truncated };
         }
 
         // Exploration: call only read-only methods (Get/Find/All/Is) of the IDE services
