@@ -104,12 +104,19 @@ public static class Sources
         return new();
     }
 
-    /// <summary>The sources of the project and of the user level (project first: its definition wins).</summary>
+    /// <summary>The knowledge repository of TcAgent, offered without being defined anywhere: newer skills and prompts between two
+    /// versions. Nothing is read from it until somebody browses it or installs an item. "knowledgeSource" switches it off
+    /// (⋯ > About TcAgent, updates.json of the company or a team).</summary>
+    public const string PredefinedName = "tcagent-knowledge";
+    static Source Predefined() => new() { Name = PredefinedName, Url = "https://github.com/ThorstenBrach/TcAgent_Knowledge.git", Ref = "main", Level = "built-in" };
+
+    /// <summary>The sources of the project and of the user level (project first: its definition wins) and the predefined one.</summary>
     public static List<Source> All(string solutionDir)
     {
         var list = new List<Source>();
         if (KnowledgeLayers.ProjectRoot(solutionDir) is { } p) list.AddRange(Load(p).Select(s => { s.Level = "project"; return s; }));
         foreach (var s in Load(KnowledgeLayers.UserRoot)) if (list.All(x => !x.Name.Equals(s.Name, StringComparison.OrdinalIgnoreCase))) { s.Level = "user"; list.Add(s); }
+        if (Updates.Setting(Updates.KnowledgeSource, Updates.LoadState()).On && list.All(x => !x.Name.Equals(PredefinedName, StringComparison.OrdinalIgnoreCase))) list.Add(Predefined());
         return list;
     }
 

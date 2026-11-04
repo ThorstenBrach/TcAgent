@@ -6,7 +6,7 @@
 // The checksum shows a damaged download; it lies in the same release, so it does not protect against a taken-over repository.
 //
 // %LOCALAPPDATA%\TcAgent\update-state.json   the switches of the user, the last answer, a skipped version
-// <level>\updates.json (company, team)       { "check": false, "sources": false } - a value here locks the switch
+// <level>\updates.json (company, team)       { "check": false, "sources": false, "knowledgeSource": false } - a value here locks the switch
 //
 // SPDX-License-Identifier: MIT
 using System.Net;
@@ -19,7 +19,7 @@ namespace TcAgent;
 
 public static class Updates
 {
-    public const string Repo = "ThorstenBrach/TcAgent";
+    public const string Repo = "ThorstenBrach/TcAgent", KnowledgeSource = "knowledgeSource";
     const string ReleasesApi = "https://api.github.com/repos/" + Repo + "/releases?per_page=30";
     const string DownloadRoot = "https://github.com/" + Repo + "/releases/download/";
     static readonly TimeSpan Interval = TimeSpan.FromHours(20);     // once a day, also when the IDE starts a little earlier
@@ -54,7 +54,7 @@ public static class Updates
     }
 
     // ------------------------------------------------------------------ switches
-    /// <summary>The switch "check" or "sources": on unless the user switched it off; a value in updates.json of the company
+    /// <summary>The switch "check", "sources" or "knowledgeSource": on unless the user switched it off; a value in updates.json of the company
     /// or a team level wins and locks it.</summary>
     public static Switch Setting(string key, JsonObject state, IEnumerable<(string Label, string Root)> levels = null)
     {
@@ -131,11 +131,13 @@ public static class Updates
         var newer = Newer(st["releases"], current);
         var skipped = st["skipped"]?.ToString();
         var src = Setting("sources", st);
+        var known = Setting(KnowledgeSource, st);
         return new JsonObject
         {
             ["current"] = current, ["latest"] = newer.FirstOrDefault()?.Version, ["available"] = newer.Count > 0,
             ["notify"] = newer.Count > 0 && newer[0].Version != skipped,
             ["check"] = sw.On, ["checkLockedBy"] = sw.LockedBy, ["sources"] = src.On, ["sourcesLockedBy"] = src.LockedBy,
+            [KnowledgeSource] = known.On, ["knowledgeSourceLockedBy"] = known.LockedBy,
             ["lastCheck"] = st["lastCheck"]?.ToString(), ["error"] = error,
             ["releases"] = new JsonArray(newer.Select(r => (JsonNode)new JsonObject
             {

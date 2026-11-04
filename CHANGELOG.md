@@ -36,6 +36,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   with Download, Install, Open on GitHub, Skip this version and Later. The download only starts on a click and must match
   SHA256SUMS.txt of the release; Install opens the VSIX installer, nothing installs silently. The XAE Shell keeps the browser
   download and the documented steps of the ZIP. Switches in About; `updates.json` on the company or team level locks them.
+- **The knowledge repository as a predefined source:** `tcagent-knowledge` (TcAgent_Knowledge) stands in the tab Sources from the start, so
+  newer skills, prompts and rules can be installed between two versions of TcAgent. Nothing is read from it until somebody browses
+  it or installs an item; it needs Git. Switch in ⋯ > About TcAgent, `"knowledgeSource": false` in `updates.json` locks it off.
 - **Newer versions in the repo sources**: once a day the sources in use are fetched (no pull, no sign-in window) and a line in the
   chat leads to the tab Sources.
 - **About TcAgent** (⋯ > About TcAgent, `TcAgent.exe about --json`): author, license, the versions of the extension, server, IDE and

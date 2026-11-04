@@ -1708,8 +1708,17 @@ namespace TcAgentBridge
         // the levels sources can be defined at (sources.json): user and project
         string[] SourceLevels() => string.IsNullOrEmpty(S(data, "solutionDir")) ? new[] { "personal" } : new[] { "personal", "project" };
 
+        // the predefined source is not in any list: it can only be switched off
+        bool Predefined(Line l)
+        {
+            if (S(l?.D, "level") != "built-in") return false;
+            Hint("This source comes with TcAgent. Switch it off in the TcAgent Chat: ⋯ > About TcAgent.");
+            return true;
+        }
+
         async void EditSource(Line l)
         {
+            if (Predefined(l)) return;
             var d = l?.D;
             var r = Ask(d == null ? "New source" : "Edit source " + S(d, "name"), new[] { 0, 1 },
                         ("Name (lowercase, hyphens)", null, S(d, "name") ?? ""), ("Git URL or path", null, S(d, "url") ?? ""),
@@ -1728,6 +1737,7 @@ namespace TcAgentBridge
         async void RemoveSource()
         {
             if (!(sourceList.SelectedItem is Line l)) { Hint("Select a source first."); return; }
+            if (Predefined(l)) return;
             if (MessageBox.Show($"Delete the source {S(l.D, "name")} from the list?\n\nItems installed from it stay (and keep their installed version).", "TcAgent Knowledge",
                                 MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
             var (ok, output) = await Cli($"sources remove --name {Quote(S(l.D, "name"))} --level {(S(l.D, "level") == "project" ? "project" : "personal")}", "Deleting the source");

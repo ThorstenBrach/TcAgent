@@ -954,10 +954,11 @@ public static partial class Cli
 
   TcAgent.exe update [check] [--force] [--json]
   TcAgent.exe update sources [--force] [--solution <sln>] [--json]
-  TcAgent.exe update download | skip <version> | set check|sources on|off
+  TcAgent.exe update download | skip <version> | set check|sources|knowledge on|off
       New versions of TcAgent (GitHub releases, at most once a day unless --force) and of the repo sources in use. download
       fetches the .vsix and checks it against SHA256SUMS.txt. The TcAgent Chat uses these; updates.json on the company or team
-      level locks a switch: { ""check"": false, ""sources"": false }.
+      level locks a switch: { ""check"": false, ""sources"": false, ""knowledgeSource"": false }. knowledge: the predefined source
+      tcagent-knowledge in the Sources tab.
 
   TcAgent.exe shared [list|check|add|keep|remove] [--path <folder or file>] [--all | --solution <sln>] [--json]
       Folders the agent may read in the TcAgent Chat, also searched by tc_docs. add keeps a folder for the solution or --all,

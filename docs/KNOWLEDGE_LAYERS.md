@@ -197,8 +197,8 @@ unless a placeholder is still open. The default is inserting. `TcAgent.exe promp
 ## Daily checks
 
 `updates.json` on the company or team level decides about the checks of the VS extension for everybody, e.g.
-`{ "check": false, "sources": false }`: `check` for new TcAgent versions, `sources` for newer versions in the repo sources. A value
-there locks the switch in **⋯ > About TcAgent**; without one each user decides, and both are on by default.
+`{ "check": false, "sources": false, "knowledgeSource": false }`: `check` for new TcAgent versions, `sources` for newer versions in the
+repo sources, `knowledgeSource` for the predefined source `tcagent-knowledge`. A value there locks the switch in **⋯ > About TcAgent**; without one each user decides, and both are on by default.
 
 ## Skills
 

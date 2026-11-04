@@ -59,15 +59,16 @@ public static partial class Cli
                 }
                 case "set":
                 {
-                    if (words.ElementAtOrDefault(1) is not ("check" or "sources") || words.ElementAtOrDefault(2) is not ("on" or "off"))
-                        throw new ArgumentException("update set check|sources on|off");
+                    if (words.ElementAtOrDefault(1) is not ("check" or "sources" or "knowledge") || words.ElementAtOrDefault(2) is not ("on" or "off"))
+                        throw new ArgumentException("update set check|sources|knowledge on|off");
                     var st = Updates.LoadState();
-                    if (Updates.Setting(words[1], st).LockedBy is { } by) throw new Exception($"locked on the {by} level");
-                    st[words[1]] = words[2] == "on";
+                    var key = words[1] == "knowledge" ? Updates.KnowledgeSource : words[1];
+                    if (Updates.Setting(key, st).LockedBy is { } by) throw new Exception($"locked on the {by} level");
+                    st[key] = words[2] == "on";
                     Updates.SaveState(st);
                     return Ok;
                 }
-                default: throw new ArgumentException("update [check|sources|download|skip <version>|set check|sources on|off]");
+                default: throw new ArgumentException("update [check|sources|download|skip <version>|set check|sources|knowledge on|off]");
             }
         }
         catch (ArgumentException ex) { Console.Error.WriteLine(ex.Message); return Usage; }

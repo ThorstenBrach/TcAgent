@@ -24,7 +24,9 @@ activate configurations, start and stop the PLC, write variables. Use it accordi
   has loaded: an anonymous GET, with the TcAgent version in the User-Agent and nothing about the solution or the user. It also
   fetches the Git repositories of the sources in use once a day (`git fetch`, no pull, no sign-in window). Pipelines, the
   command line and the agent do not check. Both switches are in **⋯ > About TcAgent**; `updates.json` on the company or team
-  level locks them, e.g. `{ "check": false, "sources": false }`.
+  level locks them, e.g. `{ "check": false, "sources": false, "knowledgeSource": false }`.
+* **Predefined source:** the tab Sources offers the repository TcAgent_Knowledge. Nothing is read from it until somebody browses it, and an
+  item is only taken over on a click, pinned to a commit. Skills and rules are instructions to the agent: check what you install.
 * **Updates are never installed silently.** A download starts on a click; the `.vsix` must match `SHA256SUMS.txt` of the release and
   **Install** opens the VSIX installer. The checksum shows a damaged download. It lies in the same release, so it does not
   protect against a taken-over repository: the packages are not signed.

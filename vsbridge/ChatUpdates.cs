@@ -340,7 +340,9 @@ namespace TcAgentBridge
             var check = new CheckBox { Content = "Look for new TcAgent versions once a day", IsChecked = true };
             var sources = new CheckBox { Content = "Look for newer versions in the repo sources once a day", IsChecked = true, Margin = new Thickness(0, 3, 0, 0) };
             var last = new TextBlock { Opacity = 0.7, Margin = new Thickness(0, 3, 0, 0), TextWrapping = TextWrapping.Wrap };
-            body.Children.Add(check); body.Children.Add(sources); body.Children.Add(last);
+            var known = new CheckBox { Content = "Offer the TcAgent knowledge repository in the tab Sources", IsChecked = true, Margin = new Thickness(0, 3, 0, 0),
+                                       ToolTip = "Newer skills, prompts and rules between two versions of TcAgent. Nothing is read from it until you browse it" };
+            body.Children.Add(check); body.Children.Add(sources); body.Children.Add(known); body.Children.Add(last);
             void Switch(CheckBox box, string key)
             {
                 RoutedEventHandler h = async (s, e) => await Ask($"update set {key} {(box.IsChecked == true ? "on" : "off")}");
@@ -354,7 +356,7 @@ namespace TcAgentBridge
                     box.IsChecked = B(r, key);
                     if (S(r, lockKey) is string by) { box.IsEnabled = false; box.ToolTip = $"Set on the {by} level (updates.json)"; }
                 }
-                One(check, "check", "checkLockedBy"); One(sources, "sources", "sourcesLockedBy");
+                One(check, "check", "checkLockedBy"); One(sources, "sources", "sourcesLockedBy"); One(known, "knowledgeSource", "knowledgeSourceLockedBy");
                 last.Text = (DateTime.TryParse(S(r, "lastCheck"), out var t) ? "Last checked " + t.ToString("g") + " · " : "") + "nothing but the request itself is sent";
             }
 
@@ -401,7 +403,7 @@ namespace TcAgentBridge
                         Rows(install, installed); Rows(comps, components);
                     }
                     Show(await Ask("update check --json --current " + BridgePackage.BridgeVersion));
-                    Switch(check, "check"); Switch(sources, "sources");
+                    Switch(check, "check"); Switch(sources, "sources"); Switch(known, "knowledge");
                 }
                 catch (Exception ex) { BridgePackage.Instance?.LogLine("About: " + ex.Message); }
             };

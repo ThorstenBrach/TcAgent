@@ -130,7 +130,9 @@ work without the extension. The extension runs **inside** the IDE process and ad
   `SHA256SUMS.txt`, **Install …** then opens the VSIX installer (Visual Studio must be closed, so save first), **Skip this version**
   ends the notice until the next one. In the XAE Shell, **Open on GitHub** leads to the ZIP; install it as in
   [INSTALLATION.md](INSTALLATION.md). A second line says when installed items have newer versions in their sources and leads
-  to the tab Sources; updating them stays your decision there.
+  to the tab Sources; updating them stays your decision there. The source `tcagent-knowledge` is predefined there: it offers newer
+  skills, prompts and rules between two versions of TcAgent (needs Git). An item you install from it replaces the built-in one of
+  the same name for you and then follows the source. **⋯ > About TcAgent** switches the source off.
 - **About TcAgent** – **⋯ > About TcAgent**: author, license, the versions of extension, server, IDE and TwinCAT, the components with
   their licenses, and the two switches for the daily checks. What they send: [SECURITY.md](../SECURITY.md).
 - **Edit a prompt** – right-click it in the list. Your own prompt opens as it is. A built-in, company or team prompt stays unchanged:

@@ -65,11 +65,37 @@ public sealed class SourcesTests : IDisposable
     }
 
     [Fact]
+    public void The_knowledge_repository_is_predefined_and_can_be_switched_off()
+    {
+        var s = Assert.Single(Sources.All(Sln), x => x.Name == Sources.PredefinedName);
+        Assert.Equal("built-in", s.Level);
+        Directory.CreateDirectory(KnowledgeLayers.UserRoot);
+        var st = Updates.LoadState();
+        st[Updates.KnowledgeSource] = false;
+        Updates.SaveState(st);
+        Assert.DoesNotContain(Sources.All(Sln), x => x.Name == Sources.PredefinedName);
+    }
+
+    [Fact]
+    public void The_company_can_lock_the_predefined_source_off()
+    {
+        Write(@"company\updates.json", """{ "knowledgeSource": false }""");
+        Assert.DoesNotContain(Sources.All(Sln), x => x.Name == Sources.PredefinedName);
+    }
+
+    [Fact]
+    public void An_own_definition_replaces_the_predefined_source()
+    {
+        Sources.AddSource(KnowledgeLayers.UserRoot, Sources.PredefinedName, Repo, null);
+        Assert.Equal("user", Assert.Single(Sources.All(Sln), x => x.Name == Sources.PredefinedName).Level);
+    }
+
+    [Fact]
     public void InstallPinsLicenseAndDetectsChanges()
     {
         var root = KnowledgeLayers.ProjectRoot(Sln)!;
         Sources.AddSource(KnowledgeLayers.UserRoot, "collection", Repo, null);
-        var s = Assert.Single(Sources.All(Sln));
+        var s = Assert.Single(Sources.All(Sln), x => x.Level != "built-in");
         var commit = Sources.Fetch(s);
         var repo = Sources.Checkout(s.Name, s.Url, commit);
         var items = Sources.Scan(repo);
