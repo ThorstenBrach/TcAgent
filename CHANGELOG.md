@@ -16,7 +16,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   of the knowledge window, from repositories through Sources, in the backups. In the TcAgent Chat `/` at the start of a
   line or the button **Prompts** opens a list above the input with search, categories and a preview; Enter inserts the
   prompt (it is not sent, it can be adapted), Ctrl+Enter inserts and sends. `{object}`, `{selection}`, `{solution}` are
-  filled from the editor, `{input:…}` is asked in a short form; recently used prompts come first; **Save as prompt …** under
+  filled from the editor, `{input:…}` is asked in a short form (`|a|b` a choice, `=value` a default), `tcagent-send: true`
+  sends a prompt as soon as it is complete; recently used prompts come first; **Save as prompt …** under
   an own message. Five neutral prompts are shipped. `TcAgent.exe prompts [--json]`.
 
 ## [0.51.0] – 2026-11-02

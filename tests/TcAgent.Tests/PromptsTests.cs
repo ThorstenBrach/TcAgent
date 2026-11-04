@@ -51,6 +51,14 @@ public sealed class PromptsTests : IDisposable
         Assert.Equal("Tests", p.Category);
         Assert.Equal(new[] { "tcunit", "test" }, p.Tags);
         Assert.Equal("Write tests for {object}.", p.Body);
+        Assert.False(p.Send);
+    }
+
+    [Fact]
+    public void SendFlagFromTheFrontMatter()
+    {
+        Write(@"user\prompts\go.md", "---\ndescription: x\nmetadata:\n  tcagent-send: true\n---\nDo it.\n");
+        Assert.True(Assert.Single(Prompts.Active(Sln, Array.Empty<string>())).Send);
     }
 
     [Fact]

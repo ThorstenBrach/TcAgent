@@ -12,7 +12,8 @@
 //   Write TcUnit tests for {object}. Cover the normal sequence, the error path and {input:extra cases}.
 //
 // Placeholders are filled in the chat: {object} (open object), {selection}, {solution}, {input:<question>} (asked before
-// inserting). TcAgent.exe prompts [--solution <sln>] [--json] lists what applies.
+// inserting; {input:<question>|a|b} offers a choice, {input:<question>=value} a default). tcagent-send: true sends the prompt
+// right after it is complete, otherwise it goes into the input. TcAgent.exe prompts [--solution <sln>] [--json] lists what applies.
 //
 // SPDX-License-Identifier: MIT
 using System.Text.Json;
@@ -24,7 +25,7 @@ public static class Prompts
 {
     public const string Kind = "prompts";
 
-    public sealed record Item(string Name, string Description, string Category, List<string> Tags, string Body, string Level, string Source, string Path);
+    public sealed record Item(string Name, string Description, string Category, List<string> Tags, string Body, string Level, string Source, string Path, bool Send);
 
     public static List<KnowledgeLayers.Entry> Entries(string solutionDir, IEnumerable<string> platforms) =>
         KnowledgeLayers.Resolve(Kind, solutionDir, platforms, replaceByName: true);
@@ -38,7 +39,7 @@ public static class Prompts
     {
         var fm = e.Meta ?? new KnowledgeLayers.FrontMatter();
         var tags = (fm.Get("tags") ?? "").Split(new[] { ',', ';' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-        return new Item(e.Name, fm.Get("description"), fm.Get("category"), tags, (fm.Body ?? "").Trim(), e.Layer.Label, fm.Get("source"), e.Path);
+        return new Item(e.Name, fm.Get("description"), fm.Get("category"), tags, (fm.Body ?? "").Trim(), e.Layer.Label, fm.Get("source"), e.Path, fm.Flag("send"));
     }
 
     // TcAgent.exe prompts [--solution <sln>] [--json]
@@ -63,7 +64,7 @@ public static class Prompts
                 {
                     ["prompts"] = new JsonArray(items.Select(p => (JsonNode)new JsonObject
                     {
-                        ["name"] = p.Name, ["description"] = p.Description, ["category"] = p.Category, ["level"] = p.Level, ["source"] = p.Source, ["path"] = p.Path,
+                        ["name"] = p.Name, ["description"] = p.Description, ["category"] = p.Category, ["level"] = p.Level, ["source"] = p.Source, ["path"] = p.Path, ["send"] = p.Send,
                         ["tags"] = new JsonArray(p.Tags.Select(t => (JsonNode)t).ToArray()), ["body"] = p.Body
                     }).ToArray())
                 }.ToJsonString(new JsonSerializerOptions { WriteIndented = true }));

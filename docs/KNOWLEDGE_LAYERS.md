@@ -169,8 +169,10 @@ metadata:
 Write TcUnit tests for {object}. Cover the normal sequence, the error path and {input:extra cases to cover}.
 ```
 
-Placeholders: `{object}` (open object), `{selection}`, `{solution}`, `{input:<question>}` (asked before inserting). A value
-that is not there stays visible in the text. `TcAgent.exe prompts [--solution <sln>] [--json]` lists what applies.
+Placeholders: `{object}` (open object), `{selection}`, `{solution}`, `{input:<question>}` (asked before inserting),
+`{input:<question>|a|b}` (a choice), `{input:<question>=value}` (a default). A value that is not there stays visible in the
+text. With `tcagent-send: true` under `metadata` the prompt is sent as soon as it is complete, without the step through the
+input - unless a placeholder is still open. `TcAgent.exe prompts [--solution <sln>] [--json]` lists what applies.
 
 ## Skills
 

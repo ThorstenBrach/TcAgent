@@ -1,7 +1,8 @@
 // TcAgent Chat: the prompt library (server: Prompts.cs). "/" at the start of a line of the input, or the button Prompts, opens a
 // list above the input: typing filters by name, description and tags; arrow keys or a click choose, Enter puts the prompt into
 // the input (never sent without the user: it can be adapted), Ctrl+Enter inserts and sends. A preview shows the text with the
-// placeholders filled from the editor - {object}, {selection}, {solution}; {input:<question>} is asked in a small form first.
+// placeholders filled from the editor - {object}, {selection}, {solution}; {input:<question>} is asked in a small form first
+// ({input:<question>|a|b} a choice, {input:<question>=value} a default). A prompt with tcagent-send: true goes off when complete.
 // "Save as prompt …" under an own message keeps it as a prompt (a file of the knowledge, TcAgent.exe knowledge new).
 //
 // SPDX-License-Identifier: MIT
@@ -27,6 +28,7 @@ namespace TcAgentBridge
         sealed class PromptItem
         {
             public string Name, Description, Category, Level, Source, Body;
+            public bool Send;
             public List<string> Tags = new List<string>();
         }
 
@@ -142,7 +144,7 @@ namespace TcAgentBridge
                             list.Add(new PromptItem
                             {
                                 Name = d["name"] as string, Description = d["description"] as string, Category = d["category"] as string, Level = d["level"] as string,
-                                Source = d["source"] as string, Body = d["body"] as string,
+                                Source = d["source"] as string, Body = d["body"] as string, Send = d.TryGetValue("send", out var snd) && snd is bool sb && sb,
                                 Tags = (d["tags"] as System.Collections.IEnumerable)?.Cast<object>().Select(x => x.ToString()).ToList() ?? new List<string>()
                             });
                     }
@@ -271,6 +273,7 @@ namespace TcAgentBridge
 
         void ChoosePrompt(PromptItem p, bool send)
         {
+            send |= p.Send;
             var questions = InputPlaceholder.Matches(p.Body).Cast<Match>().Select(m => m.Groups[1].Value.Trim()).Distinct().ToList();
             if (questions.Count == 0) { InsertPrompt(p, new Dictionary<string, string>(), send); return; }
             // the values to ask for: a short form in the panel; Enter in the last field or Insert goes on, Esc cancels
@@ -282,17 +285,22 @@ namespace TcAgentBridge
             head.Inlines.Add(new Run(questions.Count == 1 ? " needs one value" : $" needs {questions.Count} values"));
             head.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             promptForm.Children.Add(head);
-            var boxes = new List<TextBox>();
+            var boxes = new List<Control>();
             foreach (var q in questions)
             {
-                var l = new TextBlock { Text = q, Margin = new Thickness(0, 2, 0, 1), TextWrapping = TextWrapping.Wrap };
+                // "Target|local|test PLC": a choice; "Timeout=30 s": a default
+                var parts = q.Split('|').Select(x => x.Trim()).ToArray();
+                var eq = parts.Length == 1 ? q.IndexOf('=') : -1;
+                var l = new TextBlock { Text = eq > 0 ? q.Substring(0, eq).Trim() : parts[0], Margin = new Thickness(0, 2, 0, 1), TextWrapping = TextWrapping.Wrap };
                 l.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
-                var b = new TextBox { Padding = new Thickness(2), Margin = new Thickness(0, 0, 0, 4), Tag = q };
+                Control b = parts.Length > 1
+                    ? new ComboBox { ItemsSource = parts.Skip(1).ToList(), SelectedIndex = 0, Margin = new Thickness(0, 0, 0, 4), Tag = q }
+                    : (Control)new TextBox { Padding = new Thickness(2), Margin = new Thickness(0, 0, 0, 4), Tag = q, Text = eq > 0 ? q.Substring(eq + 1).Trim() : "" };
                 promptForm.Children.Add(l); promptForm.Children.Add(b); boxes.Add(b);
             }
             void Done()
             {
-                var values = boxes.ToDictionary(b => (string)b.Tag, b => b.Text.Trim());
+                var values = boxes.ToDictionary(b => (string)b.Tag, b => b is ComboBox c ? c.SelectedItem as string : ((TextBox)b).Text.Trim());
                 promptFilling = false;
                 InsertPrompt(p, values, send);
             }
@@ -333,7 +341,9 @@ namespace TcAgentBridge
             ClosePrompts();
             RememberRecentPrompt(p.Name);
             input.Focus();
-            if (send) Send();
+            // something still open ({selection} without a selection): the user decides, it is not sent like that
+            if (send && Placeholders.IsMatch(text)) status.Text = "Not sent: the prompt still has an open placeholder - complete it, then Enter.";
+            else if (send) Send();
         }
 
         List<string> RecentPrompts()
