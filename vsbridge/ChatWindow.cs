@@ -8,6 +8,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
@@ -109,6 +110,59 @@ namespace TcAgentBridge
                 settingsStamp = File.GetLastWriteTimeUtc(SettingsFile);     // our own change - nothing to reload
             }
             catch (Exception ex) { status.Text = "Could not remember the backend: " + ex.Message; }
+        }
+
+        // ------------------------------------------------------------------ the language of the answers
+        // chat-backends.json "answerLanguage": missing = the language of Windows, "request" = the language of the question,
+        // otherwise a language tag ("de"). Prepared prompts are English: without this the answers would be too.
+        const string AnswerRequest = "request";
+        string answerLanguage;
+
+        static CultureInfo Neutral(string tag)
+        {
+            try { var c = new CultureInfo(tag); return c.IsNeutralCulture || c.Parent == CultureInfo.InvariantCulture ? c : c.Parent; }
+            catch { return null; }
+        }
+
+        static CultureInfo WindowsLanguage => Neutral(CultureInfo.CurrentUICulture.Name) ?? CultureInfo.GetCultureInfo("en");
+
+        /// <summary>The languages of this Windows user (Settings > Language), then the display language and English.</summary>
+        internal static List<CultureInfo> InstalledLanguages()
+        {
+            var tags = new List<string> { CultureInfo.CurrentUICulture.Name };
+            try
+            {
+                using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Control Panel\International\User Profile"))
+                    if (k?.GetValue("Languages") is string[] list) tags.AddRange(list);
+            }
+            catch { }
+            tags.Add("en");
+            return tags.Select(Neutral).Where(c => c != null && c != CultureInfo.InvariantCulture).GroupBy(c => c.Name).Select(g => g.First()).ToList();
+        }
+
+        static string Title(CultureInfo c) => c.TextInfo.ToTitleCase(c.NativeName);
+
+        string LanguageRule()
+        {
+            if (answerLanguage == AnswerRequest) return "Answer in the language of the user's request.";
+            var c = (string.IsNullOrEmpty(answerLanguage) ? null : Neutral(answerLanguage)) ?? WindowsLanguage;
+            return $"Answer in {c.EnglishName}, also when the request or a prepared prompt is written in another language. " +
+                   "Code, identifiers and tool arguments stay as they are; comments in code follow the coding rules.";
+        }
+
+        void SetAnswerLanguage(string value)
+        {
+            answerLanguage = value;
+            try
+            {
+                if (!File.Exists(SettingsFile)) return;            // setup-clients.ps1 writes the full template later
+                var ser = new JavaScriptSerializer();
+                var js = ser.Deserialize<Dictionary<string, object>>(File.ReadAllText(SettingsFile));
+                if (string.IsNullOrEmpty(value)) js.Remove("answerLanguage"); else js["answerLanguage"] = value;
+                File.WriteAllText(SettingsFile, Indent(ser.Serialize(js)), new UTF8Encoding(false));
+                settingsStamp = File.GetLastWriteTimeUtc(SettingsFile);     // our own change - nothing to reload
+            }
+            catch (Exception ex) { status.Text = "Could not remember the language: " + ex.Message; }
         }
 
         // JavaScriptSerializer writes one line - keep chat-backends.json readable for manual editing
@@ -324,6 +378,7 @@ namespace TcAgentBridge
                     def = js.TryGetValue("default", out var d) ? d as string : null;
                     if (js.TryGetValue("historyChars", out var hc) && hc is int h) historyChars = h;
                     if (js.TryGetValue("sendContext", out var sc) && sc is bool b0) contextBox.IsChecked = b0;
+            answerLanguage = js.TryGetValue("answerLanguage", out var al) ? al as string : null;
                     if (js.TryGetValue("buildAfterChange", out var ba) && ba is bool b1) buildBox.IsChecked = b1;
                     if (js.TryGetValue("backends", out var bo) && bo is Dictionary<string, object> bs)
                         foreach (var kv in bs)
@@ -839,14 +894,14 @@ namespace TcAgentBridge
             if (followUp)
             {
                 // running session: Claude already knows the instructions and history
-                sb.AppendLine("[Note] " + buildRule);
+                sb.AppendLine("[Note] " + buildRule + " " + LanguageRule());
                 if (ctx != null) sb.AppendLine("\n[User's editor context]\n" + ctx);
                 sb.AppendLine("\n[Request]\n" + text);
                 return sb.ToString();
             }
             sb.AppendLine("You are working in a TwinCAT 3 project (Visual Studio). Use the MCP tools of the \"tcagent\" server (tc_*, ads_*) " +
                           "and follow the TcAgent guide (AGENTS.md, or the twincat-tcagent skill). " +
-                          "Answer concisely, in the language of the user's request; name changed objects with their tree path. Before writing code for the first time, call tc_coding_rules once and follow the rules. " + buildRule);
+                          "Answer concisely; name changed objects with their tree path. " + LanguageRule() + " Before writing code for the first time, call tc_coding_rules once and follow the rules. " + buildRule);
             // the user decides about code changes: an error found on the way to something else is reported, not silently fixed
             sb.AppendLine("Change code only when the user asked for a change. If the request is something else (activate, run tests, go online, explain, check) and you find " +
                           "compiler errors or other problems on the way, report them and ask with tc_ask_user whether to fix them - do not fix them on your own.");

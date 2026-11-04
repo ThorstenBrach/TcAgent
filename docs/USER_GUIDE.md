@@ -112,10 +112,13 @@ work without the extension. The extension runs **inside** the IDE process and ad
   Shift+Enter makes a new line, ↑/↓ brings back earlier prompts (kept across sessions), Esc stops the answer while the
   agent works (otherwise back to the editor). **New chat** clears the history, **Stop** cancels the running answer. The
   status line shows the state of the backend, while working "◐ Claude Code is working · 3 tool calls · 12 s · tc_check",
-  afterwards "✓ Done in 14 s · 6 tool calls". The **⋯** menu is grouped: *Chat* (send editor context, check after changes,
+  afterwards "✓ Done in 14 s · 6 tool calls". The **⋯** menu is grouped: *Chat* (send editor context, check after changes, **Answer language**,
   New chat, Copy conversation), *Windows* (TcUnit Tests, Knowledge), *Setup and help* (Set up clients, Copy diagnostics,
   Open user guide) and the version. The result of **Set up clients** is one line at the top ("TcAgent x is set up for n
   clients – restart the open ones") with **Details** (the files written, user folders as %LOCALAPPDATA% / %USERPROFILE%).
+- **Answer language** – **⋯ > Answer language**: the language of Windows (the default), the language of the question, or one
+  of the languages of your Windows user. It also holds for the prepared prompts, which are written in English. Code and
+  identifiers stay as they are.
 - **Prepared prompts** – type **/** at the start of a line in the input, or click **Prompts**: a list above the input with
   search (name, description, tags), categories and a preview. Arrow keys or a click choose, writing the name works too;
   Enter puts the prompt into the input so you can adapt it, Ctrl+Enter inserts and sends, Esc closes. `{object}`,

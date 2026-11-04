@@ -284,6 +284,17 @@ namespace TcAgentBridge
                                 "Send the open object, cursor line and selection with each request", contextBox.IsChecked == true));
             menu.Items.Add(Item("Check after changes", () => buildBox.IsChecked = buildBox.IsChecked != true,
                                 "The agent checks for compiler errors (tc_check) once after its changes", buildBox.IsChecked == true));
+            var language = new MenuItem { Header = "Answer language", ToolTip = "The language the agent answers in - also for prepared prompts, which are English" };
+            void Language(string header, string value, string tip = null)
+            {
+                var chosen = string.Equals(answerLanguage ?? "", value ?? "", StringComparison.OrdinalIgnoreCase);
+                language.Items.Add(Item(header, () => SetAnswerLanguage(value), tip, chosen));
+            }
+            Language($"Language of Windows ({Title(WindowsLanguage)})", null);
+            Language("Language of the question", AnswerRequest);
+            language.Items.Add(new Separator());
+            foreach (var c in InstalledLanguages()) Language(Title(c), c.Name);
+            menu.Items.Add(language);
             menu.Items.Add(Item("New chat", () => clear.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), clear.ToolTip as string));
             menu.Items.Add(Item("Copy conversation", CopyConversation, "The questions and answers of this chat as text"));
             menu.Items.Add(new Separator());

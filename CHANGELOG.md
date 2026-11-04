@@ -11,6 +11,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `tc_docs`) - it is not documentation of TcAgent and not the templates. The texts of the window say "reference source".
 
 ### Added
+- **Answer language in the TcAgent Chat** (⋯ > Answer language): the language of Windows (new default), the language of the
+  question, or one of the languages of the Windows user (`answerLanguage` in `chat-backends.json`). Before, the answer
+  followed the question, so prepared prompts in English gave English answers.
 - **Prompt library** (`src/Prompts.cs`, `vsbridge/ChatPrompts.cs`, [docs/KNOWLEDGE_LAYERS.md](docs/KNOWLEDGE_LAYERS.md#prompts)):
   prepared prompts as a new kind of the knowledge - `prompts\<name>.md` on every level, kind *Prompts* in the Files tab
   of the knowledge window, from repositories through Sources, in the backups. In the TcAgent Chat `/` at the start of a
