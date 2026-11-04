@@ -17,6 +17,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   the project files (unsaved changes are not included, the result says so), the tree paths come from the same files, and the
   whole call answers within about 45 s: the cross references get 25 s and 8 s for reading them, a second query does not queue
   behind one still running, and the text search is returned in any case.
+- Knowledge window, tab Platforms: Delete on a platform connected through `TCAGENT_PLATFORMS` ended with "not a file of a knowledge level". It
+  now detaches the platform, after asking; its files stay where they are.
 - `tc_delete` without `name` or `parentPath` says what is missing instead of "Value cannot be null (source)".
 
 ### Changed

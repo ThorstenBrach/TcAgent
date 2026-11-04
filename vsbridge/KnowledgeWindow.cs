@@ -2324,12 +2324,43 @@ namespace TcAgentBridge
             OpenInEditor(f);
         }
 
-        // only a platform folder of the user (or of the company folder without Git) - the delete of KnowledgeOps checks it
+        // the folders of TCAGENT_PLATFORMS in settings.json: repositories of their own, connected to TcAgent
+        static List<string> ConnectedPlatforms()
+        {
+            try
+            {
+                var file = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "settings.json");
+                var js = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(File.ReadAllText(file));
+                var env = js != null && js.TryGetValue("env", out var e) ? e as Dictionary<string, object> : null;
+                var v = env != null && env.TryGetValue("TCAGENT_PLATFORMS", out var p) ? p as string : null;
+                return (v ?? "").Split(';').Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+            }
+            catch { return new List<string>(); }
+        }
+
+        // a connected platform is not ours to delete: it is detached and its files stay where they are
+        async System.Threading.Tasks.Task<bool> DetachPlatform(string name, string folder)
+        {
+            var all = ConnectedPlatforms();
+            bool Holds(string r) => folder.Equals(r.TrimEnd('\\'), StringComparison.OrdinalIgnoreCase) || folder.StartsWith(r.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase);
+            var root = all.FirstOrDefault(Holds);
+            if (root == null) return false;
+            if (MessageBox.Show($"Detach the platform {name}?\n\nTcAgent no longer uses its skills, rules and lessons. The files stay in\n{root}\n\nAI clients get the change with \"Set up clients\".",
+                                "TcAgent Knowledge", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return true;
+            var rest = string.Join(";", all.Where(r => r != root));
+            var (ok, output) = await Cli("knowledge settings --name TCAGENT_PLATFORMS --url " + Quote(rest.Length > 0 ? rest : " "), "Detaching the platform");
+            Report(ok, output, "Detach platform");
+            Load();
+            return true;
+        }
+
+        // a platform folder of the user (or of the company folder without Git) is deleted - the delete of KnowledgeOps checks it
         async void DeletePlatform()
         {
             var d = (platformList.SelectedItem as Line)?.D;
             var folder = S(d, "file") is string f ? Path.GetDirectoryName(f) : null;
             if (folder == null) { Hint("This platform has no folder of its own to delete."); return; }
+            if (await DetachPlatform(S(d, "name"), folder)) return;
             if (MessageBox.Show($"Delete the platform {S(d, "name")} with everything in its folder?\n\n{folder}\n\n(rules, skills and lessons of the platform go too; the level is backed up first)",
                                 "TcAgent Knowledge", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
             var (ok, output) = await Cli("knowledge delete --path " + Quote(folder), "Deleting the platform");
