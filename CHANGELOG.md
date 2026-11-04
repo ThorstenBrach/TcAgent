@@ -4,11 +4,13 @@ All notable changes to TcAgent (MCP server `TcAgent.exe` and the Visual Studio e
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/); server and extension share one version number.
 
-## [Unreleased]
+## [0.52.0] – 2026-11-04
+
+The built-in knowledge in this version is TcAgent_Knowledge 1.0.0.
 
 ### Fixed
-- **Visual Studio start: the bar saying that TcAgent does not respond.** The chat window started the agent while it was
-  created, on the UI thread of the IDE, and creating the window took up to 9 s on a cold start. The agent, the search for its
+- **Visual Studio start: TcAgent blocked the IDE for up to 9 s,** which could bring up the bar saying that it does not respond. The chat window
+  started the agent while it was created, on the UI thread of the IDE (a cold start of the agent took 8.8 s). The agent, the search for its
   program and the setup check at the start now run in the background; the window opens at once and shows "starting", the agent follows when the IDE has loaded (a question
   sent before that starts it right away). The stall monitor of the extension ticks every 250 ms instead of 50 ms and no longer
   names a tool of a server that has ended; the log says how long the chat window and the agent start took.
@@ -70,6 +72,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   or `params:` in the header (types text, number, choice, bool, pou = search list of POUs, GVLs and tasks; default, options,
   required, help); `tcagent-send: true` sends right after the card; recently used prompts come first; **Save as prompt …** under
   an own message. Six neutral prompts are shipped, one example for every form. `TcAgent.exe prompts [--json]`.
+
+### Known issues
+- The bar of Visual Studio about TcAgent can still appear on a start; blocks of several seconds remain while TwinCAT loads the project. Their
+  cause is being looked at for 0.52.1.
+- `tc_find_references` is not yet confirmed on a very large project, also for 0.52.1.
 
 ## [0.51.0] – 2026-11-02
 

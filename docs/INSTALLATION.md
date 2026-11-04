@@ -94,6 +94,8 @@ Optional, for the Scope and HMI tools: **TE1300 Scope View** (`tc_scope`) and **
 
 ## 2. Build TcAgent
 
+Clone with `git clone --recurse-submodules`: the built-in knowledge is the submodule `knowledge\`. In an existing clone: `git submodule update --init`.
+
 ```powershell
 cd <path>\TcAgent
 powershell -ExecutionPolicy Bypass -File .\build.ps1

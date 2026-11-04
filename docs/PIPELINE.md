@@ -27,6 +27,8 @@ exit code, JUnit XML and inline annotations.
 | `TcAgent.exe knowledgebase list\|backup\|diff\|restore` | backups of the knowledge levels (made automatically before every change); `restore --level <level> [--from <zip>] [--item <file or skills/name>] [--dry-run]` | restoring rules or skills after a mistake |
 | `TcAgent.exe diag` | versions of TcAgent, extension, TwinCAT and IDEs, runtime state, Windows – as a Markdown list for an issue report; no IDE needed | when a pipeline fails and you report it |
 
+Since 0.52.0 TcAgent ships general risk rules: `hardcoded-credential` and `new-without-delete` are `high`, so `--fail-on high` can fail where it passed before.
+
 ```powershell
 TcAgent.exe check --solution .\MyMachine.sln --junit results\check.xml
 TcAgent.exe test  --solution .\MyMachine.sln --junit results\tests.xml --timeout 900
