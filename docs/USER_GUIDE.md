@@ -119,6 +119,9 @@ work without the extension. The extension runs **inside** the IDE process and ad
 - **Answer language** – **⋯ > Answer language**: the language of Windows (the default), the language of the question, or one
   of the languages of your Windows user. It also holds for the prepared prompts, which are written in English. Code and
   identifiers stay as they are.
+
+  <img src="img/chat/answer-language.png" width="400" alt="The menu of the chat with the answer languages">
+
 - **Shared folders** – **Attach … > Share a folder**, drop a folder on the input, or **⋯ > Shared folders**: the agent reads the folder
   without asking; changing a file there still asks you. A question decides, also for attached files: **only this chat**, or
   **keep in the knowledge** for this solution or all your solutions (a file as a copy). Kept folders are also found through the
@@ -133,8 +136,14 @@ work without the extension. The extension runs **inside** the IDE process and ad
   to the tab Sources; updating them stays your decision there. The source `tcagent-knowledge` is predefined there: it offers newer
   skills, prompts and rules between two versions of TcAgent (needs Git). An item you install from it replaces the built-in one of
   the same name for you and then follows the source. **⋯ > About TcAgent** switches the source off.
+
+  <img src="img/chat/up-to-date.png" width="340" alt="Check for updates answers in a dialog">
+
 - **About TcAgent** – **⋯ > About TcAgent**: author, license, the versions of extension, server, IDE and TwinCAT, the components with
   their licenses, and the two switches for the daily checks. What they send: [SECURITY.md](../SECURITY.md).
+
+  <img src="img/chat/about.png" width="420" alt="About TcAgent: author, license, versions, components and the switches of the daily checks">
+
 - **Edit a prompt** – right-click it in the list. Your own prompt opens as it is. A built-in, company or team prompt stays unchanged:
   **Edit my copy** puts a copy into your folder (`%LOCALAPPDATA%\TcAgent\prompts\`), which replaces it for you.
 - **Reset TcAgent** – Knowledge window, **⋯ > Reset TcAgent**: back to a fresh installation, when levels, platforms, sources or plugins should be
@@ -254,7 +263,7 @@ workflow runs against the 10 before, with a sparkline; with fewer than 5 runs th
 need 20 runs. Then the workflows, open improvement proposals and the most frequent compiler errors. Double-click a
 workflow for its runs over time.
 
-<p><img src="img/knowledge/overview.png" width="900" alt="Overview: runs, first-time-right, failed checks, corrections and the workflows"><br><em>Overview: runs, first-time-right, failed checks, corrections and the workflows</em></p>
+<p><img src="img/knowledge/overview.png" width="900" alt="Overview: what the agent gets in this project, what needs attention and the workflow runs"><br><em>Overview: what the agent gets, what needs attention and the workflow runs</em></p>
 
 ### Files
 
@@ -275,7 +284,7 @@ For every level kept in Git a line shows local changes, commits to push and new 
 the last **Fetch**), with **Pull**, **Commit …** and **Push** – the push of a company or team level goes to a new
 branch for a pull request; the column **Git** marks changed and new files.
 
-<p><img src="img/knowledge/files.png" width="900" alt="Files: every knowledge file of every level with its status; an item from a source shows locally changed"><br><em>Files: every knowledge file of every level with its status; an item from a source shows locally changed</em></p>
+<p><img src="img/knowledge/files.png" width="900" alt="Files: every knowledge file of every level with its kind, level and state"><br><em>Files: every knowledge file of every level with its kind, level and state</em></p>
 
 ### Sources
 
@@ -346,6 +355,8 @@ needs, its window and what the `modules.json` of every level says. A change appl
 again; the command line (`TcAgent.exe check`, `tcunit`, `ci` …) always keeps every tool. When the module Tests is off,
 the TcUnit Tests window stays and says so, with a link to switch it on.
 
+<p><img src="img/knowledge/modules.png" width="900" alt="Modules: the tools the agent sees and the plugins"><br><em>Modules: the tools the agent sees and the plugins</em></p>
+
 ### Reference
 
 Manuals, datasheets and library docs the agent searches (`tc_docs`) – Beckhoff InfoSys, the links, folders and network
@@ -357,7 +368,7 @@ or folder …** (one line in the `knowledge.md` of the level you choose), **Add 
 right in the tab (type, Enter; Ctrl+F) – the hits are listed below (a PDF on the page of the hit with Acrobat/Reader, Foxit, SumatraPDF or a browser)
 and open with a double-click (documents with their program, pages in the browser); the same in the context menu.
 
-<p><img src="img/knowledge/documentation.png" width="900" alt="Reference: the sources of tc_docs and the hits of a test search"><br><em>Reference (in the picture still under its former name Documentation): the sources of tc_docs and the hits of a test search</em></p>
+<p><img src="img/knowledge/reference.png" width="900" alt="Reference: the sources of tc_docs and a search like the agent"><br><em>Reference: what the agent looks things up in, and a search like the agent</em></p>
 
 ### Feedback
 
@@ -373,13 +384,15 @@ reports as resolved, wontfix or duplicate; **Delete …** (Del) deletes the sele
 (default No) they and their status changes are removed from the feedback file. Questions belong in the GitHub Discussions (category Q&A), security
 problems are reported privately (`SECURITY.md`).
 
+<p><img src="img/knowledge/feedback.png" width="900" alt="Feedback: the reports of the agent with their state"><br><em>Feedback: the reports of the agent with their state</em></p>
+
 ### Workflow runs
 
 Failed checks and corrections per run with a moving average, every adopted improvement as a marker, and the
 improvements with their values before and after (helped / no effect / worse / reverted); **Export CSV**. With fewer
 than two runs the chart says so instead of staying empty.
 
-<p><img src="img/knowledge/history.png" width="900" alt="History: the workflow runs and the backups of the knowledge"><br><em>History: the workflow runs and the backups of the knowledge</em></p>
+<p><img src="img/knowledge/workflow-runs.png" width="900" alt="Workflow runs: the course of a workflow and the adopted improvements"><br><em>Workflow runs: the course of a workflow and the adopted improvements (here before the first run)</em></p>
 
 ### Backup and restore
 
@@ -401,6 +414,8 @@ Command line: `TcAgent.exe knowledgebase list|backup|diff|restore`.
 Decisions (apply a proposal, install, pull, promote) are made in the chat – the agent asks you.
 
 ---
+
+<p><img src="img/knowledge/backups.png" width="900" alt="Backups: every backup with its level, reason and files"><br><em>Backups: made automatically before every change</em></p>
 
 ## Understanding code
 

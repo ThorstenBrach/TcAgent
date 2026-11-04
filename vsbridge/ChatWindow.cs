@@ -124,12 +124,20 @@ namespace TcAgentBridge
             catch { return null; }
         }
 
-        static CultureInfo WindowsLanguage => Neutral(CultureInfo.CurrentUICulture.Name) ?? CultureInfo.GetCultureInfo("en");
+        [DllImport("kernel32.dll")] static extern ushort GetUserDefaultUILanguage();
+
+        // the display language of Windows - in the IDE CurrentUICulture is the language of the IDE, which may be another one
+        static string DisplayLanguage
+        {
+            get { try { return new CultureInfo(GetUserDefaultUILanguage()).Name; } catch { return CultureInfo.CurrentUICulture.Name; } }
+        }
+
+        static CultureInfo WindowsLanguage => Neutral(DisplayLanguage) ?? CultureInfo.GetCultureInfo("en");
 
         /// <summary>The languages of this Windows user (Settings > Language), then the display language and English.</summary>
         internal static List<CultureInfo> InstalledLanguages()
         {
-            var tags = new List<string> { CultureInfo.CurrentUICulture.Name };
+            var tags = new List<string> { DisplayLanguage };
             try
             {
                 using (var k = Microsoft.Win32.Registry.CurrentUser.OpenSubKey(@"Control Panel\International\User Profile"))

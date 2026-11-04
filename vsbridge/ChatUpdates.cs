@@ -321,7 +321,7 @@ namespace TcAgentBridge
                 int cols = 0, y = 0;
                 foreach (var r in rows)
                 {
-                    while (cols < r.Length) { g.ColumnDefinitions.Add(new ColumnDefinition { Width = cols == 0 ? new GridLength(1, GridUnitType.Star) : new GridLength(cols == 1 ? 120 : 90) }); cols++; }
+                    while (cols < r.Length) { g.ColumnDefinitions.Add(new ColumnDefinition { Width = cols == 0 ? new GridLength(1, GridUnitType.Star) : r.Length == 2 ? new GridLength(1.4, GridUnitType.Star) : new GridLength(cols == 1 ? 120 : 90) }); cols++; }
                     g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                     for (int x = 0; x < r.Length; x++)
                     {
