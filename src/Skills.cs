@@ -32,8 +32,19 @@ public static class Skills
         return n;
     }
 
-    public static List<KnowledgeLayers.Entry> Entries(string solutionDir, IEnumerable<string> platforms) =>
-        KnowledgeLayers.Resolve("skills", solutionDir, platforms, replaceByName: true, folderFile: MainFile);
+    public static List<KnowledgeLayers.Entry> Entries(string solutionDir, IEnumerable<string> platforms)
+    {
+        var entries = KnowledgeLayers.Resolve("skills", solutionDir, platforms, replaceByName: true, folderFile: MainFile);
+        // a skill whose plugin is missing or too old stays visible, but is not offered to the agent (PluginRequirements.cs)
+        var needing = entries.Where(e => e.Active && !string.IsNullOrWhiteSpace(e.Meta?.Get(PluginRequirements.Key))).ToList();
+        if (needing.Count == 0) return entries;
+        var found = Plugins.Usable(solutionDir);
+        foreach (var e in needing)
+            if (PluginRequirements.Missing(e.Meta.Get(PluginRequirements.Key), found) is { } missing) { e.Status = NeedsPlugin; e.Reason = missing; }
+        return entries;
+    }
+
+    public const string NeedsPlugin = "needs plugin";
 
     public static string Description(KnowledgeLayers.Entry e) =>
         e.Meta.Top.TryGetValue("description", out var d) && d.Length > 0 ? d : "(no description)";
@@ -42,9 +53,11 @@ public static class Skills
     public static string Catalog(IEnumerable<KnowledgeLayers.Entry> entries)
     {
         var active = entries.Where(e => e.Active).ToList();
-        if (active.Count == 0) return null;
+        var waiting = entries.Where(e => e.Status == NeedsPlugin).ToList();
+        if (active.Count == 0 && waiting.Count == 0) return null;
         var sb = new StringBuilder("Skills (how this team does these tasks - load one with tc_skills action=show name=<name> when the task fits):\n");
         foreach (var e in active) sb.AppendLine($"- {e.Name} ({e.Layer.Label}): {Description(e)}");
+        foreach (var e in waiting) sb.AppendLine($"- {e.Name}: not available, {e.Reason}");
         return sb.ToString();
     }
 

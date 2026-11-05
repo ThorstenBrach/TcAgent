@@ -158,6 +158,7 @@ public sealed partial class ToolRegistry
         var repo = Sources.Checkout(s.Name, s.Url, commit);
         var it = FindItem(Sources.Scan(repo), name, Str(a, "kind"));
         if (Sources.LicenseRefusal(it, Bool(a, "acceptLicense", false)) is { } lic) throw new InvalidOperationException(lic);
+        if (Sources.PluginRefusal(it, dir) is { } plugin) throw new InvalidOperationException(plugin);
         // every level; a shared level kept in Git gets a branch for a pull request
         var level = (Str(a, "scope") ?? "user").Trim().ToLowerInvariant() is "personal" ? "user" : (Str(a, "scope") ?? "user").Trim();
         var root = KnowledgeOps.RootOf(dir, level);
@@ -201,6 +202,7 @@ public sealed partial class ToolRegistry
                 var it = Sources.Scan(repo).FirstOrDefault(i => i.RelPath == e.Path);
                 if (it == null) { skipped.Add($"{key}: no longer in the source ({e.Path})"); continue; }
                 if (Sources.LicenseRefusal(it, Bool(a, "acceptLicense", false)) is { } lic) { skipped.Add(lic + " (license changed?)"); continue; }
+                if (Sources.PluginRefusal(it, dir) is { } plugin) { skipped.Add(plugin + " (not updated)"); continue; }
                 var stat = Sources.Git(Sources.CacheOf(src.Name), $"diff --stat {e.Commit} {up} -- \"{e.Path}\"").Split('\n').LastOrDefault()?.Trim();
                 plan.Add((root, key, e, it, repo, up, $"{key} ({label}): {e.Commit[..8]} → {up[..8]}, {stat}, license {it.License}"));
             }

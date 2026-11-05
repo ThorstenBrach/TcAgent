@@ -172,6 +172,9 @@ The knowledge the agent gets and where it comes from – levels company (`TCAGEN
 
 Skills = how this team does a kind of task, in the open [Agent Skills](https://agentskills.io/specification) format (`<level>\skills\<name>\SKILL.md` with `name`, `description`, TcAgent's fields under `metadata`, optional further files). From the levels built-in (shipped: `requirements-interview`, `plc-debugging`, `plc-code-review`), company, user, platform and project – a later level replaces a skill with the same name. `tc_coding_rules` also returns the list (name and description); the agent loads a skill only when the task fits. `mirror` (also `TcAgent.exe skills mirror`, run by the client setup and – since 0.39.9 – in the background whenever the TcAgent server starts; only changed skills are copied, `TCAGENT_SKILL_MIRROR=0` switches that off) copies the skills that apply everywhere into the skill folders of the agent CLIs (`%USERPROFILE%\.claude\skills`, `%USERPROFILE%\.agents\skills`, or `skillMirrors` in `settings.json`); only folders TcAgent created there (marker `.tcagent-mirror`) are updated or removed.
 
+A skill with `tcagent-requires-plugin` in its metadata is listed as not available while its plugin is missing or has
+another version, and `show` says what is missing.
+
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `action` | string | yes | `list`, `show`, `add` or `mirror` |
@@ -247,6 +250,8 @@ or a team, platform or company repository. Layout as usual in the Agent Skills e
 in `<level>\skills.lock.json` (source, URL, path, commit, checksum, license) – `TcAgent.exe sources sync` restores exactly
 these in a pipeline.
 
+- **Plugin**: a skill with `tcagent-requires-plugin` is refused while its plugin is missing, not ready or has another
+  version; `pull` skips it and says why.
 - **License** (the item's LICENSE file, its `license` field, the repository's LICENSE): MIT, Apache 2.0, BSD, ISC and
   public-domain style are accepted, the notice is copied along; source-available licenses and items without a license
   are refused; others (e.g. copyleft) only with `acceptLicense=true`. Recorded as `metadata.tcagent-license`, the origin

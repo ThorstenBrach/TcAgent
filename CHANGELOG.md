@@ -4,6 +4,14 @@ All notable changes to TcAgent (MCP server `TcAgent.exe` and the Visual Studio e
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/); server and extension share one version number.
 
+## [Unreleased]
+
+### Added
+- **Skills can name the plugin they need:** `tcagent-requires-plugin` in the metadata of a skill, with versions
+  (`line-check >=1.2 <2.0`). Without a fitting plugin that is ready and switched on, the skill cannot be installed from a
+  source, `pull` does not update to it, and a skill already there shows `needs plugin` and is not offered to the agent.
+  The list of skills says what is missing.
+
 ## [0.52.0] – 2026-11-04
 
 The built-in knowledge in this version is TcAgent_Knowledge 1.0.0.
