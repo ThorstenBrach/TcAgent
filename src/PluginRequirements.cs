@@ -7,6 +7,10 @@
 // version fits. Installing such an item from a source is refused while the requirement is not met; an item already there
 // has the status "needs plugin" and does not take effect, until the plugin fits again (KnowledgeLayers.ApplyRules).
 //
+//   tcagent-requires-tcagent: >=0.53
+//
+// does the same for the version of TcAgent: for an item that uses a tool or function that older versions do not have.
+//
 // Pure logic, so the unit tests link this file.
 //
 // SPDX-License-Identifier: MIT
@@ -21,6 +25,19 @@ public static class PluginRequirements
 
     /// <summary>The status of an entry whose plugin does not fit.</summary>
     public const string Status = "needs plugin";
+
+    /// <summary>The key of the TcAgent versions an item needs, because it uses something newer.</summary>
+    public const string TcAgentKey = "requires-tcagent";
+
+    /// <summary>The status of an entry that needs another version of TcAgent.</summary>
+    public const string TcAgentStatus = "needs TcAgent";
+
+    /// <summary>Is the entry only waiting for a plugin or a TcAgent version? It stays visible, the lists say what is missing.</summary>
+    public static bool Waiting(KnowledgeLayers.Entry e) => e.Status is Status or TcAgentStatus;
+
+    /// <summary>What is missing for the TcAgent versions, or null if this one fits.</summary>
+    public static string MissingTcAgent(string versions, string current) =>
+        string.IsNullOrWhiteSpace(versions) || Fits(current, versions) ? null : $"needs TcAgent {versions.Trim()}, this is {current}";
 
     public sealed record Need(string Id, string Versions);
 

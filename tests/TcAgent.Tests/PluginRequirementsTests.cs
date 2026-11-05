@@ -115,7 +115,33 @@ public sealed class PluginRequirementsTests : IDisposable
         var repo = Path.Combine(dir, "repo");
         Directory.CreateDirectory(Path.Combine(repo, "coding-rules"));
         File.WriteAllText(Path.Combine(repo, "coding-rules", "line-rule.md"), "---\nmetadata:\n  tcagent-requires-plugin: line-check\n---\nA rule.\n");
-        Assert.Contains("is not installed", Sources.PluginRefusal(Assert.Single(Sources.Scan(repo)), Sln));
+        Assert.Contains("is not installed", Sources.RequirementRefusal(Assert.Single(Sources.Scan(repo)), Sln));
+    }
+
+    [Fact]
+    public void An_item_for_a_newer_TcAgent_waits_and_is_refused()
+    {
+        var old = KnowledgeLayers.TcAgentVersion;
+        KnowledgeLayers.TcAgentVersion = "0.52.0";
+        try
+        {
+            var head = "---\nname: new-tool\ndescription: Test.\nmetadata:\n  tcagent-requires-tcagent: >=0.53\n---\nBody.\n";
+            var d = Path.Combine(dir, "user", "skills", "new-tool");
+            Directory.CreateDirectory(d);
+            File.WriteAllText(Path.Combine(d, "SKILL.md"), head);
+            var e = Assert.Single(Skills.Entries(Sln, Array.Empty<string>()));
+            Assert.Equal(PluginRequirements.TcAgentStatus, e.Status);
+            Assert.Contains("new-tool: not available, needs TcAgent >=0.53, this is 0.52.0", Skills.Catalog(new[] { e }));
+
+            var repo = Path.Combine(dir, "repo", "skills", "new-tool");
+            Directory.CreateDirectory(repo);
+            File.WriteAllText(Path.Combine(repo, "SKILL.md"), head);
+            Assert.Contains("update TcAgent first", Sources.RequirementRefusal(Assert.Single(Sources.Scan(Path.Combine(dir, "repo"))), Sln));
+
+            KnowledgeLayers.TcAgentVersion = "0.53.1";
+            Assert.True(Assert.Single(Skills.Entries(Sln, Array.Empty<string>())).Active);
+        }
+        finally { KnowledgeLayers.TcAgentVersion = old; }
     }
 
     [Fact]
@@ -133,7 +159,7 @@ public sealed class PluginRequirementsTests : IDisposable
         Skill(repo, "line-report", "line-check >=2.0");
         PluginFolder("line-check", "1.2.0");
         var it = Assert.Single(Sources.Scan(repo));
-        Assert.Contains("needs plugin line-check >=2.0, installed is 1.2.0", Sources.PluginRefusal(it, Sln));
+        Assert.Contains("needs plugin line-check >=2.0, installed is 1.2.0", Sources.RequirementRefusal(it, Sln));
     }
 
     [Fact]
@@ -142,6 +168,6 @@ public sealed class PluginRequirementsTests : IDisposable
         var repo = Path.Combine(dir, "repo");
         Directory.CreateDirectory(Path.Combine(repo, "skills", "plain"));
         File.WriteAllText(Path.Combine(repo, "skills", "plain", "SKILL.md"), "---\nname: plain\ndescription: Test.\n---\nBody.\n");
-        Assert.Null(Sources.PluginRefusal(Assert.Single(Sources.Scan(repo)), Sln));
+        Assert.Null(Sources.RequirementRefusal(Assert.Single(Sources.Scan(repo)), Sln));
     }
 }

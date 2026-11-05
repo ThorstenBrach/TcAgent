@@ -42,7 +42,7 @@ public static class Skills
     public static string Catalog(IEnumerable<KnowledgeLayers.Entry> entries)
     {
         var active = entries.Where(e => e.Active).ToList();
-        var waiting = entries.Where(e => e.Status == PluginRequirements.Status).ToList();
+        var waiting = entries.Where(PluginRequirements.Waiting).ToList();
         if (active.Count == 0 && waiting.Count == 0) return null;
         var sb = new StringBuilder("Skills (how this team does these tasks - load one with tc_skills action=show name=<name> when the task fits):\n");
         foreach (var e in active) sb.AppendLine($"- {e.Name} ({e.Layer.Label}): {Description(e)}");
