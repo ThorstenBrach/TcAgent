@@ -82,8 +82,40 @@ public sealed class PluginRequirementsTests : IDisposable
         var entries = Skills.Entries(Sln, Array.Empty<string>());
         var e = Assert.Single(entries);
         Assert.False(e.Active);
-        Assert.Equal(Skills.NeedsPlugin, e.Status);
+        Assert.Equal(PluginRequirements.Status, e.Status);
         Assert.Contains("line-report: not available, plugin line-check >=1.0 is not installed", Skills.Catalog(entries));
+    }
+
+    [Fact]
+    public void Every_kind_waits_for_its_plugin()
+    {
+        var user = Path.Combine(dir, "user");
+        var head = "---\ndescription: Test.\nmetadata:\n  tcagent-requires-plugin: line-check\n---\n";
+        Directory.CreateDirectory(Path.Combine(user, "workflows", "line-flow"));
+        File.WriteAllText(Path.Combine(user, "workflows", "line-flow", "WORKFLOW.md"), head + "1. **check** – check.\n");
+        Directory.CreateDirectory(Path.Combine(user, "prompts"));
+        File.WriteAllText(Path.Combine(user, "prompts", "line-prompt.md"), head + "Check the line.\n");
+        Directory.CreateDirectory(Path.Combine(user, "coding-rules"));
+        File.WriteAllText(Path.Combine(user, "coding-rules", "line-rule.md"), head + "A rule.\n");
+
+        var none = Array.Empty<string>();
+        Assert.Contains("line-flow: not available", Workflows.Catalog(Workflows.Entries(Sln, none)));
+        Assert.Empty(Prompts.Active(Sln, none).Where(p => p.Name == "line-prompt"));
+        Assert.Equal(PluginRequirements.Status, KnowledgeLayers.Resolve("coding-rules", Sln, none, replaceByName: true).Single(e => e.Name == "line-rule").Status);
+
+        PluginFolder("line-check", "1.0.0");
+        Assert.True(Workflows.Entries(Sln, none).Single().Active);
+        Assert.Single(Prompts.Active(Sln, none).Where(p => p.Name == "line-prompt"));
+        Assert.True(KnowledgeLayers.Resolve("coding-rules", Sln, none, replaceByName: true).Single(e => e.Name == "line-rule").Active);
+    }
+
+    [Fact]
+    public void A_rule_of_a_source_is_refused_like_a_skill()
+    {
+        var repo = Path.Combine(dir, "repo");
+        Directory.CreateDirectory(Path.Combine(repo, "coding-rules"));
+        File.WriteAllText(Path.Combine(repo, "coding-rules", "line-rule.md"), "---\nmetadata:\n  tcagent-requires-plugin: line-check\n---\nA rule.\n");
+        Assert.Contains("is not installed", Sources.PluginRefusal(Assert.Single(Sources.Scan(repo)), Sln));
     }
 
     [Fact]

@@ -206,7 +206,7 @@ public static class Sources
     {
         var it = new Item { Kind = kind, Name = name, RelPath = Path.GetRelativePath(repo, path).Replace('\\', '/'),
                             Description = fm.Top.TryGetValue("description", out var d) ? d : "",
-                            RequiresPlugin = kind == "skills" ? fm.Get(PluginRequirements.Key) : null };
+                            RequiresPlugin = fm.Get(PluginRequirements.Key) };
         // the item's own license file, its "license" field, the license of the repository
         var own = Directory.Exists(path) ? LicenseFiles(path).FirstOrDefault() : null;
         var root = LicenseFiles(repo).FirstOrDefault();

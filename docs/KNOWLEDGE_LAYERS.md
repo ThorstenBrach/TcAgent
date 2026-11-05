@@ -224,12 +224,12 @@ metadata:
   folder name), `description` (what the skill does and when to use it, max. 1024), optional `license`, `compatibility`,
   `allowed-tools`. TcAgent's own fields (`locked`, `force`, `scope`, `owner`, `version`) go into **`metadata`** with the
   prefix `tcagent-` – other tools ignore them, and `skills-ref validate` accepts the files.
-- **A skill can need a plugin.** `tcagent-requires-plugin` under `metadata` names the plugin and its versions:
-  `line-check >=1.2 <2.0, label-printer` (several with a comma; `>=`, `>`, `<=`, `<`, `=`, a bare number means `>=`; no
-  version means any). Such a skill cannot be installed from a source while the plugin is missing, not ready, switched
-  off or has another version, and `pull` does not update it to a version that needs more. A skill already there shows
-  the state `needs plugin` and is not offered to the agent until the plugin fits; the list of skills says what is
-  missing. A skill that also works without the plugin leaves the field out.
+- **Everything can need a plugin** – skills, workflows, prompts, rules and lessons. `tcagent-requires-plugin` under
+  `metadata` names the plugin and its versions: `line-check >=1.2 <2.0, label-printer` (several with a comma; `>=`, `>`,
+  `<=`, `<`, `=`, a bare number means `>=`; no version means any). Such an item cannot be installed from a source while
+  the plugin is missing, not ready, switched off or has another version, and `pull` does not update it to a version that
+  needs more. An item already there has the status `needs plugin` and does not take effect until the plugin fits; the
+  lists of skills and workflows say what is missing. What also works without the plugin leaves the field out.
 - **`tc_skills`** (actions `list`, `show`, `add`) delivers the skills through MCP in every AI client, independent of
   where a client looks for skills. TcAgent resolves levels, platform, `locked` and `force`. The agent gets the list
   (name and description) together with the coding rules and loads a skill only when the task fits – the context stays

@@ -250,7 +250,7 @@ or a team, platform or company repository. Layout as usual in the Agent Skills e
 in `<level>\skills.lock.json` (source, URL, path, commit, checksum, license) – `TcAgent.exe sources sync` restores exactly
 these in a pipeline.
 
-- **Plugin**: a skill with `tcagent-requires-plugin` is refused while its plugin is missing, not ready or has another
+- **Plugin**: an item with `tcagent-requires-plugin` is refused while its plugin is missing, not ready or has another
   version; `pull` skips it and says why.
 - **License** (the item's LICENSE file, its `license` field, the repository's LICENSE): MIT, Apache 2.0, BSD, ISC and
   public-domain style are accepted, the notice is copied along; source-available licenses and items without a license

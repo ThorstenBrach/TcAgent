@@ -1,11 +1,11 @@
-// Skills that cannot work without a plugin: tcagent-requires-plugin in the metadata of SKILL.md names the plugin and the
-// versions it must have.
+// Knowledge that cannot work without a plugin (skills, workflows, prompts, rules, lessons): tcagent-requires-plugin in the
+// metadata of the front matter names the plugin and the versions it must have.
 //
 //   tcagent-requires-plugin: line-check >=1.2 <2.0, label-printer
 //
 // Several plugins with a comma, the versions after the id (>=, >, <=, <, =; a bare number means >=). Without versions any
-// version fits. Installing such a skill from a source is refused while the requirement is not met; a skill already there
-// is shown as "needs plugin" and is not offered to the agent, until the plugin is there again (Skills.Entries).
+// version fits. Installing such an item from a source is refused while the requirement is not met; an item already there
+// has the status "needs plugin" and does not take effect, until the plugin fits again (KnowledgeLayers.ApplyRules).
 //
 // Pure logic, so the unit tests link this file.
 //
@@ -18,6 +18,9 @@ public static class PluginRequirements
 {
     /// <summary>The key in the metadata, without the prefix tcagent-.</summary>
     public const string Key = "requires-plugin";
+
+    /// <summary>The status of an entry whose plugin does not fit.</summary>
+    public const string Status = "needs plugin";
 
     public sealed record Need(string Id, string Versions);
 

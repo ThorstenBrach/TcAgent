@@ -33,7 +33,7 @@ public sealed partial class ToolRegistry
                                                          "own: <level>\\skills\\<name>\\SKILL.md, see tc_knowledge).";
                     case "show":
                         var name = Str(a, "name") ?? throw new Exception("name is required");
-                        if (entries.FirstOrDefault(x => x.Status == Skills.NeedsPlugin && x.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) is { } waiting)
+                        if (entries.FirstOrDefault(x => x.Status == PluginRequirements.Status && x.Name.Equals(name, StringComparison.OrdinalIgnoreCase)) is { } waiting)
                             throw new Exception($"Skill '{name}' is not available: {waiting.Reason}");
                         var e = entries.FirstOrDefault(x => x.Active && x.Name.Equals(name, StringComparison.OrdinalIgnoreCase))
                                 ?? throw new Exception($"Skill '{name}' not found or switched off. Available: {string.Join(", ", entries.Where(x => x.Active).Select(x => x.Name))}");

@@ -400,6 +400,14 @@ public static class KnowledgeLayers
                 if (e.Locked && !(by.Level == "company" || by.Level == "team" && e.Layer.Level == "team")) e.Reason = "locked - cannot be switched off";
                 else { e.Status = "disabled"; e.Reason = "switched off in " + by.Label; }
             }
+        // what needs a plugin that is missing or does not fit stays visible, but does not take effect (PluginRequirements.cs)
+        var needing = all.Where(e => e.Active && !string.IsNullOrWhiteSpace(e.Meta?.Get(PluginRequirements.Key))).ToList();
+        if (needing.Count > 0)
+        {
+            var plugins = Plugins.Usable(solutionDir);
+            foreach (var e in needing)
+                if (PluginRequirements.Missing(e.Meta.Get(PluginRequirements.Key), plugins) is { } missing) { e.Status = PluginRequirements.Status; e.Reason = missing; }
+        }
         return all;
     }
 

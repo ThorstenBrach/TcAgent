@@ -7,10 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
-- **Skills can name the plugin they need:** `tcagent-requires-plugin` in the metadata of a skill, with versions
-  (`line-check >=1.2 <2.0`). Without a fitting plugin that is ready and switched on, the skill cannot be installed from a
-  source, `pull` does not update to it, and a skill already there shows `needs plugin` and is not offered to the agent.
-  The list of skills says what is missing.
+- **Skills, workflows, prompts, rules and lessons can name the plugin they need:** `tcagent-requires-plugin` in their metadata, with versions
+  (`line-check >=1.2 <2.0`). Without a fitting plugin that is ready and switched on, the item cannot be installed from a
+  source, `pull` does not update to it, and an item already there shows `needs plugin` and does not take effect.
+  The lists of skills and workflows say what is missing.
 
 ## [0.52.0] – 2026-11-04
 

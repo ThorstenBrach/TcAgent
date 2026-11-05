@@ -115,12 +115,12 @@ TcAgent.exe plugins approve <id> --solution <sln>    approves a project plugin (
 TcAgent.exe plugins revoke <id> --solution <sln>
 ```
 
-### Skills that need a plugin
+### Knowledge that needs a plugin
 
-A skill names the plugin it cannot work without in its metadata, with the versions that fit
+A skill, workflow, prompt, rule or lesson names the plugin it cannot work without in its metadata, with the versions that fit
 (`tcagent-requires-plugin: line-check >=1.2 <2.0`, see [KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md)). The version is the
 `version` of `plugin.json`, so raise it when tools or their behaviour change. Without a fitting plugin that is ready and
-switched on, the skill is not installed from a source and not offered to the agent.
+switched on, it is not installed from a source and does not take effect.
 
 ### Example
 
