@@ -1752,11 +1752,24 @@ public sealed partial class ToolRegistry
 
     JsonObject CallTool(Tool t, string name, JsonObject args)
     {
+        bool writesCode = (name is "tc_plc_write" or "tc_plc_create" or "tc_test_skeleton" || name == "tc_refactor" && string.Equals(Str(args, "action"), "apply", StringComparison.OrdinalIgnoreCase)
+                           || name == "tc_plaintext" && string.Equals(Str(args, "action"), "import", StringComparison.OrdinalIgnoreCase)) && !DryRun(args);
+        // spec-ok: a workflow that asks for a specification writes no code before the user decided (WorkflowTool.cs)
+        if (writesCode && Workflows.SpecPending(run) is { } openSpec)
+        {
+            openSpec.GateStops++;
+            Log.Info($"{name} not executed: specification open");
+            return new JsonObject
+            {
+                ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] =
+                    $"NOT executed: workflow {run.Workflow} writes no PLC code before the specification is settled. Finish the step " +
+                    $"'{openSpec.Id}' with tc_workflow action=step: TcAgent asks the user to confirm it. If the user does not want one, skip=true asks them that." }),
+                ["isError"] = true
+            };
+        }
         // Safety net: if there are coding guidelines and the agent has not read them yet, the first writing
         // code call is not executed; the guidelines are returned instead (once per session).
-        if (!rulesSeen && (name is "tc_plc_write" or "tc_plc_create" or "tc_test_skeleton" || name == "tc_refactor" && string.Equals(Str(args, "action"), "apply", StringComparison.OrdinalIgnoreCase)
-                           || name == "tc_plaintext" && string.Equals(Str(args, "action"), "import", StringComparison.OrdinalIgnoreCase)) && !DryRun(args)
-            && Environment.GetEnvironmentVariable("TCAGENT_RULES_GATE") != "0")
+        if (!rulesSeen && writesCode && Environment.GetEnvironmentVariable("TCAGENT_RULES_GATE") != "0")
         {
             rulesSeen = true;
             if (CodingRules.Text(SolutionDir()) is { } rt)

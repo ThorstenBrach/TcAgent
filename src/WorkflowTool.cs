@@ -35,6 +35,8 @@ public sealed partial class ToolRegistry
                         if (action == "status") return Workflows.Status(run);
                         if (action == "step")
                         {
+                            if (run.Active is { Requires: "spec-ok" } spec && (string.IsNullOrEmpty(Str(a, "step")) || Str(a, "step")!.Equals(spec.Id, StringComparison.OrdinalIgnoreCase)))
+                                return DecideSpec(a, spec);
                             // deterministic first: a checkpoint whose check is missing or failed - TcAgent runs the check itself instead of refusing
                             var pre = "";
                             if (!Bool(a, "skip", false) && run.Active is { Requires: "check-ok" or "build-ok" } act && Workflows.Missing(act) != null
@@ -88,6 +90,42 @@ public sealed partial class ToolRegistry
                     default: throw new Exception("action: list, show, start, step, status or finish");
                 }
             });
+    }
+
+    // spec-ok: TcAgent asks the user itself, so an agent cannot confirm its own specification. Without a person (TCAGENT_CONFIRM=off) nobody is asked.
+    string DecideSpec(JsonObject a, Workflows.Step s)
+    {
+        bool skip = Bool(a, "skip", false);
+        var note = Str(a, "note");
+        if (Confirm.Configured == Confirm.Level.Off)
+        {
+            s.SpecDecided = true;
+            return "Nobody was asked (TCAGENT_CONFIRM=off).\n\n" + Workflows.Advance(run, s.Id, skip, note);
+        }
+        var text = (skip ? "The agent wants to go on without a specification. Skip it?"
+                         : "Is the specification complete, so that the implementation can start?") +
+                   (string.IsNullOrWhiteSpace(note) ? "" : "\n\n" + note.Trim());
+        var options = new List<AskQuestions.Option>();
+        if (!skip) options.Add(new(Workflows.SpecConfirm, "The implementation starts"));
+        options.Add(new(Workflows.SpecNotYet, "The agent goes on clarifying"));
+        options.Add(new(Workflows.SpecSkip, "The implementation starts without a specification"));
+        var q = new AskQuestions.Question(text, "Specification", options, false);
+        var answers = AskAnswers(new List<AskQuestions.Question> { q });
+        if (answers == null)
+            throw new InvalidOperationException("nobody can be asked (no question dialog, no TcAgent Chat). Ask the user in your reply. " +
+                                                "Without a person the user sets TCAGENT_CONFIRM=off deliberately.");
+        answers.TryGetValue(q.Text, out var answer);
+        if (string.IsNullOrWhiteSpace(answer))
+            throw new InvalidOperationException("the user closed the question without an answer. Say in your reply what you need.");
+        Log.Info("specification: " + answer);
+        var decision = Workflows.SpecAnswer(answer);
+        if (decision == null)
+        {
+            run.Corrections++;
+            throw new InvalidOperationException("the specification is not confirmed. The user answered: " + answer.Trim());
+        }
+        s.SpecDecided = true;
+        return Workflows.Advance(run, s.Id, decision == false, note);
     }
 
     // Hard gate: activating a configuration that does not build would put a broken program on the target. A build

@@ -55,6 +55,23 @@ public sealed partial class ToolRegistry
         try { qs = AskQuestions.Parse(a["questions"]); }
         catch (ArgumentException ex) { throw new Exception("NOT asked: " + ex.Message); }
 
+        var answers = AskAnswers(qs);
+        if (answers == null)
+            return "NOT asked: no question dialog is available (the client cannot show questions and no TcAgent Chat is reachable). " +
+                   "Ask the user in your reply instead and wait for the answer.";
+        if (answers.Count == 0 || answers.Values.All(string.IsNullOrWhiteSpace))
+            return "The user closed the question without answering. Do not ask the same again; continue without it if you can, " +
+                   "otherwise say in your reply what you need.";
+        Log.Info("tc_ask_user answered: " + string.Join("; ", answers.Values));
+        // for the run log: an answer other than the recommended (first) option is a correction of the agent
+        if (run != null) run.Corrections += qs.Count(q => q.Options.Count > 0 && answers.TryGetValue(q.Text, out var v) && !string.IsNullOrWhiteSpace(v)
+                                                          && !v.Trim().Equals(q.Options[0].Label, StringComparison.OrdinalIgnoreCase));
+        return AskQuestions.Format(qs, answers);
+    }
+
+    /// <summary>Asks in the TcAgent Chat or the client's dialog. null = nobody can be asked, empty = closed without an answer.</summary>
+    Dictionary<string, string> AskAnswers(List<AskQuestions.Question> qs)
+    {
         int pid = tc.AttachedPid > 0 ? tc.AttachedPid : int.TryParse(Environment.GetEnvironmentVariable("TCAGENT_VS_PID"), out var vp) ? vp : 0;
         bool fromChat = (Environment.GetEnvironmentVariable("TCAGENT_CLIENT") ?? "").StartsWith("chat:", StringComparison.OrdinalIgnoreCase)
                         || TwinCatSession.StartedFrom(pid);
@@ -85,17 +102,6 @@ public sealed partial class ToolRegistry
             return Mcp.LastElicitOutcome is "decline" or "cancel" && Mcp.LastElicitMs >= 1500 ? new Dictionary<string, string>() : null;
         }
 
-        var answers = fromChat ? ViaBridge() ?? ViaClient() : ViaClient() ?? ViaBridge();
-        if (answers == null)
-            return "NOT asked: no question dialog is available (the client cannot show questions and no TcAgent Chat is reachable). " +
-                   "Ask the user in your reply instead and wait for the answer.";
-        if (answers.Count == 0 || answers.Values.All(string.IsNullOrWhiteSpace))
-            return "The user closed the question without answering. Do not ask the same again; continue without it if you can, " +
-                   "otherwise say in your reply what you need.";
-        Log.Info("tc_ask_user answered: " + string.Join("; ", answers.Values));
-        // for the run log: an answer other than the recommended (first) option is a correction of the agent
-        if (run != null) run.Corrections += qs.Count(q => q.Options.Count > 0 && answers.TryGetValue(q.Text, out var v) && !string.IsNullOrWhiteSpace(v)
-                                                          && !v.Trim().Equals(q.Options[0].Label, StringComparison.OrdinalIgnoreCase));
-        return AskQuestions.Format(qs, answers);
+        return fromChat ? ViaBridge() ?? ViaClient() : ViaClient() ?? ViaBridge();
     }
 }

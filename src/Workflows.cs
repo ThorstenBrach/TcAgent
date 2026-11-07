@@ -10,6 +10,8 @@
 //               check-ok  the last tc_check / tc_build during the step had 0 compiler errors
 //               build-ok  the last tc_build during the step succeeded
 //               tests-ok  the last tc_test_run / tc_test_results during the step had no failed test
+//               spec-ok   the user confirmed the specification or chose to go on without one - TcAgent asks them itself,
+//                         and until then no PLC code is written (ToolRegistry.CallTool)
 //   soft steps  everything else is guidance for the agent
 //
 // A run (tc_workflow start ... finish) counts per step what the run logs need later: failed checks, gate stops,
@@ -27,7 +29,8 @@ namespace TcAgent;
 public static class Workflows
 {
     public const string MainFile = "WORKFLOW.md";
-    public static readonly string[] Checkpoints = { "check-ok", "build-ok", "tests-ok" };
+    public static readonly string[] Checkpoints = { "check-ok", "build-ok", "tests-ok", "spec-ok" };
+    public const string SpecConfirm = "Confirmed", SpecNotYet = "Not yet", SpecSkip = "Skip the specification";
 
     public sealed class Step
     {
@@ -37,6 +40,7 @@ public static class Workflows
         public DateTime? Started, Finished;
         public bool? LastCheckOk, LastBuildOk, LastTestsOk; // observed during the step
         public string Note;
+        public bool SpecDecided;                          // spec-ok: the user confirmed the specification or skipped it
         public readonly List<string> ErrorCodes = new();  // compiler error codes of the failed checks (e.g. C0032) - names, no code
     }
 
@@ -140,8 +144,19 @@ public static class Workflows
         "check-ok" when s.LastCheckOk != true => s.LastCheckOk == null ? "no tc_check or tc_build during this step yet" : "the last tc_check / tc_build had compiler errors",
         "build-ok" when s.LastBuildOk != true => s.LastBuildOk == null ? "no tc_build during this step yet" : "the last tc_build failed",
         "tests-ok" when s.LastTestsOk != true => s.LastTestsOk == null ? "no tc_test_run during this step yet" : "the last test run had failed tests",
+        "spec-ok" when !s.SpecDecided => "the user has neither confirmed the specification nor skipped it",
         _ => null
     };
+
+    /// <summary>The step whose specification is still open: until the user decided, the run writes no PLC code.</summary>
+    public static Step SpecPending(Run run) =>
+        run?.Steps.FirstOrDefault(s => s.Requires == "spec-ok" && !s.SpecDecided && s.Status is "pending" or "active");
+
+    /// <summary>What the user decided: true = go on with the specification, false = go on without one, null = not yet.</summary>
+    public static bool? SpecAnswer(string answer) =>
+        answer?.Trim() is not { } a ? null
+        : a.StartsWith(SpecConfirm, StringComparison.OrdinalIgnoreCase) ? true
+        : a.StartsWith(SpecSkip, StringComparison.OrdinalIgnoreCase) ? false : null;
 
     /// <summary>Completes (or skips) the active step and activates the next one. Throws when a checkpoint is missing.</summary>
     public static string Advance(Run run, string stepId, bool skip, string note)
@@ -149,9 +164,10 @@ public static class Workflows
         var s = run.Active ?? throw new InvalidOperationException("all steps are done - finish the run (tc_workflow action=finish)");
         if (!string.IsNullOrEmpty(stepId) && !stepId.Equals(s.Id, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException($"the active step is '{s.Id}', not '{stepId}' - steps are done in order (skip a step with skip=true)");
-        if (skip && s.Requires != null)
+        // spec-ok is the one checkpoint with a way around it, and only the user can take it
+        if (skip && s.Requires is not (null or "spec-ok"))
             throw new InvalidOperationException($"step '{s.Id}' is a checkpoint ({s.Requires}) and cannot be skipped");
-        if (!skip && Missing(s) is { } why)
+        if ((!skip || s.Requires == "spec-ok") && Missing(s) is { } why)
         {
             s.GateStops++;
             throw new InvalidOperationException($"step '{s.Id}' needs {s.Requires}, but {why}");
@@ -175,7 +191,8 @@ public static class Workflows
             sb.AppendLine();
         }
         if (run.Active is { } a) sb.AppendLine().AppendLine($"Now: {a.Id}" + (a.Requires != null ? $" (requires {a.Requires})" : "")).AppendLine(a.Text)
-                                   .AppendLine().AppendLine("When the step is done: tc_workflow action=step" + (a.Requires == null ? " (skip=true if it does not apply)" : ""));
+                                   .AppendLine().AppendLine("When the step is done: tc_workflow action=step" + (a.Requires == null ? " (skip=true if it does not apply)"
+                                                                        : a.Requires == "spec-ok" ? " - TcAgent then asks the user to confirm the specification or to skip it; no PLC code before that" : ""));
         else sb.AppendLine().AppendLine("All steps done - tc_workflow action=finish.");
         return sb.ToString();
     }
