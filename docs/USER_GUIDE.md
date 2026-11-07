@@ -656,7 +656,10 @@ format (a folder with `SKILL.md`), so every agent CLI understands them, and come
 
 - **Built-in:** `requirements-interview` (clarify a machine function before code – one question at a time, with a
   recommended answer, ends with a short specification), `plc-debugging` (cause before fix, measured online),
-  `plc-code-review` (static risks, rules and a TwinCAT checklist, findings with location).
+  `plc-code-review` (static risks, rules and a TwinCAT checklist, standards and requirement separately, findings with location),
+  `plc-spec-review` (logic against the requirement before the first test), `plc-retro` (what would make the next session better).
+- **Built-in workflows:** `new-feature`, `bug-fix` (a signal that shows the fault, proven cause, fix, the same signal good),
+  `safe-activation` (changes, backup, your release, load, check of the state).
 - **Your own:** `<level>\skills\<name>\SKILL.md` on the company, user, platform or project level – or by talking:
   *"Save this procedure as a skill for the project."* (`tc_skills action=add`, after you agreed).
 - The agent sees the list with the coding rules and loads a skill when the task fits (*"Review the changes of today"* →

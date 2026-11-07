@@ -4,6 +4,14 @@ All notable changes to TcAgent (MCP server `TcAgent.exe` and the Visual Studio e
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/); server and extension share one version number.
 
+## [Unreleased]
+
+### Added
+- Agent guide: a result counts only with a tool output from after the last change, and a check-and-fix loop stops after 3 rounds
+  or when the same error comes back.
+- Built-in knowledge (next version of TcAgent_Knowledge): workflows `bug-fix` and `safe-activation`, skills `plc-spec-review` and
+  `plc-retro`, prompts `check-logic`, `fix-bug`, `retro`.
+
 ## [0.52.0] – 2026-11-04
 
 The built-in knowledge in this version is TcAgent_Knowledge 1.0.0.

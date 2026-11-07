@@ -95,6 +95,18 @@ public sealed class WorkflowsTests : IDisposable
     }
 
     [Fact]
+    public void EveryShippedWorkflowParses()
+    {
+        var root = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "knowledge", "workflows");
+        foreach (var d in Directory.GetDirectories(root))
+        {
+            var fm = KnowledgeLayers.ParseFrontMatter(File.ReadAllText(Path.Combine(d, Workflows.MainFile)));
+            Assert.Equal(Path.GetFileName(d), fm.Top["name"]);
+            Assert.NotEmpty(Workflows.ParseSteps(fm.Body));
+        }
+    }
+
+    [Fact]
     public void ShippedWorkflowIsValid()
     {
         var file = Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "knowledge", "workflows", "new-feature", Workflows.MainFile);
