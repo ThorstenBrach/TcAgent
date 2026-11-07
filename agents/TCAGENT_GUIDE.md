@@ -42,6 +42,8 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
    (no executable code, no files). Errors come with file and TwinCAT error code (Cxxxx); fix and check again
    until 0 compiler errors. Check **once after all changes**, not after every step, and not at all for pure
    questions (reading, searching, explaining). If the user says "don't check/build", don't.
+   **Stop when there is no progress:** after 3 rounds of check and fix, or when the same error comes back, stop and tell the
+   user what you tried and what is still wrong. Fix the first error first: later ones often follow from it.
    `tc_build` (real build, produces code and files) only before `tc_activate`/download, for a build checkpoint of a
    workflow, or when the user asks for it - and **always after a clean `tc_check`**: the check pre-compiles without
    generating code and is much faster, so fix the errors with checks and build once (several failed builds cost time).
@@ -81,6 +83,11 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
      `1.` lines, `Expected:` with `-` lines, `Link: <url>` - the window and the test report show them.
    - `TcUnit.RUN_IN_SEQUENCE()` gives progress and results per test; do not switch an existing project from
      `TcUnit.RUN()` without asking (it changes how the suites run).
+
+9. **Done means proven:** say that something works, is fixed or passes only with a tool output from after the last change
+   (`tc_check`, `tc_build`, `tc_test_run`, a value read with `ads_read`). Without one, say what was not checked. "It should
+   work now" is not a result. Code that compiles is not proven to do what was asked: for logic with several conditions use
+   the skill `plc-spec-review`, for a fault the workflow `bug-fix`.
 
 ## Coding rules (what the code must follow) vs. this guide (how to work with TcAgent)
 

@@ -12,6 +12,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   the end, so only the last project counted. The list is now read after each PLC project; the same for `analyze`, `tc_static_analysis` and for
   `tc_build checkAll=true`, which also lost the messages of the build.
 
+### Added
+- Agent guide: a result counts only with a tool output from after the last change, and a check-and-fix loop stops after 3 rounds
+  or when the same error comes back.
+- Built-in knowledge (next version of TcAgent_Knowledge): workflows `bug-fix`, `safe-activation`, `online-change`, `refactoring`,
+  `library-update`, `io-commissioning`; skills `plc-spec-review`, `plc-fix-compile`, `plc-alarm-diagnosis`, `plc-traceability`,
+  `plc-multi-review`, `plc-st-patterns`, `plc-skill-authoring`, `plc-retro`; 14 prompts for them.
+
 ## [0.52.0] – 2026-11-04
 
 The built-in knowledge in this version is TcAgent_Knowledge 1.0.0.

@@ -247,6 +247,15 @@ that work with the TcAgent tools; `metadata.tcagent-inspired-by` names the origi
 - `plc-code-review` – risk analysis, coding and risk rules, TwinCAT checklist (task assignment and cycle time, access from
   several tasks, persistence, I/O links, online change, safety interfaces read-only)
 
+- `plc-spec-review` – logic against the requirement before the first test: coverage, limits, priorities, behaviour over cycles
+- `plc-retro` – what would make the next session better: a check, a rule, a lesson, a skill
+- `plc-fix-compile` – compiler errors: first error first, stop after 3 rounds without progress
+- `plc-alarm-diagnosis` – likely fault from an alarm export: timeline, first cause, known patterns, evidence for each claim
+- `plc-traceability` – requirement, code and test as a table with stable ids
+- `plc-multi-review` – separate views on machine safety, runtime and standards, only on request
+- `plc-st-patterns` – 8 small patterns that compile, as a start for recurring logic
+- `plc-skill-authoring` – write skills and workflows so that agents follow them, and test them
+
 Later: `plc-verify` (partly hard gates), `tcunit-tdd`, `plc-change-plan`. Built-in skills are not locked – company,
 platform or project can extend or replace them.
 
