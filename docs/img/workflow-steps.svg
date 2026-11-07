@@ -14,8 +14,8 @@
 <circle cx="175" cy="76" r="11" fill="#6366f1"/>
 <text x="175" y="80" class="n" text-anchor="middle">2</text>
 <text x="167" y="112" class="h">Plan</text>
-<text x="167" y="132" class="s">questions, then</text>
-<text x="167" y="148" class="s">a specification</text>
+<text x="167" y="132" class="s">questions first,</text>
+<text x="167" y="148" class="s">spec before code</text>
 <path d="M277,110 L296,110" stroke="#6366f1" stroke-width="2" fill="none" marker-end="url(#ah)"/>
 <rect x="298" y="54" width="120" height="112" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
 <circle cx="318" cy="76" r="11" fill="#6366f1"/>

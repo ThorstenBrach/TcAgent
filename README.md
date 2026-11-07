@@ -32,7 +32,7 @@ a workflow only goes on when its checkpoint is proven, and nothing reaches a PLC
 | Step | What the agent does | With |
 |---|---|---|
 | **Understand** | Reads what you are working on, the project, the real library interfaces and your documents, before it changes anything | `tc_editor_context`, `tc_doc`, `tc_find_references`, `tc_lib_signatures`, `tc_docs` |
-| **Plan** | Clarifies open decisions one question at a time, ends with a short specification, and numbers the requirements if you need proof | skills `requirements-interview`, `plc-traceability`, `tc_workflow`, `tc_coding_rules` |
+| **Plan** | Puts you through an interview first: every open decision, one question at a time with a recommended answer, until the specification is complete. Code starts after you confirmed it. Requirements get numbers if you need proof | skills `requirements-interview`, `plc-traceability`, `tc_workflow`, `tc_coding_rules` |
 | **Implement** | Writes PLC code, step chains, I/O links and HMI pages, by your coding rules and from compiled patterns | `tc_plc_write`, `tc_plc_create`, `tc_sfc`, `tc_link`, `tc_hmi_page`, skill `plc-st-patterns` |
 | **Build** | Checks without generating code, fixes errors in a limited number of rounds, then builds | `tc_check`, `tc_build`, `tc_errors`, skill `plc-fix-compile` |
 | **Test** | Checks the logic against the requirement, writes and runs TcUnit tests, measures with Scope | `tc_test_skeleton`, `tc_test_run`, `tc_scope`, skill `plc-spec-review`, `TcAgent.exe sil` |
