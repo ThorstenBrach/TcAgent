@@ -1,4 +1,4 @@
-// Tests for skills that need a plugin (PluginRequirements.cs): versions, what is missing, the effect on the catalog and on
+﻿// Tests for skills that need a plugin (PluginRequirements.cs): versions, what is missing, the effect on the catalog and on
 // installing from a source.
 //
 // SPDX-License-Identifier: MIT
@@ -92,7 +92,7 @@ public sealed class PluginRequirementsTests : IDisposable
         var user = Path.Combine(dir, "user");
         var head = "---\ndescription: Test.\nmetadata:\n  tcagent-requires-plugin: line-check\n---\n";
         Directory.CreateDirectory(Path.Combine(user, "workflows", "line-flow"));
-        File.WriteAllText(Path.Combine(user, "workflows", "line-flow", "WORKFLOW.md"), head + "1. **check** – check.\n");
+        File.WriteAllText(Path.Combine(user, "workflows", "line-flow", "WORKFLOW.md"), head + "1. **check** â€“ check.\n");
         Directory.CreateDirectory(Path.Combine(user, "prompts"));
         File.WriteAllText(Path.Combine(user, "prompts", "line-prompt.md"), head + "Check the line.\n");
         Directory.CreateDirectory(Path.Combine(user, "coding-rules"));
@@ -131,7 +131,7 @@ public sealed class PluginRequirementsTests : IDisposable
             File.WriteAllText(Path.Combine(d, "SKILL.md"), head);
             var e = Assert.Single(Skills.Entries(Sln, Array.Empty<string>()));
             Assert.Equal(PluginRequirements.TcAgentStatus, e.Status);
-            Assert.Contains("new-tool: not available, needs TcAgent >=0.53, this is 0.52.0", Skills.Catalog(new[] { e }));
+            Assert.Contains("new-tool: not available, TcAgent >=0.53 required, this is 0.52.0", Skills.Catalog(new[] { e }));
 
             var repo = Path.Combine(dir, "repo", "skills", "new-tool");
             Directory.CreateDirectory(repo);
@@ -159,7 +159,7 @@ public sealed class PluginRequirementsTests : IDisposable
         Skill(repo, "line-report", "line-check >=2.0");
         PluginFolder("line-check", "1.2.0");
         var it = Assert.Single(Sources.Scan(repo));
-        Assert.Contains("needs plugin line-check >=2.0, installed is 1.2.0", Sources.RequirementRefusal(it, Sln));
+        Assert.Contains("plugin line-check >=2.0 required, installed is 1.2.0", Sources.RequirementRefusal(it, Sln));
     }
 
     [Fact]

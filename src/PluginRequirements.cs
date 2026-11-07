@@ -1,4 +1,4 @@
-// Knowledge that cannot work without a plugin (skills, workflows, prompts, rules, lessons): tcagent-requires-plugin in the
+﻿// Knowledge that cannot work without a plugin (skills, workflows, prompts, rules, lessons): tcagent-requires-plugin in the
 // metadata of the front matter names the plugin and the versions it must have.
 //
 //   tcagent-requires-plugin: line-check >=1.2 <2.0, label-printer
@@ -37,7 +37,7 @@ public static class PluginRequirements
 
     /// <summary>What is missing for the TcAgent versions, or null if this one fits.</summary>
     public static string MissingTcAgent(string versions, string current) =>
-        string.IsNullOrWhiteSpace(versions) || Fits(current, versions) ? null : $"needs TcAgent {versions.Trim()}, this is {current}";
+        string.IsNullOrWhiteSpace(versions) || Fits(current, versions) ? null : $"TcAgent {versions.Trim()} required, this is {current}";
 
     public sealed record Need(string Id, string Versions);
 
@@ -94,7 +94,7 @@ public static class PluginRequirements
             var p = found.FirstOrDefault(x => x.Id.Equals(n.Id, StringComparison.OrdinalIgnoreCase));
             if (p == null) problems.Add($"plugin {wanted} is not installed");
             else if (!p.Ready) problems.Add($"plugin {n.Id} is not ready ({p.Status})");
-            else if (!Fits(p.Version, n.Versions)) problems.Add($"needs plugin {wanted}, installed is {p.Version ?? "no version"}");
+            else if (!Fits(p.Version, n.Versions)) problems.Add($"plugin {wanted} required, installed is {p.Version ?? "no version"}");
         }
         return problems.Count == 0 ? null : string.Join("; ", problems);
     }
