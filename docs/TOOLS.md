@@ -198,8 +198,12 @@ checks per step and refuses to mark a checkpoint step done until its check holds
 | `check-ok` | the last `tc_check` / `tc_build` during the step had 0 compiler errors |
 | `build-ok` | the last `tc_build` during the step succeeded |
 | `tests-ok` | the last `tc_test_run` / `tc_test_results` during the step had no failed test |
+| `spec-ok` | the user confirmed the specification, or chose to go on without one |
 
-Checkpoint steps cannot be skipped. When the agent marks a `check-ok` / `build-ok` step done while its check is missing
+For `spec-ok` TcAgent asks the user itself when the agent marks the step done, also with `skip=true`, so an agent cannot confirm its
+own specification. Until the user decided, the run writes no PLC code. With `TCAGENT_CONFIRM=off` nobody is asked.
+
+The other checkpoint steps cannot be skipped. When the agent marks a `check-ok` / `build-ok` step done while its check is missing
 or failed, TcAgent runs `tc_check` itself (since 0.36) and completes the step if it passes; for `build-ok` (since 0.39) it runs
 `tc_check` first and `tc_build` only when the check is clean – otherwise it reports the check errors without building. `finish` lists
 the PLC objects written during the run. The gate before `tc_activate` holds with and without a workflow.

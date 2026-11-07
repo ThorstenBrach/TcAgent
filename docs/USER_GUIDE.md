@@ -703,6 +703,8 @@ A **workflow** is a fixed sequence of steps with checkpoints, e.g. the built-in 
 → review (skill `plc-code-review`) → save and summary. *"Add a start delay to the conveyor, use the new-feature
 workflow."* – or the agent starts it itself when the task fits.
 
+- A step marked `(requires: spec-ok)` comes before the code: the agent interviews you, and TcAgent then asks you to confirm the
+  specification or to skip it. No PLC code is written before your answer.
 - A step marked `(requires: build-ok)` or `(requires: check-ok)` is a **checkpoint**: TcAgent does not let the agent
   continue until it holds, and it cannot be skipped – when the agent says the step is done, TcAgent runs `tc_check` itself
   and, for a build checkpoint, `tc_build` only after a clean check. Other steps can be skipped
