@@ -27,7 +27,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 TcAgent does not stop at generating code. The agent works through the whole job in your IDE, and TcAgent holds it to your rules:
 a workflow only goes on when its checkpoint is proven, and nothing reaches a PLC without a clean build, an allowed target and your confirmation.
 
-<p align="center"><img src="docs/img/workflow-steps.svg" width="900" alt="The whole job in seven steps: understand, plan, implement, build, test, review, deploy. TcAgent enforces checkpoints at plan, build, test and deploy, and lessons, rules and skills stay for the next job."></p>
+<p align="center"><img src="docs/img/workflow-steps.svg" width="900" alt="The whole job in seven steps: understand, plan, implement, build, test, review, deploy. TcAgent enforces checkpoints at plan, build and deploy, and lessons, rules and skills stay for the next job."></p>
 
 | Step | What the agent does | With |
 |---|---|---|
