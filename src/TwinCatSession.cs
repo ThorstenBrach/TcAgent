@@ -569,11 +569,15 @@ public sealed class TwinCatSession
         var failed = sb.LastBuildInfo;
         // TwinCAT only compiles POUs that are used - "Check all objects" also finds errors in unused code
         var checkedInfo = "";
+        var (compile, runtime) = ReadErrorList(1000);   // the check clears the messages of the build
         if (checkAll)
-            foreach (var plc in PlcProjects())
-                checkedInfo += CheckAllObjects(plc) ? $"All objects checked: {plc.Name}\n" : $"Check all objects not available: {plc.Name}\n";
+        {
+            var (c, r) = ReadAfterEach(PlcProjects(), plc =>
+                checkedInfo += CheckAllObjects(plc) ? $"All objects checked: {plc.Name}\n" : $"Check all objects not available: {plc.Name}\n", 1000);
+            compile.AddRange(c.Where(e => !compile.Contains(e)));
+            runtime.AddRange(r.Where(e => !runtime.Contains(e)));
+        }
         var tCheck = sw.Elapsed.TotalSeconds - tBuild;
-        var (compile, runtime) = ReadErrorList(1000);
         int errs = compile.Count(e => e.Level == "ERROR"), warns = compile.Count(e => e.Level == "WARN");
         var o = new StringBuilder($"Build {(failed == 0 && errs == 0 ? "SUCCEEDED" : "FAILED")}: " +
                                   $"{failed} failed projects, {errs} compiler errors, {warns} warnings\n");
@@ -598,6 +602,21 @@ public sealed class TwinCatSession
         return (report.StartsWith("Build SUCCEEDED"), report);
     }
 
+    /// <summary>Runs an action per PLC project and reads the error list after each one: the next PLC project clears the
+    /// messages of the one before, so a list read at the end shows only the last project.</summary>
+    public (List<ErrorEntry> compile, List<ErrorEntry> runtime) ReadAfterEach(IEnumerable<ITcSmTreeItem> plcs, Action<ITcSmTreeItem> action, int max)
+    {
+        var compile = new List<ErrorEntry>(); var runtime = new List<ErrorEntry>();
+        foreach (var plc in plcs)
+        {
+            action(plc);
+            var (c, r) = ReadErrorList(max);
+            compile.AddRange(c.Where(e => !compile.Contains(e)));
+            runtime.AddRange(r.Where(e => !runtime.Contains(e)));
+        }
+        return (compile, runtime);
+    }
+
     // Only "Check all objects": compiler errors without a build (no executable code, no files)
     public string Check()
     {
@@ -606,9 +625,10 @@ public sealed class TwinCatSession
         var info = new StringBuilder();
         var plcs = PlcProjects();
         if (plcs.Count == 0) return "No PLC project found.";
-        foreach (var plc in plcs)
+        var (all, runtime) = ReadAfterEach(plcs, plc =>
+        {
             if (!CheckAllObjects(plc)) info.AppendLine($"Check all objects not available: {plc.Name} - use tc_build instead");
-        var (all, runtime) = ReadErrorList(1000);
+        }, 1000);
         // compiler messages carry a source position; entries without one (import results, device descriptions, older
         // messages of other tools) are listed separately and do not count; INFO lines are progress noise
         static bool FromCompiler(ErrorEntry e) => !string.IsNullOrEmpty(e.File) && !e.File.StartsWith(":") || !string.IsNullOrEmpty(e.Project);

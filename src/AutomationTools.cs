@@ -421,7 +421,7 @@ public sealed partial class ToolRegistry
     {
         var plcs = string.IsNullOrEmpty(plcPath) ? tc.PlcProjects() : new List<ITcSmTreeItem> { PlcProject(plcPath) };
         var o = new StringBuilder();
-        foreach (var plc in plcs)
+        var (compile, _) = tc.ReadAfterEach(plcs, plc =>
         {
             if (!string.IsNullOrEmpty(settings)) { ComCall.Invoke(plc, "LoadStaticAnalysisSettings", Path.GetFullPath(settings)); o.AppendLine($"{plc.Name}: settings loaded from {settings}"); }
             if (!string.IsNullOrEmpty(sarif))
@@ -437,8 +437,7 @@ public sealed partial class ToolRegistry
                 o.AppendLine($"{plc.Name}: static analysis run");
             }
             if (!string.IsNullOrEmpty(metrics)) { Directory.CreateDirectory(Path.GetDirectoryName(Path.GetFullPath(metrics))!); ComCall.Invoke(plc, "ExportStandardMetrics", Path.GetFullPath(metrics)); o.AppendLine($"{plc.Name}: metrics: {metrics}"); }
-        }
-        var (compile, _) = tc.ReadErrorList(2000);
+        }, 2000);
         int errs = compile.Count(e => e.Level == "ERROR"), warns = compile.Count(e => e.Level == "WARN");
         o.AppendLine($"Error list: {errs} errors, {warns} warnings");
         foreach (var e in compile.Where(e => e.Level is "ERROR" or "WARN").Take(300)) o.AppendLine(e.ToString());
