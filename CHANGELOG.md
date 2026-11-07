@@ -11,22 +11,6 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   program and a TcUnit project. The next PLC project clears the messages of the one before, and the error list was read only at
   the end, so only the last project counted. The list is now read after each PLC project; the same for `analyze`, `tc_static_analysis` and for
   `tc_build checkAll=true`, which also lost the messages of the build.
-
-### Added
-- Agent guide: a result counts only with a tool output from after the last change, and a check-and-fix loop stops after 3 rounds
-  or when the same error comes back.
-- Built-in knowledge (next version of TcAgent_Knowledge): workflows `bug-fix`, `safe-activation`, `online-change`, `refactoring`,
-  `library-update`, `io-commissioning`; skills `plc-spec-review`, `plc-fix-compile`, `plc-alarm-diagnosis`, `plc-traceability`,
-  `plc-multi-review`, `plc-st-patterns`, `plc-skill-authoring`, `plc-retro`; 14 prompts for them.
-
-### Added
-- **Skills, workflows, prompts, rules and lessons can name the plugin they need:** `tcagent-requires-plugin` in their metadata, with versions
-  (`line-check >=1.2 <2.0`). Without a fitting plugin that is ready and switched on, the item cannot be installed from a
-  source, `pull` does not update to it, and an item already there shows `needs plugin` and does not take effect.
-  The lists of skills and workflows say what is missing. `tcagent-requires-tcagent: >=0.53` does the same for the version of
-  TcAgent, for items that use something older versions do not have.
-
-Findings of test runs with an agent on a local runtime.
 - **`tc_test_results` showed 0 failed in every suite and named no failed test.** TcUnit writes the details of a test in
   several messages, the parser expected one line. A failure of a run that a reset cut off is no longer listed twice.
 - **`tc_lib_signatures` ignored `version`:** it returned the version the project resolves, labelled and cached it as the requested one.
@@ -41,6 +25,18 @@ Findings of test runs with an agent on a local runtime.
 - **`tc_hmi`** no longer takes an HMI project from a folder next to the solution: it only names it. Projects in solution folders are found.
 - **`tc_io_scan`** says that no scan was made outside config mode, instead of "No I/O devices found".
 - **`tc_library action=resolve`:** the name alone is enough, and the answer is the effective version instead of `*`.
+
+### Added
+- Agent guide: a result counts only with a tool output from after the last change, and a check-and-fix loop stops after 3 rounds
+  or when the same error comes back.
+- Built-in knowledge (next version of TcAgent_Knowledge): workflows `bug-fix`, `safe-activation`, `online-change`, `refactoring`,
+  `library-update`, `io-commissioning`; skills `plc-spec-review`, `plc-fix-compile`, `plc-alarm-diagnosis`, `plc-traceability`,
+  `plc-multi-review`, `plc-st-patterns`, `plc-skill-authoring`, `plc-retro`; 14 prompts for them.
+- **Skills, workflows, prompts, rules and lessons can name the plugin they need:** `tcagent-requires-plugin` in their metadata, with versions
+  (`line-check >=1.2 <2.0`). Without a fitting plugin that is ready and switched on, the item cannot be installed from a
+  source, `pull` does not update to it, and an item already there shows `needs plugin` and does not take effect.
+  The lists of skills and workflows say what is missing. `tcagent-requires-tcagent: >=0.53` does the same for the version of
+  TcAgent, for items that use something older versions do not have.
 
 ## [0.52.0] – 2026-11-04
 
