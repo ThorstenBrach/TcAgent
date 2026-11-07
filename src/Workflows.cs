@@ -63,9 +63,11 @@ public static class Workflows
     public static string Catalog(IEnumerable<KnowledgeLayers.Entry> entries)
     {
         var active = entries.Where(e => e.Active).ToList();
-        if (active.Count == 0) return null;
+        var waiting = entries.Where(PluginRequirements.Waiting).ToList();
+        if (active.Count == 0 && waiting.Count == 0) return null;
         var sb = new StringBuilder("Workflows (how this team ALWAYS does these tasks - start one with tc_workflow action=start name=<name> when the task fits):\n");
         foreach (var e in active) sb.AppendLine($"- {e.Name} ({e.Layer.Label}): {Description(e)}");
+        foreach (var e in waiting) sb.AppendLine($"- {e.Name}: not available, {e.Reason}");
         return sb.ToString();
     }
 

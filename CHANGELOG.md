@@ -19,6 +19,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `library-update`, `io-commissioning`; skills `plc-spec-review`, `plc-fix-compile`, `plc-alarm-diagnosis`, `plc-traceability`,
   `plc-multi-review`, `plc-st-patterns`, `plc-skill-authoring`, `plc-retro`; 14 prompts for them.
 
+### Added
+- **Skills, workflows, prompts, rules and lessons can name the plugin they need:** `tcagent-requires-plugin` in their metadata, with versions
+  (`line-check >=1.2 <2.0`). Without a fitting plugin that is ready and switched on, the item cannot be installed from a
+  source, `pull` does not update to it, and an item already there shows `needs plugin` and does not take effect.
+  The lists of skills and workflows say what is missing. `tcagent-requires-tcagent: >=0.53` does the same for the version of
+  TcAgent, for items that use something older versions do not have.
+
 ## [0.52.0] – 2026-11-04
 
 The built-in knowledge in this version is TcAgent_Knowledge 1.0.0.

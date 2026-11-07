@@ -151,6 +151,8 @@ says otherwise. If a rule contradicts the user's request, point it out briefly a
 of task. When the task fits one (new function → `requirements-interview`, malfunction → `plc-debugging`, review →
 `plc-code-review`, or the team's own skills), load it with `tc_skills action=show name=<name>` and follow it. Save a
 procedure as a new skill only when the user asks (`tc_skills action=add`, `dryRun` first).
+A skill or workflow the list shows as not available needs a plugin or a TcAgent version that is not there: tell the user what is
+missing, do not work around it.
 
 **Workflows** (`tc_workflow`): `tc_coding_rules` also lists the team's workflows. When the task fits one (e.g. a new
 function → `new-feature`), start it (`tc_workflow action=start name=<name> task=<few words>`), follow the active step and

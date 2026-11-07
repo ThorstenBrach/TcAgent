@@ -42,7 +42,7 @@ public static class Sources
 
     public sealed class Item
     {
-        public string Kind, Name, RelPath, Description, License, LicenseClass, LicenseFile;
+        public string Kind, Name, RelPath, Description, License, LicenseClass, LicenseFile, RequiresPlugin, RequiresTcAgent;
         public bool IsFolder => FolderKinds.ContainsKey(Kind);
         public string Key => Kind + "/" + Name;
     }
@@ -205,7 +205,8 @@ public static class Sources
     static Item Make(string repo, string kind, string name, string path, KnowledgeLayers.FrontMatter fm)
     {
         var it = new Item { Kind = kind, Name = name, RelPath = Path.GetRelativePath(repo, path).Replace('\\', '/'),
-                            Description = fm.Top.TryGetValue("description", out var d) ? d : "" };
+                            Description = fm.Top.TryGetValue("description", out var d) ? d : "",
+                            RequiresPlugin = fm.Get(PluginRequirements.Key), RequiresTcAgent = fm.Get(PluginRequirements.TcAgentKey) };
         // the item's own license file, its "license" field, the license of the repository
         var own = Directory.Exists(path) ? LicenseFiles(path).FirstOrDefault() : null;
         var root = LicenseFiles(repo).FirstOrDefault();
@@ -249,6 +250,15 @@ public static class Sources
     public static List<string> Scripts(IEnumerable<string> files) => files.Where(f => ScriptExt.Contains(Path.GetExtension(f).ToLowerInvariant())).ToList();
 
     // ------------------------------------------------------------------ install
+    /// <summary>Why the item cannot be installed here: it needs another TcAgent, or its plugin is missing or has the wrong
+    /// version (PluginRequirements.cs).</summary>
+    public static string RequirementRefusal(Item it, string solutionDir)
+    {
+        if (PluginRequirements.MissingTcAgent(it.RequiresTcAgent, KnowledgeLayers.TcAgentVersion) is { } old) return $"{it.Key}: {old} - update TcAgent first.";
+        return string.IsNullOrWhiteSpace(it.RequiresPlugin) || PluginRequirements.Missing(it.RequiresPlugin, Plugins.Usable(solutionDir)) is not { } missing
+            ? null : $"{it.Key}: {missing} - install the plugin first.";
+    }
+
     public static string TargetOf(string root, Item it) =>
         it.IsFolder ? Path.Combine(root, it.Kind, it.Name) : Path.Combine(root, it.Kind, Path.GetFileName(it.RelPath));
 

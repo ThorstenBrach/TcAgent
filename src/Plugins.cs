@@ -60,6 +60,15 @@ public static class Plugins
     };
 
     // ------------------------------------------------------------------ finding
+    /// <summary>The plugins as a skill sees them: like Found, and a plugin switched off in the modules is not ready.</summary>
+    public static List<Plugin> Usable(string solutionDir)
+    {
+        var found = Found(solutionDir);
+        var off = Modules.Off(Modules.Effective(solutionDir, found.Select(p => (p.Id, p.Name, p.Description, 0))));
+        foreach (var p in found.Where(p => p.Ready && off.Contains("plugin:" + p.Id))) p.Status = "switched off";
+        return found;
+    }
+
     /// <summary>All plugin folders on the levels with their status (ready, needs approval, not allowed, invalid, duplicate).
     /// The higher level wins for the same id (company before team before user before project).</summary>
     public static List<Plugin> Found(string solutionDir)

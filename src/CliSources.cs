@@ -155,7 +155,7 @@ public static partial class Cli
                         items.Add(new System.Text.Json.Nodes.JsonObject
                         {
                             ["source"] = s.Name, ["commit"] = commit, ["name"] = i.Name, ["kind"] = i.Kind, ["path"] = i.RelPath, ["description"] = i.Description,
-                            ["license"] = i.License, ["licenseClass"] = i.LicenseClass, ["refusal"] = Sources.LicenseRefusal(i, false),
+                            ["license"] = i.License, ["licenseClass"] = i.LicenseClass, ["refusal"] = Sources.LicenseRefusal(i, false) ?? Sources.RequirementRefusal(i, dir),
                             ["files"] = new System.Text.Json.Nodes.JsonArray(files.Select(f => (System.Text.Json.Nodes.JsonNode)f).ToArray()),
                             ["scripts"] = new System.Text.Json.Nodes.JsonArray(Sources.Scripts(files).Select(f => (System.Text.Json.Nodes.JsonNode)f).ToArray())
                         });
@@ -173,6 +173,7 @@ public static partial class Cli
                 if (matches.Count != 1) throw new ArgumentException(matches.Count == 0 ? $"'{o.Item}' not found in {s.Name}" : $"'{o.Item}' exists in several kinds - give --kind");
                 var it = matches[0];
                 if (Sources.LicenseRefusal(it, o.AcceptLicense) is { } lic) throw new InvalidOperationException(lic);
+                if (Sources.RequirementRefusal(it, dir) is { } plugin) throw new InvalidOperationException(plugin);
                 // every level: personal/user, project, team(:<folder>), platform:<name>, company, company-platform:<name>
                 var level = (o.Level ?? "user").Trim().ToLowerInvariant() is "personal" ? "user" : (o.Level ?? "user").Trim();
                 var root = KnowledgeOps.RootOf(dir, level);
@@ -205,6 +206,7 @@ public static partial class Cli
                         var repo = Sources.Checkout(src.Name, src.Url, up);
                         var it = Sources.Scan(repo).FirstOrDefault(i => i.RelPath == e.Path);
                         if (it == null || Sources.LicenseRefusal(it, o.AcceptLicense) is { }) { Console.WriteLine($"  {key} ({label}): not updated (removed from the source or license changed)"); continue; }
+                        if (Sources.RequirementRefusal(it, dir) is { } plugin) { Console.WriteLine($"  {key} ({label}): not updated - {plugin}"); continue; }
                         if (o.DryRun) { Console.WriteLine($"  {key} ({label}): {e.Commit[..8]} -> {up[..8]}"); n++; continue; }
                         Sources.Install(root, repo, it, src, up);
                         Console.WriteLine($"  {key} ({label}): updated {e.Commit[..8]} -> {up[..8]}");

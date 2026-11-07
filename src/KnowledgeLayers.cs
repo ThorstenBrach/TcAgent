@@ -28,6 +28,8 @@ public static class KnowledgeLayers
     // ------------------------------------------------------------------ roots
     /// <summary>Test hooks: replace the user root and the built-in root.</summary>
     public static string UserRootOverride, BuiltInRootOverride;
+    /// <summary>The version checked against tcagent-requires-tcagent; the tests set it.</summary>
+    public static string TcAgentVersion = Program.ServerVersion;
 
     public static string UserRoot => UserRootOverride ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent");
     public static string BuiltInRoot => BuiltInRootOverride ?? Path.Combine(AppContext.BaseDirectory, "knowledge");
@@ -400,6 +402,16 @@ public static class KnowledgeLayers
                 if (e.Locked && !(by.Level == "company" || by.Level == "team" && e.Layer.Level == "team")) e.Reason = "locked - cannot be switched off";
                 else { e.Status = "disabled"; e.Reason = "switched off in " + by.Label; }
             }
+        // what needs another TcAgent or a plugin that does not fit stays visible, but does not take effect (PluginRequirements.cs)
+        foreach (var e in all.Where(x => x.Active))
+            if (PluginRequirements.MissingTcAgent(e.Meta?.Get(PluginRequirements.TcAgentKey), TcAgentVersion) is { } old) { e.Status = PluginRequirements.TcAgentStatus; e.Reason = old; }
+        var needing = all.Where(e => e.Active && !string.IsNullOrWhiteSpace(e.Meta?.Get(PluginRequirements.Key))).ToList();
+        if (needing.Count > 0)
+        {
+            var plugins = Plugins.Usable(solutionDir);
+            foreach (var e in needing)
+                if (PluginRequirements.Missing(e.Meta.Get(PluginRequirements.Key), plugins) is { } missing) { e.Status = PluginRequirements.Status; e.Reason = missing; }
+        }
         return all;
     }
 
