@@ -244,6 +244,7 @@ public sealed class TwinCatSession
                 dte.UserControl = visible;
                 dte.Solution.Open(solutionPath);
                 Bind(dte, $"{id} (started) | {solutionPath}");
+                WaitForTwinCatProject(dte, $"{id} (started) | {solutionPath}", solutionPath);
                 AttachedPid = 0;
                 try { AttachedPid = ListInstances().FirstOrDefault(i => string.Equals(i.Solution, solutionPath, StringComparison.OrdinalIgnoreCase))?.Pid ?? 0; } catch { }
                 return InstanceInfo;
@@ -516,9 +517,23 @@ public sealed class TwinCatSession
         InstanceInfo = info + (SysMan == null ? " | WARNING: no TwinCAT project in the solution" : "");
     }
 
+    /// <summary>The solution is open before its projects are loaded: without waiting, tc_open reported "no TwinCAT project".</summary>
+    void WaitForTwinCatProject(DTE2 dte, string info, string solutionPath)
+    {
+        if (!ToolReports.MentionsTwinCatProject(File.ReadAllText(solutionPath))) return;
+        var end = DateTime.Now.AddSeconds(90);
+        while (SysMan == null && DateTime.Now < end)
+        {
+            System.Threading.Thread.Sleep(500);
+            try { Bind(dte, info); } catch { /* the IDE is busy loading */ }
+        }
+    }
+
     public ITcSysManager RequireSysMan()
     {
         EnsureConnected();
+        // a project that was still loading when the IDE was connected
+        if (SysMan == null && Dte != null) try { Bind(Dte, InstanceInfo.Split(" | WARNING")[0]); } catch { }
         return SysMan ?? throw new Exception("The connected solution contains no TwinCAT project - tc_attach to a different solution.");
     }
 
@@ -854,19 +869,22 @@ public sealed class TwinCatSession
                       .Select(x => x.e).ToList();
     }
 
+    public static string RuntimeLine(ErrorEntry e) =>
+        (e.Stamp?.ToString("yyyy-MM-dd HH:mm:ss.fff", System.Globalization.CultureInfo.InvariantCulture) ?? "(no time)") + "  " + e.Text;
+
     public string ErrorList(int max, string kind)
     {
-        var (compile, runtime) = ReadErrorList(max);
+        var (compile, runtime) = ReadErrorList(20000);   // the list is not sorted: max means the newest, not the first ones
         var o = new StringBuilder();
         if (kind != "runtime")
         {
             o.AppendLine($"Compiler/project: {compile.Count} entries ({compile.Count(e => e.Level == "ERROR")} errors, {compile.Count(e => e.Level == "WARN")} warnings)");
-            foreach (var e in compile) o.AppendLine(e.ToString());
+            foreach (var e in compile.Take(max)) o.AppendLine(e.ToString());
         }
         if (kind != "compile")
         {
-            o.AppendLine($"Runtime/TcUnit: {runtime.Count} messages (newest first)");
-            foreach (var e in runtime) o.AppendLine(e.Text);
+            o.AppendLine($"Runtime/TcUnit: {runtime.Count} messages (newest first, time of the target system)");
+            foreach (var e in Enumerable.Reverse(Chronological(runtime)).Take(max)) o.AppendLine(RuntimeLine(e));
         }
         return o.ToString();
     }
@@ -884,9 +902,13 @@ public sealed class TwinCatSession
         foreach (var s in r.Suites)
         {
             var failed = s.Cases.Where(c => c.Failed).ToList();
-            o.AppendLine($"  {s.Name}: {Math.Max(s.Tests ?? 0, s.Cases.Count)} tests, {failed.Count} failed");
+            o.AppendLine($"  {s.Name}: {Math.Max(s.Tests ?? 0, s.Cases.Count)} tests, {Math.Max(s.Failures ?? 0, failed.Count)} failed");
             foreach (var c in failed) o.AppendLine($"    FAILED {c.Name}: {c.Failure ?? c.Status}");
         }
+        if (r.Finished && r.Suites.Count == 0)
+            o.AppendLine("No details per suite in the messages: tc_test_run resets the PLC before TcUnit has written them. Its own result has them.");
+        else if (r.FailedCount > 0 && !r.Suites.Any(s => s.Cases.Any(c => c.Failed)))
+            o.AppendLine("The messages name no failed test - see tc_errors kind=runtime.");
         return o.ToString();
     }
 

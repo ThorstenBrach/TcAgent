@@ -58,7 +58,7 @@ public sealed partial class ToolRegistry
             a => tc.Sta.Run(() => Import(a), 300_000));
 
         // ---------------------------------------------------------- libraries
-        Add("tc_library", "Library management of a PLC project: list (references), add, add_placeholder, remove, resolve (effective version of a placeholder), " +
+        Add("tc_library", "Library management of a PLC project: list (references), add, add_placeholder, remove, resolve (name alone: shows the effective version of a placeholder; with library: sets it), " +
                           "freeze (placeholder versions), repositories, add_repository, remove_repository, install, uninstall, scan (all installed libraries).",
             Schema(Req(P("action", "string", "list, add, add_placeholder, remove, resolve, freeze, repositories, add_repository, remove_repository, install, uninstall, scan")),
                    P("plcProjectPath", "string", "PLC project (empty = the only one)"),
@@ -369,8 +369,15 @@ public sealed partial class ToolRegistry
                 ComCall.Invoke(refs, "RemoveReference", Need(name, "name"), Str(a, "version") ?? "", company);
                 return $"reference removed: {name}";
             case "resolve":
-                ComCall.Invoke(refs, "SetEffectiveResolution", Need(name, "name (placeholder)"), Need(Str(a, "library"), "library"), version, company);
-                return $"placeholder {name} -> {Str(a, "library")} {version}";
+                Need(name, "name (placeholder)");
+                if (!string.IsNullOrEmpty(Str(a, "library")))
+                    ComCall.Invoke(refs, "SetEffectiveResolution", name, Str(a, "library"), version, company);
+                foreach (var r in (System.Collections.IEnumerable)ComCall.Get(refs, "References"))
+                {
+                    var d = DescribeLib(r);
+                    if (d.StartsWith($"Placeholder {name} -> ", StringComparison.OrdinalIgnoreCase)) return d;
+                }
+                throw new Exception($"No placeholder '{name}' in this PLC project - see action=list.");
             case "freeze":
                 if (string.IsNullOrEmpty(name)) ((dynamic)refs).FreezePlaceholder(); else ((dynamic)refs).FreezePlaceholder(name);
                 return string.IsNullOrEmpty(name) ? "all placeholder versions frozen" : $"placeholder {name} frozen";

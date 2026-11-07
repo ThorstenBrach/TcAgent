@@ -11,7 +11,10 @@
 //   | Duration: 0.012
 //   | Test suite ID=0 'PRG_TEST.fbMotor_Test'
 //   | ID=0 number of tests=3, number of failed tests=1, duration=0.004
-//   | Test name=WhenStartedExpectRunning, test class name=PRG_TEST.fbMotor_Test, test status=FAIL, number of asserts=1, duration=0.001
+//   | Test name=WhenStartedExpectRunning
+//   | Test class name=PRG_TEST.fbMotor_Test
+//   | Test status=FAIL, number of asserts=1, duration=0.001
+//   | Test assert message=motor not running
 //   FAILED TEST 'PRG_TEST.fbMotor_Test@WhenStartedExpectRunning', EXP: TRUE, ACT: FALSE, MSG: motor not running
 //
 // SPDX-License-Identifier: MIT
@@ -46,7 +49,8 @@ public sealed class TcUnitResults
     /// <summary>All TcUnit lines of the run, for the log / system-out.</summary>
     public readonly List<string> Lines = new();
 
-    static readonly Regex KeyValue = new(@"(?:^|,\s*)(?<k>[A-Za-z][A-Za-z ]*?)\s*=\s*(?<v>[^,]*)", RegexOptions.Compiled);
+    const string AssertMessage = "Test assert message=";
+    static readonly Regex KeyValue =new(@"(?:^|,\s*)(?<k>[A-Za-z][A-Za-z ]*?)\s*=\s*(?<v>[^,]*)", RegexOptions.Compiled);
     static readonly Regex SuiteHeader = new(@"^Test suite ID\s*=\s*(?<id>\d+)\s+'(?<name>[^']*)'", RegexOptions.Compiled);
     static readonly Regex SuiteStats = new(@"^ID\s*=\s*(?<id>\d+)\s*,?\s*(?<rest>number of tests.*)$", RegexOptions.Compiled | RegexOptions.IgnoreCase);
     static readonly Regex FailedTest = new(@"FAILED TEST '(?<suite>[^'@]*)@(?<test>[^']*)'\s*,?\s*(?<rest>.*)$", RegexOptions.Compiled);
@@ -58,7 +62,9 @@ public sealed class TcUnitResults
         var statsById = new Dictionary<string, (int? tests, int? failed, double? dur)>();
         var cases = new Dictionary<string, Case>(StringComparer.Ordinal);   // "suite@test"
         var failures = new List<(string suite, string test, string text)>();
+        var messages = new Dictionary<Case, string>();
         Suite current = null;
+        Case reading = null;   // the test whose detail lines are being read
 
         foreach (var raw in LastRun(runtimeTexts))
         {
@@ -97,16 +103,17 @@ public sealed class TcUnitResults
                 continue;
             }
 
+            // the details of a test come in one line or, as TcUnit writes them today, in one message per line
             var kv = KeyValues(body);
+            kv.TryGetValue("test class name", out var cls);
             if (kv.TryGetValue("Test name", out var testName))
-            {
-                kv.TryGetValue("test class name", out var cls);
-                var suiteName = string.IsNullOrWhiteSpace(cls) ? current?.Name ?? "" : cls.Trim();
-                var c = r.GetCase(cases, suiteName, testName.Trim());
-                if (kv.TryGetValue("test status", out var st) && !string.IsNullOrWhiteSpace(st)) c.Status = st.Trim();
-                c.Asserts = Int(kv, "number of asserts") ?? c.Asserts;
-                c.Duration = Dbl(kv, "duration") ?? c.Duration;
-            }
+                reading = r.GetCase(cases, string.IsNullOrWhiteSpace(cls) ? current?.Name ?? "" : cls.Trim(), testName.Trim());
+            else if (reading != null && !string.IsNullOrWhiteSpace(cls)) reading = r.MoveCase(cases, reading, cls.Trim());
+            if (reading == null) continue;
+            if (kv.TryGetValue("test status", out var st) && !string.IsNullOrWhiteSpace(st)) reading.Status = st.Trim();
+            reading.Asserts = Int(kv, "number of asserts") ?? reading.Asserts;
+            reading.Duration = Dbl(kv, "duration") ?? reading.Duration;
+            if (body.StartsWith(AssertMessage, StringComparison.OrdinalIgnoreCase)) messages[reading] = body.Substring(AssertMessage.Length).Trim();
         }
 
         foreach (var (id, s) in suitesById)
@@ -118,9 +125,13 @@ public sealed class TcUnitResults
         {
             if (statusKnown && (!cases.TryGetValue(suite + "@" + test, out var known) || !known.Failed)) continue;
             var c = r.GetCase(cases, suite, test);
+            // a run that a reset of the PLC cut off leaves FAILED lines too, and has no end of its own
+            if (c.Failure?.Split('\n').Contains(text) == true) continue;
             c.Failure = c.Failure == null ? text : c.Failure + "\n" + text;
             if (!c.Failed) c.Status = "FAIL";
         }
+        foreach (var (c, message) in messages)
+            if (c.Failed && c.Failure == null) c.Failure = message;
         return r;
     }
 
@@ -155,6 +166,17 @@ public sealed class TcUnitResults
         cases[key] = c;
         GetSuite(suite).Cases.Add(c);
         return c;
+    }
+
+    // the class name line follows the name line and wins over the suite header
+    Case MoveCase(Dictionary<string, Case> cases, Case c, string suite)
+    {
+        if (c.Suite == suite) return c;
+        cases.Remove(c.Suite + "@" + c.Name);
+        GetSuite(c.Suite).Cases.Remove(c);
+        var moved = GetCase(cases, suite, c.Name);
+        moved.Status = c.Status; moved.Asserts = c.Asserts; moved.Duration = c.Duration;
+        return moved;
     }
 
     /// <summary>Failed tests: from the summary, otherwise counted from the parsed cases.</summary>
