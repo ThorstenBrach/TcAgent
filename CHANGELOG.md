@@ -9,8 +9,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ### Added
 - Agent guide: a result counts only with a tool output from after the last change, and a check-and-fix loop stops after 3 rounds
   or when the same error comes back.
-- Built-in knowledge (next version of TcAgent_Knowledge): workflows `bug-fix` and `safe-activation`, skills `plc-spec-review` and
-  `plc-retro`, prompts `check-logic`, `fix-bug`, `retro`.
+- Built-in knowledge (next version of TcAgent_Knowledge): workflows `bug-fix`, `safe-activation`, `online-change`, `refactoring`,
+  `library-update`, `io-commissioning`; skills `plc-spec-review`, `plc-fix-compile`, `plc-alarm-diagnosis`, `plc-traceability`,
+  `plc-multi-review`, `plc-st-patterns`, `plc-skill-authoring`, `plc-retro`; 14 prompts for them.
 
 ## [0.52.0] – 2026-11-04
 

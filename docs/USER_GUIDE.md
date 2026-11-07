@@ -657,9 +657,14 @@ format (a folder with `SKILL.md`), so every agent CLI understands them, and come
 - **Built-in:** `requirements-interview` (clarify a machine function before code – one question at a time, with a
   recommended answer, ends with a short specification), `plc-debugging` (cause before fix, measured online),
   `plc-code-review` (static risks, rules and a TwinCAT checklist, standards and requirement separately, findings with location),
-  `plc-spec-review` (logic against the requirement before the first test), `plc-retro` (what would make the next session better).
+  `plc-spec-review` (logic against the requirement before the first test), `plc-fix-compile` (compiler errors with a limit of rounds),
+  `plc-alarm-diagnosis` (likely fault from an alarm export), `plc-traceability` (requirement, code, test as a table), `plc-multi-review`
+  (several separate views), `plc-st-patterns` (8 patterns that compile), `plc-skill-authoring` (write and test your own),
+  `plc-retro` (what would make the next session better).
 - **Built-in workflows:** `new-feature`, `bug-fix` (a signal that shows the fault, proven cause, fix, the same signal good),
-  `safe-activation` (changes, backup, your release, load, check of the state).
+  `safe-activation` (changes, backup, your release, load, check of the state), `online-change` (risks first, then your release),
+  `refactoring` (tests before and after), `library-update` (compare interfaces, check usages), `io-commissioning` (signal by signal,
+  with a record; outputs only with your release).
 - **Your own:** `<level>\skills\<name>\SKILL.md` on the company, user, platform or project level – or by talking:
   *"Save this procedure as a skill for the project."* (`tc_skills action=add`, after you agreed).
 - The agent sees the list with the coding rules and loads a skill when the task fits (*"Review the changes of today"* →
