@@ -26,6 +26,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   The lists of skills and workflows say what is missing. `tcagent-requires-tcagent: >=0.53` does the same for the version of
   TcAgent, for items that use something older versions do not have.
 
+Findings of test runs with an agent on a local runtime.
+- **`tc_test_results` showed 0 failed in every suite and named no failed test.** TcUnit writes the details of a test in
+  several messages, the parser expected one line. A failure of a run that a reset cut off is no longer listed twice.
+- **`tc_lib_signatures` ignored `version`:** it returned the version the project resolves, labelled and cached it as the requested one.
+  Another version now comes from the library export, with a note. Wrong cache entries are ignored.
+- **`tc_activate` and `tc_runtime_mode` returned before the PLC could be read.** They now wait for TwinCAT and the PLCs and report the
+  states. `tc_activate` says when the target of the project changed. `tc_runtime_mode` warns if a PLC is in another state than before
+  config mode.
+- **`tc_errors`:** runtime messages with their time, really sorted, and `max` means the newest ones.
+- **`tc_plc_online`:** a login says whether something was loaded (nothing, online change, full download). The state comes from the port of
+  this PLC on the target of the project, not from port 851 of the local system.
+- **`tc_open`** waits until the TwinCAT project is loaded, instead of reporting that there is none.
+- **`tc_hmi`** no longer takes an HMI project from a folder next to the solution: it only names it. Projects in solution folders are found.
+- **`tc_io_scan`** says that no scan was made outside config mode, instead of "No I/O devices found".
+- **`tc_library action=resolve`:** the name alone is enough, and the answer is the effective version instead of `*`.
+
 ## [0.52.0] – 2026-11-04
 
 The built-in knowledge in this version is TcAgent_Knowledge 1.0.0.

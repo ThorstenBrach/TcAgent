@@ -35,7 +35,7 @@ Shows open modal dialogs of the IDE (title, text, buttons) – while one is open
 
 ### `tc_open`
 
-Starts Visual Studio 2022 (or TcXaeShell) and opens a solution.
+Starts Visual Studio 2022 (or TcXaeShell), opens a solution and waits until its TwinCAT project is loaded.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -379,7 +379,7 @@ Creates I/O configuration: EtherCAT master under TIID, below it couplers and ter
 
 ### `tc_io_scan`
 
-Searches the I/O devices of the target (network adapters with EtherCAT, fieldbus cards ...) – read only. Needs config mode (`tc_runtime_mode mode=config`). Take one over with `tc_io_scan_add`.
+Searches the I/O devices of the target (network adapters with EtherCAT, fieldbus cards ...) – read only. Needs config mode (`tc_runtime_mode mode=config`): outside of it the answer says that no scan was made. Take one over with `tc_io_scan_add`.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -705,7 +705,7 @@ Signatures of a library - also from third-party compiled libraries (requires the
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `library` | string | yes | Library title, e.g. Tc2_Standard or MyLibrary |
-| `version` | string |  | Version (default: the one resolved in the project, otherwise the newest installed) |
+| `version` | string |  | Version (default: the one resolved in the project, otherwise the newest installed). Another version than the resolved one comes from the library export, as with `source=doc`, and the answer says so |
 | `symbol` | string |  | Name of an FB, function or type; method as FB.Method |
 | `filter` | string |  | Outline only for names containing this text (e.g. MC_ or FB) |
 | `source` | string |  | lm (default: with EXTENDS, methods, original casing) or doc (alternative export, fallback) |
@@ -821,7 +821,7 @@ PLC code as plain-text ST files and back (format: [PLAINTEXT.md](PLAINTEXT.md)).
 
 ### `tc_library`
 
-Library management of a PLC project: list (references), add, add_placeholder, remove, resolve (effective version of a placeholder), freeze (placeholder versions), repositories, add_repository, remove_repository, install, uninstall, scan (all installed libraries).
+Library management of a PLC project: list (references), add, add_placeholder, remove, resolve (name alone: shows the effective version of a placeholder; with `library`: sets it), freeze (placeholder versions), repositories, add_repository, remove_repository, install, uninstall, scan (all installed libraries).
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -1153,7 +1153,7 @@ Builds the solution (produces executable code and files – slower than a check)
 
 ### `tc_errors`
 
-Reads the IDE error list, split into compiler/project messages and PLC runtime/TcUnit messages.
+Reads the IDE error list, split into compiler/project messages and PLC runtime/TcUnit messages. Runtime messages come with their time, newest first.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -1164,6 +1164,7 @@ Reads the IDE error list, split into compiler/project messages and PLC runtime/T
 
 Returns the result of the last TcUnit run (suites, tests, passes, failures with test names and messages) from the PLC runtime messages.
 Only the last run counts: failures of earlier runs that are still in the message list are left out.
+After `tc_test_run` the details per suite can be missing, because it resets the PLC before TcUnit has written them; its own result has them.
 
 ### `tc_test_run`
 
@@ -1187,7 +1188,7 @@ with confirmation. Same run as `TcAgent.exe tcunit run` and the TcUnit Tests win
 
 ### `tc_runtime_mode`
 
-Switches the TwinCAT runtime of the target to config mode (needed for the I/O scan, stops the PLC) or restarts it in run mode with the active configuration. Allowed targets only, with confirmation. Current state: `tc_plc_state port=10000`.
+Switches the TwinCAT runtime of the target to config mode (needed for the I/O scan, stops the PLC) or restarts it in run mode with the active configuration. It returns when the state is reached and the PLCs of the solution answer, and warns if a PLC is in another state than before config mode (a boot project can start a PLC that was stopped). Allowed targets only, with confirmation. Current state: `tc_plc_state port=10000`.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -1213,7 +1214,8 @@ Shows the solution's license node as XML; change via `tc_xml_set`. Trial license
 
 ### `tc_activate`
 
-Optionally sets the target NetId, activates the configuration and restarts TwinCAT in Run mode.
+Optionally sets the target NetId, activates the configuration and restarts TwinCAT in Run mode. With a restart it returns when
+TwinCAT is in Run and the PLCs of the solution answer. A changed target stays in the project, and the answer says so.
 
 **Gate (since 0.32):** before the activation (and before anybody is asked to confirm it) TcAgent builds the solution –
 without "check all objects", which also checks code that is never called. With build errors the activation is refused
@@ -1227,7 +1229,7 @@ and the build report is returned – the agent is told to show the errors and as
 
 ### `tc_plc_online`
 
-PLC online commands via the PLC project: login, download/online change, start, stop, logout.
+PLC online commands via the PLC project: login, start, stop, logout. Login loads a changed program if the IDE offers it (a question can open: `tc_dialogs`); the answer says whether something was loaded.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

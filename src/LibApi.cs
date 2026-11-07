@@ -40,6 +40,22 @@ public sealed class LibApi
 
     static string Clean(string s) => string.IsNullOrWhiteSpace(s) ? null : string.Join(" ", s.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries).Select(l => l.Trim())).Trim();
 
+    /// <summary>The version in the library ids of the symbols ("Tc2_Standard, 3.4.7.0 (Beckhoff Automation GmbH)").</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string Version => Symbols.Select(s => VersionOf(s.LibraryId)).FirstOrDefault(v => v != null);
+
+    public bool IsVersion(string version) => Version == null ? string.IsNullOrEmpty(version) || version == "*" : SameVersion(version, Version);
+
+    public static string VersionOf(string libraryId)
+    {
+        var parts = (libraryId ?? "").Split(',', 2);
+        return parts.Length == 2 ? parts[1].Split('(')[0].Trim() : null;
+    }
+
+    /// <summary>Empty and * stand for "any version".</summary>
+    public static bool SameVersion(string a, string b) =>
+        string.IsNullOrEmpty(a) || a == "*" || string.IsNullOrEmpty(b) || b == "*" || a.Trim().Equals(b.Trim(), StringComparison.OrdinalIgnoreCase);
+
     public void Save(string path) => File.WriteAllText(path, JsonSerializer.Serialize(this));
     public static LibApi Load(string path) => JsonSerializer.Deserialize<LibApi>(File.ReadAllText(path));
 

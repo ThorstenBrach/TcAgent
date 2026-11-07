@@ -8,6 +8,7 @@
 // A device scan needs the target in config mode. Assigning an adapter is what the IDE does with "Adapter > Search".
 //
 // SPDX-License-Identifier: MIT
+using System.Text.RegularExpressions;
 using System.Text;
 using System.Text.Json.Nodes;
 using System.Xml;
@@ -59,12 +60,16 @@ public sealed partial class ToolRegistry
                 c.Connect(AmsNetId.Parse(net), SystemServicePort);
                 var before = c.ReadState().AdsState;
                 if (before == AdsState.Config) return $"{net}: already in Config mode.";
+                var ports = PlcPorts();
+                plcStatesBeforeConfig[net] = ports.ToDictionary(p => p, p => PlcState(net, p));
                 c.WriteControl(new StateInfo(AdsState.Reconfig, 0));
                 var state = WaitState(c, AdsState.Config, 30);
-                return $"{net}: {before} -> {state}" + (state == AdsState.Config ? "" : " (Config mode not reached - check the state with tc_plc_state port=10000)");
+                return $"{net}: {before} -> {state}" + (state == AdsState.Config ? "" : " (Config mode not reached - check the state with tc_plc_state port=10000)") +
+                       (ports.Count > 0 ? "\nPLC before: " + string.Join(", ", plcStatesBeforeConfig[net].Select(x => $"port {x.Key} {x.Value}")) : "");
             }
             case "run":
-                return tc.Sta.Run(() =>
+            {
+                tc.Sta.Run(() =>
                 {
                     dynamic sm = tc.RequireSysMan();
                     // restart on the requested target without retargeting the project permanently
@@ -73,11 +78,71 @@ public sealed partial class ToolRegistry
                     if (other) sm.SetTargetNetId(net);
                     try { sm.StartRestartTwinCAT(); }
                     finally { if (other) sm.SetTargetNetId(original); }
-                    return $"{net}: TwinCAT is being restarted in Run mode with the active configuration.";
+                    return 0;
                 });
+                var report = WaitForRuntime(net, out var plcs);
+                if (plcStatesBeforeConfig.Remove(net, out var earlier))
+                    foreach (var (port, was) in earlier)
+                        if (plcs.TryGetValue(port, out var now) && now != was)
+                            report += $"\nWARNING: the PLC on port {port} was {was} before Config mode and is {now} now - tell the user.";
+                return report;
+            }
             default:
                 throw new Exception("mode: config or run");
         }
+    }
+
+    readonly Dictionary<string, Dictionary<int, string>> plcStatesBeforeConfig = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>ADS ports of the PLC projects of the solution (AdsPort of the PLC item, 851 if it cannot be read).</summary>
+    List<int> PlcPorts() => tc.Sta.Run(() =>
+    {
+        var ports = new List<int>();
+        foreach (var plc in tc.PlcProjects()) ports.Add(PlcPort((string)((dynamic)plc).PathName));
+        return ports.Distinct().ToList();
+    });
+
+    int PlcPort(string plcProjectPath)
+    {
+        try
+        {
+            var parent = plcProjectPath[..plcProjectPath.LastIndexOf('^')];
+            var m = Regex.Match((string)((dynamic)tc.Item(parent)).ProduceXml(false), @"<AdsPort>(\d+)</AdsPort>");
+            if (m.Success) return int.Parse(m.Groups[1].Value);
+        }
+        catch { }
+        return 851;
+    }
+
+    static string PlcState(string net, int port)
+    {
+        try
+        {
+            using var c = new AdsClient();
+            c.Connect(AmsNetId.Parse(net), port);
+            return c.ReadState().AdsState.ToString();
+        }
+        catch (Exception ex) { return "not readable (" + (ex.InnerException?.Message ?? ex.Message) + ")"; }
+    }
+
+    /// <summary>After a restart: waits until TwinCAT is in Run and each PLC of the solution answers, and says what it found.</summary>
+    string WaitForRuntime(string net, out Dictionary<int, string> plcs)
+    {
+        using var c = new AdsClient();
+        c.Connect(AmsNetId.Parse(net), SystemServicePort);
+        var system = WaitState(c, AdsState.Run, 60);
+        plcs = new Dictionary<int, string>();
+        var report = $"{net}: TwinCAT {system}";
+        if (system != AdsState.Run) return report + " (Run mode not reached - check the state with tc_plc_state port=10000)";
+        foreach (var port in PlcPorts())
+        {
+            var end = DateTime.Now.AddSeconds(30);
+            var state = PlcState(net, port);
+            while (state.StartsWith("not readable") && DateTime.Now < end) { Thread.Sleep(500); state = PlcState(net, port); }
+            plcs[port] = state;
+            report += $", PLC port {port} {state}";
+        }
+        return report;
     }
 
     static AdsState WaitState(AdsClient c, AdsState want, int seconds)
@@ -133,7 +198,11 @@ public sealed partial class ToolRegistry
         List<FoundDevice> found;
         try { found = ScanDevices(); }
         catch (Exception ex) { return "Scan failed: " + (ex.InnerException?.Message ?? ex.Message) + ConfigModeHint(); }
-        if (found.Count == 0) return "No I/O devices found." + ConfigModeHint();
+        if (found.Count == 0)
+        {
+            var hint = ConfigModeHint();
+            return hint.Length == 0 ? "No I/O devices found." : "No scan was made, so this says nothing about the devices." + hint;
+        }
         var o = new StringBuilder($"{found.Count} device(s) found:\n");
         foreach (var f in found)
         {

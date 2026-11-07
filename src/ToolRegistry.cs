@@ -51,7 +51,7 @@ public sealed partial class ToolRegistry
             Schema(P("solution", "string", "Part of the solution path for selection"), P("pid", "integer", "Process ID of the IDE")),
             a => tc.Sta.Run(() => tc.Attach(Str(a, "solution"), Int(a, "pid", 0))));
 
-        Add("tc_open", "Starts Visual Studio 2022 (or TcXaeShell) and opens a solution.",
+        Add("tc_open", "Starts Visual Studio 2022 (or TcXaeShell), opens a solution and waits until its TwinCAT project is loaded.",
             Schema(Req(P("solutionPath", "string", "Full path to the .sln")),
                    P("visible", "boolean", "Start the IDE visible (default true)"),
                    P("progId", "string", "e.g. VisualStudio.DTE.17.0 or TcXaeShell.DTE.17.0")),
@@ -379,7 +379,7 @@ public sealed partial class ToolRegistry
             Schema(P("rebuild", "boolean", "Clean first"), P("checkAll", "boolean", "Additionally check all objects (default false)")),
             a => tc.Sta.Run(() => tc.Build(null, Bool(a, "rebuild", false), Bool(a, "checkAll", false))));
 
-        Add("tc_errors", "Reads the IDE error list, separated into compiler/project messages and runtime/TcUnit messages of the PLC.",
+        Add("tc_errors", "Reads the IDE error list, separated into compiler/project messages and runtime/TcUnit messages of the PLC (with their time, newest first).",
             Schema(P("kind", "string", "compile, runtime or all (default)"), P("max", "integer", "Max. entries (default 500)")),
             a => tc.Sta.Run(() => tc.ErrorList(Int(a, "max", 500), Str(a, "kind") ?? "all")));
 
@@ -436,21 +436,33 @@ public sealed partial class ToolRegistry
                            "an activation through).",
             Schema(P("netId", "string", "AmsNetId of the target, e.g. 5.12.34.56.1.1 (empty = current target)"),
                    P("restart", "boolean", "Restart TwinCAT (default true)")),
-            a => tc.Sta.Run(() =>
+            a =>
             {
-                dynamic sm = tc.RequireSysMan();
-                var net = Str(a, "netId");
-                if (!string.IsNullOrEmpty(net)) sm.SetTargetNetId(net);
-                sm.ActivateConfiguration();
-                if (Bool(a, "restart", true)) sm.StartRestartTwinCAT();
-                return "activated on " + (string)sm.GetTargetNetId();
-            }));
+                bool restart = Bool(a, "restart", true);
+                var (target, earlier) = tc.Sta.Run(() =>
+                {
+                    dynamic sm = tc.RequireSysMan();
+                    var net = Str(a, "netId");
+                    string before = (string)sm.GetTargetNetId();
+                    if (!string.IsNullOrEmpty(net)) sm.SetTargetNetId(net);
+                    sm.ActivateConfiguration();
+                    if (restart) sm.StartRestartTwinCAT();
+                    return ((string)sm.GetTargetNetId(), before);
+                });
+                var report = "activated on " + target;
+                if (!string.Equals(earlier, target, StringComparison.OrdinalIgnoreCase))
+                    report += $"\nNote: the target of the project changed from {earlier} to {target}, and it stays that way - tell the user.";
+                return restart ? report + "\n" + WaitForRuntime(target, out _) : report;
+            });
 
-        Add("tc_plc_online", "PLC online commands via the PLC project: login, download/online change, start, stop, logout.",
+        Add("tc_plc_online", "PLC online commands via the PLC project: login, start, stop, logout. Login loads a changed program if the IDE offers it " +
+                             "(a question can open: tc_dialogs); the result says whether something was loaded.",
             Schema(Req(P("plcProjectPath", "string", "Path of the PLC project, e.g. TIPC^MyPlc^MyPlc Project")),
                    P("login", "boolean", ""), P("start", "boolean", ""), P("stop", "boolean", ""), P("logout", "boolean", "")),
             a =>
             {
+                var (net, port) = tc.Sta.Run(() => ((string)((dynamic)tc.RequireSysMan()).GetTargetNetId(), PlcPort(Str(a, "plcProjectPath"))));
+                var loadedBefore = Bool(a, "login", false) ? ReadLoadMarks(net, port) : null;
                 // Send commands individually one after another - TwinCAT does not reliably execute login and start in one XML
                 var done = new List<string>();
                 foreach (var (k, tag) in new[] { ("login", "LoginCmd"), ("stop", "StopCmd"), ("start", "StartCmd"), ("logout", "LogoutCmd") })
@@ -461,9 +473,8 @@ public sealed partial class ToolRegistry
                     done.Add(k);
                     Thread.Sleep(k == "login" ? 3000 : 1000);
                 }
-                string state;
-                try { using var c = Connect(a); state = c.ReadState().AdsState.ToString(); } catch (Exception ex) { state = "unknown (" + ex.Message + ")"; }
-                return $"executed: {string.Join(", ", done)}; PLC state (ADS): {state}";
+                var report = $"executed: {string.Join(", ", done)}; PLC state (ADS port {port}): {PlcState(net, port)}";
+                return loadedBefore == null ? report : report + "\n" + ToolReports.LoadReport(loadedBefore, ReadLoadMarks(net, port));
             });
 
         Add("tc_plc_state", "Reads the runtime state of the PLC via ADS (Run, Stop, Config ...).",
@@ -677,26 +688,60 @@ public sealed partial class ToolRegistry
     static string Pretty(JsonObject o) => o.ToJsonString(new System.Text.Json.JsonSerializerOptions
         { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping });
 
+    // What shows that a PLC got a new program: online changes and the time stamp of the application
+    (uint? onlineChanges, uint? timestamp)? ReadLoadMarks(string net, int port)
+    {
+        try
+        {
+            using var c = new AdsClient();
+            c.Connect(AmsNetId.Parse(net), port);
+            uint? Read(string path)
+            {
+                try
+                {
+                    var h = c.CreateVariableHandle(path);
+                    try { return (uint)c.ReadAny(h, typeof(uint)); } finally { c.DeleteVariableHandle(h); }
+                }
+                catch { return null; }
+            }
+            return (Read("TwinCAT_SystemInfoVarList._AppInfo.OnlineChangeCnt"), Read("TwinCAT_SystemInfoVarList._AppInfo.AppTimestamp"));
+        }
+        catch { return (null, null); }
+    }
+
     string LibSignatures(JsonObject a)
     {
         var lib = Str(a, "library");
-        var (pid, version) = tc.Sta.Run(() =>
+        var (pid, referenced) = tc.Sta.Run(() =>
         {
-            string v = Str(a, "version");
-            if (string.IsNullOrEmpty(v))
-                try { v = ReferencedVersion(lib); } catch { }
+            string v = null;
+            try { v = ReferencedVersion(lib); } catch { }
             return (tc.AttachedPid, v);
         });
+        var requested = Str(a, "version");
+        var version = string.IsNullOrEmpty(requested) ? referenced : requested;
         var source = Str(a, "source") ?? "lm";
+        var note = "";
+        // the project model only holds the version the project resolves
+        if (source == "lm" && !LibApi.SameVersion(requested, referenced))
+        {
+            source = "doc";
+            note = $"The project resolves {referenced}, so {requested} comes from the library export (no EXTENDS, no original spelling).\n";
+        }
         if (source == "lm")
         {
             // Project model: cached compactly per library version
             var cacheDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "libcache");
             Directory.CreateDirectory(cacheDir);
-            var apiFile = Path.Combine(cacheDir, $"{lib}_{(string.IsNullOrEmpty(version) ? "aktuell" : version)}.api.json");
-            LibApi api = null; string origin;
-            if (File.Exists(apiFile) && !Bool(a, "refresh", false)) { api = LibApi.Load(apiFile); origin = "from cache"; }
-            else
+            var apiFile = Path.Combine(cacheDir, $"{lib}_{(string.IsNullOrEmpty(version) || version == "*" ? "aktuell" : version)}.api.json");
+            LibApi api = null; string origin = null;
+            if (File.Exists(apiFile) && !Bool(a, "refresh", false))
+            {
+                // older versions of TcAgent saved whatever the project resolved under the requested version
+                var cached = LibApi.Load(apiFile);
+                if (cached.IsVersion(version)) { api = cached; origin = "from cache"; }
+            }
+            if (api == null)
             {
                 var lr = BridgeClient.Call(pid, "lm_export", new JsonObject { ["library"] = lib }, 300000);
                 if (lr["found"]?.GetValue<bool>() != true || lr["file"] == null)
@@ -707,18 +752,31 @@ public sealed partial class ToolRegistry
                 var libIds = api.Symbols.Select(x => x.LibraryId).Where(x => x != null).Distinct().ToList();
                 if (libIds.Count > 0 && !libIds.Any(x => x.StartsWith(lib + ",", StringComparison.OrdinalIgnoreCase)))
                     return $"Wrong context picked up ({string.Join("; ", libIds)}) - please query with source=doc and report via tc_feedback.";
-                api.Save(apiFile);
                 try { File.Delete(raw); } catch { }
-                origin = $"freshly read from the IDE ({libIds.FirstOrDefault()})";
+                if (api.IsVersion(version))
+                {
+                    api.Save(apiFile);
+                    origin = $"freshly read from the IDE ({libIds.FirstOrDefault()})";
+                }
+                else
+                {
+                    note = $"The project model holds {libIds.FirstOrDefault()}, so {version} comes from the library export (no EXTENDS, no original spelling).\n";
+                    api = null;
+                }
             }
-            var s0 = Str(a, "symbol");
-            return $"{lib} {version} - {origin}\n" + (string.IsNullOrEmpty(s0) ? api.Outline(Str(a, "filter")) : api.Describe(s0));
+            if (api != null)
+            {
+                var s0 = Str(a, "symbol");
+                return $"{lib} {api.Version ?? version} - {origin}\n" + (string.IsNullOrEmpty(s0) ? api.Outline(Str(a, "filter")) : api.Describe(s0));
+            }
         }
         var args = new JsonObject { ["library"] = lib, ["version"] = version ?? "*", ["refresh"] = Bool(a, "refresh", false) };
         var r = BridgeClient.Call(pid, "lib_export", args, 300000);
         var file = r["file"]!.ToString();
         var json = File.ReadAllText(file);
-        var head = $"{r["title"]} {r["version"]} ({r["company"]}) - {(r["cached"]?.GetValue<bool>() == true ? "from cache" : "freshly exported")}, {json.Length} characters, {file}\n";
+        if (!LibApi.SameVersion(version, r["version"]?.ToString()))
+            note += $"WARNING: {version} was asked for, this is {r["version"]}.\n";
+        var head = note + $"{r["title"]} {r["version"]} ({r["company"]}) - {(r["cached"]?.GetValue<bool>() == true ? "from cache" : "freshly exported")}, {json.Length} characters, {file}\n";
         var sym = Str(a, "symbol");
         return head + (string.IsNullOrEmpty(sym) ? LibJson.Outline(json, Str(a, "filter")) : LibJson.Find(json, sym));
     }

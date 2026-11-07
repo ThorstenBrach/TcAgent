@@ -132,6 +132,7 @@ public sealed partial class ToolRegistry
         if (!string.IsNullOrEmpty(hint) && hint.EndsWith(".hmiproj", StringComparison.OrdinalIgnoreCase) && File.Exists(hint))
             return new HmiProject(Path.GetFullPath(hint), Path.GetDirectoryName(Path.GetFullPath(hint))!);
         var found = new List<string>();
+        var outside = new List<string>();
         try
         {
             tc.Sta.Run(() =>
@@ -145,10 +146,12 @@ public sealed partial class ToolRegistry
                     var dir = Path.GetDirectoryName(tc.RequireDte().Solution.FullName);
                     if (!string.IsNullOrEmpty(dir))
                         found.AddRange(Directory.EnumerateFiles(dir, "*.hmiproj", new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 3 }));
-                    // HMI projects are often created next to the TwinCAT folder (..\HmiProject)
+                    // also in a solution folder; a project in a folder next to the solution may belong to another solution, so it is only named
+                    if (found.Count == 0 && !string.IsNullOrEmpty(dir))
+                        found.AddRange(ToolReports.HmiProjectsOf(File.ReadAllText(tc.RequireDte().Solution.FullName), dir).Where(File.Exists));
                     var parent = string.IsNullOrEmpty(dir) ? null : Path.GetDirectoryName(dir);
                     if (found.Count == 0 && !string.IsNullOrEmpty(parent))
-                        found.AddRange(Directory.EnumerateFiles(parent, "*.hmiproj", new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 3 }));
+                        outside.AddRange(Directory.EnumerateFiles(parent, "*.hmiproj", new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 3 }));
                 }
                 return 0;
             });
@@ -156,6 +159,8 @@ public sealed partial class ToolRegistry
         catch (Exception ex) { if (found.Count == 0) throw new Exception("No HMI project found (pass project=<path to .hmiproj>): " + ex.Message); }
         if (!string.IsNullOrEmpty(hint)) found = found.Where(f => Path.GetFileNameWithoutExtension(f).Equals(hint, StringComparison.OrdinalIgnoreCase)).ToList();
         if (found.Count == 0) throw new Exception("No TwinCAT HMI project (.hmiproj) found - create one in Visual Studio (Add > New Project > TwinCAT HMI Project) or pass project=<path>.");
+        if (found.Count == 0 && outside.Count > 0)
+            throw new Exception("No TwinCAT HMI project in this solution. Outside of it (pass project=<path> if one of them is meant): " + string.Join(", ", outside));
         if (found.Count > 1) throw new Exception("Several HMI projects - pass project=: " + string.Join(", ", found));
         return new HmiProject(found[0], Path.GetDirectoryName(found[0])!);
     }
