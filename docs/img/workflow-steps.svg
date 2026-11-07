@@ -1,0 +1,74 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1000 352" width="1000" height="352" role="img" aria-label="The whole job in seven steps: understand, plan, implement, build, test, review, deploy. TcAgent enforces checkpoints at plan, build, test and deploy. Lessons, rules and skills stay for the next job.">
+<defs><marker id="ah" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0,0 L10,5 L0,10 z" fill="#6366f1"/></marker></defs>
+<style>text{font-family:"Segoe UI",system-ui,-apple-system,"DejaVu Sans",sans-serif}.h{font-size:14.5px;font-weight:700;fill:#0f172a}.s{font-size:12px;fill:#475569}.g{font-size:12px;font-weight:600;fill:#15803d}.n{font-size:12px;font-weight:700;fill:#ffffff}.z{font-size:12px;font-weight:700;fill:#64748b;letter-spacing:.06em}.l{font-size:12.5px;fill:#4338ca}</style>
+<rect x="0" y="0" width="1000" height="352" rx="14" fill="#f8fafc"/>
+<text x="16" y="34" class="z">ONE JOB, FROM THE IDEA TO THE RUNNING MACHINE</text>
+<rect x="12" y="54" width="120" height="112" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<circle cx="32" cy="76" r="11" fill="#6366f1"/>
+<text x="32" y="80" class="n" text-anchor="middle">1</text>
+<text x="24" y="112" class="h">Understand</text>
+<text x="24" y="132" class="s">project, libraries,</text>
+<text x="24" y="148" class="s">manuals</text>
+<path d="M134,110 L153,110" stroke="#6366f1" stroke-width="2" fill="none" marker-end="url(#ah)"/>
+<rect x="155" y="54" width="120" height="112" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<circle cx="175" cy="76" r="11" fill="#6366f1"/>
+<text x="175" y="80" class="n" text-anchor="middle">2</text>
+<text x="167" y="112" class="h">Plan</text>
+<text x="167" y="132" class="s">questions first,</text>
+<text x="167" y="148" class="s">spec before code</text>
+<path d="M277,110 L296,110" stroke="#6366f1" stroke-width="2" fill="none" marker-end="url(#ah)"/>
+<rect x="298" y="54" width="120" height="112" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<circle cx="318" cy="76" r="11" fill="#6366f1"/>
+<text x="318" y="80" class="n" text-anchor="middle">3</text>
+<text x="310" y="112" class="h">Implement</text>
+<text x="310" y="132" class="s">code, I/O, HMI,</text>
+<text x="310" y="148" class="s">by your rules</text>
+<path d="M420,110 L439,110" stroke="#6366f1" stroke-width="2" fill="none" marker-end="url(#ah)"/>
+<rect x="441" y="54" width="120" height="112" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<circle cx="461" cy="76" r="11" fill="#6366f1"/>
+<text x="461" y="80" class="n" text-anchor="middle">4</text>
+<text x="453" y="112" class="h">Build</text>
+<text x="453" y="132" class="s">check, fix,</text>
+<text x="453" y="148" class="s">build</text>
+<path d="M563,110 L582,110" stroke="#6366f1" stroke-width="2" fill="none" marker-end="url(#ah)"/>
+<rect x="584" y="54" width="120" height="112" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<circle cx="604" cy="76" r="11" fill="#6366f1"/>
+<text x="604" y="80" class="n" text-anchor="middle">5</text>
+<text x="596" y="112" class="h">Test</text>
+<text x="596" y="132" class="s">TcUnit, Scope,</text>
+<text x="596" y="148" class="s">simulation</text>
+<path d="M706,110 L725,110" stroke="#6366f1" stroke-width="2" fill="none" marker-end="url(#ah)"/>
+<rect x="727" y="54" width="120" height="112" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<circle cx="747" cy="76" r="11" fill="#6366f1"/>
+<text x="747" y="80" class="n" text-anchor="middle">6</text>
+<text x="739" y="112" class="h">Review</text>
+<text x="739" y="132" class="s">risks a compiler</text>
+<text x="739" y="148" class="s">cannot see</text>
+<path d="M849,110 L868,110" stroke="#6366f1" stroke-width="2" fill="none" marker-end="url(#ah)"/>
+<rect x="870" y="54" width="120" height="112" rx="8" fill="#eef2ff" stroke="#6366f1" stroke-width="1.5"/>
+<circle cx="890" cy="76" r="11" fill="#6366f1"/>
+<text x="890" y="80" class="n" text-anchor="middle">7</text>
+<text x="882" y="112" class="h">Deploy</text>
+<text x="882" y="132" class="s">activate or online</text>
+<text x="882" y="148" class="s">change, with proof</text>
+<text x="358" y="208" class="z" text-anchor="middle">CHECKPOINTS</text>
+<text x="358" y="225" class="z" text-anchor="middle">TCAGENT ENFORCES</text>
+<path d="M215,166 L215,190" stroke="#16a34a" stroke-width="2" fill="none"/>
+<rect x="155" y="190" width="120" height="44" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+<text x="215" y="209" class="g" text-anchor="middle">you confirm</text>
+<text x="215" y="225" class="g" text-anchor="middle">or skip</text>
+<path d="M501,166 L501,190" stroke="#16a34a" stroke-width="2" fill="none"/>
+<rect x="441" y="190" width="120" height="44" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+<text x="501" y="217" class="g" text-anchor="middle">0 errors</text>
+<path d="M644,166 L644,190" stroke="#16a34a" stroke-width="2" fill="none"/>
+<rect x="584" y="190" width="120" height="44" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+<text x="644" y="217" class="g" text-anchor="middle">tests pass</text>
+<path d="M930,166 L930,190" stroke="#16a34a" stroke-width="2" fill="none"/>
+<rect x="870" y="190" width="120" height="44" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
+<text x="930" y="209" class="g" text-anchor="middle">allowed target,</text>
+<text x="930" y="225" class="g" text-anchor="middle">your confirmation</text>
+<path d="M930,234 L930,268 L72,268 L72,169" stroke="#6366f1" stroke-width="2" stroke-dasharray="6 4" fill="none" marker-end="url(#ah)"/>
+<rect x="346" y="256" width="308" height="24" fill="#f8fafc"/>
+<text x="500" y="272" class="l" text-anchor="middle">Lessons, rules and skills stay for the next job</text>
+<text x="500" y="336" class="s" text-anchor="middle">Check, build and test run the same way without an AI in your pipeline.</text>
+</svg>
