@@ -4,6 +4,14 @@ All notable changes to TcAgent (MCP server `TcAgent.exe` and the Visual Studio e
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/); server and extension share one version number.
 
+## [Unreleased]
+
+### Fixed
+- **`tc_check` and `TcAgent.exe check` said OK despite compiler errors in solutions with several PLC projects**, for example a
+  program and a TcUnit project. The next PLC project clears the messages of the one before, and the error list was read only at
+  the end, so only the last project counted. The list is now read after each PLC project; the same for `analyze` and for
+  `tc_build checkAll=true`, which also lost the messages of the build.
+
 ## [0.52.0] – 2026-11-04
 
 The built-in knowledge in this version is TcAgent_Knowledge 1.0.0.

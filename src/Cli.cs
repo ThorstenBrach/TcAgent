@@ -194,7 +194,7 @@ public static partial class Cli
         var (compile, names) = tc.Sta.Run(() =>
         {
             var plcs = SelectedPlcs(o, tc);
-            foreach (var plc in plcs)
+            var found = tc.ReadAfterEach(plcs, plc =>
             {
                 if (o.Settings != null) ComCall.Invoke(plc, "LoadStaticAnalysisSettings", Path.GetFullPath(o.Settings));
                 if (o.Sarif != null)
@@ -206,8 +206,8 @@ public static partial class Cli
                     Say("SARIF: " + f);
                 }
                 else ComCall.Invoke(plc, "RunStaticAnalysis", false);
-            }
-            return (tc.ReadErrorList(5000).compile, plcs.Select(p => p.Name).ToList());
+            }, 5000);
+            return (found.compile, plcs.Select(p => p.Name).ToList());
         }, o.TimeoutSec * 1000);
         return ReportCompile(o, "analyze", string.Join(", ", names), compile, sw.Elapsed.TotalSeconds);
     }
@@ -336,9 +336,11 @@ public static partial class Cli
         {
             var list = tc.PlcProjects();
             if (list.Count == 0) throw new Exception("No PLC project in the solution.");
-            foreach (var plc in list)
+            var found = tc.ReadAfterEach(list, plc =>
+            {
                 if (!tc.CheckAllObjects(plc)) throw new Exception($"'Check all objects' is not available for {plc.Name}.");
-            return (tc.ReadErrorList(5000).compile, list.Select(p => p.Name).ToList());
+            }, 5000);
+            return (found.compile, list.Select(p => p.Name).ToList());
         }, o.TimeoutSec * 1000);
         return ReportCompile(o, "check", string.Join(", ", plcs), compile, sw.Elapsed.TotalSeconds);
     }
