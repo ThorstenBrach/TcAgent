@@ -277,6 +277,31 @@ bLamp := (bEnable AND NOT bPhaseOff);";
     }
 
     [Fact]
+    public void EnumCommentsFromTheDut()
+    {
+        var d = StEnums.FromText("TYPE E_State :\n(\n  Idle := 0,  // waiting for start\n  /// the cycle runs\n  Run,\n  (* fault *)\n  Error\n);\nEND_TYPE");
+        Assert.Equal("waiting for start", d["E_State.Idle"]);
+        Assert.Equal("the cycle runs", d["E_State.Run"]);
+        Assert.Equal("fault", d["E_State.Error"]);
+    }
+
+    [Fact]
+    public void CaseLabelsGetTheEnumCommentAndBlankLines()
+    {
+        var cfg = With("comment.case-labels", "enum", "blank.case-branches", "between");
+        cfg.EnumComments["E_State.Idle"] = "waiting for start";
+        var src = "CASE eState OF\nE_State.Idle:\nx := 1;\nE_State.Run:\nx := 2;\n// my own\nE_State.Error, E_State.Idle:\nx := 3;\n10:\nx := 4;\nELSE\nx := 5;\nEND_CASE";
+        var r = F(src, StPart.Implementation, cfg);
+        Assert.Null(r.Error);
+        Assert.Equal("CASE eState OF\n  // waiting for start\n  E_State.Idle:\n    x := 1;\n\n  // Run\n  E_State.Run:\n    x := 2;\n\n  // my own\n  E_State.Error, E_State.Idle:\n    x := 3;\n\n  10:\n    x := 4;\n\n  ELSE\n    x := 5;\nEND_CASE", N(r.Text));
+        Stable(r.Text, cfg);
+        var after = With("blank.case-branches", "after-label");
+        var a = F("CASE n OF\n1:\nx := 1;\n2: x := 2;\nEND_CASE", StPart.Implementation, after);
+        Assert.Equal("CASE n OF\n  1:\n\n    x := 1;\n  2: x := 2;\nEND_CASE", N(a.Text));
+        Stable(a.Text, after);
+    }
+
+    [Fact]
     public void ConfigFromLevelsLocksAndUnset()
     {
         var c = new StFormatConfig();

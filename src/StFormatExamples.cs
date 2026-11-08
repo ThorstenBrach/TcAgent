@@ -15,6 +15,10 @@ public static class StFormatExamples
     static Example I(string rule, string code, string[] values, params (string, string)[] with) => new(rule, StPart.Implementation, code, values, with);
     static Example D(string rule, string code, string[] values, params (string, string)[] with) => new(rule, StPart.Declaration, code, values, with);
 
+    /// <summary>The DUT the CASE examples refer to.</summary>
+    public const string EnumState = "TYPE E_State :\n(\n  Idle := 0,  // waiting for start\n  /// the cycle runs\n  Run,\n  Error\n);\nEND_TYPE";
+    const string CaseCode = "CASE eState OF\n  E_State.Idle:\n    IF bStart THEN eState := E_State.Run; END_IF\n  E_State.Run:\n    nCount := nCount + 1;\n  E_State.Error:\n    bAlarm := TRUE;\nEND_CASE";
+
     const string LongCall = "fbAxis(Execute := bStart, Position := rTarget, Velocity := rSpeed, Acceleration := rAcc);";
     const string LongIf = "IF bStartButton AND bDoorClosed AND NOT bEmergencyStop OR bSetupMode AND bKeySwitch THEN\n  x := 1;\nEND_IF";
 
@@ -36,6 +40,7 @@ public static class StFormatExamples
         I("space.parens", "nX := ( nA + nB ) * (nC);", new[] { "none", "one", "preserve" }),
         I("space.keyword-paren", "bX := NOT(bA) AND(bB);", new[] { "one", "preserve" }),
         I("space.call-paren", "F_Sum (nA, nB);", new[] { "none", "preserve" }),
+        I("comment.case-labels", CaseCode, new[] { "off", "enum" }),
         I("comment.eol-spaces", "nA := 1;// first\nnLonger := 22;    // second", new[] { "preserve", "1", "2" }),
         I("layout.blocks", "IF bStart THEN nCount := 0; bBusy := TRUE; END_IF", new[] { "expand", "preserve" }),
         I("layout.short-if", "IF bReset THEN\n  nCount := 0;\nEND_IF\nIF bStartConditionsComplete THEN\n  eState := E_State.Run;\nEND_IF", new[] { "preserve", "40", "80" }),
@@ -53,6 +58,7 @@ public static class StFormatExamples
         I("wrap.operator", LongIf, new[] { "first", "last" }, ("wrap.max-length", "60"), ("wrap.conditions", "when-long")),
         I("blank.max", "nA := 1;\n\n\n\nnB := 2;", new[] { "0", "1", "preserve" }),
         I("blank.body-edges", "\n\nnA := 1;\n\n", new[] { "remove", "preserve" }),
+        I("blank.case-branches", CaseCode, new[] { "preserve", "between", "after-label", "both" }),
         I("blank.around-blocks", "nA := 1;\nIF bStart THEN\n  nB := 2;\nEND_IF\nnC := 3;", new[] { "add", "preserve" }),
         I("paren.precedence", "bRelease := bAuto AND bDoorClosed OR bSetup AND bKey;", new[] { "true", "false" }),
     };
@@ -64,6 +70,8 @@ public static class StFormatExamples
         c.ApplyProfile("preserve", "example");
         foreach (var (k, v) in e.With) c.Set(k, v, "example");
         c.Set(e.Rule, value, "example");
+        // the enum of the CASE examples, as a project would have it in E_State.TcDUT
+        foreach (var kv in StEnums.FromText(EnumState)) c.EnumComments[kv.Key] = kv.Value;
         var r = StFormatter.Format(e.Code, c, e.Part);
         return r.Error != null ? "(not formatted: " + r.Error + ")" : r.Text;
     }

@@ -69,6 +69,8 @@ public static class CliFormat
         StFormatConfig cfg;
         try { cfg = rules != null ? StFormatConfig.FromFile(rules) : StFormatConfig.Load(dir); }
         catch (Exception ex) { Console.Error.WriteLine("Error: rules: " + ex.Message); return Cli.Usage; }
+        // the comments of the enum values of the project, for comment.case-labels
+        if (dir != null && cfg["comment.case-labels"].Equals("enum", StringComparison.OrdinalIgnoreCase)) cfg.EnumComments = StEnums.Read(dir);
 
         if (save != null)
         {

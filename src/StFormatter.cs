@@ -35,11 +35,26 @@ public static class StFormatter
             var before = StLexer.Lex(text);
             if (part == StPart.Auto) part = Detect(before);
             r.Part = part;
-            var once = Core(before, cfg, part, r.Notes, out bool parens);
+            var inserted = new List<string>();
+            var once = Core(before, cfg, part, r.Notes, out bool parens, inserted);
             // safety net 1: the meaning-carrying tokens are the same (brackets: checked on the trees in StExpr)
             var after = StLexer.Lex(once);
             var a = StLexer.Significant(before, parens);
             var b = StLexer.Significant(after, parens);
+            // comments the formatter wrote itself (comment.case-labels) are the only allowed addition
+            if (inserted.Count > 0)
+            {
+                // walk both: an extra comment in the new text must be the next one the formatter wrote, at its place
+                var kept = new List<string>();
+                int ia = 0, ins = 0;
+                foreach (var x in b)
+                {
+                    if (ia < a.Count && a[ia] == x) { kept.Add(x); ia++; continue; }
+                    if (ins < inserted.Count && x == "C:" + inserted[ins].TrimEnd()) { ins++; continue; }
+                    kept.Add(x);
+                }
+                b = kept;
+            }
             if (!a.SequenceEqual(b))
             {
                 int k = 0; while (k < a.Count && k < b.Count && a[k] == b[k]) k++;
@@ -52,7 +67,7 @@ public static class StFormatter
                 return r;
             }
             // safety net 2: idempotent
-            var twice = Core(after, cfg, part, new List<string>(), out _);
+            var twice = Core(after, cfg, part, new List<string>(), out _, new List<string>());
             if (twice != once)
             {
                 if (Environment.GetEnvironmentVariable("TCAGENT_FORMAT_DEBUG") is { Length: > 0 } dbg)
@@ -84,7 +99,7 @@ public static class StFormatter
         public readonly List<Piece> P = new();
         public string Newline;
         public string OrigIndent = "";
-        public bool Frozen, Blank, CommentOnly, Cont, Label, InBlock, Fixed;
+        public bool Frozen, Blank, CommentOnly, Cont, Label, InBlock, Fixed, CaseElse;
         public int Depth, DepthHere;
         public Line ContBase;
         public string Original;
@@ -93,7 +108,7 @@ public static class StFormatter
         public StToken Last => P.LastOrDefault(p => !p.T.Comment && p.T.Kind != StTok.Pragma)?.T;
     }
 
-    static string Core(List<StToken> tokens, StFormatConfig cfg, StPart part, List<string> notes, out bool parens)
+    static string Core(List<StToken> tokens, StFormatConfig cfg, StPart part, List<string> notes, out bool parens, List<string> inserted)
     {
         parens = false;
         var toks = new List<StToken>(tokens);
@@ -112,6 +127,7 @@ public static class StFormatter
         foreach (var l in lines) if (!l.Frozen && !l.Blank) Spacing(l, cfg, part);
         Indentation(lines, cfg);
         ExpandTabs(lines, cfg);
+        if (part == StPart.Implementation) lines = CaseBranches(lines, cfg, inserted);
         if (part == StPart.Declaration) AlignDeclarations(lines, cfg);
         if (part == StPart.Implementation)
         {
@@ -282,7 +298,7 @@ public static class StFormatter
                 if (f is "END_IF" or "END_FOR" or "END_WHILE" or "END_REPEAT" or "END_VAR" or "END_STRUCT" or "END_UNION") d = Math.Max(0, depth - 1);
                 else if (f == "UNTIL" && top?.Kind == "REPEAT") d = top.Base;
                 else if (f == "END_CASE" && top?.Kind == "CASE") d = top.Base;
-                else if (f == "ELSE" && top?.Kind == "CASE") d = top.LabelDepth;
+                else if (f == "ELSE" && top?.Kind == "CASE") { d = top.LabelDepth; l.CaseElse = true; }
                 else if (f is "ELSE" or "ELSIF" && top?.Kind == "IF") d = top.Base;
                 else if (label) d = top.LabelDepth;
                 l.Depth = d;
@@ -756,6 +772,78 @@ public static class StFormatter
             r.Add(Segment(target, start, target.P.Count, firstSeg, true));
         }
         return r;
+    }
+
+    // ------------------------------------------------------------------ CASE branches: comments above the labels, blank lines
+    /// <summary>comment.case-labels = enum: a comment above each CASE label that has none - the comment of the enum value
+    /// (StEnums, from the DUTs of the project), otherwise its name; numbers alone get none. blank.case-branches: a blank line
+    /// between the branches (between), after the label line (after-label) or both.</summary>
+    static List<Line> CaseBranches(List<Line> lines, StFormatConfig cfg, List<string> inserted)
+    {
+        bool comments = cfg["comment.case-labels"].Equals("enum", StringComparison.OrdinalIgnoreCase);
+        string blank = cfg["blank.case-branches"].ToLowerInvariant();
+        if (!comments && blank is not ("between" or "after-label" or "both")) return lines;
+        var r = new List<Line>();
+        Line Empty(Line like) => new Line { Blank = true, Newline = like.Newline ?? DefaultNewline, Original = "" };
+        bool first = true;                     // the first branch after OF gets no blank line above
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var l = lines[i];
+            if (!l.Frozen && Kw(l.Last, "OF") && l.P.Any(p => Kw(p.T, "OF"))) first = true;
+            bool branch = !l.Frozen && !l.Cont && (l.Label || l.CaseElse);   // a label list over several lines: only its end has the colon
+            if (branch)
+            {
+                // the comment lines right above belong to the label
+                int k = r.Count;
+                while (k > 0 && r[k - 1].CommentOnly && !r[k - 1].Frozen) k--;
+                bool hasComment = k < r.Count;
+                if (comments && !hasComment && l.Label && LabelComment(l, cfg) is { } text)
+                {
+                    var c = new Line { CommentOnly = true, Indent = l.Indent, Newline = DefaultNewline, Original = "", Depth = l.Depth };
+                    c.P.Add(new Piece { T = new StToken(StTok.LineComment, text) });
+                    r.Add(c); inserted.Add(text);
+                    k = r.Count - 1;
+                }
+                if (blank is "between" or "both" && !first && k > 0 && !r[k - 1].Blank) r.Insert(k, Empty(l));
+                first = false;
+                r.Add(l);
+                // a blank line after the label line, when the statements follow on the next lines
+                bool alone = l.P.Count > 0 && (l.P[^1].T.Text == ":" || Kw(l.Last, "ELSE"));
+                if (blank is "after-label" or "both" && alone && i + 1 < lines.Count && !lines[i + 1].Blank) r.Add(Empty(l));
+                continue;
+            }
+            r.Add(l);
+        }
+        return r;
+    }
+
+    /// <summary>"// <comment of the enum value>" for each value of the label, or its name; null for numbers only.</summary>
+    static string LabelComment(Line l, StFormatConfig cfg)
+    {
+        var items = new List<string>();
+        var cur = new StringBuilder();
+        int paren = 0;
+        foreach (var p in l.P)
+        {
+            var t = p.T;
+            if (t.Comment || t.Kind == StTok.Pragma) continue;
+            if (t.Text is "(" or "[") paren++; else if (t.Text is ")" or "]") paren--;
+            if (paren == 0 && t.Kind == StTok.Punct && t.Text is "," or ":") { items.Add(cur.ToString()); cur.Clear(); if (t.Text == ":") break; continue; }
+            cur.Append(t.Text);
+        }
+        var parts = new List<string>();
+        bool named = false;
+        foreach (var it in items.Select(x => x.Trim()).Where(x => x.Length > 0))
+        {
+            if (it.Contains("..") || char.IsDigit(it[0]) || it[0] == '-') { parts.Add(it); continue; }
+            named = true;
+            var key = it.Replace("#", ".");
+            if (cfg.EnumComments.TryGetValue(key, out var c)) { parts.Add(c); continue; }
+            // an unqualified value: unique among the enums of the project
+            var hits = cfg.EnumComments.Where(kv => kv.Key.EndsWith("." + key, StringComparison.OrdinalIgnoreCase)).Select(kv => kv.Value).Distinct().ToList();
+            parts.Add(hits.Count == 1 ? hits[0] : key.Split('.').Last());
+        }
+        return named && parts.Count > 0 ? "// " + string.Join(" / ", parts) : null;
     }
 
     // ------------------------------------------------------------------ short IF on one line
