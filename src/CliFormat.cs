@@ -5,6 +5,8 @@
 //       formats the text from stdin (UTF-8) and writes it to stdout; --json: {ok, changed, text, error, notes, part}
 //   TcAgent.exe format --file <file.st> [--write] [--check] ...   a plain-text file: print it, write it back, or only check it
 //   TcAgent.exe format --show-rules [--solution <sln>] [--json]   the effective rules and the level each one comes from
+//   TcAgent.exe format --save <changes.json> --level user|project|team|company [--solution <sln>]   writes rules into the
+//       formatting.json of that level (backup first); a rule set to "unset" is removed there - the settings window of the IDE
 //
 // Exit codes: 0 = formatted (or nothing to do), 1 = --check: the file would change, 2 = wrong call, 3 = not formatted (safety net).
 //
@@ -18,7 +20,7 @@ public static class CliFormat
 {
     public static int Run(string[] args)
     {
-        string solution = null, rules = null, file = null, part = null;
+        string solution = null, rules = null, file = null, part = null, save = null, level = null;
         bool stdin = false, json = false, write = false, check = false, show = false;
         try
         {
@@ -36,11 +38,13 @@ public static class CliFormat
                     case "--write": write = true; break;
                     case "--check": check = true; break;
                     case "--show-rules": show = true; break;
+                    case "--save": save = V(); break;
+                    case "--level": level = V(); break;
                     case "--survey": return Survey(V(), json: args.Contains("--json"));
                     default: throw new ArgumentException("unknown option " + args[i]);
                 }
             }
-            if (!stdin && file == null && !show) throw new ArgumentException("--stdin, --file or --show-rules is required");
+            if (!stdin && file == null && !show && save == null) throw new ArgumentException("--stdin, --file, --show-rules or --save is required");
         }
         catch (ArgumentException ex)
         {
@@ -54,6 +58,11 @@ public static class CliFormat
         try { cfg = rules != null ? StFormatConfig.FromFile(rules) : StFormatConfig.Load(dir); }
         catch (Exception ex) { Console.Error.WriteLine("Error: rules: " + ex.Message); return Cli.Usage; }
 
+        if (save != null)
+        {
+            try { Console.WriteLine(Save(save, level ?? "project", dir)); return Cli.Ok; }
+            catch (Exception ex) { Console.Error.WriteLine("Error: " + ex.Message); return Cli.Usage; }
+        }
         if (show)
         {
             if (json) { Console.WriteLine(cfg.ToJson().ToJsonString()); return Cli.Ok; }
@@ -101,6 +110,42 @@ public static class CliFormat
         }
         Console.Write(res.Text);
         return Cli.Ok;
+    }
+
+    /// <summary>Merges {"rules": {...}, "profile": "..."} into the formatting.json of a level (after a backup of the levels).</summary>
+    static string Save(string changesFile, string level, string dir)
+    {
+        var changes = JsonNode.Parse(File.ReadAllText(changesFile)) as JsonObject ?? throw new ArgumentException("the changes are not a JSON object");
+        string root = level.ToLowerInvariant() switch
+        {
+            "user" or "personal" => KnowledgeLayers.UserRoot,
+            "project" => KnowledgeLayers.ProjectRoot(dir) ?? throw new ArgumentException("--solution is needed for the project level"),
+            "team" => KnowledgeLayers.TeamWriteRoot(),
+            "company" => KnowledgeLayers.CompanyRoot ?? throw new ArgumentException("no company level - set TCAGENT_COMPANY"),
+            _ => throw new ArgumentException("--level user, project, team or company")
+        };
+        KnowledgeBackup.Version = Program.ServerVersion;
+        KnowledgeBackup.BeforeWrite(dir, "format rules");
+        var target = Path.Combine(root, "formatting.json");
+        var doc = File.Exists(target) ? JsonNode.Parse(File.ReadAllText(target)) as JsonObject ?? new JsonObject() : new JsonObject();
+        if (changes["profile"] is JsonNode prof)
+        {
+            var p = prof.ToString();
+            if (p == "unset" || p.Length == 0) doc.Remove("profile"); else doc["profile"] = p;
+        }
+        if (doc["rules"] is not JsonObject rules) { rules = new JsonObject(); doc["rules"] = rules; }
+        int n = 0;
+        foreach (var kv in (changes["rules"] as JsonObject ?? new JsonObject()).ToList())
+        {
+            var v = kv.Value?.ToString() ?? "unset";
+            if (!StFormatConfig.Rules.Any(r => r.Key.Equals(kv.Key, StringComparison.OrdinalIgnoreCase))) throw new ArgumentException("unknown rule " + kv.Key);
+            if (v == "unset") rules.Remove(kv.Key);
+            else rules[kv.Key] = int.TryParse(v, out var i) ? JsonValue.Create(i) : v is "true" or "false" ? JsonValue.Create(v == "true") : JsonValue.Create(v);
+            n++;
+        }
+        Directory.CreateDirectory(root);
+        File.WriteAllText(target, doc.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }) + "\n", new UTF8Encoding(false));
+        return $"{n} rule(s) saved in {target}";
     }
 
     static readonly System.Text.RegularExpressions.Regex Sections = new(

@@ -57,6 +57,8 @@ public sealed class StFormatConfig
     /// <summary>Where each value comes from: "default", "profile compact", "user", "project" ...</summary>
     public readonly Dictionary<string, string> Source = new(StringComparer.OrdinalIgnoreCase);
     public readonly List<string> Notes = new();
+    /// <summary>Rules a level locked: key → the level.</summary>
+    public readonly Dictionary<string, string> Locked = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>A formatting.json was found on some level (the agent formats its own code only then).</summary>
     public bool FromFiles;
 
@@ -130,6 +132,7 @@ public sealed class StFormatConfig
             }
             catch (Exception ex) { c.Notes.Add($"{f}: {ex.Message} - ignored"); }
         }
+        foreach (var kv in locked) c.Locked[kv.Key] = kv.Value;
         return c;
     }
 
@@ -144,7 +147,12 @@ public sealed class StFormatConfig
 
     public JsonObject ToJson() => new()
     {
-        ["rules"] = new JsonObject(Values.OrderBy(k => k.Key).Select(k => KeyValuePair.Create(k.Key, (JsonNode)new JsonObject { ["value"] = k.Value, ["from"] = Source[k.Key] }))),
+        ["rules"] = new JsonObject(Rules.Select(r => KeyValuePair.Create(r.Key, (JsonNode)new JsonObject
+        {
+            ["value"] = this[r.Key], ["from"] = Source[r.Key], ["default"] = r.Default, ["values"] = r.Values, ["description"] = r.Description,
+            ["locked"] = Locked.TryGetValue(r.Key, out var by) ? by : null
+        }))),
+        ["profiles"] = new JsonArray(Profiles.Keys.Select(p => (JsonNode)p).ToArray()),
         ["fromFiles"] = FromFiles,
         ["notes"] = new JsonArray(Notes.Select(n => (JsonNode)n).ToArray())
     };

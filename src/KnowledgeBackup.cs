@@ -1,6 +1,6 @@
 // Backup and restore of the knowledge levels (docs/KNOWLEDGE_LAYERS.md): coding rules, risk rules, skills, workflows,
 // lessons, templates, platforms, documentation sources (knowledge.md), the shared folders of the chat (the list and the kept files,
-// not the content of the folders), sources.json, skills.lock.json, disabled.json and config.json of the company, user, team, platform and project level (the built-in level comes with TcAgent).
+// not the content of the folders), sources.json, skills.lock.json, disabled.json, config.json and formatting.json of the company, user, team, platform and project level (the built-in level comes with TcAgent).
 //
 //   when      automatically before every writing action - knowledge window, chat (the knowledge tools), command line -
 //             and by hand. A level is only zipped when its content differs from its newest backup, so the newest backup
@@ -31,7 +31,7 @@ public static class KnowledgeBackup
     public static readonly string[] Parts =
     {
         "coding-rules", "coding-rules.md", "risk-rules", "risk-rules.md", "skills", "workflows", "lessons", "lessons.md", "doc-templates", "prompts",
-        "platforms", "platform.md", "knowledge.md", "sources.json", "skills.lock.json", "disabled.json", "config.json",
+        "platforms", "platform.md", "knowledge.md", "sources.json", "skills.lock.json", "disabled.json", "config.json", "formatting.json",
         SharedFolders.ListName, SharedFolders.FilesName
     };
 
