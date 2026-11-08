@@ -32,6 +32,16 @@ public static class Workflows
     public static readonly string[] Checkpoints = { "check-ok", "build-ok", "tests-ok", "spec-ok" };
     public const string SpecConfirm = "Confirmed", SpecNotYet = "Not yet", SpecSkip = "Skip the specification";
 
+    /// <summary>The question about the specification in the answer language of the chat (German or English; the labels in German
+    /// are understood by SpecAnswer too).</summary>
+    public sealed record SpecText(string Ask, string AskSkip, string Confirm, string ConfirmWhat, string NotYet, string NotYetWhat, string Skip, string SkipWhat);
+
+    public static SpecText SpecTexts(string language) => (language ?? "").StartsWith("de", StringComparison.OrdinalIgnoreCase)
+        ? new SpecText("Ist die Spezifikation vollständig, sodass die Umsetzung beginnen kann?", "Der Agent will ohne Spezifikation weitermachen. Überspringen?",
+                       "Bestätigt", "Die Umsetzung beginnt", "Noch nicht", "Der Agent klärt weiter", "Spezifikation überspringen", "Die Umsetzung beginnt ohne Spezifikation")
+        : new SpecText("Is the specification complete, so that the implementation can start?", "The agent wants to go on without a specification. Skip it?",
+                       SpecConfirm, "The implementation starts", SpecNotYet, "The agent goes on clarifying", SpecSkip, "The implementation starts without a specification");
+
     public sealed class Step
     {
         public string Id, Text, Requires;
@@ -156,8 +166,8 @@ public static class Workflows
     /// <summary>What the user decided: true = go on with the specification, false = go on without one, null = not yet.</summary>
     public static bool? SpecAnswer(string answer) =>
         answer?.Trim() is not { } a ? null
-        : a.StartsWith(SpecConfirm, StringComparison.OrdinalIgnoreCase) ? true
-        : a.StartsWith(SpecSkip, StringComparison.OrdinalIgnoreCase) ? false : null;
+        : a.StartsWith(SpecConfirm, StringComparison.OrdinalIgnoreCase) || a.StartsWith("Bestätigt", StringComparison.OrdinalIgnoreCase) ? true
+        : a.StartsWith(SpecSkip, StringComparison.OrdinalIgnoreCase) || a.StartsWith("Spezifikation überspringen", StringComparison.OrdinalIgnoreCase) ? false : null;
 
     /// <summary>Completes (or skips) the active step and activates the next one. Throws when a checkpoint is missing.</summary>
     public static string Advance(Run run, string stepId, bool skip, string note)

@@ -73,6 +73,9 @@ public class SpecCheckpointTests
     [InlineData("Confirmed, but name it FB_Conveyor", true)]
     [InlineData("Skip the specification", false)]
     [InlineData("Not yet", null)]
+    [InlineData("Bestätigt", true)]
+    [InlineData("Spezifikation überspringen", false)]
+    [InlineData("Noch nicht", null)]
     [InlineData("add a timeout first", null)]
     [InlineData(null, null)]
     public void TheAnswerDecides(string answer, bool? expected) => Assert.Equal(expected, Workflows.SpecAnswer(answer));

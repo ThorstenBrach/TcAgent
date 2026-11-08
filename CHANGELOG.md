@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Fixed
+- **The question about the specification** follows the answer language of the chat (German or English), and the chat asks the agent
+  to write what a person reads in a question, a specification or an advice in that language too, also as tool arguments.
 - **Knowledge window:** an item that waits for a plugin, a module or another TcAgent showed `✓ applies`. It now shows `✗ needs …`,
   the column Why says what is missing.
 - **`tc_check` and `TcAgent.exe check` said OK despite compiler errors in solutions with several PLC projects**, for example a
