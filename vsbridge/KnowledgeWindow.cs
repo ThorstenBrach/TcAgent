@@ -511,6 +511,8 @@ namespace TcAgentBridge
             refresh.Click += (s, e) => RefreshAll();
             var more = TcUnitControl.Tool("⋯", null, "Levels, backup, restore, diagnostics");
             var moreMenu = MenuOf(A("Levels …", "Company, team and platform folders or repositories (settings.json)", EditLevels),
+                                  A("Formatter settings …", "The rules of the ST formatter (formatting.json of the levels) with a preview",
+                                    () => { try { BridgePackage.Instance?.ShowFormatSettings(); } catch (Exception ex) { Error(ex.Message); } }),
                                   Sep,
                                   A(BackupLabel, "Back up the knowledge of the levels now (it is also backed up automatically before every change)", BackupNow),
                                   A(RestoreLabel, "Restore a level, a file or a skill from a backup", RestoreBackup),
