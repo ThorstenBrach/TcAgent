@@ -168,6 +168,70 @@ bLamp := (bEnable AND NOT bPhaseOff);";
         Assert.Contains("\n  bPhaseOff := FALSE;", N(once.Text));
     }
 
+    static StFormatConfig With(params string[] kv)
+    {
+        var c = new StFormatConfig();
+        for (int i = 0; i < kv.Length; i += 2) c.Set(kv[i], kv[i + 1], "test");
+        return c;
+    }
+
+    static void Stable(string text, StFormatConfig cfg) => Assert.Equal(text, F(text, StPart.Implementation, cfg).Text);
+
+    [Fact]
+    public void BlocksExpandToOneStatementPerLine()
+    {
+        var cfg = With("layout.blocks", "expand");
+        var r = F("IF a THEN b := 1; c := 2; ELSE d := 3; END_IF", StPart.Implementation, cfg);
+        Assert.Null(r.Error);
+        Assert.Equal("IF a THEN\n  b := 1;\n  c := 2;\nELSE\n  d := 3;\nEND_IF", N(r.Text));
+        Stable(r.Text, cfg);
+    }
+
+    [Fact]
+    public void ThenOnItsOwnLineOrAtTheEnd()
+    {
+        var own = With("layout.then", "own-line");
+        var r = F("IF a THEN\nb := 1;\nEND_IF\nWHILE x DO\ny := 1;\nEND_WHILE", StPart.Implementation, own);
+        Assert.Equal("IF a\nTHEN\n  b := 1;\nEND_IF\nWHILE x\nDO\n  y := 1;\nEND_WHILE", N(r.Text));
+        Stable(r.Text, own);
+        var same = With("layout.then", "same-line");
+        var s = F("IF a\nTHEN\nb := 1;\nEND_IF", StPart.Implementation, same);
+        Assert.Equal("IF a THEN\n  b := 1;\nEND_IF", N(s.Text));
+        Stable(s.Text, same);
+    }
+
+    [Fact]
+    public void LongConditionsGetOneTermPerLine()
+    {
+        var cfg = With("wrap.max-length", "40");
+        var r = F("IF bStartButton AND bDoorClosed AND NOT bEmergencyStop THEN\nx := 1;\nEND_IF", StPart.Implementation, cfg);
+        Assert.Null(r.Error);
+        Assert.Equal("IF bStartButton\n  AND bDoorClosed\n  AND NOT bEmergencyStop THEN\n  x := 1;\nEND_IF", N(r.Text));
+        Stable(r.Text, cfg);
+        var last = With("wrap.max-length", "40", "wrap.operator", "last");
+        var l = F("bRelease := bStartButton AND bDoorClosed OR bSetupMode AND bKey;", StPart.Implementation, last);
+        Assert.Equal("bRelease := (bStartButton AND bDoorClosed) OR\n            (bSetupMode AND bKey);", N(l.Text));
+        Stable(l.Text, last);
+    }
+
+    [Fact]
+    public void NamedArgumentsAndAssignmentsInColumns()
+    {
+        var cfg = With("wrap.max-length", "40", "align.assignments", "true");
+        var r = F("fbTimer(IN := bEnable AND NOT bPhase, PT := tOn);\nnA := 1;\nnLonger := 2;", StPart.Implementation, cfg);
+        Assert.Equal("fbTimer(\n  IN := bEnable AND NOT bPhase,\n  PT := tOn\n);\nnA      := 1;\nnLonger := 2;", N(r.Text));
+        Stable(r.Text, cfg);
+    }
+
+    [Fact]
+    public void BlankLinesAroundBlocks()
+    {
+        var cfg = With("blank.around-blocks", "add");
+        var r = F("x := 1;\n// check\nIF a THEN\nIF b THEN\ny := 2;\nEND_IF\nEND_IF\nz := 3;", StPart.Implementation, cfg);
+        Assert.Equal("x := 1;\n\n// check\nIF a THEN\n  IF b THEN\n    y := 2;\n  END_IF\nEND_IF\n\nz := 3;", N(r.Text));
+        Stable(r.Text, cfg);
+    }
+
     [Fact]
     public void ConfigFromLevelsLocksAndUnset()
     {
