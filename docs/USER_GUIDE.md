@@ -245,6 +245,8 @@ agent gets – coding rules, risk rules, skills, workflows, lessons, reference s
 knowledge without editing folders by hand. The levels and what belongs to them: [Your files](#configuration-reference)
 and [docs/KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md). Every list sorts by a click on a column header; a second click reverses it.
 
+<p align="center"><img src="img/knowledge-in-ide.png" width="1000" alt="The Knowledge window and the TcAgent Chat in the IDE"></p>
+
 *How the window works:* the tabs are on top – a badge on a tab counts what needs your attention there; on the right
 the platform of the project (a click opens the Platforms tab), **⟳** (F5) and **⋯** with **Levels …**, **Backup now …**,
 **Restore …**, **Refresh** and **Copy diagnostics**. All tabs use the same words in the same order: New … / Add
@@ -259,6 +261,8 @@ status line shows on the right what the tab holds.
 
 ### Overview
 
+<p align="center"><img src="img/knowledge-overview.png" width="900" alt="The Overview tab: what the agent gets, what needs attention, the workflow runs"></p>
+
 First **what the agent gets in this project** – one entry per kind (coding rule files, skills, workflows,
 reference sources …); a click shows them in the Files tab. Then **Needs attention** (items from a source changed
 or newer, Git changes, reference sources not reachable, open blocker/major feedback), each with a link to its tab. Below
@@ -270,6 +274,8 @@ workflow for its runs over time.
 <p><img src="img/knowledge/overview.png" width="900" alt="Overview: what the agent gets in this project, what needs attention and the workflow runs"><br><em>Overview: what the agent gets, what needs attention and the workflow runs</em></p>
 
 ### Files
+
+<p align="center"><img src="img/knowledge-tab-files.png" width="900" alt="The Files tab: every file of every level with its state and where it comes from"></p>
 
 Coding rules, risk rules, skills, workflows, lessons and templates of every level with their state
 (✓ applies, ↷ replaced by a later level, ⊘ switched off, locked, forced, and for an item from a source ✎ changed
@@ -291,6 +297,8 @@ branch for a pull request; the column **Git** marks changed and new files.
 <p><img src="img/knowledge/files.png" width="900" alt="Files: every knowledge file of every level with its kind, level and state"><br><em>Files: every knowledge file of every level with its kind, level and state</em></p>
 
 ### Sources
+
+<p align="center"><img src="img/knowledge-tab-sources.png" width="900" alt="The Sources tab: Git repositories and the items installed from them"></p>
 
 The Git repositories skills, workflows and rules can be installed from (`tc_sources`): **Browse and install …**
 first, then **New …**, **Open** (the repository in the browser; double-click), **Open folder** (TcAgent's local copy),
@@ -333,6 +341,8 @@ The output of these actions appears in the box **Output** at the bottom (folded 
 
 ### Platforms
 
+<p align="center"><img src="img/knowledge-tab-platforms.png" width="900" alt="The Platforms tab: the platform of this project and all platforms"></p>
+
 On top the decision for this project – which platforms apply, chosen by hand or detected and why, the
 libraries of the project – with **Set for this project …** and **Detect automatically**. Below all platforms
 (automation frameworks) with the libraries and terms that detect them and **✓ applies**. **New …** (a platform of your own – for you or, with a company
@@ -350,6 +360,8 @@ window at once; **⋯ > Set up clients** in the chat passes them on to the AI cl
 
 ### Modules
 
+<p align="center"><img src="img/knowledge-tab-modules.png" width="900" alt="The Modules tab: the tool modules and plugins the agent sees"></p>
+
 Which groups of tools the AI agent sees and which plugins it gets ([docs/PLUGINS.md](PLUGINS.md)). A check box per
 module switches it on or off – for **me** (your user level, the default) or for **this project**
 (`.tcagent\modules.json`, in Git for everybody who works on the solution). A grey box cannot be changed here: the core,
@@ -365,6 +377,8 @@ the TcUnit Tests window stays and says so, with a link to switch it on.
 
 ### Reference
 
+<p align="center"><img src="img/knowledge-tab-reference.png" width="900" alt="The Reference tab: what the agent looks things up in, and a search like the agent"></p>
+
 Manuals, datasheets and library docs the agent searches (`tc_docs`) – Beckhoff InfoSys, the links, folders and network
 shares of the `knowledge.md` of every level and the document folders `knowledge\`, each with type, level, state
 (✓ n documents, ↗ online, ○ empty – use Add documents …, ⚠ not reachable) and the file it is defined in. **Open** (browser or Explorer),
@@ -377,6 +391,8 @@ and open with a double-click (documents with their program, pages in the browser
 <p><img src="img/knowledge/reference.png" width="900" alt="Reference: the sources of tc_docs and a search like the agent"><br><em>Reference: what the agent looks things up in, and a search like the agent</em></p>
 
 ### Feedback
+
+<p align="center"><img src="img/knowledge-tab-feedback.png" width="900" alt="The Feedback tab: tool problems the agent reported"></p>
 
 The reports of `tc_feedback` (**Show:** open, all, resolved …). For the selected reports the window builds the text of
 an issue and **anonymizes** it: names of this computer, user, solution and projects, your `privateTerms`
@@ -394,6 +410,8 @@ problems are reported privately (`SECURITY.md`).
 
 ### Workflow runs
 
+<p align="center"><img src="img/knowledge-tab-workflow-runs.png" width="900" alt="The Workflow runs tab: failed checks and corrections per run over time"></p>
+
 Failed checks and corrections per run with a moving average, every adopted improvement as a marker, and the
 improvements with their values before and after (helped / no effect / worse / reverted); **Export CSV**. With fewer
 than two runs the chart says so instead of staying empty.
@@ -401,6 +419,8 @@ than two runs the chart says so instead of staying empty.
 <p><img src="img/knowledge/workflow-runs.png" width="900" alt="Workflow runs: the course of a workflow and the adopted improvements"><br><em>Workflow runs: the course of a workflow and the adopted improvements (here before the first run)</em></p>
 
 ### Advisor
+
+<p align="center"><img src="img/knowledge-tab-advisor.png" width="900" alt="The Advisor tab: advice with state, rating, kind and confidence"></p>
 
 The advice of the Advisor runs ([ADVISOR.md](ADVISOR.md)), newest first, with its finding, evidence, proposal and order.
 **Right**, **Partly**, **Wrong** and **n/a** rate it with one click (a "wrong" asks what is wrong); the heading shows the
@@ -411,6 +431,8 @@ done**). **Delete …** removes an advice from the list. Ctrl or Shift select se
 window with `TcAgent.exe advise`; at the running plant with `/advise-live` or the watch `TcAgent.exe advise watch`.
 
 ### Backup and restore
+
+<p align="center"><img src="img/knowledge-tab-backups.png" width="900" alt="The Backups tab: the automatic backups of every level"></p>
 
 The tab **Backups** (and **⋯ > Backup now … / Restore …**): the knowledge of every level – coding rules, risk rules, skills, workflows,
 lessons, templates, platforms, `knowledge.md`, `sources.json`, `skills.lock.json`, `disabled.json`, `config.json` – is

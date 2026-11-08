@@ -47,6 +47,8 @@ Advice that stays unrated for 14 days no longer counts as open.
 
 ## Where you see it
 
+<p align="center"><img src="img/knowledge-tab-advisor.png" width="900" alt="The Advisor tab of the Knowledge window: advice with state, rating, kind and confidence"></p>
+
 - **Knowledge window, tab Advisor:** the advice with its evidence, order and diff; one click to rate it; **Act on it …**
   opens the TcAgent Chat with the order in the input – you read it, change it and send it. The advice is then marked
   "sent", and the agent marks it done when the work is proven (`tc_advisor action=done`) – or you do (**Mark as done**).
