@@ -1,4 +1,4 @@
-// Unit tests: knowledge follows the modules - tcagent-requires-module and the note for tools of a switched-off module.
+﻿// Unit tests: knowledge follows the modules - tcagent-requires-module and the note for tools of a switched-off module.
 // SPDX-License-Identifier: MIT
 using TcAgent;
 using Xunit;
@@ -9,7 +9,7 @@ public class ModuleRequirementsTests
 
     [Fact]
     public void AnItemWaitsForItsModule() =>
-        Assert.Equal("module scope is switched off", PluginRequirements.MissingModules("scope", new[] { "scope" }, Known));
+        Assert.Equal("scope is switched off", PluginRequirements.MissingModules("scope", new[] { "scope" }, Known));
 
     [Fact]
     public void AnItemWithItsModulesOnTakesEffect() =>
@@ -17,7 +17,7 @@ public class ModuleRequirementsTests
 
     [Fact]
     public void AnUnknownModuleIsNamed() =>
-        Assert.Equal("module scopes does not exist", PluginRequirements.MissingModules("scopes", Array.Empty<string>(), Known));
+        Assert.Equal("scopes does not exist", PluginRequirements.MissingModules("scopes", Array.Empty<string>(), Known));
 
     [Fact]
     public void WithoutTheFieldNothingIsMissing() =>

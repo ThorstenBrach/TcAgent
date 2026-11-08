@@ -52,8 +52,8 @@ public static class PluginRequirements
         var problems = new List<string>();
         foreach (var id in (spec ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            if (!known.Contains(id, StringComparer.OrdinalIgnoreCase)) problems.Add($"module {id} does not exist");
-            else if (off.Contains(id, StringComparer.OrdinalIgnoreCase)) problems.Add($"module {id} is switched off");
+            if (!known.Contains(id, StringComparer.OrdinalIgnoreCase)) problems.Add($"{id} does not exist");
+            else if (off.Contains(id, StringComparer.OrdinalIgnoreCase)) problems.Add($"{id} is switched off");
         }
         return problems.Count == 0 ? null : string.Join("; ", problems);
     }
