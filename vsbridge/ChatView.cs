@@ -302,6 +302,8 @@ namespace TcAgentBridge
             menu.Items.Add(Item("TcUnit Tests", () => tests.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), tests.ToolTip as string));
             menu.Items.Add(Item("Knowledge", () => { try { BridgePackage.Instance?.ShowKnowledge(true); } catch { } },
                                 "TcAgent Knowledge window: what the agent gets (rules, skills, workflows, lessons) and how the workflows develop"));
+            menu.Items.Add(Item("Formatter settings …", () => { try { BridgePackage.Instance?.ShowFormatSettings(); } catch { } },
+                                "The rules of the ST formatter (Ctrl+Alt+F) with a preview"));
             menu.Items.Add(new Separator());
             menu.Items.Add(Group("Setup and help"));
             if (Installer.IsVsixInstall) menu.Items.Add(Item("Set up clients", () => setup.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), setup.ToolTip as string));
