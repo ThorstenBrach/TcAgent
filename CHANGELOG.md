@@ -33,6 +33,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   order in the project (`.tcagent\advisor`), a run is read only (TcAgent refuses every change). `TcAgent.exe advise` runs it
   without a window at night or after a failed pipeline, `/advise` in the chat. The Knowledge window has a tab Advisor: rate
   with one click, **Act on it …** puts the order into the chat. [docs/ADVISOR.md](docs/ADVISOR.md)
+- **Review of a whole project:** workflow `project-review` and prompt `/review-prj` - deterministic checks over everything first,
+  then the structure, deep reviews of at most 10 hotspots, a report with a traffic light per area; findings become advice.
+  `TcAgent.exe advise --trigger project` runs it without a window, e.g. once a month.
 - **Advisor (Live):** at the running plant, read only. `/advise-live` in the chat, `TcAgent.exe advise watch` notices a PLC or
   the runtime leaving Run, an exceeded cycle time and the fault signals of `.tcagent\advisor-watch.json` (by hand or in the
   chat), and starts a run with `--run`. A plugin brings its diagnosis skill and signals in an `advisor.json`.
