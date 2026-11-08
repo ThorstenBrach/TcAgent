@@ -39,6 +39,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **Knowledge window:** every list sorts by a click on a column header (again: the other way), and keeps the order when it is read again.
   Switching a module on or off reads the files again at once, so items that wait for it show it without a refresh.
 - **Knowledge window:** a … button picks a folder in the dialogs New source / Edit source and Levels (company, team, platform repositories; with several, it adds one). An empty name of a new source takes the name of the folder or repository.
+- **Knowledge window, deleting a source:** asks whether the items installed from it go as well - unchanged ones are uninstalled (a copy goes to the backups), ones you changed are kept as your own version.
 - **Advisor (Shadow):** an agent that reads and advises, never changes. `tc_advisor` keeps advice with evidence and a ready
   order in the project (`.tcagent\advisor`), a run is read only (TcAgent refuses every change). `TcAgent.exe advise` runs it
   without a window at night or after a failed pipeline, `/advise` in the chat. The Knowledge window has a tab Advisor: rate
