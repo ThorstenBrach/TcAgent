@@ -97,7 +97,7 @@ Buttons can be reached with Tab.
   repository"); an empty chat shows suggestions to click; an empty chart says from when it shows something.
 - **Several items are chosen with check boxes** whenever the choice takes effort (tests, items to install): the ticks
   stay when the filter or search changes; never Ctrl/Shift multi-selection - one click beside it would lose everything.
-  "Tick all shown" / "Untick all" where it helps.
+  "Select all" / "Select none" where it helps.
 - Filters: kind, level, search box with a hint inside and ✕ to clear.
 
 ## 8. Safety-relevant information is visible
