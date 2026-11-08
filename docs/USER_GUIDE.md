@@ -402,7 +402,8 @@ than two runs the chart says so instead of staying empty.
 The advice of the Advisor runs ([ADVISOR.md](ADVISOR.md)), newest first, with its finding, evidence, proposal and order.
 **Right**, **Partly**, **Wrong** and **n/a** rate it with one click (a "wrong" asks what is wrong); the heading shows the
 hit rate per kind of task. **Act on it …** (or a double-click) opens the TcAgent Chat with the order in the input: you read
-it, change it and send it. The Advisor itself never changes anything. A run starts in the chat with `/advise`, or without a
+it, change it and send it; the advice is then "sent", and the agent marks it done when the work is proven (or you do: **Mark as
+done**). **Delete …** removes an advice from the list. **Show** filters open, not rated, done or all. The Advisor itself never changes anything. A run starts in the chat with `/advise`, or without a
 window with `TcAgent.exe advise`; at the running plant with `/advise-live` or the watch `TcAgent.exe advise watch`.
 
 ### Backup and restore

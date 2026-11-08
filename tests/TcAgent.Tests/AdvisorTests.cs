@@ -52,6 +52,23 @@ public class AdvisorTests : IDisposable
     }
 
     [Fact]
+    public void AdviceIsActedOnDoneOrDeleted()
+    {
+        var a = Advisor.Record(dir, Advice());
+        var b = Advisor.Record(dir, Advice());
+        Assert.Equal("open", Advisor.Load(dir)[0].State);
+        Advisor.Mark(dir, a.Id, "acted", "anna");
+        Assert.Equal("acted", Advisor.Load(dir).Single(i => i.Id == a.Id).State);
+        Advisor.Mark(dir, a.Id, "done", "anna", "fixed in commit 1a2b");
+        var done = Advisor.Load(dir).Single(i => i.Id == a.Id);
+        Assert.Equal("done", done.State);
+        Assert.Equal("fixed in commit 1a2b", done.DoneComment);
+        Advisor.Mark(dir, b.Id, "delete", "anna");
+        Assert.Equal(new[] { a.Id }, Advisor.Load(dir).Select(i => i.Id));
+        Assert.Throws<ArgumentException>(() => Advisor.Mark(dir, b.Id, "done", "anna"));
+    }
+
+    [Fact]
     public void AnUnknownRatingOrIdIsRefused()
     {
         var it = Advisor.Record(dir, Advice());

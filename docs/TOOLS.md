@@ -230,7 +230,7 @@ Advisor Live: `watch_list` (the fault signals of the project and the plugins), `
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `action` | string | yes | start, record, finish, list, rate, stats, watch_list, watch_add, watch_remove, watch_check |
+| `action` | string | yes | start, record, finish, list, rate, done (the finding is dealt with), stats, watch_list, watch_add, watch_remove, watch_check |
 | `symbol`, `when`, `text`, `details` | string |  | watch_add/remove: the fault signal (details comma-separated) |
 | `port` | integer |  | watch_add: ADS port of the PLC (default 851) |
 | `netId` | string |  | watch_check: AmsNetId (default: the target of the project) |
