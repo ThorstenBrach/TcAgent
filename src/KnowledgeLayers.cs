@@ -412,7 +412,33 @@ public static class KnowledgeLayers
             foreach (var e in needing)
                 if (PluginRequirements.Missing(e.Meta.Get(PluginRequirements.Key), plugins) is { } missing) { e.Status = PluginRequirements.Status; e.Reason = missing; }
         }
+        // modules switched off: what needs them waits, what only names their tools gets a note
+        var off = OffModules(solutionDir);
+        if (off.Count > 0)
+        {
+            var known = Modules.All.Select(m => m.Id).Concat(off).ToList();
+            foreach (var e in all.Where(x => x.Active))
+            {
+                if (PluginRequirements.MissingModules(e.Meta?.Get(PluginRequirements.ModuleKey), off, known) is { } missing)
+                { e.Status = PluginRequirements.ModuleStatus; e.Reason = missing; }
+                else if (string.IsNullOrEmpty(e.Reason) && PluginRequirements.OffModuleNote(e.Meta?.Body, off, Modules.Of) is { } note) e.Reason = note;
+            }
+        }
+        else
+            foreach (var e in all.Where(x => x.Active && !string.IsNullOrWhiteSpace(x.Meta?.Get(PluginRequirements.ModuleKey))))
+                if (PluginRequirements.MissingModules(e.Meta.Get(PluginRequirements.ModuleKey), off, Modules.All.Select(m => m.Id).ToList()) is { } missing)
+                { e.Status = PluginRequirements.ModuleStatus; e.Reason = missing; }
         return all;
+    }
+
+    static HashSet<string> OffModules(string solutionDir)
+    {
+        try
+        {
+            var plugins = Plugins.Found(solutionDir);
+            return Modules.Off(Modules.Effective(solutionDir, plugins.Select(p => (p.Id, p.Name, p.Description, 0))));
+        }
+        catch (Exception ex) { Log.Error("modules: " + ex.Message); return new HashSet<string>(StringComparer.OrdinalIgnoreCase); }
     }
 
     // ------------------------------------------------------------------ disabled.json

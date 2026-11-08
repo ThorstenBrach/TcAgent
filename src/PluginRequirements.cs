@@ -11,6 +11,11 @@
 //
 // does the same for the version of TcAgent: for an item that uses a tool or function that older versions do not have.
 //
+//   tcagent-requires-module: scope, hmi
+//
+// does the same for modules (Modules.cs): while one of them is switched off, the item has the status "needs module". An item
+// that only names tools of a switched-off module stays active and gets a note - a review still works without the static analysis.
+//
 // Pure logic, so the unit tests link this file.
 //
 // SPDX-License-Identifier: MIT
@@ -32,8 +37,37 @@ public static class PluginRequirements
     /// <summary>The status of an entry that needs another version of TcAgent.</summary>
     public const string TcAgentStatus = "needs TcAgent";
 
-    /// <summary>Is the entry only waiting for a plugin or a TcAgent version? It stays visible, the lists say what is missing.</summary>
-    public static bool Waiting(KnowledgeLayers.Entry e) => e.Status is Status or TcAgentStatus;
+    /// <summary>The key of the modules an item cannot work without (Modules.cs).</summary>
+    public const string ModuleKey = "requires-module";
+
+    /// <summary>The status of an entry whose module is switched off.</summary>
+    public const string ModuleStatus = "needs module";
+
+    /// <summary>Is the entry only waiting for a plugin, a module or a TcAgent version? It stays visible, the lists say what is missing.</summary>
+    public static bool Waiting(KnowledgeLayers.Entry e) => e.Status is Status or TcAgentStatus or ModuleStatus;
+
+    /// <summary>What is missing of the modules ("scope, hmi"), or null. off: the modules switched off; known: all module ids.</summary>
+    public static string MissingModules(string spec, ICollection<string> off, ICollection<string> known)
+    {
+        var problems = new List<string>();
+        foreach (var id in (spec ?? "").Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (!known.Contains(id, StringComparer.OrdinalIgnoreCase)) problems.Add($"module {id} does not exist");
+            else if (off.Contains(id, StringComparer.OrdinalIgnoreCase)) problems.Add($"module {id} is switched off");
+        }
+        return problems.Count == 0 ? null : string.Join("; ", problems);
+    }
+
+    static readonly Regex ToolName = new(@"\b(?:tc|ads|x)_[a-z0-9_]+\b");
+
+    /// <summary>A note for an item that names tools of switched-off modules - it stays active, only some of its steps are missing.</summary>
+    public static string OffModuleNote(string text, ICollection<string> off, Func<string, string> moduleOf)
+    {
+        var hits = ToolName.Matches(text ?? "").Select(m => m.Value).Distinct()
+                           .Select(t => (tool: t, module: moduleOf(t))).Where(x => x.module != null && off.Contains(x.module, StringComparer.OrdinalIgnoreCase))
+                           .GroupBy(x => x.module).Select(g => $"{g.Key} ({string.Join(", ", g.Select(x => x.tool))})").ToList();
+        return hits.Count == 0 ? null : "uses tools of switched-off modules: " + string.Join("; ", hits);
+    }
 
     /// <summary>What is missing for the TcAgent versions, or null if this one fits.</summary>
     public static string MissingTcAgent(string versions, string current) =>
