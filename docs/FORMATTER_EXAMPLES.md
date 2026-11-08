@@ -519,6 +519,48 @@ END_IF
 IF bStart THEN nCount := 0; bBusy := TRUE; END_IF
 ```
 
+### Short IF on one line up to (`layout.short-if`)
+
+IF ... THEN with one statement and END_IF on one line when it stays within this many characters. Default: `preserve`.
+
+Written as:
+
+```
+IF bReset THEN
+  nCount := 0;
+END_IF
+IF bStartConditionsComplete THEN
+  eState := E_State.Run;
+END_IF
+```
+
+`preserve`:
+
+```
+IF bReset THEN
+  nCount := 0;
+END_IF
+IF bStartConditionsComplete THEN
+  eState := E_State.Run;
+END_IF
+```
+
+`40`:
+
+```
+IF bReset THEN nCount := 0; END_IF
+IF bStartConditionsComplete THEN
+  eState := E_State.Run;
+END_IF
+```
+
+`80`:
+
+```
+IF bReset THEN nCount := 0; END_IF
+IF bStartConditionsComplete THEN eState := E_State.Run; END_IF
+```
+
 ### THEN, DO, OF (`layout.then`)
 
 THEN, DO and OF at the end of the condition or on their own line. Default: `preserve`.

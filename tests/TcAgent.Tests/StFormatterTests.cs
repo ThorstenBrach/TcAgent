@@ -253,6 +253,20 @@ bLamp := (bEnable AND NOT bPhaseOff);";
     }
 
     [Fact]
+    public void ShortIfsOnOneLine()
+    {
+        var cfg = With("layout.short-if", "40");
+        var src = "IF bReset THEN\nnCount := 0;\nEND_IF\nIF bStartConditionsComplete THEN\neState := E_State.Run;\nEND_IF\nIF a THEN\nb := 1;\nELSE\nb := 2;\nEND_IF";
+        var r = F(src, StPart.Implementation, cfg);
+        Assert.Equal("IF bReset THEN nCount := 0; END_IF\nIF bStartConditionsComplete THEN\n  eState := E_State.Run;\nEND_IF\nIF a THEN\n  b := 1;\nELSE\n  b := 2;\nEND_IF", N(r.Text));
+        Stable(r.Text, cfg);
+        var both = With("layout.short-if", "40", "layout.blocks", "expand", "blank.around-blocks", "add");
+        var x = F("x := 1;\nIF bReset THEN nCount := 0; END_IF\ny := 2;", StPart.Implementation, both);
+        Assert.Null(x.Error);
+        Stable(x.Text, both);
+    }
+
+    [Fact]
     public void ConfigFromLevelsLocksAndUnset()
     {
         var c = new StFormatConfig();
