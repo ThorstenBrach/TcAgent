@@ -295,7 +295,7 @@ namespace TcAgentBridge
 
             var w = new Window
             {
-                Title = T("Formatter settings (TcAgent)", "Formatierer-Einstellungen (TcAgent)"), Icon = AppIcon, Width = 1200, Height = 780, MinWidth = 820, MinHeight = 520,
+                Title = T("Formatter settings (TcAgent)", "Formatierer-Einstellungen (TcAgent)"), Icon = AppIcon, Width = 1280, Height = 780, MinWidth = 820, MinHeight = 520,
                 ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResizeWithGrip
             };
             try { w.Owner = Application.Current?.MainWindow; } catch { }
@@ -350,7 +350,7 @@ namespace TcAgentBridge
             foreach (var x in new UIElement[] { close, save, undo }) { DockPanel.SetDock(x, Dock.Right); bar.Children.Add(x); }
 
             var body = new Grid { Margin = new Thickness(12, 0, 12, 0) };
-            body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(580), MinWidth = 420 });
+            body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(640), MinWidth = 420 });
             body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             body.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 300 });
             var root = new DockPanel();
@@ -412,9 +412,22 @@ namespace TcAgentBridge
 
             // ---- left: the rules (group headings, Rule | Value | From), the details below
             var list = new Grid();
+            // the value column as wide as the longest value in plain words, so every choice can be read in full
+            double valueWidth = 120;
+            try
+            {
+                var tf = new Typeface(w.FontFamily, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+                foreach (var kv in rules)
+                    foreach (var v in (FmtStr(kv.Value as Dictionary<string, object>, "values") ?? "").Split('|').Select(x => x.Trim()).Where(x => x.Length > 0 && x != "number"))
+                    {
+                        var ft = new FormattedText(Disp(kv.Key, v), System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, tf, w.FontSize, Brushes.Black, 1.0);
+                        valueWidth = Math.Max(valueWidth, ft.WidthIncludingTrailingWhitespace + 40);
+                    }
+            }
+            catch { valueWidth = 240; }
             list.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
-            list.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
-            list.ColumnDefinitions.Add(new ColumnDefinition());
+            list.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(Math.Ceiling(valueWidth)) });
+            list.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 120 });
             var selBrush = new SolidColorBrush(Color.FromArgb(70, 0x3B, 0x6F, 0xD8));
             var detail = new StackPanel { Margin = new Thickness(10, 8, 10, 8) };
             var folded = new HashSet<TextBlock>();
