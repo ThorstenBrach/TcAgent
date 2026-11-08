@@ -30,6 +30,7 @@ least one AI client is signed in.
 - [Understanding code](#understanding-code)
 - [Writing and changing code](#writing-and-changing-code)
 - [Plain-text ST files](#plain-text-st-files)
+- [Formatting ST code](#formatting-st-code)
 - [Coding rules](#coding-rules)
 - [Library APIs](#library-apis)
 - [SFC step chains](#sfc-step-chains)
@@ -636,6 +637,17 @@ is refused while the solution is open in an IDE.
 - Format, rules and exit codes: [PLAINTEXT.md](PLAINTEXT.md).
 
 ---
+
+## Formatting ST code
+
+Open a POU, method, property, action, DUT or GVL and press **Ctrl+Alt+F** (or **Tools > Format ST code (TcAgent)**): TcAgent
+formats the declaration and the implementation - indentation, case of keywords, spacing, aligned declarations, blank lines,
+long calls, brackets in conditions. Unsaved changes are included, **Ctrl+Z** takes it back. It never changes what the code
+means: a safety net compares the code before and after, and a part it cannot read stays as it is.
+
+Every rule can be set in `formatting.json` on the knowledge levels (company, team, platform, project - a level can lock
+rules). Sections stay untouched between `// tcagent-format: off` and `// tcagent-format: on`. Rules, profiles and examples:
+[FORMATTER.md](FORMATTER.md).
 
 ## Coding rules
 
