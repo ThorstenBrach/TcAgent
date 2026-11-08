@@ -29,7 +29,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **`tc_library action=resolve`:** the name alone is enough, and the answer is the effective version instead of `*`.
 
 ### Added
-- **Knowledge window:** a … button picks a folder in the dialogs New source / Edit source and Levels (company, team, platform repositories; with several, it adds one).
+- **Knowledge window:** a … button picks a folder in the dialogs New source / Edit source and Levels (company, team, platform repositories; with several, it adds one). An empty name of a new source takes the name of the folder or repository.
 - **Advisor (Shadow):** an agent that reads and advises, never changes. `tc_advisor` keeps advice with evidence and a ready
   order in the project (`.tcagent\advisor`), a run is read only (TcAgent refuses every change). `TcAgent.exe advise` runs it
   without a window at night or after a failed pipeline, `/advise` in the chat. The Knowledge window has a tab Advisor: rate
