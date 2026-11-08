@@ -185,11 +185,29 @@ namespace TcAgentBridge
             return r;
         }
 
+        // ------------------------------------------------------------------ language: German when the chat answers in German, English otherwise
+        [ThreadStatic] static bool fmtGerman;
+        static string T(string en, string de) => fmtGerman ? de : en;
+
+        static bool UiGerman()
+        {
+            var lang = ChatSetting("answerLanguage") as string;
+            if (string.IsNullOrWhiteSpace(lang) || lang.Equals("request", StringComparison.OrdinalIgnoreCase)) lang = System.Globalization.CultureInfo.CurrentUICulture.Name;
+            return lang.StartsWith("de", StringComparison.OrdinalIgnoreCase) || lang.StartsWith("German", StringComparison.OrdinalIgnoreCase) || lang.StartsWith("Deutsch", StringComparison.OrdinalIgnoreCase);
+        }
+
+        static string LevelName(string l) => l switch { "project" => T("project", "Projekt"), "user" => T("user", "Benutzer"), "team" => "Team", "company" => T("company", "Firma"), _ => l };
+
+        /// <summary>Where a value comes from, in the language of the window.</summary>
+        static string FromName(string f) => !fmtGerman || f == null ? f : f.Replace("default", "Standard").Replace("unset by", "zurückgesetzt von").Replace("profile", "Profil")
+            .Replace("user", "Benutzer").Replace("project", "Projekt").Replace("company", "Firma").Replace("built-in", "eingebaut").Replace("platform", "Plattform");
+
         // ------------------------------------------------------------------ the window
         internal void ShowFormatSettings()
         {
+            fmtGerman = UiGerman();
             var exe = TcUnitControl.TcAgentExe();
-            if (exe == null) { FormatMessage("Formatter settings: TcAgent.exe was not found - set it up in the TcAgent Chat first.", true); return; }
+            if (exe == null) { FormatMessage(T("Formatter settings: TcAgent.exe was not found - set it up in the TcAgent Chat first.", "Formatierer-Einstellungen: TcAgent.exe wurde nicht gefunden - richte TcAgent zuerst im TcAgent Chat ein."), true); return; }
             var sln = TcUnitControl.SolutionPath();
             // values from the IDE are read on the UI thread before anything runs in the background
             string openDecl = null, openImpl = null, openName = null;
@@ -215,7 +233,7 @@ namespace TcAgentBridge
 
             var w = new Window
             {
-                Title = "Formatter settings (TcAgent)", Icon = AppIcon, Width = 1200, Height = 780, MinWidth = 820, MinHeight = 520,
+                Title = T("Formatter settings (TcAgent)", "Formatierer-Einstellungen (TcAgent)"), Icon = AppIcon, Width = 1200, Height = 780, MinWidth = 820, MinHeight = 520,
                 ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResizeWithGrip
             };
             try { w.Owner = Application.Current?.MainWindow; } catch { }
@@ -225,28 +243,29 @@ namespace TcAgentBridge
 
             // ---- frame: heading, search/profile/level, body, buttons, status line
             var head = new TextBlock { Margin = new Thickness(12, 10, 12, 6), TextWrapping = TextWrapping.Wrap };
-            head.Inlines.Add(new Run("Formatter settings") { FontWeight = FontWeights.SemiBold, FontSize = 14 });
-            head.Inlines.Add(new Run(" – every rule of the ST formatter; a change shows at once in the preview") { Foreground = Brushes.Gray });
-            var search = new TextBox { Width = 300, Padding = new Thickness(3, 2, 3, 2), ToolTip = "Search rules by name, key or description (Ctrl+F)" };
-            var hint = new TextBlock { Text = "Search rules (Ctrl+F)", Opacity = 0.55, IsHitTestVisible = false, Margin = new Thickness(6, 3, 0, 0) };
-            var clear = new Button { Content = "✕", Width = 22, Padding = new Thickness(0), BorderThickness = new Thickness(0), Background = Brushes.Transparent, Visibility = Visibility.Collapsed, ToolTip = "Clear the search" };
+            head.Inlines.Add(new Run(T("Formatter settings", "Formatierer-Einstellungen")) { FontWeight = FontWeights.SemiBold, FontSize = 14 });
+            head.Inlines.Add(new Run(T(" – every rule of the ST formatter; a change shows at once in the preview", " – jede Regel des ST-Formatierers; eine Änderung zeigt sich sofort in der Vorschau")) { Foreground = Brushes.Gray });
+            var search = new TextBox { Width = 300, Padding = new Thickness(3, 2, 3, 2), ToolTip = T("Search rules by name, key or description (Ctrl+F)", "Regeln nach Name, Schlüssel oder Beschreibung suchen (Strg+F)") };
+            var hint = new TextBlock { Text = T("Search rules (Ctrl+F)", "Regeln suchen (Strg+F)"), Opacity = 0.55, IsHitTestVisible = false, Margin = new Thickness(6, 3, 0, 0) };
+            var clear = new Button { Content = "✕", Width = 22, Padding = new Thickness(0), BorderThickness = new Thickness(0), Background = Brushes.Transparent, Visibility = Visibility.Collapsed, ToolTip = T("Clear the search", "Suche leeren") };
             var searchBox = new Grid { Width = 300 };
             searchBox.Children.Add(search); searchBox.Children.Add(hint);
             clear.HorizontalAlignment = HorizontalAlignment.Right; searchBox.Children.Add(clear);
-            var profile = new ComboBox { MinWidth = 120, Margin = new Thickness(6, 0, 0, 0), ToolTip = "Puts the values of a profile into the window (not locked rules); Save writes the changed ones" };
-            var level = new ComboBox { MinWidth = 110, Margin = new Thickness(6, 0, 0, 0), ToolTip = "The knowledge level whose formatting.json gets the changed rules" };
-            if (!string.IsNullOrEmpty(sln)) level.Items.Add("project");
-            level.Items.Add("user");
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TCAGENT_TEAM"))) level.Items.Add("team");
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TCAGENT_COMPANY"))) level.Items.Add("company");
+            var profile = new ComboBox { MinWidth = 120, Margin = new Thickness(6, 0, 0, 0), ToolTip = T("Puts the values of a profile into the window (not locked rules); Save writes the changed ones", "Übernimmt die Werte eines Profils ins Fenster (nicht gesperrte Regeln); Speichern schreibt die geänderten") };
+            var level = new ComboBox { MinWidth = 110, Margin = new Thickness(6, 0, 0, 0), ToolTip = T("The knowledge level whose formatting.json gets the changed rules", "Die Wissens-Ebene, deren formatting.json die geänderten Regeln bekommt") };
+            ComboBoxItem Lv(string v) => new ComboBoxItem { Content = LevelName(v), Tag = v };
+            if (!string.IsNullOrEmpty(sln)) level.Items.Add(Lv("project"));
+            level.Items.Add(Lv("user"));
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TCAGENT_TEAM"))) level.Items.Add(Lv("team"));
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TCAGENT_COMPANY"))) level.Items.Add(Lv("company"));
             level.SelectedIndex = 0;
             var row = new DockPanel { Margin = new Thickness(12, 0, 12, 8), LastChildFill = false };
-            var lp = new TextBlock { Text = "Start from profile:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
-            var ll = new TextBlock { Text = "Save to level:", VerticalAlignment = VerticalAlignment.Center };
+            var lp = new TextBlock { Text = T("Start from profile:", "Starten mit Profil:"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+            var ll = new TextBlock { Text = T("Save to level:", "Speichern in Ebene:"), VerticalAlignment = VerticalAlignment.Center };
             foreach (var x in new UIElement[] { searchBox, lp, profile }) { DockPanel.SetDock(x, Dock.Left); row.Children.Add(x); }
             foreach (var x in new UIElement[] { level, ll }) { DockPanel.SetDock(x, Dock.Right); row.Children.Add(x); }
 
-            var statusLeft = new TextBlock { Text = "Reading the rules …", VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+            var statusLeft = new TextBlock { Text = T("Reading the rules …", "Lese die Regeln …"), VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
             var statusRight = new TextBlock { Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center };
             var progress = new ProgressBar { Height = 2, IsIndeterminate = true, BorderThickness = new Thickness(0), Visibility = Visibility.Visible };
             var status = new DockPanel { Margin = new Thickness(0) };
@@ -257,12 +276,12 @@ namespace TcAgentBridge
             statusLeft.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.StatusBarDefaultTextBrushKey);
             statusRight.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.StatusBarDefaultTextBrushKey);
 
-            var wish = new Button { Content = "Wish a rule or feature …", Padding = new Thickness(10, 3, 10, 3), ToolTip = "Opens a new issue on GitHub with the example of the preview - you check it there and send it yourself" };
-            var undo = new Button { Content = "Undo changes", Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(6, 0, 0, 0), ToolTip = "Back to the rules as they apply now" };
-            var save = new Button { Content = "Save", Padding = new Thickness(18, 3, 18, 3), Margin = new Thickness(6, 0, 0, 0), IsEnabled = false, ToolTip = "Writes the changed rules into formatting.json of the chosen level" };
+            var wish = new Button { Content = T("Wish a rule or feature …", "Regel oder Funktion wünschen …"), Padding = new Thickness(10, 3, 10, 3), ToolTip = T("Opens a new issue on GitHub with the example of the preview - you check it there and send it yourself", "Öffnet ein neues Issue auf GitHub mit dem Beispiel der Vorschau - du prüfst es dort und schickst es selbst ab") };
+            var undo = new Button { Content = T("Undo changes", "Änderungen verwerfen"), Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(6, 0, 0, 0), ToolTip = T("Back to the rules as they apply now", "Zurück zu den Regeln, wie sie jetzt gelten") };
+            var save = new Button { Content = T("Save", "Speichern"), Padding = new Thickness(18, 3, 18, 3), Margin = new Thickness(6, 0, 0, 0), IsEnabled = false, ToolTip = T("Writes the changed rules into formatting.json of the chosen level", "Schreibt die geänderten Regeln in die formatting.json der gewählten Ebene") };
             save.SetResourceReference(Control.BackgroundProperty, EnvironmentColors.SystemHighlightBrushKey);
             save.SetResourceReference(Control.ForegroundProperty, EnvironmentColors.SystemHighlightTextBrushKey);
-            var close = new Button { Content = "Close", Padding = new Thickness(14, 3, 14, 3), Margin = new Thickness(6, 0, 0, 0), IsCancel = true };
+            var close = new Button { Content = T("Close", "Schließen"), Padding = new Thickness(14, 3, 14, 3), Margin = new Thickness(6, 0, 0, 0), IsCancel = true };
             close.Click += (s, e) => w.Close();
             var bar = new DockPanel { Margin = new Thickness(12, 8, 12, 8), LastChildFill = false };
             DockPanel.SetDock(wish, Dock.Left); bar.Children.Add(wish);
@@ -291,7 +310,7 @@ namespace TcAgentBridge
                     state = await rulesTask;
                     state["__examples"] = await exTask;
                 }
-                catch (Exception ex) { FormatMessage("Formatter settings: the rules could not be read.\n\n" + Inner(ex) + "\n\nTcAgent 0.54 or newer is needed.", true); w.Close(); return; }
+                catch (Exception ex) { FormatMessage(T("Formatter settings: the rules could not be read.", "Formatierer-Einstellungen: Die Regeln konnten nicht gelesen werden.") + "\n\n" + Inner(ex) + "\n\n" + T("TcAgent 0.54 or newer is needed.", "TcAgent 0.54 oder neuer wird gebraucht."), true); w.Close(); return; }
                 progress.Visibility = Visibility.Collapsed;
                 BuildSettings(w, state, body, search, hint, clear, profile, level, wish, undo, save, statusLeft, statusRight, progress, look, exe, sln, openDecl, openImpl, openName);
             };
@@ -301,6 +320,7 @@ namespace TcAgentBridge
         sealed class RuleRow
         {
             public string Key, Label, Description, Default, Values, From, Locked;
+            public Dictionary<string, string> ToValue;
             public FrameworkElement Row;
             public ComboBox Box;
             public TextBlock State;
@@ -314,6 +334,14 @@ namespace TcAgentBridge
             var rules = state["rules"] as Dictionary<string, object> ?? new Dictionary<string, object>();
             var profiles = state.TryGetValue("profiles", out var po) ? po as Dictionary<string, object> : null;
             var examples = state.TryGetValue("__examples", out var eo0) ? eo0 as Dictionary<string, object> : null;
+            var valueLabels = state.TryGetValue("valueLabels", out var vl0) ? vl0 as Dictionary<string, object> : null;
+            // a value in plain words (a number stays a number; 0 of the line length means never)
+            string Disp(string key, string v)
+            {
+                if (v == null) return "";
+                if (int.TryParse(v, out var num)) return num == 0 && key == "wrap.max-length" ? T("0 = never wrap", "0 = nie umbrechen") : v;
+                return valueLabels != null && valueLabels.TryGetValue(v, out var o) && o is Dictionary<string, object> d2 ? FmtStr(d2, fmtGerman ? "de" : "en") ?? v : v;
+            }
             var loaded = rules.ToDictionary(k => k.Key, k => FmtStr(k.Value as Dictionary<string, object>, "value") ?? "", StringComparer.OrdinalIgnoreCase);
             var current = new Dictionary<string, string>(loaded, StringComparer.OrdinalIgnoreCase);
             var rows = new List<RuleRow>();
@@ -328,7 +356,7 @@ namespace TcAgentBridge
             var selBrush = new SolidColorBrush(Color.FromArgb(70, 0x3B, 0x6F, 0xD8));
             var detail = new StackPanel { Margin = new Thickness(10, 8, 10, 8) };
             var folded = new HashSet<TextBlock>();
-            var exampleTab = new TabItem { Header = "Example of the rule", ToolTip = "The selected rule alone: the code as written and the result for every value" };
+            var exampleTab = new TabItem { Header = T("Example of the rule", "Beispiel der Regel"), ToolTip = T("The selected rule alone: the code as written and the result for every value", "Die gewählte Regel allein: der Code, wie er geschrieben ist, und das Ergebnis für jeden Wert") };
             Action<RuleRow> showDetail = null;
             int r0 = 0;
             void AddRow(UIElement e, int col, int span = 1) { Grid.SetRow(e, r0); Grid.SetColumn(e, col); Grid.SetColumnSpan(e, span); list.Children.Add(e); }
@@ -339,7 +367,8 @@ namespace TcAgentBridge
                 var d = kv.Value as Dictionary<string, object>;
                 var rr = new RuleRow
                 {
-                    Key = kv.Key, Label = FmtStr(d, "label") ?? kv.Key, Description = FmtStr(d, "description") ?? "", Default = FmtStr(d, "default"),
+                    Key = kv.Key, Label = (fmtGerman ? FmtStr(d, "labelDe") : null) ?? FmtStr(d, "label") ?? kv.Key,
+                    Description = (fmtGerman ? FmtStr(d, "descriptionDe") : null) ?? FmtStr(d, "description") ?? "", Default = FmtStr(d, "default"),
                     Values = FmtStr(d, "values") ?? "", From = FmtStr(d, "from"), Locked = FmtStr(d, "locked")
                 };
                 string group = kv.Key.Split('.')[0];
@@ -347,7 +376,7 @@ namespace TcAgentBridge
                 {
                     list.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
                     header = new TextBlock { Text = "▾ " + GroupName(group), Tag = GroupName(group), FontWeight = FontWeights.SemiBold, Margin = new Thickness(4, r0 == 0 ? 2 : 10, 0, 2),
-                                             Cursor = Cursors.Hand, ToolTip = "Click to fold or unfold the rules of this group", Background = Brushes.Transparent };
+                                             Cursor = Cursors.Hand, ToolTip = T("Click to fold or unfold the rules of this group", "Klick klappt die Regeln dieser Gruppe ein oder aus"), Background = Brushes.Transparent };
                     var h0 = header;
                     h0.MouseLeftButtonDown += (s, e) => { if (!folded.Add(h0)) folded.Remove(h0); Filter(); e.Handled = true; };
                     AddRow(header, 0, 3); r0++;
@@ -361,9 +390,11 @@ namespace TcAgentBridge
                 var values = rr.Values.Split('|').Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                 bool number = values.Contains("number");
                 var box = new ComboBox { IsEditable = number, Margin = new Thickness(0, 1, 6, 1), MinWidth = 100, ToolTip = rr.Description };
-                foreach (var v in values.Where(v => v != "number")) box.Items.Add(v);
-                box.Text = current[rr.Key];
-                if (!number) box.SelectedItem = current[rr.Key];
+                var toValue = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var v in values.Where(v => v != "number")) { var dv = Disp(rr.Key, v); toValue[dv] = v; toValue[v] = v; box.Items.Add(dv); }
+                rr.ToValue = toValue;
+                box.Text = Disp(rr.Key, current[rr.Key]);
+                if (!number) box.SelectedItem = Disp(rr.Key, current[rr.Key]);
                 var st = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
                 rr.Box = box; rr.State = st;
                 AddRow(lab, 0); AddRow(box, 1); AddRow(st, 2);
@@ -376,9 +407,15 @@ namespace TcAgentBridge
                 box.GotKeyboardFocus += (s, e) => Select();
                 void Pick()
                 {
-                    var v = (box.IsEditable ? box.Text : box.SelectedItem as string ?? box.Text)?.Trim() ?? "";
+                    var shown = (box.IsEditable ? box.Text : box.SelectedItem as string ?? box.Text)?.Trim() ?? "";
+                    var v = toValue.TryGetValue(shown, out var tv) ? tv : shown;
                     if (v.Length == 0 || v == current[rr.Key]) return;
-                    if (box.IsEditable && !int.TryParse(v, out _) && !values.Contains(v)) { box.Text = current[rr.Key]; statusLeft.Text = $"{rr.Label}: a number or {string.Join(", ", values.Where(x => x != "number"))}"; return; }
+                    if (box.IsEditable && !int.TryParse(v, out _) && !values.Contains(v))
+                    {
+                        box.Text = Disp(rr.Key, current[rr.Key]);
+                        statusLeft.Text = $"{rr.Label}: " + T("a number or ", "eine Zahl oder ") + string.Join(", ", values.Where(x => x != "number").Select(x => Disp(rr.Key, x)));
+                        return;
+                    }
                     current[rr.Key] = v;
                     changed?.Invoke();
                 }
@@ -393,14 +430,16 @@ namespace TcAgentBridge
                 foreach (var rr in rows)
                 {
                     bool ch = current[rr.Key] != loaded[rr.Key];
-                    rr.State.Text = rr.Locked != null ? "⊘ locked by " + rr.Locked : ch ? "✎ changed, not saved" : rr.From;
+                    rr.State.Text = rr.Locked != null ? T("⊘ locked by ", "⊘ gesperrt von ") + FromName(rr.Locked) : ch ? T("✎ changed, not saved", "✎ geändert, nicht gespeichert") : FromName(rr.From);
                     rr.State.Foreground = ch ? new SolidColorBrush(Color.FromRgb(0xC2, 0x6A, 0x00)) : Brushes.Gray;
-                    rr.State.ToolTip = rr.Locked != null ? "A level above locked this rule - it can only be changed there" : ch ? "Changed in this window - Save writes it" : "Comes from: " + rr.From;
-                    if ((rr.Box.IsEditable ? rr.Box.Text : rr.Box.SelectedItem as string) != current[rr.Key]) { rr.Box.Text = current[rr.Key]; if (!rr.Box.IsEditable) rr.Box.SelectedItem = current[rr.Key]; }
+                    rr.State.ToolTip = rr.Locked != null ? T("A level above locked this rule - it can only be changed there", "Eine Ebene darüber hat diese Regel gesperrt - sie kann nur dort geändert werden")
+                                     : ch ? T("Changed in this window - Save writes it", "In diesem Fenster geändert - Speichern schreibt sie") : T("Comes from: ", "Kommt von: ") + FromName(rr.From);
+                    var want = Disp(rr.Key, current[rr.Key]);
+                    if ((rr.Box.IsEditable ? rr.Box.Text : rr.Box.SelectedItem as string) != want) { rr.Box.Text = want; if (!rr.Box.IsEditable) rr.Box.SelectedItem = want; }
                 }
                 int n = rows.Count(x => current[x.Key] != loaded[x.Key]);
                 save.IsEnabled = n > 0;
-                statusRight.Text = $"{rows.Count} rules · {rows.Count(x => x.Locked != null)} locked";
+                statusRight.Text = $"{rows.Count} " + T("rules", "Regeln") + $" · {rows.Count(x => x.Locked != null)} " + T("locked", "gesperrt");
                 if (selected != null) showDetail(selected);
             }
             showDetail = rr =>
@@ -410,10 +449,10 @@ namespace TcAgentBridge
                 name.Inlines.Add(new Run(rr.Label));
                 bool ch = current[rr.Key] != loaded[rr.Key];
                 if (rr.Locked != null || ch)
-                    name.Inlines.Add(new Run("   " + (rr.Locked != null ? "⊘ locked by " + rr.Locked : "✎ changed, not saved")) { FontSize = 11, FontWeight = FontWeights.Normal, Foreground = ch ? new SolidColorBrush(Color.FromRgb(0xC2, 0x6A, 0x00)) : Brushes.Gray });
+                    name.Inlines.Add(new Run("   " + (rr.Locked != null ? T("⊘ locked by ", "⊘ gesperrt von ") + FromName(rr.Locked) : T("✎ changed, not saved", "✎ geändert, nicht gespeichert"))) { FontSize = 11, FontWeight = FontWeights.Normal, Foreground = ch ? new SolidColorBrush(Color.FromRgb(0xC2, 0x6A, 0x00)) : Brushes.Gray });
                 detail.Children.Add(name);
                 var g = new Grid { Margin = new Thickness(0, 6, 0, 0) };
-                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); g.ColumnDefinitions.Add(new ColumnDefinition());
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) }); g.ColumnDefinitions.Add(new ColumnDefinition());
                 int i = 0;
                 void Fact(string a, string b)
                 {
@@ -421,11 +460,13 @@ namespace TcAgentBridge
                     var ta = new TextBlock { Text = a, Opacity = 0.65, Margin = new Thickness(0, 1, 8, 1) }; var tb = new TextBlock { Text = b, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 0, 1) };
                     Grid.SetRow(ta, i); Grid.SetRow(tb, i); Grid.SetColumn(tb, 1); g.Children.Add(ta); g.Children.Add(tb); i++;
                 }
-                Fact("Rule", rr.Key);
-                Fact("What it does", rr.Description);
-                Fact("Values", rr.Values.Replace("|", "·"));
-                Fact("Default", rr.Default);
-                Fact("Now applies", loaded[rr.Key] + " – from " + rr.From + (ch ? $"; {current[rr.Key]} after Save on level {level.SelectedItem}" : ""));
+                var lvName = (level.SelectedItem as ComboBoxItem)?.Content as string;
+                Fact(T("Rule", "Regel"), rr.Key + " (formatting.json)");
+                Fact(T("What it does", "Was sie tut"), rr.Description);
+                Fact(T("Values", "Werte"), string.Join(" · ", rr.Values.Split('|').Select(x => x.Trim()).Select(x => x == "number" ? T("a number", "eine Zahl") : Disp(rr.Key, x))));
+                Fact(T("Default", "Standard"), Disp(rr.Key, rr.Default));
+                Fact(T("Now applies", "Gilt jetzt"), Disp(rr.Key, loaded[rr.Key]) + T(" – from ", " – aus ") + FromName(rr.From)
+                     + (ch ? "; " + Disp(rr.Key, current[rr.Key]) + T(" after Save on level ", " nach dem Speichern in Ebene ") + lvName : ""));
                 detail.Children.Add(g);
                 // the tab "Example of the rule": the code as written and the result for every value, side by side
                 var page = new DockPanel { Margin = new Thickness(0, 6, 0, 0) };
@@ -434,12 +475,12 @@ namespace TcAgentBridge
                 DockPanel.SetDock(title, Dock.Top); page.Children.Add(title);
                 if (examples != null && examples.TryGetValue(rr.Key, out var eo) && eo is Dictionary<string, object> ex)
                 {
-                    title.Inlines.Add(new Run(" – only this rule acts" + (FmtStr(ex, "with") is string with && with.Length > 0 ? ", shown with " + with : "")) { Foreground = Brushes.Gray });
-                    var samples = new List<(string Title, ArrayList Tokens, bool Now)> { ("Written as", ex["code"] as ArrayList, false) };
+                    title.Inlines.Add(new Run(T(" – only this rule acts", " – nur diese Regel wirkt") + (FmtStr(ex, "with") is string with && with.Length > 0 ? T(", shown with ", ", gezeigt mit ") + with : "")) { Foreground = Brushes.Gray });
+                    var samples = new List<(string Title, ArrayList Tokens, bool Now)> { (T("Written as", "So geschrieben"), ex["code"] as ArrayList, false) };
                     foreach (var v in (ex["values"] as ArrayList ?? new ArrayList()).OfType<Dictionary<string, object>>())
                     {
                         var val = FmtStr(v, "value");
-                        samples.Add((val + (val == current[rr.Key] ? "  ← set here" : ""), v["tokens"] as ArrayList, val == current[rr.Key]));
+                        samples.Add((Disp(rr.Key, val) + (val == current[rr.Key] ? T("  ← set here", "  ← hier eingestellt") : ""), v["tokens"] as ArrayList, val == current[rr.Key]));
                     }
                     var grid = new Grid();
                     grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); grid.RowDefinitions.Add(new RowDefinition());
@@ -455,7 +496,7 @@ namespace TcAgentBridge
                     }
                     page.Children.Add(grid);
                 }
-                else page.Children.Add(new TextBlock { Text = "This rule has no example: its effect cannot be seen in the text (tab width, line ends) or it works in the IDE.", Opacity = 0.65, TextWrapping = TextWrapping.Wrap });
+                else page.Children.Add(new TextBlock { Text = T("This rule has no example: its effect cannot be seen in the text (tab width, line ends) or it works in the IDE.", "Diese Regel hat kein Beispiel: Ihre Wirkung ist im Text nicht sichtbar (Tab-Breite, Zeilenenden) oder sie wirkt in der IDE."), Opacity = 0.65, TextWrapping = TextWrapping.Wrap });
                 exampleTab.Content = page;
             };
             var listScroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
@@ -467,7 +508,7 @@ namespace TcAgentBridge
                 BorderThickness = new Thickness(1), Margin = new Thickness(0, 8, 0, 0), Height = 170
             };
             detailBorder.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
-            detail.Children.Add(new TextBlock { Text = "Select a rule to see what it does, its values and where it comes from.", Opacity = 0.65, TextWrapping = TextWrapping.Wrap });
+            detail.Children.Add(new TextBlock { Text = T("Select a rule to see what it does, its values and where it comes from.", "Wähle eine Regel, um zu sehen, was sie tut, welche Werte sie hat und woher sie kommt."), Opacity = 0.65, TextWrapping = TextWrapping.Wrap });
             var left = new DockPanel();
             DockPanel.SetDock(detailBorder, Dock.Bottom); left.Children.Add(detailBorder); left.Children.Add(listBorder);
 
@@ -478,7 +519,7 @@ namespace TcAgentBridge
                 hint.Visibility = q.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
                 clear.Visibility = q.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
                 // a folded group shows only its heading; while searching, every match shows
-                var match = rows.ToDictionary(rr => rr, rr => q.Length == 0 || (rr.Label + " " + rr.Key + " " + rr.Description).IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0);
+                var match = rows.ToDictionary(rr => rr, rr => q.Length == 0 || (rr.Label + " " + rr.Key + " " + rr.Description + " " + Disp(rr.Key, current[rr.Key])).IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0);
                 foreach (var rr in rows)
                 {
                     bool show = match[rr] && (q.Length > 0 || !folded.Contains(rr.Header));
@@ -497,7 +538,7 @@ namespace TcAgentBridge
             clear.Click += (s, e) => { search.Text = ""; search.Focus(); };
 
             // ---- profile
-            profile.Items.Add("(as it applies now)");
+            profile.Items.Add(T("(as it applies now)", "(wie jetzt gültig)"));
             if (profiles != null) foreach (var p in profiles.Keys) profile.Items.Add(p);
             profile.SelectedIndex = 0;
             profile.SelectionChanged += (s, e) =>
@@ -510,11 +551,11 @@ namespace TcAgentBridge
 
             // ---- right: the preview
             var tabs = new TabControl { Margin = new Thickness(0) };
-            var declTab = new TabItem { Header = "Declaration" }; var implTab = new TabItem { Header = "Implementation" };
+            var declTab = new TabItem { Header = T("Declaration", "Deklaration") }; var implTab = new TabItem { Header = T("Implementation", "Implementierung") };
             tabs.Items.Add(declTab); tabs.Items.Add(implTab); tabs.Items.Add(exampleTab); tabs.SelectedIndex = 1;
             bool haveOpen = openImpl != null || openDecl != null;
-            var useOpen = new CheckBox { Content = "Preview the object open in the editor" + (openName != null ? $" ({openName})" : ""), IsChecked = haveOpen, IsEnabled = haveOpen, VerticalAlignment = VerticalAlignment.Center };
-            var marks = new TextBlock { Text = "changed lines are marked", Opacity = 0.65, VerticalAlignment = VerticalAlignment.Center };
+            var useOpen = new CheckBox { Content = T("Preview the object open in the editor", "Vorschau mit dem Objekt im Editor") + (openName != null ? $" ({openName})" : ""), IsChecked = haveOpen, IsEnabled = haveOpen, VerticalAlignment = VerticalAlignment.Center };
+            var marks = new TextBlock { Text = T("changed lines are marked", "geänderte Zeilen sind markiert"), Opacity = 0.65, VerticalAlignment = VerticalAlignment.Center };
             var opts = new DockPanel { Margin = new Thickness(0, 6, 0, 4), LastChildFill = false };
             DockPanel.SetDock(useOpen, Dock.Left); opts.Children.Add(useOpen); DockPanel.SetDock(marks, Dock.Right); opts.Children.Add(marks);
             var right = new DockPanel();
@@ -526,7 +567,7 @@ namespace TcAgentBridge
                 var g = new Grid();
                 g.ColumnDefinitions.Add(new ColumnDefinition()); g.ColumnDefinitions.Add(new ColumnDefinition());
                 g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); g.RowDefinitions.Add(new RowDefinition());
-                var ha = new TextBlock { Text = "Before", Opacity = 0.65, Margin = new Thickness(0, 4, 0, 2) }; var hb = new TextBlock { Text = "After", Opacity = 0.65, Margin = new Thickness(6, 4, 0, 2) };
+                var ha = new TextBlock { Text = T("Before", "Vorher"), Opacity = 0.65, Margin = new Thickness(0, 4, 0, 2) }; var hb = new TextBlock { Text = T("After", "Nachher"), Opacity = 0.65, Margin = new Thickness(6, 4, 0, 2) };
                 Grid.SetColumn(hb, 1);
                 var ba = new Border { Child = a, BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 3, 0) }; var bb = new Border { Child = b, BorderThickness = new Thickness(1), Margin = new Thickness(3, 0, 0, 0) };
                 ba.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey); bb.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
@@ -555,18 +596,19 @@ namespace TcAgentBridge
                     if (my != version) return;
                     void Fill(TabItem tab, Dictionary<string, object> res)
                     {
-                        if (res == null) { tab.Content = new TextBlock { Text = "This object has no " + tab.Header.ToString().ToLowerInvariant() + ".", Opacity = 0.65, Margin = new Thickness(6) }; return; }
+                        if (res == null) { tab.Content = new TextBlock { Text = T("This object has no " + tab.Header.ToString().ToLowerInvariant() + ".", "Dieses Objekt hat keine " + tab.Header + "."), Opacity = 0.65, Margin = new Thickness(6) }; return; }
                         var bt = res["inputTokens"] as ArrayList ?? new ArrayList(); var at = res["tokens"] as ArrayList ?? new ArrayList();
                         tab.Content = Pair(CodeView(look, bt, null), CodeView(look, at, Changed(LinesOf(bt), LinesOf(at))));
                     }
                     Fill(declTab, dr); Fill(implTab, ir);
                     lastBeforeDecl = d; lastBeforeImpl = i; lastAfterDecl = FmtStr(dr, "text") ?? d; lastAfterImpl = FmtStr(ir, "text") ?? i;
-                    var errs = new[] { ("Declaration", FmtStr(dr, "error")), ("Implementation", FmtStr(ir, "error")) }.Where(x => !string.IsNullOrEmpty(x.Item2)).Select(x => x.Item1 + ": " + x.Item2).ToList();
+                    var errs = new[] { (T("Declaration", "Deklaration"), FmtStr(dr, "error")), (T("Implementation", "Implementierung"), FmtStr(ir, "error")) }.Where(x => !string.IsNullOrEmpty(x.Item2)).Select(x => x.Item1 + ": " + x.Item2).ToList();
                     int n = current.Count(k => k.Value != loaded[k.Key]);
-                    statusLeft.Text = errs.Count > 0 ? string.Join("  ·  ", errs) : n == 0 ? "The preview shows the rules as they apply now." : $"{n} rule{(n == 1 ? "" : "s")} changed – not saved";
-                    statusRight.Text = $"{rows.Count} rules · {rows.Count(x => x.Locked != null)} locked · preview {sw.Elapsed.TotalSeconds:0.0} s";
+                    statusLeft.Text = errs.Count > 0 ? string.Join("  ·  ", errs) : n == 0 ? T("The preview shows the rules as they apply now.", "Die Vorschau zeigt die Regeln, wie sie jetzt gelten.")
+                                    : n + T(n == 1 ? " rule changed – not saved" : " rules changed – not saved", n == 1 ? " Regel geändert – nicht gespeichert" : " Regeln geändert – nicht gespeichert");
+                    statusRight.Text = $"{rows.Count} " + T("rules", "Regeln") + $" · {rows.Count(x => x.Locked != null)} " + T("locked", "gesperrt") + T(" · preview ", " · Vorschau ") + $"{sw.Elapsed.TotalSeconds:0.0} s";
                 }
-                catch (Exception ex) { if (my == version) FormatMessage("The preview could not be formatted:\n\n" + Inner(ex), true); }
+                catch (Exception ex) { if (my == version) FormatMessage(T("The preview could not be formatted:", "Die Vorschau konnte nicht formatiert werden:") + "\n\n" + Inner(ex), true); }
                 finally { if (my == version) progress.Visibility = Visibility.Collapsed; }
             };
             changed = () => { States(); timer.Stop(); timer.Start(); };
@@ -585,18 +627,19 @@ namespace TcAgentBridge
             {
                 var diff = current.Where(k => k.Value != loaded[k.Key]).ToDictionary(k => k.Key, k => (object)k.Value);
                 if (diff.Count == 0) return;
-                var lv = level.SelectedItem as string ?? "project";
+                var lv = (level.SelectedItem as ComboBoxItem)?.Tag as string ?? "project";
                 var file = Path.Combine(Path.GetTempPath(), "tcagent-format-save-" + Process.GetCurrentProcess().Id + ".json");
                 File.WriteAllText(file, new JavaScriptSerializer().Serialize(new Dictionary<string, object> { ["rules"] = diff }), new UTF8Encoding(false));
-                save.IsEnabled = false; progress.Visibility = Visibility.Visible; statusLeft.Text = "Saving …";
+                save.IsEnabled = false; progress.Visibility = Visibility.Visible; statusLeft.Text = T("Saving …", "Speichere …");
                 try
                 {
                     var res = await Task.Run(() => FmtRun(exe, $"format --save \"{file}\" --level {lv}" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), null));
                     foreach (var k in diff.Keys) { loaded[k] = current[k]; var rr = rows.First(x => x.Key == k); rr.From = lv; }
                     States();
-                    statusLeft.Text = $"✓ {diff.Count} rule{(diff.Count == 1 ? "" : "s")} saved on level {lv} – Format ST code uses them from now on";
+                    statusLeft.Text = "✓ " + diff.Count + T(diff.Count == 1 ? " rule saved on level " : " rules saved on level ", diff.Count == 1 ? " Regel gespeichert in Ebene " : " Regeln gespeichert in Ebene ")
+                                      + LevelName(lv) + T(" – Format ST code uses them from now on", " – ST-Code formatieren nutzt sie ab jetzt");
                 }
-                catch (Exception ex) { save.IsEnabled = true; statusLeft.Text = "Not saved."; FormatMessage("The rules were not saved:\n\n" + Inner(ex), true); }
+                catch (Exception ex) { save.IsEnabled = true; statusLeft.Text = T("Not saved.", "Nicht gespeichert."); FormatMessage(T("The rules were not saved:", "Die Regeln wurden nicht gespeichert:") + "\n\n" + Inner(ex), true); }
                 finally { progress.Visibility = Visibility.Collapsed; }
             };
 
@@ -611,8 +654,9 @@ namespace TcAgentBridge
 
         static string GroupName(string g) => g switch
         {
-            "indent" => "Indentation", "case" => "Case", "space" => "Spaces", "comment" => "Comments", "layout" => "Layout",
-            "align" => "Columns", "wrap" => "Long lines", "blank" => "Blank lines", "eol" => "Line ends", "paren" => "Brackets in conditions", _ => g
+            "indent" => T("Indentation", "Einrückung"), "case" => T("Case", "Schreibweise"), "space" => T("Spaces", "Leerzeichen"), "comment" => T("Comments", "Kommentare"),
+            "layout" => "Layout", "align" => T("Columns", "Spalten"), "wrap" => T("Long lines", "Lange Zeilen"), "blank" => T("Blank lines", "Leerzeilen"),
+            "eol" => T("Line ends", "Zeilenenden"), "paren" => T("Brackets in conditions", "Klammern in Bedingungen"), _ => g
         };
 
         static string FmtStr(Dictionary<string, object> d, string k) => d != null && d.TryGetValue(k, out var v) && v != null ? v.ToString() : null;
@@ -660,11 +704,12 @@ namespace TcAgentBridge
             bool tooLong = full.Length > 7500;
             if (tooLong) { try { System.Windows.Forms.Clipboard.SetText(body.ToString()); } catch { } full = url + "?labels=" + Uri.EscapeDataString("enhancement,formatter") + "&title=" + Uri.EscapeDataString("Formatter: "); }
             var owner = Application.Current?.Windows.OfType<Window>().FirstOrDefault(x => x.IsActive) ?? Application.Current?.MainWindow;
-            if (MessageBox.Show(owner, "Open a new issue on GitHub in the browser?\n\nIt contains the example of the preview - check it there, remove names of customers or plants, and send it yourself." +
-                                (tooLong ? "\n\nThe text is long: it is in the clipboard - paste it into the issue." : ""),
-                                "Wish a rule or feature", MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
+            if (MessageBox.Show(owner, T("Open a new issue on GitHub in the browser?\n\nIt contains the example of the preview - check it there, remove names of customers or plants, and send it yourself.",
+                                        "Ein neues Issue auf GitHub im Browser öffnen?\n\nEs enthält das Beispiel der Vorschau - prüfe es dort, entferne Namen von Kunden oder Anlagen und schicke es selbst ab.") +
+                                (tooLong ? T("\n\nThe text is long: it is in the clipboard - paste it into the issue.", "\n\nDer Text ist lang: Er ist in der Zwischenablage - füge ihn ins Issue ein.") : ""),
+                                T("Wish a rule or feature", "Regel oder Funktion wünschen"), MessageBoxButton.OKCancel, MessageBoxImage.Information) != MessageBoxResult.OK) return;
             try { Process.Start(new ProcessStartInfo(full) { UseShellExecute = true }); }
-            catch (Exception ex) { FormatMessage("Could not open the browser: " + ex.Message, true); }
+            catch (Exception ex) { FormatMessage(T("Could not open the browser: ", "Der Browser konnte nicht geöffnet werden: ") + ex.Message, true); }
         }
     }
 }

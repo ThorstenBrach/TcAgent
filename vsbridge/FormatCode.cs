@@ -47,6 +47,7 @@ namespace TcAgentBridge
         internal void FormatFromEditor()
         {
             var said = new List<string>();
+            fmtGerman = UiGerman();
             try
             {
                 var dv = ActiveDocView(out var doc);
@@ -62,29 +63,30 @@ namespace TcAgentBridge
                 // actions and transitions: one text editor without a declaration
                 if (halves.Count == 0 && SafeCall(dv, "GetActiveSynEdControl", SafeGet(dv, "EditorView")) is System.Windows.Forms.Control only)
                     halves.Add((only, "implementation"));
-                if (halves.Count == 0) { FormatMessage("Format ST code: open a POU, method, property, action, DUT or GVL in the editor first.", true); return; }
+                if (halves.Count == 0) { FormatMessage(T("Format ST code: open a POU, method, property, action, DUT or GVL in the editor first.", "ST-Code formatieren: Öffne zuerst eine POU, Methode, Eigenschaft, Aktion, einen DUT oder eine GVL im Editor."), true); return; }
                 var exe = TcUnitControl.TcAgentExe();
-                if (exe == null) { FormatMessage("Format ST code: TcAgent.exe was not found - set it up in the TcAgent Chat first.", true); return; }
+                if (exe == null) { FormatMessage(T("Format ST code: TcAgent.exe was not found - set it up in the TcAgent Chat first.", "ST-Code formatieren: TcAgent.exe wurde nicht gefunden - richte TcAgent zuerst im TcAgent Chat ein."), true); return; }
                 var sln = TcUnitControl.SolutionPath();
                 int changed = 0;
                 foreach (var (syn, part) in halves)
                 {
-                    if (SafeGet(syn, "ReadOnly") is bool ro && ro) { said.Add(part + ": read only (online?) - not formatted"); continue; }
+                    if (SafeGet(syn, "ReadOnly") is bool ro && ro) { said.Add(part + T(": read only (online?) - not formatted", ": schreibgeschützt (online?) - nicht formatiert")); continue; }
                     var text = SafeGet(syn, "Text") as string;
                     if (string.IsNullOrEmpty(text)) continue;
                     var res = RunFormatter(exe, sln, part, text);
                     if (res.TryGetValue("error", out var err) && err is string e && e.Length > 0) { said.Add(part + ": " + e); continue; }
                     if (!(res.TryGetValue("changed", out var ch) && ch is bool c && c)) continue;
                     var formatted = res["text"] as string ?? text;
-                    if (!Replace(syn, formatted)) said.Add(part + ": the editor did not take the text - check it, Ctrl+Z takes it back");
+                    if (!Replace(syn, formatted)) said.Add(part + T(": the editor did not take the text - check it, Ctrl+Z takes it back", ": der Editor hat den Text nicht übernommen - bitte prüfen, Strg+Z nimmt es zurück"));
                     else changed++;
                 }
-                var msg = changed > 0 ? $"TcAgent: formatted ({changed} part{(changed == 1 ? "" : "s")}) - Ctrl+Z takes it back" : "TcAgent: already formatted";
-                if (said.Count > 0) FormatMessage("Format ST code\n\n" + string.Join("\n", said), true);
+                var msg = changed > 0 ? T($"TcAgent: formatted ({changed} part{(changed == 1 ? "" : "s")}) - Ctrl+Z takes it back", $"TcAgent: formatiert ({changed} Teil{(changed == 1 ? "" : "e")}) - Strg+Z nimmt es zurück")
+                                      : T("TcAgent: already formatted", "TcAgent: bereits formatiert");
+                if (said.Count > 0) FormatMessage(T("Format ST code", "ST-Code formatieren") + "\n\n" + string.Join("\n", said), true);
                 SetStatus(msg);
                 Log(msg + (said.Count > 0 ? " | " + string.Join(" | ", said) : ""));
             }
-            catch (Exception ex) { FormatMessage("Format ST code failed: " + Inner(ex), true); }
+            catch (Exception ex) { FormatMessage(T("Format ST code failed: ", "ST-Code formatieren fehlgeschlagen: ") + Inner(ex), true); }
         }
 
         Dictionary<string, object> RunFormatter(string exe, string sln, string part, string text)

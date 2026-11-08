@@ -23,6 +23,14 @@ public class StFormatExamplesTests
     }
 
     [Fact]
+    public void EveryRuleAndValueHasPlainWordsInEnglishAndGerman()
+    {
+        Assert.Empty(StFormatConfig.Rules.Select(r => r.Key).Where(k => !StFormatConfig.Labels.ContainsKey(k) || !StFormatConfig.German.ContainsKey(k)));
+        var values = StFormatConfig.Rules.SelectMany(r => r.Values.Split('|').Select(v => v.Trim())).Where(v => v != "number" && v.Length > 0 && !int.TryParse(v, out _)).Distinct();
+        Assert.Empty(values.Where(v => !StFormatConfig.ValueLabels.ContainsKey(v)));
+    }
+
+    [Fact]
     public void TheExamplesInTheDocsAreCurrent()
     {
         var dir = AppContext.BaseDirectory;

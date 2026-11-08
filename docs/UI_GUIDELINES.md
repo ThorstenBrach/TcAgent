@@ -117,8 +117,14 @@ Buttons can be reached with Tab.
 
 ## 9. Texts and privacy
 
-- Texts in English, short, the action before the explanation; plain words over jargon ("Source @ version", "newer in
-  the source", kinds as words like "Coding rules"); the same terms as in the User Guide.
+- **Language:** German or English, by the answer language of the TcAgent Chat (without one: the language of Windows) -
+  German when it is German, English for every other language. The same rule as for the texts the agent writes to the
+  person (the question about the specification). Implemented in the Formatter settings and Format ST code
+  (`vsbridge/FormatSettings.cs`, `T(en, de)`); the other windows are English for now and follow. Keys, file names and
+  values in files (`formatting.json`, `preserve`) stay as they are; the window shows them in plain words.
+- Texts short, the action before the explanation; plain words over jargon ("Source @ version", "newer in the source",
+  kinds as words like "Coding rules", values like "keep as written" instead of `preserve`); the same terms as in the
+  User Guide.
 - **No user, computer, customer or project names** in texts, examples, screenshots and mockups - neutral examples only
   (`MAIN`, `FB_Motor`, `my-plc-platform`).
 - **Paths shortened in the middle** (`D:\Projekte\…\POUs\MAIN.TcPOU`) and user folders as `%LOCALAPPDATA%`,
