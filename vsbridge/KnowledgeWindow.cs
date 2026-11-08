@@ -1373,9 +1373,9 @@ namespace TcAgentBridge
         {
             var st = data?.TryGetValue("settings", out var so) == true ? so as Dictionary<string, object> : null;
             var r = Prompt("Levels of the knowledge",
-                           ("Company level (TCAGENT_COMPANY): a folder, network share or Git working copy", null, S(st, "TCAGENT_COMPANY") ?? ""),
-                           ("Team level(s) (TCAGENT_TEAM): folder or Git working copy, several separated by ;", null, S(st, "TCAGENT_TEAM") ?? ""),
-                           ("Platform repositories (TCAGENT_PLATFORMS), several separated by ; - optional", null, S(st, "TCAGENT_PLATFORMS") ?? ""));
+                           ("Company level (TCAGENT_COMPANY): a folder, network share or Git working copy", FolderField, S(st, "TCAGENT_COMPANY") ?? ""),
+                           ("Team level(s) (TCAGENT_TEAM): folder or Git working copy, several separated by ;", FoldersField, S(st, "TCAGENT_TEAM") ?? ""),
+                           ("Platform repositories (TCAGENT_PLATFORMS), several separated by ; - optional", FoldersField, S(st, "TCAGENT_PLATFORMS") ?? ""));
             if (r == null) return;
             var names = new[] { "TCAGENT_COMPANY", "TCAGENT_TEAM", "TCAGENT_PLATFORMS" };
             var outs = new List<string>(); bool all = true;
@@ -1561,6 +1561,10 @@ namespace TcAgentBridge
         /// <summary>A small dialog: one field per entry (choices = combo box, null = text box). Returns the values or null.</summary>
         string[] Prompt(string title, params (string Label, string[] Choices, string Value)[] fields) => Ask(title, null, fields);
 
+        /// <summary>As Choices of a field: a text field with a "…" button that picks a folder. Several (separated by ;) add a folder
+        /// to the list instead of replacing it.</summary>
+        static readonly string[] FolderField = new string[0], FoldersField = new string[0];
+
         /// <summary>Like Prompt; required = the indexes of the text fields that must not be empty - OK stays off until they are filled.</summary>
         string[] Ask(string title, int[] required, params (string Label, string[] Choices, string Value)[] fields)
         {
@@ -1573,7 +1577,24 @@ namespace TcAgentBridge
             foreach (var f in fields)
             {
                 sp.Children.Add(new TextBlock { Text = f.Label, Margin = new Thickness(0, 8, 0, 3), TextWrapping = TextWrapping.Wrap, MaxWidth = 480 });
-                if (f.Choices != null)
+                if (ReferenceEquals(f.Choices, FolderField) || ReferenceEquals(f.Choices, FoldersField))
+                {
+                    var tb = new TextBox { Text = f.Value ?? "", Padding = new Thickness(2) };
+                    var browse = new Button { Content = "…", MinWidth = 32, Margin = new Thickness(6, 0, 0, 0), ToolTip = "Choose a folder" };
+                    bool several = ReferenceEquals(f.Choices, FoldersField);
+                    browse.Click += (s, e) =>
+                    {
+                        var current = tb.Text.Split(';').Select(x => x.Trim()).LastOrDefault(x => x.Length > 0 && Directory.Exists(x));
+                        using (var dlg = new System.Windows.Forms.FolderBrowserDialog { Description = f.Label, SelectedPath = current ?? "", ShowNewFolderButton = true })
+                            if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK)
+                                tb.Text = several && tb.Text.Trim().Length > 0 ? tb.Text.Trim().TrimEnd(';') + ";" + dlg.SelectedPath : dlg.SelectedPath;
+                    };
+                    var row = new DockPanel { MinWidth = 400 };
+                    DockPanel.SetDock(browse, Dock.Right); row.Children.Add(browse); row.Children.Add(tb);
+                    tb.TextChanged += (s, e) => Check();
+                    sp.Children.Add(row); getters.Add(() => tb.Text); first ??= tb;
+                }
+                else if (f.Choices != null)
                 {
                     var cb = new ComboBox { ItemsSource = f.Choices, SelectedItem = f.Value ?? f.Choices.FirstOrDefault(), MinWidth = 400 };
                     sp.Children.Add(cb); getters.Add(() => cb.SelectedItem as string); first ??= cb;
@@ -1727,7 +1748,7 @@ namespace TcAgentBridge
             if (Predefined(l)) return;
             var d = l?.D;
             var r = Ask(d == null ? "New source" : "Edit source " + S(d, "name"), new[] { 0, 1 },
-                        ("Name (lowercase, hyphens)", null, S(d, "name") ?? ""), ("Git URL or path", null, S(d, "url") ?? ""),
+                        ("Name (lowercase, hyphens)", null, S(d, "name") ?? ""), ("Git URL or path (… picks a folder)", FolderField, S(d, "url") ?? ""),
                         ("Branch or tag (empty = the default branch)", null, S(d, "ref") == "HEAD" ? "" : S(d, "ref") ?? ""),
                         ("Defined for", SourceLevels(), S(d, "level") == "project" ? "project" : "personal"));
             if (r == null) return;
