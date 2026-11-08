@@ -9,8 +9,8 @@ workflows, checkpoints and confirmations.
 | When | in the background: at night, after a commit, after a failed pipeline | at the running plant: commissioning, troubleshooting in operation |
 | Who | the team | the person in front of the machine |
 | Reads | code, commits and diff, errors, test results | in addition online values, alarms, step chains |
-| Started by | `TcAgent.exe advise`, or `/advise` in the chat | the person (`/advise live`), later events at the machine |
-| State | **available** | planned |
+| Started by | `TcAgent.exe advise`, or `/advise` in the chat | the person (`/advise-live` in the chat), or the watch (`TcAgent.exe advise watch --run`) |
+| State | available | available |
 
 ## What an Advisor run may do
 
@@ -69,3 +69,40 @@ TcAgent.exe advise --solution MyMachine.sln --trigger pipeline --results results
 - `--dry-run` prints the prompt only.
 
 In a pipeline: [PIPELINE.md](PIPELINE.md#advisor).
+
+## Advisor Live
+
+At the running plant the Advisor helps the person in front of it: commissioning, troubleshooting in operation. It only reads:
+it never writes a variable and never starts, stops or acknowledges anything.
+
+**In the chat:** `/advise-live` with what is wrong. The agent first looks at the state of the plant (`tc_advisor action=watch_check`),
+then goes from the top level down only as far as it needs, and records the cause with an order.
+
+**The watch:** `TcAgent.exe advise watch --solution <sln> --target <AmsNetId>` looks every 2 s and reports what newly went
+wrong, the same event at most once an hour. With `--run` it starts an Advisor run for it; `--once` looks once (exit 1 when
+something is wrong).
+
+What it notices, without any setup:
+
+1. the runtime or a PLC leaving Run (Stop, Error, Exception), a task exceeding its cycle time
+2. the person, in the chat
+
+And what the project declares, in `.tcagent\advisor-watch.json` (edited by hand, or in the chat: "remember: `nFault` other
+than 0 is a fault" - `tc_advisor action=watch_add` after you agreed):
+
+```json
+{
+  "signals": [
+    { "symbol": "MAIN.fbStation.bError", "when": "true", "text": "Station reports a fault" },
+    { "symbol": "MAIN.fbStation.nFault", "when": "!= 0", "text": "Fault number", "details": ["MAIN.fbStation.nStep"] },
+    { "symbol": "MAIN.fbStation.nState", "when": "& 128", "text": "Error bit of the state" },
+    { "symbol": "MAIN.fbConveyor.nStep", "when": "unchanged 30s", "text": "Conveyor hangs in a step" }
+  ]
+}
+```
+
+`when`: `true`, `false`, `== n`, `!= n`, `> n`, `>= n`, `< n`, `<= n`, `& n` (a bit of the mask is set), `unchanged <n>s`.
+`details` are read as well when the signal fires; `port` is the ADS port of the PLC (default 851).
+
+A plugin brings what it knows about its platform: an `advisor.json` with the skill that knows how the platform reports
+faults, and fixed signals if there are any ([PLUGINS.md](PLUGINS.md#fault-signals-for-the-advisor)). TcAgent itself knows no platform.

@@ -403,7 +403,7 @@ The advice of the Advisor runs ([ADVISOR.md](ADVISOR.md)), newest first, with it
 **Right**, **Partly**, **Wrong** and **n/a** rate it with one click (a "wrong" asks what is wrong); the heading shows the
 hit rate per kind of task. **Act on it …** (or a double-click) opens the TcAgent Chat with the order in the input: you read
 it, change it and send it. The Advisor itself never changes anything. A run starts in the chat with `/advise`, or without a
-window with `TcAgent.exe advise`.
+window with `TcAgent.exe advise`; at the running plant with `/advise-live` or the watch `TcAgent.exe advise watch`.
 
 ### Backup and restore
 

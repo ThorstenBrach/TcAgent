@@ -20,8 +20,16 @@ public sealed partial class ToolRegistry
         Add("tc_advisor", "Advisor: look, advise, hand over an order - never change anything. action=start (kind, trigger) makes this session " +
                           "read only until action=finish: tools that change the project or the runtime are refused. record keeps one piece of " +
                           "advice (finding, evidence, proposal, order = the prompt a person sends to an agent to act on it). list shows the advice " +
-                          "of the project, rate records a person's rating, stats the hit rate per kind of task.",
-            Schema(Req(P("action", "string", "start, record, finish, list, rate or stats")),
+                          "of the project, rate records a person's rating, stats the hit rate per kind of task. Live, at the running plant: watch_list shows the " +
+                          "fault signals of the project (.tcagent\\advisor-watch.json) and of the plugins, watch_add / watch_remove change them (after the user " +
+                          "agreed), watch_check looks now: runtime and PLC state, cycle time, the signals that fire with their details.",
+            Schema(Req(P("action", "string", "start, record, finish, list, rate, stats; Live: watch_list, watch_add, watch_remove, watch_check")),
+                   P("symbol", "string", "watch_add/remove: the variable that signals a fault, e.g. MAIN.fbStation.bError"),
+                   P("when", "string", "watch_add: true, false, == n, != n, > n, >= n, < n, <= n, & n (bit mask) or unchanged <n>s (default true)"),
+                   P("text", "string", "watch_add: what the fault means"),
+                   P("details", "string", "watch_add: variables to read as well when it fires, comma-separated"),
+                   P("port", "integer", "watch_add: ADS port of the PLC (default 851)"),
+                   P("netId", "string", "watch_check: AmsNetId (default: the target of the project)"),
                    P("kind", "string", "start/record: review, diagnose, cause or code (default review)"),
                    P("trigger", "string", "start/record: chat, nightly, commit, pipeline (default chat)"),
                    P("finding", "string", "record: one sentence - what you found"),
@@ -80,9 +88,50 @@ public sealed partial class ToolRegistry
                         var q = Advisor.Quotas(Advisor.Load(dir), DateTime.Now);
                         return q.Count == 0 ? "No advice yet." : string.Join("\n", q.Select(Advisor.FormatQuota));
                     }
-                    default: throw new Exception("action: start, record, finish, list, rate or stats");
+                    case "watch_list":
+                    {
+                        var (signals, hints) = AdvisorWatch.Load(dir, PluginFolders(dir));
+                        var o = new System.Text.StringBuilder();
+                        o.AppendLine(signals.Count == 0 ? "No fault signals declared (.tcagent\\advisor-watch.json)." : $"{signals.Count} fault signal(s):");
+                        foreach (var s in signals) o.AppendLine("  " + AdvisorWatch.Describe(s));
+                        foreach (var h in hints) o.AppendLine($"Plugin {h.Plugin}: load the skill {h.Skill} - it knows how this platform reports faults.");
+                        o.Append("Always watched as well: the runtime and each PLC leaving Run, tasks exceeding their cycle time.");
+                        return o.ToString();
+                    }
+                    case "watch_add":
+                        try
+                        {
+                            AdvisorWatch.Add(dir, new AdvisorWatch.Signal(Str(a, "symbol"), Str(a, "when") ?? "true", Str(a, "text") ?? Str(a, "symbol"),
+                                (Str(a, "details") ?? "").Split(new[] { ',', '\n' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList(),
+                                Int(a, "port", 851)));
+                        }
+                        catch (ArgumentException ex) { throw new Exception("NOT added: " + ex.Message); }
+                        return $"fault signal {Str(a, "symbol")} {Str(a, "when") ?? "true"} added to .tcagent\\advisor-watch.json";
+                    case "watch_remove":
+                        return AdvisorWatch.Remove(dir, Str(a, "symbol") ?? throw new Exception("symbol is required"))
+                            ? $"fault signal {Str(a, "symbol")} removed" : $"{Str(a, "symbol")} is not in .tcagent\\advisor-watch.json";
+                    case "watch_check":
+                    {
+                        // one look at the plant now: what is wrong, with the details of the signals that fire
+                        var (signals, _) = AdvisorWatch.Load(dir, PluginFolders(dir));
+                        string net = Str(a, "netId");
+                        if (string.IsNullOrEmpty(net)) try { net = tc.Sta.Run(() => (string)((dynamic)tc.RequireSysMan()).GetTargetNetId()); } catch { net = "local"; }
+                        using var r = new AdvisorReader(net);
+                        var ports = signals.Select(s => s.Port).Append(851);
+                        var found = AdvisorLook.Look(r, ports, signals, new AdvisorWatch.State(), DateTime.Now);
+                        var head = $"{r.NetId}: runtime {r.State(10000)}, PLC 851 {r.State(851)}; {signals.Count} fault signal(s) checked.";
+                        return found.Count == 0 ? head + "\nNothing is wrong now."
+                            : head + "\n" + string.Join("\n", found.Select(f => "  " + f.Text + (f.Details.Count > 0 ? "\n    " + string.Join("\n    ", f.Details) : "")));
+                    }
+                    default: throw new Exception("action: start, record, finish, list, rate, stats, watch_list, watch_add, watch_remove or watch_check");
                 }
             });
+    }
+
+    static IEnumerable<(string id, string folder)> PluginFolders(string dir)
+    {
+        try { return Plugins.Usable(dir).Where(p => p.Ready).Select(p => (p.Id, p.Folder)).ToList(); }
+        catch { return Enumerable.Empty<(string, string)>(); }
     }
 
     /// <summary>During an Advisor run nothing is changed: every tool that is not read only is refused.</summary>

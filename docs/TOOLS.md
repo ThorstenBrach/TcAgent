@@ -225,10 +225,15 @@ Advisor ([ADVISOR.md](ADVISOR.md)): look, advise, hand over an order – never c
 the session read only until `action=finish`: every tool that would change the project or the runtime is refused. `record` keeps
 one advice in `<solution folder>\.tcagent\advisor\` (finding, evidence, proposal, optional diff, confidence and the order – the
 prompt a person sends to an agent to act on it); `list`, `rate` (right, partly, wrong, n/a) and `stats` (the hit rate per kind of task).
+Advisor Live: `watch_list` (the fault signals of the project and the plugins), `watch_add` / `watch_remove` (`.tcagent\advisor-watch.json`),
+`watch_check` (one look now: runtime and PLC state, cycle time, the signals that fire with their details).
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `action` | string | yes | start, record, finish, list, rate or stats |
+| `action` | string | yes | start, record, finish, list, rate, stats, watch_list, watch_add, watch_remove, watch_check |
+| `symbol`, `when`, `text`, `details` | string |  | watch_add/remove: the fault signal (details comma-separated) |
+| `port` | integer |  | watch_add: ADS port of the PLC (default 851) |
+| `netId` | string |  | watch_check: AmsNetId (default: the target of the project) |
 | `kind` | string |  | start/record: review, diagnose, cause or code |
 | `trigger` | string |  | start/record: chat, nightly, commit, pipeline |
 | `finding`, `evidence`, `proposal`, `diff`, `order`, `workflow`, `confidence`, `why` | string |  | record: the advice (evidence one per line) |
