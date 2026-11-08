@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Fixed
+- **New code without a specification:** outside a workflow the agent could create new functions without asking. Now TcAgent
+  asks once per chat at the first new FB, program, function or method: go on without a specification, or clarify first.
 - **The question about the specification** follows the answer language of the chat (German or English), and the chat asks the agent
   to write what a person reads in a question, a specification or an advice in that language too, also as tool arguments.
 - **Knowledge window:** an item that waits for a plugin, a module or another TcAgent showed `✓ applies`. It now shows `✗ needs …`,

@@ -140,6 +140,28 @@ public sealed partial class ToolRegistry
         return System.Globalization.CultureInfo.InstalledUICulture.TwoLetterISOLanguageName;
     }
 
+    bool newCodeDecided;   // the user agreed once in this session to create new objects without a specification
+
+    /// <summary>A new function (FB, program, function, method) outside a workflow: TcAgent asks the user once per session whether
+    /// it goes on without a specification - the agent cannot decide that alone. null = go on, otherwise the refusal.</summary>
+    string NewCodeGate(string name, JsonObject args)
+    {
+        if (name != "tc_plc_create" || DryRun(args) || run != null || newCodeDecided || !Workflows.IsNewFunction(Str(args, "kind"))) return null;
+        if (Confirm.Configured == Confirm.Level.Off || Environment.GetEnvironmentVariable("TCAGENT_SPEC_GATE") == "0") return null;
+        var t = Workflows.SpecTexts(AnswerLanguage());
+        var q = new AskQuestions.Question($"{t.NewCode} ({Str(args, "kind")} {Str(args, "name")})", "Specification",
+            new List<AskQuestions.Option> { new(t.Clarify, t.ClarifyWhat), new(t.Go, t.GoWhat) }, false);
+        var answers = AskAnswers(new List<AskQuestions.Question> { q });
+        if (answers == null) return null;                       // nobody can be asked (no dialog, no chat): as in a pipeline
+        answers.TryGetValue(q.Text, out var answer);
+        Log.Info("new code without a specification: " + (answer ?? "(no answer)"));
+        if (Workflows.NewCodeAnswer(answer) == true) { newCodeDecided = true; return null; }
+        return Workflows.NewCodeAnswer(answer) == false
+            ? "NOT executed: the user wants the function clarified first. Start tc_workflow action=start name=new-feature and follow it (interview, specification, then code)."
+            : "NOT executed: the user did not agree to new code without a specification" + (string.IsNullOrWhiteSpace(answer) ? "." : ": " + answer.Trim()) +
+              " Ask in your reply what they want, or start the workflow new-feature.";
+    }
+
     // Hard gate: activating a configuration that does not build would put a broken program on the target. A build
     // (without "check all objects" - that also checks code that is never called) must have 0 errors. Saving stays allowed.
     // The build decides; the agent is told to run tc_check before (faster, no code generated) - see tc_build.

@@ -1761,6 +1761,12 @@ public sealed partial class ToolRegistry
             Log.Info($"{name} not executed: Advisor run");
             return new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = advisorNo }), ["isError"] = true };
         }
+        // a new function outside a workflow: the user decides once per chat whether it goes on without a specification (WorkflowTool.cs)
+        if (NewCodeGate(name, args) is { } noNewCode)
+        {
+            Log.Info($"{name} not executed: new code without a specification refused");
+            return new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = noNewCode }), ["isError"] = true };
+        }
         // spec-ok: a workflow that asks for a specification writes no code before the user decided (WorkflowTool.cs)
         if (writesCode && Workflows.SpecPending(run) is { } openSpec)
         {

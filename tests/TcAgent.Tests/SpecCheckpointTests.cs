@@ -69,6 +69,21 @@ public class SpecCheckpointTests
     }
 
     [Theory]
+    [InlineData("function_block", true)]
+    [InlineData("Method", true)]
+    [InlineData("dut_struct", false)]
+    [InlineData("folder", false)]
+    public void OnlyNewFunctionsAsk(string kind, bool asks) => Assert.Equal(asks, Workflows.IsNewFunction(kind));
+
+    [Theory]
+    [InlineData("Ohne Spezifikation weiter", true)]
+    [InlineData("Go on without a specification", true)]
+    [InlineData("Erst klären", false)]
+    [InlineData("Clarify first", false)]
+    [InlineData("hmm", null)]
+    public void TheNewCodeAnswerDecides(string answer, bool? expected) => Assert.Equal(expected, Workflows.NewCodeAnswer(answer));
+
+    [Theory]
     [InlineData("Confirmed", true)]
     [InlineData("Confirmed, but name it FB_Conveyor", true)]
     [InlineData("Skip the specification", false)]
