@@ -31,7 +31,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "about" or "shared" or "reset" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "about" or "shared" or "reset" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" or "advise" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -67,6 +67,7 @@ public static partial class Cli
         if (args[0].Equals("shared", StringComparison.OrdinalIgnoreCase)) return SharedCli(args);       // SharedFolders.cs - files only
         if (args[0].Equals("reset", StringComparison.OrdinalIgnoreCase)) return ResetCli(args);         // Reset.cs - files only
         if (args[0].Equals("prompts", StringComparison.OrdinalIgnoreCase)) return Prompts.RunCli(args);   // Prompts.cs - files only, the list for the chat
+        if (args[0].Equals("advise", StringComparison.OrdinalIgnoreCase)) return CliAdvisor.Run(args);    // CliAdvisor.cs - Advisor Shadow, its record
         // the elevated part of tc_packages_change (Packages.cs), started by TcAgent itself through the UAC prompt
         if (args[0].Equals("tcpkg-elevated", StringComparison.Ordinal)) return ToolRegistry.RunElevatedTcpkg(args);
         Options o;
@@ -977,6 +978,12 @@ public static partial class Cli
 
   TcAgent.exe prompts [list] [--solution <sln>] [--json]
       The prompts of the prompt library that apply (prompts\<name>.md on the knowledge levels), chosen in the chat with /.
+
+  TcAgent.exe advise [run] --solution <sln> [--trigger nightly|commit|pipeline] [--since ""24 hours ago""] [--results <dir>] [--minutes 15]
+      Advisor Shadow: the AI client of the chat (Claude Code for now) reads the project without a window and records advice
+      with an order in .tcagent\advisor - it changes nothing (TCAGENT_MODE=ask). --dry-run prints the prompt only.
+  TcAgent.exe advise list|stats|rate --solution <sln> [--open] [--json] [--id AD-... --rating right|partly|wrong|n/a]
+      The advice of the project, the hit rate per kind of task, a rating.
 
   TcAgent.exe plugins [list] [--solution <sln>]
   TcAgent.exe plugins approve|revoke <id> [--solution <sln>]
