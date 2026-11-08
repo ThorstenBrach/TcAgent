@@ -45,7 +45,11 @@ public static class CliFormat
                     case "--examples":
                         Console.OutputEncoding = new UTF8Encoding(false);
                         if (args.Contains("--markdown")) { Console.Write(StFormatExamples.Markdown()); return Cli.Ok; }
-                        Console.WriteLine(ExamplesJson().ToJsonString());
+                        {
+                            // with --rules: the examples on the rules of the settings window (all other rules as set there)
+                            int ri = Array.FindIndex(args, a => a.Equals("--rules", StringComparison.OrdinalIgnoreCase));
+                            Console.WriteLine(ExamplesJson(ri >= 0 && ri + 1 < args.Length ? StFormatConfig.FromFile(args[ri + 1]) : null).ToJsonString());
+                        }
                         return Cli.Ok;
                     case "--survey":
                         {
@@ -161,7 +165,7 @@ public static class CliFormat
     }
 
     /// <summary>The examples of every rule for the settings window: the code and, per value, the result - with syntax classes.</summary>
-    static JsonObject ExamplesJson()
+    static JsonObject ExamplesJson(StFormatConfig baseRules = null)
     {
         var r = new JsonObject();
         foreach (var e in StFormatExamples.All)
@@ -169,7 +173,7 @@ public static class CliFormat
             {
                 ["part"] = e.Part.ToString().ToLowerInvariant(),
                 ["code"] = Colored(e.Code),
-                ["values"] = new JsonArray(e.Values.Select(v => (JsonNode)new JsonObject { ["value"] = v, ["tokens"] = Colored(StFormatExamples.Run(e, v)) }).ToArray()),
+                ["values"] = new JsonArray(e.Values.Select(v => (JsonNode)new JsonObject { ["value"] = v, ["tokens"] = Colored(StFormatExamples.Run(e, v, baseRules)) }).ToArray()),
                 ["with"] = string.Join(", ", e.With.Select(w => $"{w.Key}: {w.Value}"))
             };
         return r;

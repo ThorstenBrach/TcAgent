@@ -64,10 +64,12 @@ public static class StFormatExamples
     };
 
     /// <summary>The example formatted with one value: profile preserve, the extra settings of the example, then the value.</summary>
-    public static string Run(Example e, string value)
+    public static string Run(Example e, string value, StFormatConfig baseRules = null)
     {
         var c = new StFormatConfig();
-        c.ApplyProfile("preserve", "example");
+        // the docs: all other rules leave the code alone; the settings window: the rules as they are set there
+        if (baseRules == null) c.ApplyProfile("preserve", "example");
+        else foreach (var kv in baseRules.Values) c.Set(kv.Key, kv.Value, "window");
         foreach (var (k, v) in e.With) c.Set(k, v, "example");
         c.Set(e.Rule, value, "example");
         // the enum of the CASE examples, as a project would have it in E_State.TcDUT
