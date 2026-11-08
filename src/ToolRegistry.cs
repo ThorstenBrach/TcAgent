@@ -220,6 +220,7 @@ public sealed partial class ToolRegistry
         RegisterKnowledge();
         RegisterSkills();
         RegisterWorkflows();
+        RegisterAdvisor();
         RegisterImprove();
         RegisterSources();
         RegisterTestSkeleton();
@@ -1754,6 +1755,12 @@ public sealed partial class ToolRegistry
     {
         bool writesCode = (name is "tc_plc_write" or "tc_plc_create" or "tc_test_skeleton" || name == "tc_refactor" && string.Equals(Str(args, "action"), "apply", StringComparison.OrdinalIgnoreCase)
                            || name == "tc_plaintext" && string.Equals(Str(args, "action"), "import", StringComparison.OrdinalIgnoreCase)) && !DryRun(args);
+        // an Advisor run changes nothing (AdvisorTool.cs)
+        if (AdvisorRefusal(name, args) is { } advisorNo)
+        {
+            Log.Info($"{name} not executed: Advisor run");
+            return new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = advisorNo }), ["isError"] = true };
+        }
         // spec-ok: a workflow that asks for a specification writes no code before the user decided (WorkflowTool.cs)
         if (writesCode && Workflows.SpecPending(run) is { } openSpec)
         {
