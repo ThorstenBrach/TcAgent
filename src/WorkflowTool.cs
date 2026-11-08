@@ -102,13 +102,12 @@ public sealed partial class ToolRegistry
             s.SpecDecided = true;
             return "Nobody was asked (TCAGENT_CONFIRM=off).\n\n" + Workflows.Advance(run, s.Id, skip, note);
         }
-        var text = (skip ? "The agent wants to go on without a specification. Skip it?"
-                         : "Is the specification complete, so that the implementation can start?") +
-                   (string.IsNullOrWhiteSpace(note) ? "" : "\n\n" + note.Trim());
+        var t = Workflows.SpecTexts(AnswerLanguage());
+        var text = (skip ? t.AskSkip : t.Ask) + (string.IsNullOrWhiteSpace(note) ? "" : "\n\n" + note.Trim());
         var options = new List<AskQuestions.Option>();
-        if (!skip) options.Add(new(Workflows.SpecConfirm, "The implementation starts"));
-        options.Add(new(Workflows.SpecNotYet, "The agent goes on clarifying"));
-        options.Add(new(Workflows.SpecSkip, "The implementation starts without a specification"));
+        if (!skip) options.Add(new(t.Confirm, t.ConfirmWhat));
+        options.Add(new(t.NotYet, t.NotYetWhat));
+        options.Add(new(t.Skip, t.SkipWhat));
         var q = new AskQuestions.Question(text, "Specification", options, false);
         var answers = AskAnswers(new List<AskQuestions.Question> { q });
         if (answers == null)
@@ -126,6 +125,19 @@ public sealed partial class ToolRegistry
         }
         s.SpecDecided = true;
         return Workflows.Advance(run, s.Id, decision == false, note);
+    }
+
+    /// <summary>The answer language of the TcAgent Chat (chat-backends.json "answerLanguage"; missing or "request" = the display
+    /// language of Windows) - for the texts TcAgent itself shows to the person.</summary>
+    static string AnswerLanguage()
+    {
+        try
+        {
+            var f = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "chat-backends.json");
+            if (File.Exists(f) && (System.Text.Json.Nodes.JsonNode.Parse(File.ReadAllText(f)) as JsonObject)?["answerLanguage"]?.ToString() is { Length: > 0 } l && l != "request") return l;
+        }
+        catch { }
+        return System.Globalization.CultureInfo.InstalledUICulture.TwoLetterISOLanguageName;
     }
 
     // Hard gate: activating a configuration that does not build would put a broken program on the target. A build

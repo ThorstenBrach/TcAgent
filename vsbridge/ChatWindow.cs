@@ -155,7 +155,9 @@ namespace TcAgentBridge
             if (answerLanguage == AnswerRequest) return "Answer in the language of the user's request.";
             var c = (string.IsNullOrEmpty(answerLanguage) ? null : Neutral(answerLanguage)) ?? WindowsLanguage;
             return $"Answer in {c.EnglishName}, also when the request or a prepared prompt is written in another language. " +
-                   "Code, identifiers and tool arguments stay as they are; comments in code follow the coding rules.";
+                   "Code, identifiers and tool arguments stay as they are; comments in code follow the coding rules. " +
+                   $"Texts a person reads are written in {c.EnglishName} too, also when they are tool arguments: the questions of tc_ask_user, " +
+                   "the note of tc_workflow (a specification), the finding, proposal and order of tc_advisor.";
         }
 
         void SetAnswerLanguage(string value)
