@@ -115,6 +115,7 @@ public static class StFormatter
         if (part == StPart.Declaration) AlignDeclarations(lines, cfg);
         if (part == StPart.Implementation)
         {
+            lines = JoinShortIfs(lines, cfg);
             lines = WrapConditions(lines, cfg);
             lines = WrapCalls(lines, cfg);
             AlignCode(lines, cfg);
@@ -752,6 +753,37 @@ public static class StFormatter
                 r.Add(Segment(target, start, c, firstSeg)); firstSeg = false; start = c;
             }
             r.Add(Segment(target, start, target.P.Count, firstSeg, true));
+        }
+        return r;
+    }
+
+    // ------------------------------------------------------------------ short IF on one line
+    /// <summary>layout.short-if = N: IF cond THEN / one statement / END_IF becomes one line when it stays within N characters.
+    /// Only without ELSE/ELSIF, comments or a statement over several lines.</summary>
+    static List<Line> JoinShortIfs(List<Line> lines, StFormatConfig cfg)
+    {
+        if (!int.TryParse(cfg["layout.short-if"], out int max) || max <= 0) return lines;
+        int tab = cfg.TabWidth;
+        bool Plain(Line x) => !x.Frozen && !x.Blank && !x.CommentOnly && !x.Cont && !x.Fixed && x.P.All(p => !p.T.Comment && p.T.Kind != StTok.Pragma);
+        var r = new List<Line>();
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var a = lines[i];
+            if (i + 2 < lines.Count && Plain(a) && Kw(a.P[0].T, "IF") && Kw(a.Last, "THEN") && !a.P.Skip(1).Take(a.P.Count - 2).Any(p => Kw(p.T, "THEN", "END_IF")))
+            {
+                var b = lines[i + 1]; var c = lines[i + 2];
+                bool body = Plain(b) && b.Last?.Text == ";" && !Kw(b.First, "IF", "CASE", "FOR", "WHILE", "REPEAT", "ELSE", "ELSIF", "END_IF")
+                            && b.P.Count(p => p.T.Text == ";") == 1;
+                bool end = Plain(c) && Kw(c.P[0].T, "END_IF") && (c.P.Count == 1 || c.P.Count == 2 && c.P[1].T.Text == ";");
+                if (body && end)
+                {
+                    var j = new Line { Newline = c.Newline, Indent = a.Indent, OrigIndent = a.OrigIndent, Depth = a.Depth, Original = a.Original, Fixed = true };
+                    foreach (var x in new[] { a, b, c })
+                        for (int k = 0; k < x.P.Count; k++) j.P.Add(new Piece { T = x.P[k].T, Gap = k == 0 ? (x == a ? "" : " ") : x.P[k].Gap });
+                    if (Width(j.Indent, tab) + TextWidth(j, 0, j.P.Count, tab) <= max) { r.Add(j); i += 2; continue; }
+                }
+            }
+            r.Add(a);
         }
         return r;
     }
