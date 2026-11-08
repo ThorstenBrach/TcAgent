@@ -8,6 +8,9 @@
 // %LOCALAPPDATA%\TcAgent\update-state.json   the switches of the user, the last answer, a skipped version
 // <level>\updates.json (company, team)       { "check": false, "sources": false, "knowledgeSource": false } - a value here locks the switch
 //
+// What is new comes from CHANGELOG.md of the newest release (its tag): every version between the installed and the newest one,
+// not only the text of the release. Without it (not reachable, no section) the text of the release stays.
+//
 // SPDX-License-Identifier: MIT
 using System.Net;
 using System.Net.Http;
@@ -22,6 +25,7 @@ public static class Updates
     public const string Repo = "ThorstenBrach/TcAgent", KnowledgeSource = "knowledgeSource";
     const string ReleasesApi = "https://api.github.com/repos/" + Repo + "/releases?per_page=30";
     const string DownloadRoot = "https://github.com/" + Repo + "/releases/download/";
+    const string RawRoot = "https://raw.githubusercontent.com/" + Repo + "/";
     static readonly TimeSpan Interval = TimeSpan.FromHours(20);     // once a day, also when the IDE starts a little earlier
 
     static string StateFile => Path.Combine(KnowledgeLayers.UserRoot, "update-state.json");
@@ -51,6 +55,34 @@ public static class Updates
             list.Add((v, new Release(v.ToString(), tag, r?["published_at"]?.ToString(), r?["body"]?.ToString() ?? "", r?["html_url"]?.ToString())));
         }
         return list.OrderByDescending(x => x.V).Select(x => x.R).ToList();
+    }
+
+    /// <summary>The sections of CHANGELOG.md per version ("## [0.52.1] – 2026-11-08" up to the next "## ["), without the heading.</summary>
+    public static Dictionary<string, string> ChangelogSections(string changelog)
+    {
+        var d = new Dictionary<string, string>();
+        var ms = Regex.Matches(changelog ?? "", @"^##\s*\[(?<v>[^\]]+)\][^\n]*$", RegexOptions.Multiline);
+        for (int i = 0; i < ms.Count; i++)
+        {
+            int start = ms[i].Index + ms[i].Length, end = i + 1 < ms.Count ? ms[i + 1].Index : (changelog ?? "").Length;
+            if (ParseVersion(ms[i].Groups["v"].Value) is { } v) d[v.ToString()] = changelog[start..end].Trim();
+        }
+        return d;
+    }
+
+    /// <summary>The releases with the text of their CHANGELOG.md section where there is one.</summary>
+    public static List<Release> WithChangelog(List<Release> releases, string changelog, string current = null)
+    {
+        var s = ChangelogSections(changelog);
+        var list = releases.Select(r => s.TryGetValue(r.Version, out var text) && text.Length > 0 ? r with { Notes = text } : r).ToList();
+        // versions in between that were never released on their own (combined into a later one) are new as well
+        if (list.Count > 0 && ParseVersion(list[0].Version) is { } newest)
+        {
+            var oldest = ParseVersion(current) ?? list.Select(r => ParseVersion(r.Version)).Min();
+            foreach (var (v, text) in s)
+                if (ParseVersion(v) is { } pv && pv < newest && pv > oldest && list.All(r => r.Version != v)) list.Add(new Release(v, null, null, text, null));
+        }
+        return list.OrderByDescending(r => ParseVersion(r.Version)).ToList();
     }
 
     // ------------------------------------------------------------------ switches
@@ -115,6 +147,10 @@ public static class Updates
             {
                 st["releases"] = JsonNode.Parse(Http.GetStringAsync(ReleasesApi).GetAwaiter().GetResult());
                 st.Remove("error");
+                // what is new in every newer version: the changelog of the newest release
+                if (Newer(st["releases"], current).FirstOrDefault() is { } newest && Regex.IsMatch(newest.Tag, @"^v?\d+(\.\d+){1,3}$"))
+                    try { st["changelog"] = Http.GetStringAsync(RawRoot + newest.Tag + "/CHANGELOG.md").GetAwaiter().GetResult(); }
+                    catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException) { st.Remove("changelog"); }
             }
             catch (Exception ex) when (ex is HttpRequestException or TaskCanceledException or System.Text.Json.JsonException)
             {
@@ -128,7 +164,7 @@ public static class Updates
 
     public static JsonObject Describe(JsonObject st, Switch sw, string current, string error)
     {
-        var newer = Newer(st["releases"], current);
+        var newer = WithChangelog(Newer(st["releases"], current), st["changelog"]?.ToString(), current);
         var skipped = st["skipped"]?.ToString();
         var src = Setting("sources", st);
         var known = Setting(KnowledgeSource, st);

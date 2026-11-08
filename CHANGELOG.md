@@ -33,6 +33,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **`tc_library action=resolve`:** the name alone is enough, and the answer is the effective version instead of `*`.
 
 ### Added
+- **Update notice with what is new:** the notice of a new version shows the CHANGELOG.md sections of every version between the
+  installed and the newest one (also versions that were never released on their own), not only the short text of the release.
 - **Knowledge window:** every list sorts by a click on a column header (again: the other way), and keeps the order when it is read again.
   Switching a module on or off reads the files again at once, so items that wait for it show it without a refresh.
 - **Knowledge window:** a … button picks a folder in the dialogs New source / Edit source and Levels (company, team, platform repositories; with several, it adds one). An empty name of a new source takes the name of the folder or repository.
