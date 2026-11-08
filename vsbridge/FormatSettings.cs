@@ -1,10 +1,12 @@
-// TcAgentBridge - "Formatter settings": every rule of the ST formatter with a live preview (before | after) of what it does,
-// saved into formatting.json of a knowledge level, and "Wish a rule or feature ..." as a GitHub issue.
+// TcAgentBridge - "Formatter settings": every rule of the ST formatter in plain words, with a live preview (before | after)
+// that looks like the TwinCAT editor, saved into formatting.json of a knowledge level; "Wish a rule or feature ..." as a
+// GitHub issue. Built after the approved mockup and docs/UI_GUIDELINES.md.
 //
-//   Tools > Formatter settings (TcAgent) ... ; from the message of Format ST code as well.
-//   The preview formats an example, or the object open in the editor, with the rules as they are set in the window
-//   (TcAgent.exe format --stdin --rules <temp file>), a moment after each change. Nothing is saved before "Save".
-//   Rules locked by a level above cannot be changed here; the window says by which level.
+//   Tools > Formatter settings (TcAgent) ...
+//   Search (Ctrl+F), "Start from profile", the rules grouped with value and level (✎ changed, not saved · ⊘ locked by …),
+//   the details of the selected rule, the preview with the changed lines marked, a status line.
+//   The preview takes the font and the background of the TwinCAT editor and syntax colors for the light or dark theme
+//   (colors found in the editor are used, otherwise the TwinCAT defaults). TcAgent.exe runs in the background.
 //
 // SPDX-License-Identifier: MIT
 using System;
@@ -13,11 +15,14 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
+using System.Windows.Input;
 using System.Windows.Media;
 using Microsoft.VisualStudio.PlatformUI;
 
@@ -28,41 +33,189 @@ namespace TcAgentBridge
         const int CmdFormatSettings = 0x0104;
 
         const string SampleDeclaration =
-"FUNCTION_BLOCK FB_Station\r\nVAR_INPUT\r\nbStart:BOOL; // start the cycle\r\nnParts : INT:=0; // parts so far\r\ntTimeout:TIME:=t#5s;\r\nEND_VAR\r\nVAR\r\nfbTimer   :   TON;\r\neState : E_State;\r\nEND_VAR\r\n";
+"FUNCTION_BLOCK FB_Motor\r\nVAR_INPUT\r\nbStart:BOOL; // start the cycle\r\nnParts : INT:=0; // parts so far\r\ntTimeout:TIME:=t#5s;\r\nEND_VAR\r\nVAR\r\nfbTimer   :   TON;\r\neState : E_State;\r\nEND_VAR\r\n";
 
         const string SampleImplementation =
-"// cycle of the station\r\nif bStart and not bBusy or bSetup and bKey then\r\nbBusy:=true;\r\nend_if\r\n\r\n\r\ncase eState of\r\nE_State.Idle:\r\nif bStart then eState:=E_State.Run; end_if\r\nE_State.Run:\r\nfbTimer(IN:=bBusy AND NOT bDone, PT:=tTimeout);\r\nfbAxis(Execute := bBusy, Position := rTarget, Velocity := rVelocity, Acceleration := rAcc, Deceleration := rAcc, Jerk := rJerk);\r\nelse\r\n;\r\nend_case\r\n";
+"// cycle of the motor\r\nif bStart and not bBusy or bSetup and bKey then\r\nbBusy:=true;\r\nend_if\r\n\r\n\r\ncase eState of\r\nE_State.Idle:\r\nif bStart then eState:=E_State.Run; end_if\r\nE_State.Run:\r\nfbTimer(IN:=bBusy AND NOT bDone, PT:=tTimeout);\r\nfbAxis(Execute := bBusy, Position := rTarget, Velocity := rVelocity, Acceleration := rAcc, Deceleration := rAcc, Jerk := rJerk);\r\nelse\r\n;\r\nend_case\r\n";
 
+        // ------------------------------------------------------------------ the look of the TwinCAT editor
+        sealed class EditorLook
+        {
+            public FontFamily Font = new FontFamily("Consolas");
+            public double Size = 13;
+            public Brush Back, Fore;
+            public readonly Dictionary<string, Brush> Colors = new Dictionary<string, Brush>();
+            public bool Dark;
+        }
+
+        static SolidColorBrush B(byte r, byte g, byte b) { var x = new SolidColorBrush(Color.FromRgb(r, g, b)); x.Freeze(); return x; }
+        static SolidColorBrush B(System.Drawing.Color c) => B(c.R, c.G, c.B);
+
+        /// <summary>Font and background of the open TwinCAT editor; syntax colors found in it, otherwise the TwinCAT defaults of
+        /// the theme. What was found is logged, so the defaults can be checked.</summary>
+        EditorLook ReadEditorLook(System.Windows.Forms.Control syn)
+        {
+            var look = new EditorLook();
+            System.Drawing.Color back = System.Drawing.Color.Empty, fore = System.Drawing.Color.Empty;
+            try
+            {
+                if (syn != null)
+                {
+                    var f = syn.Font;
+                    if (f != null) { look.Font = new FontFamily(f.FontFamily.Name); look.Size = f.SizeInPoints * 96.0 / 72.0; }
+                    back = syn.BackColor; fore = syn.ForeColor;
+                }
+            }
+            catch { }
+            if (back.IsEmpty || back.A == 0)
+            {
+                try { var c = VSColorTheme.GetThemedColor(EnvironmentColors.ToolWindowBackgroundColorKey); back = c; } catch { back = System.Drawing.Color.White; }
+            }
+            look.Dark = back.GetBrightness() < 0.4;
+            if (fore.IsEmpty || Math.Abs(fore.GetBrightness() - back.GetBrightness()) < 0.3) fore = look.Dark ? System.Drawing.Color.FromArgb(220, 220, 220) : System.Drawing.Color.Black;
+            look.Back = B(back); look.Fore = B(fore);
+            // TwinCAT defaults
+            if (look.Dark)
+            {
+                look.Colors["keyword"] = B(86, 156, 214); look.Colors["type"] = B(86, 156, 214); look.Colors["comment"] = B(87, 166, 74);
+                look.Colors["string"] = B(214, 157, 133); look.Colors["number"] = B(181, 206, 168); look.Colors["pragma"] = B(155, 155, 155);
+            }
+            else
+            {
+                look.Colors["keyword"] = B(0, 0, 255); look.Colors["type"] = B(0, 0, 255); look.Colors["comment"] = B(0, 128, 0);
+                look.Colors["string"] = B(163, 21, 21); look.Colors["number"] = B(0, 0, 0); look.Colors["pragma"] = B(128, 128, 128);
+            }
+            // colors of the editor itself, where its objects name them
+            try
+            {
+                var found = new Dictionary<string, System.Drawing.Color>();
+                FindColors(syn, 0, found, new HashSet<object>(ReferenceEqualityComparer.Instance), "");
+                foreach (var kv in found)
+                {
+                    var n = kv.Key.ToLowerInvariant();
+                    string cls = n.Contains("keyword") ? "keyword" : n.Contains("comment") ? "comment" : n.Contains("string") ? "string"
+                               : n.Contains("number") || n.Contains("literal") ? "number" : n.Contains("pragma") ? "pragma" : n.Contains("type") ? "type" : null;
+                    if (cls != null && !kv.Value.IsEmpty && kv.Value.A > 0) look.Colors[cls] = B(kv.Value);
+                }
+                if (found.Count > 0) Log("Formatter preview colors found in the editor: " + string.Join(", ", found.Select(k => k.Key + "=" + k.Value.Name).Take(40)));
+            }
+            catch (Exception ex) { Log("Formatter preview colors: " + Inner(ex)); }
+            return look;
+        }
+
+        sealed class ReferenceEqualityComparer : IEqualityComparer<object>
+        {
+            public static readonly ReferenceEqualityComparer Instance = new ReferenceEqualityComparer();
+            public new bool Equals(object a, object b) => ReferenceEquals(a, b);
+            public int GetHashCode(object o) => System.Runtime.CompilerServices.RuntimeHelpers.GetHashCode(o);
+        }
+
+        static void FindColors(object o, int depth, Dictionary<string, System.Drawing.Color> found, HashSet<object> seen, string path)
+        {
+            if (o == null || depth > 3 || found.Count > 60 || o is string || o.GetType().IsPrimitive || !seen.Add(o)) return;
+            if (o is System.Windows.Forms.Control c && depth > 0 && !(c.GetType().Name.Contains("SynEd") || c.GetType().Name.Contains("TextArea"))) return;
+            const BindingFlags bf = BindingFlags.Instance | BindingFlags.Public | BindingFlags.NonPublic;
+            for (var t = o.GetType(); t != null && t != typeof(object) && t != typeof(System.Windows.Forms.Control) && t != typeof(System.ComponentModel.Component); t = t.BaseType)
+                foreach (var f in t.GetFields(bf | BindingFlags.DeclaredOnly))
+                {
+                    object v; try { v = f.GetValue(o); } catch { continue; }
+                    if (v is System.Drawing.Color col) { if (!found.ContainsKey(path + f.Name)) found[path + f.Name] = col; }
+                    else if (v != null && !(v is Delegate) && (f.FieldType.Namespace ?? "").StartsWith("_3S")) FindColors(v, depth + 1, found, seen, path + f.Name + ".");
+                }
+        }
+
+        /// <summary>A read-only code view in the look of the editor: [class, text] pieces, marked lines tinted.</summary>
+        static FrameworkElement CodeView(EditorLook look, ArrayList pieces, HashSet<int> marked)
+        {
+            var lines = new List<List<(string Cls, string Text)>> { new List<(string, string)>() };
+            foreach (var p in pieces.OfType<ArrayList>())
+            {
+                string cls = p[0] as string, text = p[1] as string ?? "";
+                if (cls == "newline") { lines.Add(new List<(string, string)>()); continue; }
+                var parts = text.Replace("\r\n", "\n").Split('\n');
+                for (int i = 0; i < parts.Length; i++)
+                {
+                    if (i > 0) lines.Add(new List<(string, string)>());
+                    if (parts[i].Length > 0) lines[lines.Count - 1].Add((cls, parts[i]));
+                }
+            }
+            var mark = new SolidColorBrush(Color.FromArgb(look.Dark ? (byte)70 : (byte)55, 0xE0, 0x8A, 0x00));
+            var bar = new SolidColorBrush(Color.FromRgb(0xE0, 0x8A, 0x00));
+            var stack = new StackPanel { Background = look.Back };
+            for (int n = 0; n < lines.Count; n++)
+            {
+                var tb = new TextBlock { FontFamily = look.Font, FontSize = look.Size, Foreground = look.Fore, Padding = new Thickness(6, 0, 8, 0) };
+                foreach (var (cls, text) in lines[n])
+                    tb.Inlines.Add(new Run(text.Replace("\t", "    ")) { Foreground = look.Colors.TryGetValue(cls, out var br) ? br : look.Fore });
+                if (lines[n].Count == 0) tb.Text = " ";
+                bool m = marked != null && marked.Contains(n);
+                stack.Children.Add(new Border
+                {
+                    Child = tb, Background = m ? mark : Brushes.Transparent,
+                    BorderBrush = bar, BorderThickness = new Thickness(m ? 3 : 0, 0, 0, 0), Padding = new Thickness(m ? 0 : 3, 0, 0, 0)
+                });
+            }
+            return new ScrollViewer { Content = stack, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Background = look.Back };
+        }
+
+        static List<string> LinesOf(ArrayList pieces)
+        {
+            var sb = new StringBuilder();
+            foreach (var p in pieces.OfType<ArrayList>()) sb.Append(p[0] as string == "newline" ? "\n" : (p[1] as string ?? "").Replace("\r\n", "\n"));
+            return sb.ToString().Split('\n').ToList();
+        }
+
+        /// <summary>Lines of b that are not in a longest common sequence with a - the changed lines.</summary>
+        static HashSet<int> Changed(List<string> a, List<string> b)
+        {
+            int n = a.Count, m = b.Count;
+            if ((long)n * m > 4_000_000) return new HashSet<int>();
+            var l = new int[n + 1, m + 1];
+            for (int i = n - 1; i >= 0; i--)
+                for (int j = m - 1; j >= 0; j--)
+                    l[i, j] = a[i].TrimEnd() == b[j].TrimEnd() ? l[i + 1, j + 1] + 1 : Math.Max(l[i + 1, j], l[i, j + 1]);
+            var keep = new HashSet<int>();
+            for (int i = 0, j = 0; i < n && j < m;)
+            {
+                if (a[i].TrimEnd() == b[j].TrimEnd()) { keep.Add(j); i++; j++; }
+                else if (l[i + 1, j] >= l[i, j + 1]) i++; else j++;
+            }
+            var r = new HashSet<int>();
+            for (int j = 0; j < m; j++) if (!keep.Contains(j)) r.Add(j);
+            return r;
+        }
+
+        // ------------------------------------------------------------------ the window
         internal void ShowFormatSettings()
         {
             var exe = TcUnitControl.TcAgentExe();
             if (exe == null) { FormatMessage("Formatter settings: TcAgent.exe was not found - set it up in the TcAgent Chat first.", true); return; }
             var sln = TcUnitControl.SolutionPath();
-            Dictionary<string, object> state;
-            try { state = FmtJson(FmtRun(exe, "format --show-rules --json" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), null)); }
-            catch (Exception ex) { FormatMessage("Formatter settings: " + Inner(ex) + "\n\nTcAgent 0.54 or newer is needed.", true); return; }
-            var rules = (state["rules"] as Dictionary<string, object>) ?? new Dictionary<string, object>();
-
-            // the object open in the editor, for the preview
-            string openDecl = null, openImpl = null;
+            // values from the IDE are read on the UI thread before anything runs in the background
+            string openDecl = null, openImpl = null, openName = null;
+            System.Windows.Forms.Control anySyn = null;
             try
             {
-                var dv = ActiveDocView(out _);
+                var dv = ActiveDocView(out var doc);
                 var cds = SafeGet(dv, "EditorView") ?? SafeGet(SafeGet(EnvProp("Engine"), "Frame"), "ActiveView");
                 foreach (var pn in new[] { "InterfaceEditorView", "ImplementationEditorView" })
                 {
                     if (!(SafeGet(cds, pn) is System.Windows.Forms.Control ctl)) continue;
                     var syn = ctl.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0 ? ctl
                             : Descendants(ctl).FirstOrDefault(c => c.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0);
+                    if (syn == null) continue;
+                    anySyn = anySyn ?? syn;
                     var t = SafeGet(syn, "Text") as string;
                     if (pn == "InterfaceEditorView") openDecl = t; else openImpl = t;
                 }
+                if (anySyn != null && !string.IsNullOrEmpty(doc)) openName = Path.GetFileNameWithoutExtension(doc.Split('|').Last().Trim());
             }
             catch { }
+            var look = ReadEditorLook(anySyn);
 
             var w = new Window
             {
-                Title = "Formatter settings (TcAgent)", Icon = AppIcon, Width = 1180, Height = 760, MinWidth = 760, MinHeight = 480,
+                Title = "Formatter settings (TcAgent)", Icon = AppIcon, Width = 1200, Height = 780, MinWidth = 820, MinHeight = 520,
                 ShowInTaskbar = false, WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResizeWithGrip
             };
             try { w.Owner = Application.Current?.MainWindow; } catch { }
@@ -70,183 +223,342 @@ namespace TcAgentBridge
             w.SetResourceReference(Control.BackgroundProperty, ThemedDialogColors.WindowPanelBrushKey);
             w.SetResourceReference(Control.ForegroundProperty, ThemedDialogColors.WindowPanelTextBrushKey);
 
+            // ---- frame: heading, search/profile/level, body, buttons, status line
+            var head = new TextBlock { Margin = new Thickness(12, 10, 12, 6), TextWrapping = TextWrapping.Wrap };
+            head.Inlines.Add(new Run("Formatter settings") { FontWeight = FontWeights.SemiBold, FontSize = 14 });
+            head.Inlines.Add(new Run(" – every rule of the ST formatter; a change shows at once in the preview") { Foreground = Brushes.Gray });
+            var search = new TextBox { Width = 300, Padding = new Thickness(3, 2, 3, 2), ToolTip = "Search rules by name, key or description (Ctrl+F)" };
+            var hint = new TextBlock { Text = "Search rules (Ctrl+F)", Opacity = 0.55, IsHitTestVisible = false, Margin = new Thickness(6, 3, 0, 0) };
+            var clear = new Button { Content = "✕", Width = 22, Padding = new Thickness(0), BorderThickness = new Thickness(0), Background = Brushes.Transparent, Visibility = Visibility.Collapsed, ToolTip = "Clear the search" };
+            var searchBox = new Grid { Width = 300 };
+            searchBox.Children.Add(search); searchBox.Children.Add(hint);
+            clear.HorizontalAlignment = HorizontalAlignment.Right; searchBox.Children.Add(clear);
+            var profile = new ComboBox { MinWidth = 120, Margin = new Thickness(6, 0, 0, 0), ToolTip = "Puts the values of a profile into the window (not locked rules); Save writes the changed ones" };
+            var level = new ComboBox { MinWidth = 110, Margin = new Thickness(6, 0, 0, 0), ToolTip = "The knowledge level whose formatting.json gets the changed rules" };
+            if (!string.IsNullOrEmpty(sln)) level.Items.Add("project");
+            level.Items.Add("user");
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TCAGENT_TEAM"))) level.Items.Add("team");
+            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TCAGENT_COMPANY"))) level.Items.Add("company");
+            level.SelectedIndex = 0;
+            var row = new DockPanel { Margin = new Thickness(12, 0, 12, 8), LastChildFill = false };
+            var lp = new TextBlock { Text = "Start from profile:", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(12, 0, 0, 0) };
+            var ll = new TextBlock { Text = "Save to level:", VerticalAlignment = VerticalAlignment.Center };
+            foreach (var x in new UIElement[] { searchBox, lp, profile }) { DockPanel.SetDock(x, Dock.Left); row.Children.Add(x); }
+            foreach (var x in new UIElement[] { level, ll }) { DockPanel.SetDock(x, Dock.Right); row.Children.Add(x); }
+
+            var statusLeft = new TextBlock { Text = "Reading the rules …", VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+            var statusRight = new TextBlock { Opacity = 0.7, VerticalAlignment = VerticalAlignment.Center };
+            var progress = new ProgressBar { Height = 2, IsIndeterminate = true, BorderThickness = new Thickness(0), Visibility = Visibility.Visible };
+            var status = new DockPanel { Margin = new Thickness(0) };
+            var statusInner = new DockPanel { Margin = new Thickness(12, 3, 12, 3) };
+            DockPanel.SetDock(statusRight, Dock.Right); statusInner.Children.Add(statusRight); statusInner.Children.Add(statusLeft);
+            DockPanel.SetDock(progress, Dock.Top); status.Children.Add(progress); status.Children.Add(statusInner);
+            status.SetResourceReference(Panel.BackgroundProperty, EnvironmentColors.StatusBarDefaultBrushKey);
+            statusLeft.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.StatusBarDefaultTextBrushKey);
+            statusRight.SetResourceReference(TextBlock.ForegroundProperty, EnvironmentColors.StatusBarDefaultTextBrushKey);
+
+            var wish = new Button { Content = "Wish a rule or feature …", Padding = new Thickness(10, 3, 10, 3), ToolTip = "Opens a new issue on GitHub with the example of the preview - you check it there and send it yourself" };
+            var undo = new Button { Content = "Undo changes", Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(6, 0, 0, 0), ToolTip = "Back to the rules as they apply now" };
+            var save = new Button { Content = "Save", Padding = new Thickness(18, 3, 18, 3), Margin = new Thickness(6, 0, 0, 0), IsEnabled = false, ToolTip = "Writes the changed rules into formatting.json of the chosen level" };
+            save.SetResourceReference(Control.BackgroundProperty, EnvironmentColors.SystemHighlightBrushKey);
+            save.SetResourceReference(Control.ForegroundProperty, EnvironmentColors.SystemHighlightTextBrushKey);
+            var close = new Button { Content = "Close", Padding = new Thickness(14, 3, 14, 3), Margin = new Thickness(6, 0, 0, 0), IsCancel = true };
+            close.Click += (s, e) => w.Close();
+            var bar = new DockPanel { Margin = new Thickness(12, 8, 12, 8), LastChildFill = false };
+            DockPanel.SetDock(wish, Dock.Left); bar.Children.Add(wish);
+            foreach (var x in new UIElement[] { close, save, undo }) { DockPanel.SetDock(x, Dock.Right); bar.Children.Add(x); }
+
+            var body = new Grid { Margin = new Thickness(12, 0, 12, 0) };
+            body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(480), MinWidth = 360 });
+            body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            body.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 300 });
+            var root = new DockPanel();
+            DockPanel.SetDock(head, Dock.Top); root.Children.Add(head);
+            DockPanel.SetDock(row, Dock.Top); root.Children.Add(row);
+            DockPanel.SetDock(status, Dock.Bottom); root.Children.Add(status);
+            DockPanel.SetDock(bar, Dock.Bottom); root.Children.Add(bar);
+            root.Children.Add(body);
+            w.Content = root;
+            w.PreviewKeyDown += (s, e) => { if (e.Key == Key.F && Keyboard.Modifiers == ModifierKeys.Control) { search.Focus(); search.SelectAll(); e.Handled = true; } };
+
+            w.Loaded += async (s, e) =>
+            {
+                Dictionary<string, object> state;
+                try { state = await Task.Run(() => FmtJson(FmtRun(exe, "format --show-rules --json" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), null))); }
+                catch (Exception ex) { FormatMessage("Formatter settings: the rules could not be read.\n\n" + Inner(ex) + "\n\nTcAgent 0.54 or newer is needed.", true); w.Close(); return; }
+                progress.Visibility = Visibility.Collapsed;
+                BuildSettings(w, state, body, search, hint, clear, profile, level, wish, undo, save, statusLeft, statusRight, progress, look, exe, sln, openDecl, openImpl, openName);
+            };
+            w.ShowDialog();
+        }
+
+        sealed class RuleRow
+        {
+            public string Key, Label, Description, Default, Values, From, Locked;
+            public FrameworkElement Row;
+            public ComboBox Box;
+            public TextBlock State;
+            public TextBlock Header;
+        }
+
+        void BuildSettings(Window w, Dictionary<string, object> state, Grid body, TextBox search, TextBlock hint, Button clear, ComboBox profile, ComboBox level,
+                           Button wish, Button undo, Button save, TextBlock statusLeft, TextBlock statusRight, ProgressBar progress, EditorLook look,
+                           string exe, string sln, string openDecl, string openImpl, string openName)
+        {
+            var rules = state["rules"] as Dictionary<string, object> ?? new Dictionary<string, object>();
+            var profiles = state.TryGetValue("profiles", out var po) ? po as Dictionary<string, object> : null;
             var loaded = rules.ToDictionary(k => k.Key, k => FmtStr(k.Value as Dictionary<string, object>, "value") ?? "", StringComparer.OrdinalIgnoreCase);
             var current = new Dictionary<string, string>(loaded, StringComparer.OrdinalIgnoreCase);
-
-            // ---- left: the rules
-            var grid = new Grid { Margin = new Thickness(0, 0, 8, 0) };
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(190) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(130) });
-            grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
-            var sources = new Dictionary<string, TextBlock>();
-            int row = 0;
-            string lastGroup = null;
+            var rows = new List<RuleRow>();
             Action changed = null;
+            RuleRow selected = null;
+
+            // ---- left: the rules (group headings, Rule | Value | From), the details below
+            var list = new Grid();
+            list.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
+            list.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+            list.ColumnDefinitions.Add(new ColumnDefinition());
+            var selBrush = new SolidColorBrush(Color.FromArgb(70, 0x3B, 0x6F, 0xD8));
+            var detail = new StackPanel { Margin = new Thickness(10, 8, 10, 8) };
+            Action<RuleRow> showDetail = null;
+            int r0 = 0;
+            void AddRow(UIElement e, int col, int span = 1) { Grid.SetRow(e, r0); Grid.SetColumn(e, col); Grid.SetColumnSpan(e, span); list.Children.Add(e); }
+            TextBlock header = null;
+            string lastGroup = null;
             foreach (var kv in rules)
             {
-                var r = kv.Value as Dictionary<string, object>;
-                string key = kv.Key, group = key.Split('.')[0];
+                var d = kv.Value as Dictionary<string, object>;
+                var rr = new RuleRow
+                {
+                    Key = kv.Key, Label = FmtStr(d, "label") ?? kv.Key, Description = FmtStr(d, "description") ?? "", Default = FmtStr(d, "default"),
+                    Values = FmtStr(d, "values") ?? "", From = FmtStr(d, "from"), Locked = FmtStr(d, "locked")
+                };
+                string group = kv.Key.Split('.')[0];
                 if (group != lastGroup)
                 {
-                    grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                    var h = new TextBlock { Text = GroupName(group), FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, row == 0 ? 0 : 10, 0, 2) };
-                    Grid.SetRow(h, row); Grid.SetColumnSpan(h, 3); grid.Children.Add(h); row++;
+                    list.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    header = new TextBlock { Text = GroupName(group), FontWeight = FontWeights.SemiBold, Margin = new Thickness(4, r0 == 0 ? 2 : 10, 0, 2) };
+                    AddRow(header, 0, 3); r0++;
                     lastGroup = group;
                 }
-                grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                var desc = FmtStr(r, "description") ?? "";
-                var lab = new TextBlock { Text = key, ToolTip = desc + "\nDefault: " + FmtStr(r, "default"), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 1, 6, 1) };
-                var values = (FmtStr(r, "values") ?? "").Split('|').Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
+                rr.Header = header;
+                list.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                var back = new Border { Background = Brushes.Transparent };
+                AddRow(back, 0, 3);
+                var lab = new TextBlock { Text = rr.Label, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 2, 6, 2), ToolTip = rr.Description, TextTrimming = TextTrimming.CharacterEllipsis };
+                var values = rr.Values.Split('|').Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                 bool number = values.Contains("number");
-                var box = new ComboBox { IsEditable = number, Margin = new Thickness(0, 1, 6, 1), MinWidth = 110, ToolTip = desc };
+                var box = new ComboBox { IsEditable = number, Margin = new Thickness(0, 1, 6, 1), MinWidth = 100, ToolTip = rr.Description };
                 foreach (var v in values.Where(v => v != "number")) box.Items.Add(v);
-                box.Text = current[key];
-                if (!number) box.SelectedItem = current[key];
-                var src = new TextBlock { Text = FmtStr(r, "from"), Opacity = 0.65, VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis, ToolTip = desc };
-                sources[key] = src;
-                if (FmtStr(r, "locked") is string by)
-                {
-                    box.IsEnabled = false;
-                    src.Text = "🔒 locked by " + by;
-                    lab.ToolTip = desc + "\nLocked by " + by + " - it cannot be changed on another level.";
-                }
+                box.Text = current[rr.Key];
+                if (!number) box.SelectedItem = current[rr.Key];
+                var st = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+                rr.Box = box; rr.State = st;
+                AddRow(lab, 0); AddRow(box, 1); AddRow(st, 2);
+                rr.Row = back;
+                var grp = new[] { (UIElement)back, lab, box, st };
+                rr.Row.Tag = grp;
+                if (rr.Locked != null) { box.IsEnabled = false; }
+                void Select() { selected = rr; foreach (var x in rows) ((Border)x.Row).Background = Brushes.Transparent; back.Background = selBrush; showDetail(rr); }
+                foreach (var el in new FrameworkElement[] { lab, st, back }) el.MouseLeftButtonDown += (s, e) => Select();
+                box.GotKeyboardFocus += (s, e) => Select();
                 void Pick()
                 {
                     var v = (box.IsEditable ? box.Text : box.SelectedItem as string ?? box.Text)?.Trim() ?? "";
-                    if (v.Length == 0 || v == current[key]) return;
-                    current[key] = v;
-                    src.Text = v == loaded[key] ? FmtStr(r, "from") : "changed - not saved";
+                    if (v.Length == 0 || v == current[rr.Key]) return;
+                    if (box.IsEditable && !int.TryParse(v, out _) && !values.Contains(v)) { box.Text = current[rr.Key]; statusLeft.Text = $"{rr.Label}: a number or {string.Join(", ", values.Where(x => x != "number"))}"; return; }
+                    current[rr.Key] = v;
                     changed?.Invoke();
                 }
                 box.SelectionChanged += (s, e) => { if (!box.IsEditable) Pick(); else if (box.SelectedItem is string si) { box.Text = si; Pick(); } };
                 box.LostFocus += (s, e) => Pick();
-                box.KeyUp += (s, e) => { if (e.Key == System.Windows.Input.Key.Enter) Pick(); };
-                Grid.SetRow(lab, row); Grid.SetColumn(lab, 0); grid.Children.Add(lab);
-                Grid.SetRow(box, row); Grid.SetColumn(box, 1); grid.Children.Add(box);
-                Grid.SetRow(src, row); Grid.SetColumn(src, 2); grid.Children.Add(src);
-                row++;
+                box.KeyUp += (s, e) => { if (e.Key == Key.Enter) { Pick(); e.Handled = true; } };
+                rows.Add(rr);
+                r0++;
             }
-            var left = new ScrollViewer { Content = grid, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            void States()
+            {
+                foreach (var rr in rows)
+                {
+                    bool ch = current[rr.Key] != loaded[rr.Key];
+                    rr.State.Text = rr.Locked != null ? "⊘ locked by " + rr.Locked : ch ? "✎ changed, not saved" : rr.From;
+                    rr.State.Foreground = ch ? new SolidColorBrush(Color.FromRgb(0xC2, 0x6A, 0x00)) : Brushes.Gray;
+                    rr.State.ToolTip = rr.Locked != null ? "A level above locked this rule - it can only be changed there" : ch ? "Changed in this window - Save writes it" : "Comes from: " + rr.From;
+                    if ((rr.Box.IsEditable ? rr.Box.Text : rr.Box.SelectedItem as string) != current[rr.Key]) { rr.Box.Text = current[rr.Key]; if (!rr.Box.IsEditable) rr.Box.SelectedItem = current[rr.Key]; }
+                }
+                int n = rows.Count(x => current[x.Key] != loaded[x.Key]);
+                save.IsEnabled = n > 0;
+                statusRight.Text = $"{rows.Count} rules · {rows.Count(x => x.Locked != null)} locked";
+                if (selected != null) showDetail(selected);
+            }
+            showDetail = rr =>
+            {
+                detail.Children.Clear();
+                var name = new TextBlock { FontSize = 14, FontWeight = FontWeights.SemiBold, TextWrapping = TextWrapping.Wrap };
+                name.Inlines.Add(new Run(rr.Label));
+                bool ch = current[rr.Key] != loaded[rr.Key];
+                if (rr.Locked != null || ch)
+                    name.Inlines.Add(new Run("   " + (rr.Locked != null ? "⊘ locked by " + rr.Locked : "✎ changed, not saved")) { FontSize = 11, FontWeight = FontWeights.Normal, Foreground = ch ? new SolidColorBrush(Color.FromRgb(0xC2, 0x6A, 0x00)) : Brushes.Gray });
+                detail.Children.Add(name);
+                var g = new Grid { Margin = new Thickness(0, 6, 0, 0) };
+                g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(100) }); g.ColumnDefinitions.Add(new ColumnDefinition());
+                int i = 0;
+                void Fact(string a, string b)
+                {
+                    g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                    var ta = new TextBlock { Text = a, Opacity = 0.65, Margin = new Thickness(0, 1, 8, 1) }; var tb = new TextBlock { Text = b, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 1, 0, 1) };
+                    Grid.SetRow(ta, i); Grid.SetRow(tb, i); Grid.SetColumn(tb, 1); g.Children.Add(ta); g.Children.Add(tb); i++;
+                }
+                Fact("Rule", rr.Key);
+                Fact("What it does", rr.Description);
+                Fact("Values", rr.Values.Replace("|", "·"));
+                Fact("Default", rr.Default);
+                Fact("Now applies", loaded[rr.Key] + " – from " + rr.From + (ch ? $"; {current[rr.Key]} after Save on level {level.SelectedItem}" : ""));
+                detail.Children.Add(g);
+            };
+            var listScroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            var listBorder = new Border { Child = listScroll, BorderThickness = new Thickness(1) };
+            listBorder.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+            var detailBorder = new Border { Child = detail, BorderThickness = new Thickness(1), Margin = new Thickness(0, 8, 0, 0), MinHeight = 120 };
+            detailBorder.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+            detail.Children.Add(new TextBlock { Text = "Select a rule to see what it does, its values and where it comes from.", Opacity = 0.65, TextWrapping = TextWrapping.Wrap });
+            var left = new DockPanel();
+            DockPanel.SetDock(detailBorder, Dock.Bottom); left.Children.Add(detailBorder); left.Children.Add(listBorder);
+
+            // ---- search
+            void Filter()
+            {
+                var q = search.Text.Trim();
+                hint.Visibility = q.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
+                clear.Visibility = q.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+                foreach (var rr in rows)
+                {
+                    bool show = q.Length == 0 || (rr.Label + " " + rr.Key + " " + rr.Description).IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0;
+                    foreach (UIElement el in (UIElement[])rr.Row.Tag) el.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+                }
+                foreach (var h in rows.Select(x => x.Header).Distinct())
+                    h.Visibility = rows.Any(x => x.Header == h && x.Box.Visibility == Visibility.Visible) ? Visibility.Visible : Visibility.Collapsed;
+            }
+            search.TextChanged += (s, e) => Filter();
+            clear.Click += (s, e) => { search.Text = ""; search.Focus(); };
+
+            // ---- profile
+            profile.Items.Add("(as it applies now)");
+            if (profiles != null) foreach (var p in profiles.Keys) profile.Items.Add(p);
+            profile.SelectedIndex = 0;
+            profile.SelectionChanged += (s, e) =>
+            {
+                if (profile.SelectedIndex <= 0) { foreach (var k in loaded.Keys.ToList()) current[k] = loaded[k]; }
+                else if (profiles?[profile.SelectedItem as string] is Dictionary<string, object> pv)
+                    foreach (var rr in rows.Where(x => x.Locked == null)) if (pv.TryGetValue(rr.Key, out var v) && v != null) current[rr.Key] = v.ToString();
+                changed?.Invoke();
+            };
 
             // ---- right: the preview
-            TextBox Code(bool before) => new TextBox
-            {
-                IsReadOnly = true, FontFamily = new FontFamily("Consolas"), FontSize = 12, AcceptsReturn = true, TextWrapping = TextWrapping.NoWrap,
-                VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, Opacity = before ? 0.8 : 1,
-                Margin = new Thickness(0, 2, before ? 4 : 0, 0)
-            };
-            var declBefore = Code(true); var declAfter = Code(false); var implBefore = Code(true); var implAfter = Code(false);
-            UIElement Pair(TextBox a, TextBox b)
+            var tabs = new TabControl { Margin = new Thickness(0) };
+            var declTab = new TabItem { Header = "Declaration" }; var implTab = new TabItem { Header = "Implementation" };
+            tabs.Items.Add(declTab); tabs.Items.Add(implTab); tabs.SelectedIndex = 1;
+            bool haveOpen = openImpl != null || openDecl != null;
+            var useOpen = new CheckBox { Content = "Preview the object open in the editor" + (openName != null ? $" ({openName})" : ""), IsChecked = haveOpen, IsEnabled = haveOpen, VerticalAlignment = VerticalAlignment.Center };
+            var marks = new TextBlock { Text = "changed lines are marked", Opacity = 0.65, VerticalAlignment = VerticalAlignment.Center };
+            var opts = new DockPanel { Margin = new Thickness(0, 6, 0, 4), LastChildFill = false };
+            DockPanel.SetDock(useOpen, Dock.Left); opts.Children.Add(useOpen); DockPanel.SetDock(marks, Dock.Right); opts.Children.Add(marks);
+            var right = new DockPanel();
+            DockPanel.SetDock(opts, Dock.Top);
+            right.Children.Add(opts); right.Children.Add(tabs);
+            string lastBeforeDecl = "", lastBeforeImpl = "", lastAfterDecl = "", lastAfterImpl = "";
+            UIElement Pair(FrameworkElement a, FrameworkElement b)
             {
                 var g = new Grid();
                 g.ColumnDefinitions.Add(new ColumnDefinition()); g.ColumnDefinitions.Add(new ColumnDefinition());
                 g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); g.RowDefinitions.Add(new RowDefinition());
-                var ha = new TextBlock { Text = "Before", Opacity = 0.7 }; var hb = new TextBlock { Text = "After", Opacity = 0.7 };
-                Grid.SetColumn(hb, 1); Grid.SetRow(a, 1); Grid.SetRow(b, 1); Grid.SetColumn(b, 1);
-                g.Children.Add(ha); g.Children.Add(hb); g.Children.Add(a); g.Children.Add(b);
+                var ha = new TextBlock { Text = "Before", Opacity = 0.65, Margin = new Thickness(0, 4, 0, 2) }; var hb = new TextBlock { Text = "After", Opacity = 0.65, Margin = new Thickness(6, 4, 0, 2) };
+                Grid.SetColumn(hb, 1);
+                var ba = new Border { Child = a, BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 3, 0) }; var bb = new Border { Child = b, BorderThickness = new Thickness(1), Margin = new Thickness(3, 0, 0, 0) };
+                ba.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey); bb.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+                Grid.SetRow(ba, 1); Grid.SetRow(bb, 1); Grid.SetColumn(bb, 1);
+                g.Children.Add(ha); g.Children.Add(hb); g.Children.Add(ba); g.Children.Add(bb);
                 return g;
             }
-            var tabs = new TabControl();
-            tabs.Items.Add(new TabItem { Header = "Declaration", Content = Pair(declBefore, declAfter) });
-            tabs.Items.Add(new TabItem { Header = "Implementation", Content = Pair(implBefore, implAfter) });
-            tabs.SelectedIndex = 1;
-            var useOpen = new CheckBox { Content = "Preview the object open in the editor", IsChecked = openImpl != null || openDecl != null, IsEnabled = openImpl != null || openDecl != null, Margin = new Thickness(0, 0, 0, 4) };
-            var note = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.8, Margin = new Thickness(0, 4, 0, 0) };
-            var right = new DockPanel();
-            DockPanel.SetDock(useOpen, Dock.Top); right.Children.Add(useOpen);
-            DockPanel.SetDock(note, Dock.Bottom); right.Children.Add(note);
-            right.Children.Add(tabs);
 
-            // ---- the preview runs a moment after the last change, the newest one wins
             int version = 0;
-            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(350) };
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
             timer.Tick += async (s, e) =>
             {
                 timer.Stop();
                 int my = ++version;
                 bool open = useOpen.IsChecked == true;
                 string d = open ? openDecl ?? "" : SampleDeclaration, i = open ? openImpl ?? "" : SampleImplementation;
-                declBefore.Text = d; implBefore.Text = i;
-                note.Text = "Formatting the preview ...";
                 var rulesFile = Path.Combine(Path.GetTempPath(), "tcagent-format-preview-" + Process.GetCurrentProcess().Id + ".json");
-                var obj = new Dictionary<string, object> { ["rules"] = current.ToDictionary(k => k.Key, k => (object)k.Value) };
-                File.WriteAllText(rulesFile, new JavaScriptSerializer().Serialize(obj), new UTF8Encoding(false));
+                File.WriteAllText(rulesFile, new JavaScriptSerializer().Serialize(new Dictionary<string, object> { ["rules"] = current.ToDictionary(k => k.Key, k => (object)k.Value) }), new UTF8Encoding(false));
+                progress.Visibility = Visibility.Visible;
+                var sw = Stopwatch.StartNew();
                 try
                 {
-                    var dt = Task.Run(() => d.Length == 0 ? null : FmtJson(FmtRun(exe, $"format --stdin --json --part declaration --rules \"{rulesFile}\"", d)));
-                    var it = Task.Run(() => i.Length == 0 ? null : FmtJson(FmtRun(exe, $"format --stdin --json --part implementation --rules \"{rulesFile}\"", i)));
+                    var dt = Task.Run(() => d.Length == 0 ? null : FmtJson(FmtRun(exe, $"format --stdin --json --tokens --part declaration --rules \"{rulesFile}\"", d)));
+                    var it = Task.Run(() => i.Length == 0 ? null : FmtJson(FmtRun(exe, $"format --stdin --json --tokens --part implementation --rules \"{rulesFile}\"", i)));
                     var dr = await dt; var ir = await it;
                     if (my != version) return;
-                    declAfter.Text = FmtStr(dr, "text") ?? d; implAfter.Text = FmtStr(ir, "text") ?? i;
+                    void Fill(TabItem tab, Dictionary<string, object> res)
+                    {
+                        if (res == null) { tab.Content = new TextBlock { Text = "This object has no " + tab.Header.ToString().ToLowerInvariant() + ".", Opacity = 0.65, Margin = new Thickness(6) }; return; }
+                        var bt = res["inputTokens"] as ArrayList ?? new ArrayList(); var at = res["tokens"] as ArrayList ?? new ArrayList();
+                        tab.Content = Pair(CodeView(look, bt, null), CodeView(look, at, Changed(LinesOf(bt), LinesOf(at))));
+                    }
+                    Fill(declTab, dr); Fill(implTab, ir);
+                    lastBeforeDecl = d; lastBeforeImpl = i; lastAfterDecl = FmtStr(dr, "text") ?? d; lastAfterImpl = FmtStr(ir, "text") ?? i;
                     var errs = new[] { ("Declaration", FmtStr(dr, "error")), ("Implementation", FmtStr(ir, "error")) }.Where(x => !string.IsNullOrEmpty(x.Item2)).Select(x => x.Item1 + ": " + x.Item2).ToList();
                     int n = current.Count(k => k.Value != loaded[k.Key]);
-                    note.Text = errs.Count > 0 ? string.Join("\n", errs) : n == 0 ? "The preview shows the rules as they apply now." : $"{n} rule(s) changed - not saved yet.";
+                    statusLeft.Text = errs.Count > 0 ? string.Join("  ·  ", errs) : n == 0 ? "The preview shows the rules as they apply now." : $"{n} rule{(n == 1 ? "" : "s")} changed – not saved";
+                    statusRight.Text = $"{rows.Count} rules · {rows.Count(x => x.Locked != null)} locked · preview {sw.Elapsed.TotalSeconds:0.0} s";
                 }
-                catch (Exception ex) { if (my == version) note.Text = "Preview: " + Inner(ex); }
+                catch (Exception ex) { if (my == version) FormatMessage("The preview could not be formatted:\n\n" + Inner(ex), true); }
+                finally { if (my == version) progress.Visibility = Visibility.Collapsed; }
             };
-            changed = () => { timer.Stop(); timer.Start(); };
+            changed = () => { States(); timer.Stop(); timer.Start(); };
             useOpen.Checked += (s, e) => changed(); useOpen.Unchecked += (s, e) => changed();
+            level.SelectionChanged += (s, e) => { if (selected != null) showDetail(selected); };
 
-            // ---- bottom: level, save, wish
-            var level = new ComboBox { MinWidth = 150, Margin = new Thickness(6, 0, 12, 0), ToolTip = "The knowledge level whose formatting.json gets the changed rules" };
-            if (!string.IsNullOrEmpty(sln)) level.Items.Add("project");
-            level.Items.Add("user");
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TCAGENT_TEAM"))) level.Items.Add("team");
-            if (!string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TCAGENT_COMPANY"))) level.Items.Add("company");
-            level.SelectedIndex = 0;
-            var wish = new Button { Content = "Wish a rule or feature ...", Padding = new Thickness(10, 3, 10, 3), ToolTip = "Opens a new issue on GitHub with the example of the preview - you check it there and send it yourself" };
-            wish.Click += (s, e) => WishFormatterRule(tabs.SelectedIndex == 0 ? declBefore.Text : implBefore.Text, tabs.SelectedIndex == 0 ? declAfter.Text : implAfter.Text,
-                                                      current.Where(k => k.Value != FmtStr(rules[k.Key] as Dictionary<string, object>, "default")).Select(k => k.Key + " = " + k.Value).ToList());
-            var reset = new Button { Content = "Undo changes", Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(6, 0, 0, 0) };
-            var save = new Button { Content = "Save", Padding = new Thickness(16, 3, 16, 3), Margin = new Thickness(6, 0, 0, 0), IsDefault = true };
-            var cancel = new Button { Content = "Close", Padding = new Thickness(14, 3, 14, 3), Margin = new Thickness(6, 0, 0, 0), IsCancel = true };
-            cancel.Click += (s, e) => w.Close();
-            reset.Click += (s, e) => { w.Close(); ShowFormatSettings(); };
-            save.Click += (s, e) =>
+            // ---- buttons
+            wish.Click += (s, e) =>
+            {
+                bool decl = tabs.SelectedIndex == 0;
+                WishFormatterRule(decl ? lastBeforeDecl : lastBeforeImpl, decl ? lastAfterDecl : lastAfterImpl,
+                                  rows.Where(x => current[x.Key] != x.Default).Select(x => x.Key + " = " + current[x.Key]).ToList());
+            };
+            undo.Click += (s, e) => { foreach (var k in loaded.Keys.ToList()) current[k] = loaded[k]; profile.SelectedIndex = 0; changed(); };
+            save.Click += async (s, e) =>
             {
                 var diff = current.Where(k => k.Value != loaded[k.Key]).ToDictionary(k => k.Key, k => (object)k.Value);
-                if (diff.Count == 0) { note.Text = "Nothing changed."; return; }
+                if (diff.Count == 0) return;
                 var lv = level.SelectedItem as string ?? "project";
                 var file = Path.Combine(Path.GetTempPath(), "tcagent-format-save-" + Process.GetCurrentProcess().Id + ".json");
                 File.WriteAllText(file, new JavaScriptSerializer().Serialize(new Dictionary<string, object> { ["rules"] = diff }), new UTF8Encoding(false));
+                save.IsEnabled = false; progress.Visibility = Visibility.Visible; statusLeft.Text = "Saving …";
                 try
                 {
-                    var res = FmtRun(exe, $"format --save \"{file}\" --level {lv}" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), null);
-                    note.Text = res.Trim() + " - a later level can still change them; Format ST code uses them from now on.";
-                    foreach (var k in diff.Keys) { loaded[k] = current[k]; sources[k].Text = lv; }
+                    var res = await Task.Run(() => FmtRun(exe, $"format --save \"{file}\" --level {lv}" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), null));
+                    foreach (var k in diff.Keys) { loaded[k] = current[k]; var rr = rows.First(x => x.Key == k); rr.From = lv; }
+                    States();
+                    statusLeft.Text = $"✓ {diff.Count} rule{(diff.Count == 1 ? "" : "s")} saved on level {lv} – Format ST code uses them from now on";
                 }
-                catch (Exception ex) { note.Text = "Not saved: " + Inner(ex); }
+                catch (Exception ex) { save.IsEnabled = true; statusLeft.Text = "Not saved."; FormatMessage("The rules were not saved:\n\n" + Inner(ex), true); }
+                finally { progress.Visibility = Visibility.Collapsed; }
             };
-            var bar = new DockPanel { Margin = new Thickness(12, 8, 12, 10), LastChildFill = false };
-            var lvLabel = new TextBlock { Text = "Save to level:", VerticalAlignment = VerticalAlignment.Center };
-            foreach (var x in new UIElement[] { lvLabel, level, wish }) { DockPanel.SetDock(x, Dock.Left); bar.Children.Add(x); }
-            foreach (var x in new UIElement[] { cancel, save, reset }) { DockPanel.SetDock(x, Dock.Right); bar.Children.Add(x); }
 
-            var body = new Grid { Margin = new Thickness(12, 10, 12, 0) };
-            body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(470) });
-            body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
-            body.ColumnDefinitions.Add(new ColumnDefinition());
-            var split = new GridSplitter { Width = 5, HorizontalAlignment = HorizontalAlignment.Stretch, Background = Brushes.Transparent };
+            var split = new GridSplitter { Width = 6, HorizontalAlignment = HorizontalAlignment.Stretch, Background = Brushes.Transparent };
             Grid.SetColumn(split, 1); Grid.SetColumn(right, 2);
             body.Children.Add(left); body.Children.Add(split); body.Children.Add(right);
-            var root = new DockPanel();
-            var head = new TextBlock
-            {
-                Text = "Every rule of the ST formatter. Change one and the preview shows what it does; Save writes the changed rules into formatting.json of the chosen level. Rules: docs/FORMATTER.md",
-                TextWrapping = TextWrapping.Wrap, Opacity = 0.8, Margin = new Thickness(12, 10, 12, 0)
-            };
-            DockPanel.SetDock(head, Dock.Top); root.Children.Add(head);
-            DockPanel.SetDock(bar, Dock.Bottom); root.Children.Add(bar);
-            root.Children.Add(body);
-            w.Content = root;
-            w.Loaded += (s, e) => changed();
-            w.ShowDialog();
+            States();
+            Filter();
+            if (rows.Count > 0) { selected = rows[0]; ((Border)rows[0].Row).Background = selBrush; showDetail(rows[0]); }
+            changed();
         }
 
         static string GroupName(string g) => g switch
         {
-            "indent" => "Indentation", "case" => "Case", "space" => "Spaces", "comment" => "Comments", "align" => "Alignment of declarations",
-            "wrap" => "Long lines", "blank" => "Blank lines", "eol" => "Line ends", "paren" => "Brackets in conditions", _ => g
+            "indent" => "Indentation", "case" => "Case", "space" => "Spaces", "comment" => "Comments", "layout" => "Layout",
+            "align" => "Columns", "wrap" => "Long lines", "blank" => "Blank lines", "eol" => "Line ends", "paren" => "Brackets in conditions", _ => g
         };
 
         static string FmtStr(Dictionary<string, object> d, string k) => d != null && d.TryGetValue(k, out var v) && v != null ? v.ToString() : null;

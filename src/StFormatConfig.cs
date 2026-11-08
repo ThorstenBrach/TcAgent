@@ -51,6 +51,23 @@ public sealed class StFormatConfig
         ("paren.precedence", "true", "true | false", "brackets around AND groups inside OR, so the order is visible (the meaning stays)"),
     };
 
+    /// <summary>Short names in plain words for the settings window (the key stays in the details).</summary>
+    public static readonly Dictionary<string, string> Labels = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["indent.style"] = "Indent with", ["indent.size"] = "Spaces per level", ["indent.tab-width"] = "Width of a tab",
+        ["indent.case-labels"] = "CASE labels one level in", ["indent.continuation"] = "Continuation lines", ["indent.from-ide"] = "Take indentation from the IDE",
+        ["case.keywords"] = "Keywords", ["case.types"] = "Data types", ["case.literals"] = "TRUE, FALSE, T#",
+        ["space.operators"] = "Around operators", ["space.comma"] = "After commas", ["space.decl-colon"] = "Around the : of declarations",
+        ["space.parens"] = "Inside brackets", ["space.keyword-paren"] = "Keyword and (", ["space.call-paren"] = "Name and (",
+        ["comment.eol-spaces"] = "Before end-of-line comments",
+        ["layout.blocks"] = "One statement per line", ["layout.then"] = "THEN, DO, OF",
+        ["align.decl"] = "Declarations: the :", ["align.decl-init"] = "Declarations: the :=", ["align.eol-comments"] = "Declarations: comments",
+        ["align.assignments"] = "Assignments: the :=", ["align.named-args"] = "Named parameters", ["align.max-pad"] = "Most filling for a column",
+        ["wrap.max-length"] = "Longest line", ["wrap.call-args"] = "Long calls", ["wrap.conditions"] = "Long conditions", ["wrap.operator"] = "AND / OR stand",
+        ["blank.max"] = "Blank lines in a row", ["blank.body-edges"] = "Blank lines at the edges", ["blank.around-blocks"] = "Blank lines around blocks",
+        ["eol.trim-trailing"] = "Spaces at line ends", ["eol.style"] = "Line endings", ["paren.precedence"] = "Brackets for AND in OR",
+    };
+
     public static readonly Dictionary<string, Dictionary<string, string>> Profiles = new(StringComparer.OrdinalIgnoreCase)
     {
         ["twincat"] = new(),
@@ -158,9 +175,11 @@ public sealed class StFormatConfig
         ["rules"] = new JsonObject(Rules.Select(r => KeyValuePair.Create(r.Key, (JsonNode)new JsonObject
         {
             ["value"] = this[r.Key], ["from"] = Source[r.Key], ["default"] = r.Default, ["values"] = r.Values, ["description"] = r.Description,
+            ["label"] = Labels.TryGetValue(r.Key, out var lab) ? lab : r.Key,
             ["locked"] = Locked.TryGetValue(r.Key, out var by) ? by : null
         }))),
-        ["profiles"] = new JsonArray(Profiles.Keys.Select(p => (JsonNode)p).ToArray()),
+        ["profiles"] = new JsonObject(Profiles.Select(p => KeyValuePair.Create(p.Key,
+            (JsonNode)new JsonObject(Rules.Select(r => KeyValuePair.Create(r.Key, (JsonNode)(p.Value.TryGetValue(r.Key, out var v) ? v : r.Default))))))),
         ["fromFiles"] = FromFiles,
         ["notes"] = new JsonArray(Notes.Select(n => (JsonNode)n).ToArray())
     };

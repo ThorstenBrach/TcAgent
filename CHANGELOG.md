@@ -14,8 +14,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   it cannot read stays unchanged. Every rule is configurable in `formatting.json` on the knowledge levels, with locks;
   `// tcagent-format: off` ... `on` and the pragma form keep sections as they are. `TcAgent.exe format --stdin|--file|--show-rules`.
   [docs/FORMATTER.md](docs/FORMATTER.md)
-- **Formatter settings with a preview:** Tools > Formatter settings (TcAgent) ... - every rule with its value and level; a change
-  shows at once what it does (before | after, example or the open object); Save writes the changed rules into formatting.json
+- **Formatter settings with a preview:** Tools > Formatter settings (TcAgent) ... - every rule in plain words with its value and
+  level, search, start from a profile, details of the selected rule; a change shows at once what it does (before | after,
+  example or the open object, changed lines marked, in the font and syntax colors of the TwinCAT editor, light or dark); Save writes the changed rules into formatting.json
   of a level (`TcAgent.exe format --save`), locked rules stay locked. **Wish a rule or feature ...** opens a GitHub issue with
   the example of the preview. formatting.json is part of the knowledge backups.
 - **Formatter layout rules:** `layout.blocks` (one statement per line, block bodies on their own lines), `layout.then` (THEN/DO/OF
