@@ -7,6 +7,8 @@
 //            the Advisor itself never changes anything. The advice is then marked "sent"; the agent that did the work marks it
 //            done (tc_advisor action=done), or the person does (Mark as done).
 //   delete   removes an advice from the list (Delete …, after a question) - it stays in the Git history of the project
+//   several  Ctrl/Shift select several: rate, mark as done, delete and act on all of them at once; "Act on it" puts one order
+//            with all findings into the chat
 //
 // SPDX-License-Identifier: MIT
 using System;
@@ -24,7 +26,7 @@ namespace TcAgentBridge
 {
     public sealed partial class KnowledgeControl
     {
-        readonly ListView adviceList = NewList();
+        readonly ListView adviceList = MultiList();
         readonly ComboBox adviceShow = new ComboBox { MinWidth = 110, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center,
                                                       ItemsSource = new[] { "open", "not rated", "done", "all" }, SelectedIndex = 0 };
         readonly TextBox adviceText = new TextBox { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(6),
@@ -36,13 +38,25 @@ namespace TcAgentBridge
 
         Dictionary<string, object> SelectedAdvice => (adviceList.SelectedItem as Line)?.D;
 
+        // all selected, in the order of the list
+        List<Dictionary<string, object>> SelectedAdvices => adviceList.Items.OfType<Line>().Where(l => adviceList.SelectedItems.Contains(l)).Select(l => l.D).ToList();
+
+        static ListView MultiList()
+        {
+            var l = NewList();
+            l.SelectionMode = SelectionMode.Extended;
+            return l;
+        }
+
+        static string Ids(IEnumerable<Dictionary<string, object>> a) => string.Join(",", a.Select(x => S(x, "id")).Where(x => x != null));
+
         FrameworkElement AdvisorPage()
         {
             if (advisorPage != null) return advisorPage;
             bool Sel() => SelectedAdvice != null;
             var acts = new[] {
-                A("Act on it …", "Opens the TcAgent Chat with the order of the selected advice - read it, change it, send it", ActOnAdvice, Sel),
-                A("Mark as done", "The finding is dealt with", () => MarkAdvice("done"), () => Sel() && S(SelectedAdvice, "state") != "done"),
+                A("Act on it …", "Opens the TcAgent Chat with the order of the selected advice (several: one order with all of them) - read it, change it, send it", ActOnAdvice, Sel),
+                A("Mark as done", "The selected findings are dealt with", () => MarkAdvice("done"), () => SelectedAdvices.Any(a => S(a, "state") != "done")),
                 A("Delete …", "Removes the selected advice from the list (it stays in the Git history of the project)", DeleteAdvice, Sel, "Del"),
                 Sep,
                 A("Right", "The advice is right", () => RateAdvice("right"), Sel),
@@ -50,7 +64,7 @@ namespace TcAgentBridge
                 A("Wrong", "The advice is wrong - say why in the comment, it becomes a proposal for tc_improve", () => RateAdvice("wrong"), Sel),
                 A("n/a", "Cannot be rated", () => RateAdvice("n/a"), Sel),
                 Sep,
-                A("Copy order", "Copy the order (the prompt for an agent)", () => { try { Clipboard.SetText(S(SelectedAdvice, "order") ?? ""); status.Text = "Copied."; } catch (Exception ex) { Error(ex.Message); } }, Sel),
+                A("Copy order", "Copy the order (the prompt for an agent; several: one order with all of them)", () => { try { Clipboard.SetText(Order(SelectedAdvices)); status.Text = "Copied."; } catch (Exception ex) { Error(ex.Message); } }, Sel),
                 A("Refresh", "Read the advice again", LoadAdvice) };
             // the short columns first: in a narrow window the finding is cut, not the state
             Columns(adviceList, ("Time", 115, nameof(Line.C1)), ("State", 75, nameof(Line.C6)), ("Rating", 95, "!" + nameof(Line.C5)), ("Kind", 120, nameof(Line.C2)),
@@ -95,7 +109,7 @@ namespace TcAgentBridge
 
         void FillAdvice()
         {
-            var keep = S(SelectedAdvice, "id");
+            var keep = new HashSet<string>(SelectedAdvices.Select(a => S(a, "id")));
             var show = adviceShow.SelectedItem as string ?? "open";
             var lines = advice.Where(a => show == "all" || show == "open" && S(a, "state") != "done" || show == "not rated" && S(a, "rating") == null
                                          || show == "done" && S(a, "state") == "done").Select(a => new Line
@@ -109,7 +123,7 @@ namespace TcAgentBridge
                 Tip = S(a, "order")
             }).ToList();
             adviceList.ItemsSource = lines;
-            adviceList.SelectedItem = lines.FirstOrDefault(l => S(l.D, "id") == keep);
+            foreach (var l in lines.Where(l => keep.Contains(S(l.D, "id")))) adviceList.SelectedItems.Add(l);
             var rates = adviceStats.Select(q => $"{S(q, "kind")}: " + (N(q, "rate") is double r ? $"{r * 100:0} % right of {S(q, "rated")}" : $"{S(q, "rated")} of 10 ratings") + $", {S(q, "open")} open");
             Heading(adviceHeading, $"Advisor ({advice.Count})", adviceStats.Count == 0 ? "advice with an order - the Advisor reads and advises, it changes nothing" : string.Join(" · ", rates));
             ShowAdvice();
@@ -119,7 +133,15 @@ namespace TcAgentBridge
         void ShowAdvice()
         {
             var a = SelectedAdvice;
-            if (a == null) { adviceText.Text = "Select an advice above."; return; }
+            if (a == null) { adviceText.Text = "Select an advice above - Ctrl or Shift select several."; return; }
+            var all = SelectedAdvices;
+            if (all.Count > 1)
+            {
+                var m = new StringBuilder($"{all.Count} advice selected - Act on it, Mark as done, Delete and the rating apply to all of them.\n\n");
+                foreach (var x in all) m.AppendLine($"{S(x, "id")}  [{S(x, "state")}{(S(x, "rating") is string rr ? ", " + rr : "")}]  {S(x, "finding")}");
+                adviceText.Text = m.ToString();
+                return;
+            }
             var sb = new StringBuilder();
             sb.AppendLine(S(a, "finding")).AppendLine();
             sb.AppendLine("Evidence:");
@@ -137,8 +159,9 @@ namespace TcAgentBridge
 
         async void RateAdvice(string rating)
         {
-            var id = S(SelectedAdvice, "id");
-            if (id == null) return;
+            var sel = SelectedAdvices;
+            if (sel.Count == 0) return;
+            var id = Ids(sel);
             string comment = null;
             if (rating == "wrong")
             {
@@ -147,7 +170,7 @@ namespace TcAgentBridge
             }
             var (ok, output) = await Cli($"advise rate --id {id} --rating {rating}" + (string.IsNullOrWhiteSpace(comment) ? "" : " --comment " + Quote(comment)), "Rating");
             if (!ok) { Report(false, output, "Advisor"); return; }
-            status.Text = $"{id}: {rating}";
+            status.Text = sel.Count == 1 ? $"{id}: {rating}" : $"{sel.Count} advice: {rating}";
             LoadAdvice();
         }
 
@@ -169,31 +192,45 @@ namespace TcAgentBridge
 
         async void MarkAdvice(string what)
         {
-            var id = S(SelectedAdvice, "id");
-            if (id == null) return;
+            var sel = SelectedAdvices.Where(a => what != "done" || S(a, "state") != "done").ToList();
+            if (sel.Count == 0) return;
+            var id = Ids(sel);
             var (ok, output) = await Cli($"advise {what} --id {id}", "Saving");
             if (!ok) { Report(false, output, "Advisor"); return; }
-            status.Text = $"{id}: {what}";
+            status.Text = sel.Count == 1 ? $"{id}: {what}" : $"{sel.Count} advice: {what}";
             LoadAdvice();
         }
 
         void DeleteAdvice()
         {
-            var a = SelectedAdvice;
-            if (a == null) return;
-            if (MessageBox.Show($"Remove this advice from the list?\n\n{S(a, "finding")}\n\nIt stays in the Git history of the project.", "TcAgent Knowledge",
+            var sel = SelectedAdvices;
+            if (sel.Count == 0) return;
+            var what = sel.Count == 1 ? "this advice" : $"these {sel.Count} advice";
+            var list = string.Join("\n", sel.Take(8).Select(a => "- " + Short(S(a, "finding"), 90))) + (sel.Count > 8 ? $"\n… and {sel.Count - 8} more" : "");
+            if (MessageBox.Show($"Remove {what} from the list?\n\n{list}\n\nIt stays in the Git history of the project.", "TcAgent Knowledge",
                                 MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
             MarkAdvice("delete");
         }
 
+        // one order for the chat; the agent that does the work closes each advice when it is done
+        static string Order(List<Dictionary<string, object>> sel)
+        {
+            sel = sel.Where(a => !string.IsNullOrWhiteSpace(S(a, "order"))).ToList();
+            if (sel.Count == 0) return "";
+            if (sel.Count == 1) return S(sel[0], "order").TrimEnd() + $"\n\nWhen it is done and proven: tc_advisor action=done id={S(sel[0], "id")}.";
+            var sb = new StringBuilder($"Work through these {sel.Count} findings of the Advisor one after the other. Close each one as soon as it is done and proven (tc_advisor action=done id=...); say which ones you leave open and why.\n");
+            int n = 0;
+            foreach (var a in sel) sb.Append($"\n{++n}. {S(a, "id")}: {S(a, "finding")}\n{S(a, "order").TrimEnd()}\n");
+            return sb.ToString();
+        }
+
         async void ActOnAdvice()
         {
-            var id = S(SelectedAdvice, "id");
-            var order = S(SelectedAdvice, "order");
+            var sel = SelectedAdvices.Where(a => !string.IsNullOrWhiteSpace(S(a, "order"))).ToList();
+            var order = Order(sel);
             if (string.IsNullOrWhiteSpace(order)) return;
-            // the agent that does the work closes the advice when it is done
-            order = order.TrimEnd() + $"\n\nWhen it is done and proven: tc_advisor action=done id={id}.";
-            if (S(SelectedAdvice, "state") == "open") { await Cli($"advise acted --id {id}"); LoadAdvice(); }
+            var open = sel.Where(a => S(a, "state") == "open").ToList();
+            if (open.Count > 0) { await Cli($"advise acted --id {Ids(open)}"); LoadAdvice(); }
             try
             {
                 BridgePackage.Instance?.ShowChat(true);

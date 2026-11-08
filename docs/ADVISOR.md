@@ -50,8 +50,10 @@ Advice that stays unrated for 14 days no longer counts as open.
 - **Knowledge window, tab Advisor:** the advice with its evidence, order and diff; one click to rate it; **Act on it …**
   opens the TcAgent Chat with the order in the input – you read it, change it and send it. The advice is then marked
   "sent", and the agent marks it done when the work is proven (`tc_advisor action=done`) – or you do (**Mark as done**).
-  **Delete …** removes an advice from the list; it stays in the Git history.
-- `TcAgent.exe advise list|stats --solution <sln> [--open] [--json]`, `tc_advisor action=list|stats`.
+  **Delete …** removes an advice from the list; it stays in the Git history. Ctrl or Shift select several: rating, **Mark as
+  done**, **Delete …** and **Act on it …** apply to all of them (one order with all findings in the chat).
+- `TcAgent.exe advise list|stats --solution <sln> [--open] [--json]`, `tc_advisor action=list|stats`. `advise rate`, `acted`,
+  `done` and `delete` take several ids at once (`--id AD-1,AD-2`).
 
 ## Starting a run
 

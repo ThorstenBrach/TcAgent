@@ -110,12 +110,18 @@ public static class CliAdvisor
                     return Cli.Ok;
                 }
                 case "rate":
-                    Advisor.Rate(dir, o.Id ?? throw new ArgumentException("--id is required"), o.Rating, Environment.UserName, o.Comment);
-                    Console.WriteLine($"{o.Id}: {o.Rating}");
+                    foreach (var id in Ids(o.Id))       // several at once: --id a,b,c
+                    {
+                        Advisor.Rate(dir, id, o.Rating, Environment.UserName, o.Comment);
+                        Console.WriteLine($"{id}: {o.Rating}");
+                    }
                     return Cli.Ok;
                 case "acted" or "done" or "delete":
-                    Advisor.Mark(dir, o.Id ?? throw new ArgumentException("--id is required"), o.Sub, Environment.UserName, o.Comment);
-                    Console.WriteLine($"{o.Id}: {o.Sub}");
+                    foreach (var id in Ids(o.Id))
+                    {
+                        Advisor.Mark(dir, id, o.Sub, Environment.UserName, o.Comment);
+                        Console.WriteLine($"{id}: {o.Sub}");
+                    }
                     return Cli.Ok;
                 case "run": return RunShadow(o, dir);
                 case "watch": return Watch(o, dir);
@@ -315,6 +321,12 @@ public static class CliAdvisor
         (string.IsNullOrWhiteSpace(context) ? "There is no context from git or the pipeline - look at the project as it is.\n" : "# Context\n" + context);
 
     static string Prompt(Args o, string context) => Prompt(o.Trigger, o.Solution, context);
+
+    public static string[] Ids(string id)
+    {
+        var ids = (id ?? "").Split(new[] { ',', ';', ' ' }, StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Distinct().ToArray();
+        return ids.Length > 0 ? ids : throw new ArgumentException("--id is required (several: --id a,b)");
+    }
 
     static string Cut(string s, int max) => s.Length <= max ? s : s[..max] + $"\n… ({s.Length - max} more characters cut)";
 
