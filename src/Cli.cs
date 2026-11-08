@@ -984,6 +984,7 @@ public static partial class Cli
       with an order in .tcagent\advisor - it changes nothing (TCAGENT_MODE=ask). --dry-run prints the prompt only.
   TcAgent.exe advise list|stats|rate --solution <sln> [--open] [--json] [--id AD-... --rating right|partly|wrong|n/a]
       The advice of the project, the hit rate per kind of task, a rating.
+      rate, acted, done and delete take several ids at once: --id AD-1,AD-2.
 
   TcAgent.exe plugins [list] [--solution <sln>]
   TcAgent.exe plugins approve|revoke <id> [--solution <sln>]
