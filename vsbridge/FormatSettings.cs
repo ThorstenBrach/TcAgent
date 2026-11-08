@@ -63,6 +63,8 @@ namespace TcAgentBridge
                 {
                     var f = syn.Font;
                     if (f != null) { look.Font = new FontFamily(f.FontFamily.Name); look.Size = f.SizeInPoints * 96.0 / 72.0; }
+                    // the control's font is not always the font of the text (columns only line up with a fixed-width font)
+                    if (!Monospaced(look.Font)) { look.Font = new FontFamily("Consolas"); look.Size = Math.Max(look.Size, 13); }
                     back = syn.BackColor; fore = syn.ForeColor;
                 }
             }
@@ -101,6 +103,18 @@ namespace TcAgentBridge
             }
             catch (Exception ex) { Log("Formatter preview colors: " + Inner(ex)); }
             return look;
+        }
+
+        /// <summary>Do "iiiiii" and "WWWWWW" have the same width in this font?</summary>
+        static bool Monospaced(FontFamily font)
+        {
+            try
+            {
+                var tf = new Typeface(font, FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
+                double W(string s) => new FormattedText(s, System.Globalization.CultureInfo.InvariantCulture, FlowDirection.LeftToRight, tf, 13, Brushes.Black, 1.0).WidthIncludingTrailingWhitespace;
+                return Math.Abs(W("iiiiii") - W("WWWWWW")) < 0.5 && Math.Abs(W("      ") - W("iiiiii")) < 0.5;
+            }
+            catch { return false; }
         }
 
         sealed class ReferenceEqualityComparer : IEqualityComparer<object>
@@ -336,7 +350,7 @@ namespace TcAgentBridge
             foreach (var x in new UIElement[] { close, save, undo }) { DockPanel.SetDock(x, Dock.Right); bar.Children.Add(x); }
 
             var body = new Grid { Margin = new Thickness(12, 0, 12, 0) };
-            body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(480), MinWidth = 360 });
+            body.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(580), MinWidth = 420 });
             body.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
             body.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 300 });
             var root = new DockPanel();
@@ -399,7 +413,7 @@ namespace TcAgentBridge
             // ---- left: the rules (group headings, Rule | Value | From), the details below
             var list = new Grid();
             list.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
-            list.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(120) });
+            list.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(200) });
             list.ColumnDefinitions.Add(new ColumnDefinition());
             var selBrush = new SolidColorBrush(Color.FromArgb(70, 0x3B, 0x6F, 0xD8));
             var detail = new StackPanel { Margin = new Thickness(10, 8, 10, 8) };
@@ -439,6 +453,7 @@ namespace TcAgentBridge
                 var values = rr.Values.Split('|').Select(x => x.Trim()).Where(x => x.Length > 0).ToList();
                 bool number = values.Contains("number");
                 var box = new ComboBox { IsEditable = number, Margin = new Thickness(0, 1, 6, 1), MinWidth = 100, ToolTip = rr.Description };
+                box.SelectionChanged += (s2, e2) => { if (box.SelectedItem is string sv) box.ToolTip = sv + " – " + rr.Description; };
                 var toValue = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
                 foreach (var v in values.Where(v => v != "number")) { var dv = Disp(rr.Key, v); toValue[dv] = v; toValue[v] = v; box.Items.Add(dv); }
                 rr.ToValue = toValue;
