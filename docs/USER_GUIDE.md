@@ -294,7 +294,9 @@ branch for a pull request; the column **Git** marks changed and new files.
 
 The Git repositories skills, workflows and rules can be installed from (`tc_sources`): **Browse and install …**
 first, then **New …**, **Open** (the repository in the browser; double-click), **Open folder** (TcAgent's local copy),
-**Edit …**, **Delete …**, **Copy URL**. **Browse and install …** lists everything a source offers – search, filter by
+**Edit …**, **Delete …** (asks whether the items installed from the source go as well: unchanged ones are uninstalled with
+a copy in the backups, ones you changed stay as your own version; items you already keep as your own version are not touched),
+**Copy URL**. **Browse and install …** lists everything a source offers – search, filter by
 kind, "Only not installed", the state (✓ installed and where, ○ not installed, ✗ not installable), license, scripts and
 the details of the selected line (description, license, files, scripts); tick the items to install – several at once,
 the ticks stay when you change the filter (Space or a double-click ticks the selected line, **Select all**,

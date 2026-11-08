@@ -808,7 +808,7 @@ namespace TcAgentBridge
                 Sep,
                 A("Edit …", "Change URL, branch/tag or level of the selected source", () => EditSource(sourceList.SelectedItem as Line), SSel),
                 Sep,
-                A("Delete …", "Delete the selected source from the list (installed items stay)", RemoveSource, SSel, "Del"),
+                A("Delete …", "Delete the selected source from the list - asks whether the items installed from it go as well", RemoveSource, SSel, "Del"),
                 Sep,
                 A("Copy URL", "Copy the URL of the repository", () => CopyPath(Src("url")), SSel) };
             var tools1 = Bar(srcActs);
@@ -1810,10 +1810,41 @@ namespace TcAgentBridge
         {
             if (!(sourceList.SelectedItem is Line l)) { Hint("Select a source first."); return; }
             if (Predefined(l)) return;
-            if (MessageBox.Show($"Delete the source {S(l.D, "name")} from the list?\n\nItems installed from it stay (and keep their installed version).", "TcAgent Knowledge",
-                                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-            var (ok, output) = await Cli($"sources remove --name {Quote(S(l.D, "name"))} --level {(S(l.D, "level") == "project" ? "project" : "personal")}", "Deleting the source");
-            Report(ok, output, "Delete source");
+            var name = S(l.D, "name");
+            // the items still tied to this source (an own version - "Keep as own version" - is no longer tied and stays anyway)
+            var tied = Arr(data?["installed"]).Where(i => S(i, "source") == name).ToList();
+            var changed = tied.Where(i => (S(i, "state") ?? "").Contains("changed locally")).ToList();
+            var plain = tied.Except(changed).ToList();
+            bool removeItems = false;
+            if (tied.Count == 0)
+            {
+                if (MessageBox.Show($"Delete the source {name} from the list?", "TcAgent Knowledge", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            }
+            else
+            {
+                string Names(List<Dictionary<string, object>> x) => string.Join("\n", x.Take(10).Select(i => $"  {S(i, "key")} ({S(i, "level")})")) + (x.Count > 10 ? $"\n  … and {x.Count - 10} more" : "");
+                var text = $"Delete the source {name} from the list?\n\n{tied.Count} item(s) are installed from it. Remove them as well?\n\n" +
+                           (plain.Count > 0 ? $"Uninstalled (a copy goes to %LOCALAPPDATA%\\TcAgent\\backups\\sources):\n{Names(plain)}\n\n" : "") +
+                           (changed.Count > 0 ? $"You changed these - they stay as your own version:\n{Names(changed)}\n\n" : "") +
+                           "Yes = delete the source and remove the items · No = delete the source only, the items stay · Cancel = nothing";
+                var answer = MessageBox.Show(text, "TcAgent Knowledge", MessageBoxButton.YesNoCancel, MessageBoxImage.Question, MessageBoxResult.Cancel);
+                if (answer == MessageBoxResult.Cancel || answer == MessageBoxResult.None) return;
+                removeItems = answer == MessageBoxResult.Yes;
+            }
+            var failed = new List<string>();
+            if (removeItems)
+            {
+                foreach (var i in tied)
+                {
+                    var item = (S(i, "key") ?? "").Split('/').Last();
+                    var verb = changed.Contains(i) ? "detach" : "uninstall";
+                    var (iok, iout) = await Cli($"sources {verb} --item {Quote(item)} --level {Quote(S(i, "level"))}", (verb == "detach" ? "Keeping " : "Uninstalling ") + item);
+                    if (!iok) failed.Add($"{S(i, "key")}: {iout.Trim().Split('\n')[0]}");
+                }
+            }
+            var (ok, output) = await Cli($"sources remove --name {Quote(name)} --level {(S(l.D, "level") == "project" ? "project" : "personal")}", "Deleting the source");
+            if (failed.Count > 0) Report(false, "Not removed:\n" + string.Join("\n", failed), "Delete source");
+            else Report(ok, removeItems ? $"Source {name} deleted; {plain.Count} item(s) uninstalled" + (changed.Count > 0 ? $", {changed.Count} kept as your own version." : ".") : output, "Delete source");
             Load();
         }
 
