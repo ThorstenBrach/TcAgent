@@ -32,6 +32,7 @@ public sealed class StFormatConfig
         ("space.parens", "preserve", "none | one | preserve", "spaces inside ( ) and [ ]"),
         ("space.keyword-paren", "one", "one | preserve", "IF (, AND (, NOT ("),
         ("space.call-paren", "none", "none | preserve", "no space between a name and its ("),
+        ("comment.case-labels", "off", "off | enum", "a comment above each CASE label that has none: the comment of the enum value, otherwise its name"),
         ("comment.eol-spaces", "preserve", "preserve | number", "spaces before a comment at the end of a code line (implementation)"),
         ("layout.blocks", "preserve", "expand | preserve", "one statement per line; the bodies of IF, CASE, FOR, WHILE and REPEAT on their own lines"),
         ("layout.short-if", "preserve", "preserve | number", "IF ... THEN with one statement and END_IF on one line when it stays within this many characters"),
@@ -49,6 +50,7 @@ public sealed class StFormatConfig
         ("wrap.operator", "first", "first | last", "where AND/OR stand when a condition is wrapped"),
         ("blank.max", "1", "number | preserve", "most blank lines in a row"),
         ("blank.body-edges", "remove", "remove | preserve", "blank lines at the start and end of a part"),
+        ("blank.case-branches", "preserve", "between | after-label | both | preserve", "a blank line between the CASE branches, after the label line, or both"),
         ("blank.around-blocks", "preserve", "add | preserve", "a blank line before and after IF, CASE, FOR, WHILE and REPEAT blocks"),
         ("eol.trim-trailing", "true", "true | false", "remove spaces at the end of lines"),
         ("eol.style", "preserve", "preserve | crlf | lf", "line endings"),
@@ -63,7 +65,8 @@ public sealed class StFormatConfig
         ["case.keywords"] = "Keywords", ["case.types"] = "Data types", ["case.literals"] = "TRUE, FALSE, T#",
         ["space.operators"] = "Around operators", ["space.comma"] = "After commas", ["space.decl-colon"] = "Around the : of declarations",
         ["space.parens"] = "Inside brackets", ["space.tabs"] = "Tabs inside a line", ["space.keyword-paren"] = "Keyword and (", ["space.call-paren"] = "Name and (",
-        ["comment.eol-spaces"] = "Before end-of-line comments",
+        ["comment.eol-spaces"] = "Before end-of-line comments", ["comment.case-labels"] = "Comment above CASE labels",
+        ["blank.case-branches"] = "Blank lines in CASE",
         ["layout.blocks"] = "One statement per line", ["layout.then"] = "THEN, DO, OF", ["layout.short-if"] = "Short IF on one line up to", ["layout.long-if"] = "Longer IF on one line",
         ["align.decl"] = "Declarations: the :", ["align.decl-init"] = "Declarations: the :=", ["align.eol-comments"] = "Declarations: comments",
         ["align.assignments"] = "Assignments: the :=", ["align.named-args"] = "Named parameters", ["align.max-pad"] = "Most filling for a column",
@@ -86,6 +89,8 @@ public sealed class StFormatConfig
     /// <summary>Where each value comes from: "default", "profile compact", "user", "project" ...</summary>
     public readonly Dictionary<string, string> Source = new(StringComparer.OrdinalIgnoreCase);
     public readonly List<string> Notes = new();
+    /// <summary>"E_Type.Value" → the comment of the enumeration value (StEnums.Read of the solution folder) for comment.case-labels.</summary>
+    public Dictionary<string, string> EnumComments = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>Rules a level locked: key → the level.</summary>
     public readonly Dictionary<string, string> Locked = new(StringComparer.OrdinalIgnoreCase);
     /// <summary>A formatting.json was found on some level (the agent formats its own code only then).</summary>

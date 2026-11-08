@@ -16,6 +16,7 @@
     <Compile Include="..\..\src\StFormatConfig.cs" Link="src\StFormatConfig.cs" />
     <Compile Include="..\..\src\StExpr.cs" Link="src\StExpr.cs" />
     <Compile Include="..\..\src\StFormatExamples.cs" Link="src\StFormatExamples.cs" />
+    <Compile Include="..\..\src\StEnums.cs" Link="src\StEnums.cs" />
     <Compile Include="..\..\src\PlainText.cs" Link="src\PlainText.cs" />
     <Compile Include="..\..\src\TcUnitDiscovery.cs" Link="src\TcUnitDiscovery.cs" />
     <Compile Include="..\..\src\Guards.cs" Link="src\Guards.cs" />

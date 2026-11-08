@@ -460,6 +460,52 @@ F_Sum (nA, nB);
 
 ## Comments
 
+### Comment above CASE labels (`comment.case-labels`)
+
+A comment above each CASE label that has none: the comment of the enum value, otherwise its name. Default: `off`.
+
+Written as:
+
+```
+CASE eState OF
+  E_State.Idle:
+    IF bStart THEN eState := E_State.Run; END_IF
+  E_State.Run:
+    nCount := nCount + 1;
+  E_State.Error:
+    bAlarm := TRUE;
+END_CASE
+```
+
+`off`:
+
+```
+CASE eState OF
+  E_State.Idle:
+    IF bStart THEN eState := E_State.Run; END_IF
+  E_State.Run:
+    nCount := nCount + 1;
+  E_State.Error:
+    bAlarm := TRUE;
+END_CASE
+```
+
+`enum`:
+
+```
+CASE eState OF
+  // waiting for start
+  E_State.Idle:
+    IF bStart THEN eState := E_State.Run; END_IF
+  // the cycle runs
+  E_State.Run:
+    nCount := nCount + 1;
+  // Error
+  E_State.Error:
+    bAlarm := TRUE;
+END_CASE
+```
+
 ### Before end-of-line comments (`comment.eol-spaces`)
 
 Spaces before a comment at the end of a code line (implementation). Default: `preserve`.
@@ -1012,6 +1058,85 @@ nA := 1;
 
 
 nA := 1;
+```
+
+### Blank lines in CASE (`blank.case-branches`)
+
+A blank line between the CASE branches, after the label line, or both. Default: `preserve`.
+
+Written as:
+
+```
+CASE eState OF
+  E_State.Idle:
+    IF bStart THEN eState := E_State.Run; END_IF
+  E_State.Run:
+    nCount := nCount + 1;
+  E_State.Error:
+    bAlarm := TRUE;
+END_CASE
+```
+
+`preserve`:
+
+```
+CASE eState OF
+  E_State.Idle:
+    IF bStart THEN eState := E_State.Run; END_IF
+  E_State.Run:
+    nCount := nCount + 1;
+  E_State.Error:
+    bAlarm := TRUE;
+END_CASE
+```
+
+`between`:
+
+```
+CASE eState OF
+  E_State.Idle:
+    IF bStart THEN eState := E_State.Run; END_IF
+
+  E_State.Run:
+    nCount := nCount + 1;
+
+  E_State.Error:
+    bAlarm := TRUE;
+END_CASE
+```
+
+`after-label`:
+
+```
+CASE eState OF
+  E_State.Idle:
+
+    IF bStart THEN eState := E_State.Run; END_IF
+  E_State.Run:
+
+    nCount := nCount + 1;
+  E_State.Error:
+
+    bAlarm := TRUE;
+END_CASE
+```
+
+`both`:
+
+```
+CASE eState OF
+  E_State.Idle:
+
+    IF bStart THEN eState := E_State.Run; END_IF
+
+  E_State.Run:
+
+    nCount := nCount + 1;
+
+  E_State.Error:
+
+    bAlarm := TRUE;
+END_CASE
 ```
 
 ### Blank lines around blocks (`blank.around-blocks`)

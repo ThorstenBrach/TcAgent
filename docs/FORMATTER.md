@@ -35,6 +35,8 @@ or plants, and send it yourself.
 - The tokens that carry meaning must be the same before and after (keywords without case). Brackets the formatter adds are
   checked on the expression trees instead: the order of the operators must stay the same.
 - A second run must give the same text.
+- The only thing the formatter may add is the comment of `comment.case-labels`: the safety net checks that every other
+  token is unchanged and that the added comments stand exactly where the formatter put them.
 - A part that cannot be read (a comment that is not closed, an `END_IF` without `IF`) stays unchanged and is reported.
 
 Tested on more than 66,000 declaration and implementation parts of real projects: no change of meaning, every part formatted
@@ -75,6 +77,7 @@ Nothing is a fixed rule. The defaults (profile `twincat`) - **an example with be
 | `space.parens` | `preserve` | none, one, preserve - spaces inside `( )` and `[ ]` |
 | `space.keyword-paren` | `one` | `IF (`, `AND (`; or preserve |
 | `space.call-paren` | `none` | `F(x)`; or preserve |
+| `comment.case-labels` | `off` | `enum`: a comment above each CASE label that has none - the comment of the enum value from the DUTs of the project (end-of-line comment, `///` or `(* *)` above the value), otherwise the name of the value; numbers get none |
 | `comment.eol-spaces` | `preserve` | spaces before a comment at the end of a code line |
 | `layout.blocks` | `preserve` | `expand`: one statement per line, the bodies of IF, CASE, FOR, WHILE and REPEAT on their own lines |
 | `layout.short-if` | `preserve` | a number: `IF … THEN` with one statement and `END_IF` on one line when it stays within that many characters (not with ELSE/ELSIF, comments, or `layout.then: own-line`) |
@@ -90,6 +93,7 @@ Nothing is a fixed rule. The defaults (profile `twincat`) - **an example with be
 | `wrap.operator` | `first` | `first` or `last`: where AND/OR stand when a condition is wrapped |
 | `blank.max` | `1` | most blank lines in a row, or preserve |
 | `blank.body-edges` | `remove` | blank lines at the start and end of a part |
+| `blank.case-branches` | `preserve` | `between` (a blank line between the CASE branches), `after-label` (after a label on its own line), `both` |
 | `blank.around-blocks` | `preserve` | `add`: a blank line before and after IF, CASE, FOR, WHILE and REPEAT blocks (a comment above a block stays with it) |
 | `eol.trim-trailing` | `true` | spaces at the end of lines |
 | `eol.style` | `preserve` | preserve, crlf, lf |

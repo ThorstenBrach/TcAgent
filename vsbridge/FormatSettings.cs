@@ -549,8 +549,8 @@ namespace TcAgentBridge
                 var sw = Stopwatch.StartNew();
                 try
                 {
-                    var dt = Task.Run(() => d.Length == 0 ? null : FmtJson(FmtRun(exe, $"format --stdin --json --tokens --part declaration --rules \"{rulesFile}\"", d)));
-                    var it = Task.Run(() => i.Length == 0 ? null : FmtJson(FmtRun(exe, $"format --stdin --json --tokens --part implementation --rules \"{rulesFile}\"", i)));
+                    var dt = Task.Run(() => d.Length == 0 ? null : FmtJson(FmtRun(exe, $"format --stdin --json --tokens --part declaration --rules \"{rulesFile}\"" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), d)));
+                    var it = Task.Run(() => i.Length == 0 ? null : FmtJson(FmtRun(exe, $"format --stdin --json --tokens --part implementation --rules \"{rulesFile}\"" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), i)));
                     var dr = await dt; var ir = await it;
                     if (my != version) return;
                     void Fill(TabItem tab, Dictionary<string, object> res)
