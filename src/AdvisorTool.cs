@@ -90,7 +90,7 @@ public sealed partial class ToolRegistry
                     }
                     case "watch_list":
                     {
-                        var (signals, hints) = AdvisorWatch.Load(dir, PluginFolders(dir));
+                        var (signals, hints) = AdvisorWatch.Load(dir, PluginFolders(dir), ActivePlatforms(dir));
                         var o = new System.Text.StringBuilder();
                         o.AppendLine(signals.Count == 0 ? "No fault signals declared (.tcagent\\advisor-watch.json)." : $"{signals.Count} fault signal(s):");
                         foreach (var s in signals) o.AppendLine("  " + AdvisorWatch.Describe(s));
@@ -113,7 +113,7 @@ public sealed partial class ToolRegistry
                     case "watch_check":
                     {
                         // one look at the plant now: what is wrong, with the details of the signals that fire
-                        var (signals, _) = AdvisorWatch.Load(dir, PluginFolders(dir));
+                        var (signals, _) = AdvisorWatch.Load(dir, PluginFolders(dir), ActivePlatforms(dir));
                         string net = Str(a, "netId");
                         if (string.IsNullOrEmpty(net)) try { net = tc.Sta.Run(() => (string)((dynamic)tc.RequireSysMan()).GetTargetNetId()); } catch { net = "local"; }
                         using var r = new AdvisorReader(net);
@@ -126,6 +126,11 @@ public sealed partial class ToolRegistry
                     default: throw new Exception("action: start, record, finish, list, rate, stats, watch_list, watch_add, watch_remove or watch_check");
                 }
             });
+    }
+
+    static IEnumerable<string> ActivePlatforms(string dir)
+    {
+        try { return KnowledgeLayers.Platforms(dir).Active; } catch { return Enumerable.Empty<string>(); }
     }
 
     static IEnumerable<(string id, string folder)> PluginFolders(string dir)

@@ -62,6 +62,16 @@ public class AdvisorWatchTests : IDisposable
     }
 
     [Fact]
+    public void APlatformPluginOnlyAppliesToItsPlatform()
+    {
+        var plugin = Path.Combine(dir, "plugin-b");
+        Directory.CreateDirectory(plugin);
+        File.WriteAllText(Path.Combine(plugin, "advisor.json"), "{ \"platform\": \"platform-b\", \"skill\": \"platform-b-diagnose\", \"signals\": [] }");
+        Assert.Empty(AdvisorWatch.Load(dir, new[] { ("plugin-b", plugin) }, new[] { "platform-a" }).hints);
+        Assert.Single(AdvisorWatch.Load(dir, new[] { ("plugin-b", plugin) }, new[] { "platform-b" }).hints);
+    }
+
+    [Fact]
     public void APluginBringsItsSkillAndSignals()
     {
         var plugin = Path.Combine(dir, "plugin-a");

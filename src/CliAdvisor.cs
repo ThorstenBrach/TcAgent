@@ -22,7 +22,7 @@ public static class CliAdvisor
     sealed class Args
     {
         public string Sub = "run", Solution, Trigger = "nightly", Since = "24 hours ago", Results, Id, Rating, Comment, Out, Target = "local";
-        public int Minutes = 15, MaxTurns = 80, Interval = 2;
+        public int Minutes = 15, MaxTurns = 80, Interval = 2, MaxRuns;
         public List<int> Ports = new() { 851 };
         public bool Open, Json, DryRun, Once, StartRuns;
     }
@@ -33,7 +33,7 @@ public static class CliAdvisor
         "      Advisor Shadow: an AI client without a window reads the project and records advice with an order (.tcagent\\advisor).\n" +
         "      --trigger project reviews the whole project (workflow project-review), e.g. once a month.\n" +
         "      It changes nothing (TCAGENT_MODE=ask). --dry-run prints the prompt only.\n" +
-        "  TcAgent.exe advise watch --solution <sln> [--target <AmsNetId>] [--ports 851,852] [--interval 2] [--run] [--once]\n" +
+        "  TcAgent.exe advise watch --solution <sln> [--target <AmsNetId>] [--ports 851,852] [--interval 2] [--run] [--max-runs n] [--once]\n" +
         "      Advisor Live: watches the plant (runtime and PLC state, cycle time, the fault signals of .tcagent\\advisor-watch.json\n" +
         "      and of the plugins) and only reads. --run starts an Advisor run when something goes wrong, --once looks once.\n" +
         "  TcAgent.exe advise list|stats --solution <sln> [--open] [--json]\n" +
@@ -67,6 +67,7 @@ public static class CliAdvisor
                 case "--interval": o.Interval = Math.Max(1, int.Parse(V())); break;
                 case "--once": o.Once = true; break;
                 case "--run": o.StartRuns = true; break;
+                case "--max-runs": o.MaxRuns = int.Parse(V()); break;
                 default: throw new ArgumentException("unknown option " + a[i]);
             }
         }
@@ -202,11 +203,14 @@ public static class CliAdvisor
     {
         var plugins = new List<(string, string)>();
         try { plugins = Plugins.Usable(dir).Where(p => p.Ready).Select(p => (p.Id, p.Folder)).ToList(); } catch { }
-        var (signals, hints) = AdvisorWatch.Load(dir, plugins);
+        IEnumerable<string> platforms = Enumerable.Empty<string>();
+        try { platforms = KnowledgeLayers.Platforms(dir).Active; } catch { }
+        var (signals, hints) = AdvisorWatch.Load(dir, plugins, platforms);
         var ports = signals.Select(s => s.Port).Concat(o.Ports).Distinct().ToList();
         var state = new AdvisorWatch.State();
         var reported = new Dictionary<string, DateTime>();
         var active = new HashSet<string>();
+        int runs = 0;
         Console.WriteLine($"Advisor Live watches {o.Target}: runtime, PLC port(s) {string.Join(", ", ports)}, {signals.Count} fault signal(s)" +
                           (hints.Count > 0 ? $", skills {string.Join(", ", hints.Select(h => h.Skill))}" : "") + ". It only reads. Ctrl+C ends it.");
         using var r = new AdvisorReader(o.Target);
@@ -235,6 +239,7 @@ public static class CliAdvisor
                               (hints.Count > 0 ? "\n\nPlatform: load the skill " + string.Join(" and ", hints.Select(h => h.Skill)) + " - it knows how the platform reports faults.\n" : "\n");
                 o.Trigger = "machine";
                 StartRun(o, dir, LivePrompt(o.Solution, o.Target, context), "Advisor Live");
+                if (o.MaxRuns > 0 && ++runs >= o.MaxRuns) { Console.WriteLine($"{runs} run(s) - the watch ends (--max-runs)."); return Cli.Ok; }
             }
             Thread.Sleep(o.Interval * 1000);
         }
