@@ -22,7 +22,8 @@ the preview shows at once what it does - before and after, for the declaration a
 the object open in the editor, with the changed lines marked. The preview looks like the TwinCAT editor: its font and
 background, syntax colors for the light or the dark theme. **Save** writes the changed rules into `formatting.json` of the
 chosen level (project, user, team, company; a backup of the levels is made first). A rule a level above locked shows
-"⊘ locked by ..." and cannot be changed; a changed one shows "✎ changed, not saved" until it is saved.
+"⊘ locked by ..." and cannot be changed; a changed one shows "✎ changed, not saved" until it is saved. The details of a rule
+show its example: the code as written and the result for every value, only this rule acting.
 
 **Wish a rule or feature ...** opens a new issue on GitHub with the example of the preview: what the code looks like, what the
 formatter makes of it today, and a place for what you would like instead. Check it in the browser, remove names of customers
@@ -55,7 +56,8 @@ The markers of other formatters are understood as well (`STweep.Disable`/`Enable
 
 ## Rules
 
-Nothing is a fixed rule. The defaults (profile `twincat`):
+Nothing is a fixed rule. The defaults (profile `twincat`) - **an example with before and after for every rule:
+[FORMATTER_EXAMPLES.md](FORMATTER_EXAMPLES.md)** (made by the formatter itself, so it always shows what it really does):
 
 | Rule | Default | Values |
 |---|---|---|

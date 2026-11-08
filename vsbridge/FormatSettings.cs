@@ -284,7 +284,13 @@ namespace TcAgentBridge
             w.Loaded += async (s, e) =>
             {
                 Dictionary<string, object> state;
-                try { state = await Task.Run(() => FmtJson(FmtRun(exe, "format --show-rules --json" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), null))); }
+                try
+                {
+                    var rulesTask = Task.Run(() => FmtJson(FmtRun(exe, "format --show-rules --json" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), null)));
+                    var exTask = Task.Run(() => { try { return FmtJson(FmtRun(exe, "format --examples --json", null)); } catch { return null; } });
+                    state = await rulesTask;
+                    state["__examples"] = await exTask;
+                }
                 catch (Exception ex) { FormatMessage("Formatter settings: the rules could not be read.\n\n" + Inner(ex) + "\n\nTcAgent 0.54 or newer is needed.", true); w.Close(); return; }
                 progress.Visibility = Visibility.Collapsed;
                 BuildSettings(w, state, body, search, hint, clear, profile, level, wish, undo, save, statusLeft, statusRight, progress, look, exe, sln, openDecl, openImpl, openName);
@@ -307,6 +313,7 @@ namespace TcAgentBridge
         {
             var rules = state["rules"] as Dictionary<string, object> ?? new Dictionary<string, object>();
             var profiles = state.TryGetValue("profiles", out var po) ? po as Dictionary<string, object> : null;
+            var examples = state.TryGetValue("__examples", out var eo0) ? eo0 as Dictionary<string, object> : null;
             var loaded = rules.ToDictionary(k => k.Key, k => FmtStr(k.Value as Dictionary<string, object>, "value") ?? "", StringComparer.OrdinalIgnoreCase);
             var current = new Dictionary<string, string>(loaded, StringComparer.OrdinalIgnoreCase);
             var rows = new List<RuleRow>();
@@ -415,11 +422,38 @@ namespace TcAgentBridge
                 Fact("Default", rr.Default);
                 Fact("Now applies", loaded[rr.Key] + " – from " + rr.From + (ch ? $"; {current[rr.Key]} after Save on level {level.SelectedItem}" : ""));
                 detail.Children.Add(g);
+                // the example of this rule: the code as written and the result for every value (all other rules leave it alone)
+                if (examples != null && examples.TryGetValue(rr.Key, out var eo) && eo is Dictionary<string, object> ex)
+                {
+                    detail.Children.Add(new TextBlock { Text = "Example – only this rule acts", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 10, 0, 2) });
+                    if (FmtStr(ex, "with") is string with && with.Length > 0) detail.Children.Add(new TextBlock { Text = "shown with " + with, Opacity = 0.65, TextWrapping = TextWrapping.Wrap });
+                    UIElement Sample(string title, ArrayList tokens, bool now)
+                    {
+                        var sp = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
+                        var t = new TextBlock { Text = title, Opacity = now ? 1 : 0.7, FontWeight = now ? FontWeights.SemiBold : FontWeights.Normal };
+                        sp.Children.Add(t);
+                        var code = CodeView(look, tokens ?? new ArrayList(), null);
+                        var b = new Border { Child = code, BorderThickness = new Thickness(1), MaxHeight = 160 };
+                        b.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+                        sp.Children.Add(b);
+                        return sp;
+                    }
+                    detail.Children.Add(Sample("Written as", ex["code"] as ArrayList, false));
+                    foreach (var v in (ex["values"] as ArrayList ?? new ArrayList()).OfType<Dictionary<string, object>>())
+                    {
+                        var val = FmtStr(v, "value");
+                        detail.Children.Add(Sample(val + (val == current[rr.Key] ? "   ← set in this window" : ""), v["tokens"] as ArrayList, val == current[rr.Key]));
+                    }
+                }
             };
             var listScroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
             var listBorder = new Border { Child = listScroll, BorderThickness = new Thickness(1) };
             listBorder.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
-            var detailBorder = new Border { Child = detail, BorderThickness = new Thickness(1), Margin = new Thickness(0, 8, 0, 0), MinHeight = 120 };
+            var detailBorder = new Border
+            {
+                Child = new ScrollViewer { Content = detail, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled },
+                BorderThickness = new Thickness(1), Margin = new Thickness(0, 8, 0, 0), Height = 300
+            };
             detailBorder.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
             detail.Children.Add(new TextBlock { Text = "Select a rule to see what it does, its values and where it comes from.", Opacity = 0.65, TextWrapping = TextWrapping.Wrap });
             var left = new DockPanel();

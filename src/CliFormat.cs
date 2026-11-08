@@ -5,6 +5,7 @@
 //       formats the text from stdin (UTF-8) and writes it to stdout; --json: {ok, changed, text, error, notes, part}
 //   TcAgent.exe format --file <file.st> [--write] [--check] ...   a plain-text file: print it, write it back, or only check it
 //   TcAgent.exe format --show-rules [--solution <sln>] [--json]   the effective rules and the level each one comes from
+//   TcAgent.exe format --examples --markdown | --json             an example for every rule (docs/FORMATTER_EXAMPLES.md, the window)
 //   TcAgent.exe format --save <changes.json> --level user|project|team|company [--solution <sln>]   writes rules into the
 //       formatting.json of that level (backup first); a rule set to "unset" is removed there - the settings window of the IDE
 //
@@ -41,6 +42,11 @@ public static class CliFormat
                     case "--show-rules": show = true; break;
                     case "--save": save = V(); break;
                     case "--level": level = V(); break;
+                    case "--examples":
+                        Console.OutputEncoding = new UTF8Encoding(false);
+                        if (args.Contains("--markdown")) { Console.Write(StFormatExamples.Markdown()); return Cli.Ok; }
+                        Console.WriteLine(ExamplesJson().ToJsonString());
+                        return Cli.Ok;
                     case "--survey":
                         {
                             var folder = V();
@@ -149,6 +155,21 @@ public static class CliFormat
             else r.Add(new JsonArray(c, x.Text));
             if (!x.Trivia && !x.Comment) prev = x;
         }
+        return r;
+    }
+
+    /// <summary>The examples of every rule for the settings window: the code and, per value, the result - with syntax classes.</summary>
+    static JsonObject ExamplesJson()
+    {
+        var r = new JsonObject();
+        foreach (var e in StFormatExamples.All)
+            r[e.Rule] = new JsonObject
+            {
+                ["part"] = e.Part.ToString().ToLowerInvariant(),
+                ["code"] = Colored(e.Code),
+                ["values"] = new JsonArray(e.Values.Select(v => (JsonNode)new JsonObject { ["value"] = v, ["tokens"] = Colored(StFormatExamples.Run(e, v)) }).ToArray()),
+                ["with"] = string.Join(", ", e.With.Select(w => $"{w.Key}: {w.Value}"))
+            };
         return r;
     }
 

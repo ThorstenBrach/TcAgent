@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
   <!-- Unit tests for the parts of TcAgent that need no TwinCAT/Visual Studio (pure file logic). The sources are linked,
        not referenced: the server project needs the TwinCAT interop and Windows, these tests run anywhere with .NET 8.
        Run: dotnet test tests\TcAgent.Tests -->
@@ -15,6 +15,7 @@
     <Compile Include="..\..\src\StFormatter.cs" Link="src\StFormatter.cs" />
     <Compile Include="..\..\src\StFormatConfig.cs" Link="src\StFormatConfig.cs" />
     <Compile Include="..\..\src\StExpr.cs" Link="src\StExpr.cs" />
+    <Compile Include="..\..\src\StFormatExamples.cs" Link="src\StFormatExamples.cs" />
     <Compile Include="..\..\src\PlainText.cs" Link="src\PlainText.cs" />
     <Compile Include="..\..\src\TcUnitDiscovery.cs" Link="src\TcUnitDiscovery.cs" />
     <Compile Include="..\..\src\Guards.cs" Link="src\Guards.cs" />

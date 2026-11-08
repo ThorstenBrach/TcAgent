@@ -648,7 +648,8 @@ means: a safety net compares the code before and after, and a part it cannot rea
 Every rule can be set in `formatting.json` on the knowledge levels (company, team, platform, project - a level can lock
 rules); **Tools > Formatter settings (TcAgent) ...** shows each rule with a live preview of what it does and saves the changed
 ones, and **Wish a rule or feature ...** opens a GitHub issue with the example. Sections stay untouched between
-`// tcagent-format: off` and `// tcagent-format: on`. Rules, profiles and examples:
+`// tcagent-format: off` and `// tcagent-format: on`. Every rule with an example before and after:
+[FORMATTER_EXAMPLES.md](FORMATTER_EXAMPLES.md). Rules, profiles and configuration:
 [FORMATTER.md](FORMATTER.md).
 
 ## Coding rules
