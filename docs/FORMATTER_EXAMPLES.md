@@ -105,6 +105,50 @@ E_State.Run:
 END_CASE
 ```
 
+### Names with _ one column left (`indent.underscore`)
+
+A name that starts with _ one column further left, so its letters line up with the other names. Default: `off`; shown with `align.decl: true`.
+
+Written as:
+
+```
+VAR
+  bStart : BOOL;
+  _localCount : INT;
+  nParts : INT;
+END_VAR
+```
+
+`off`:
+
+```
+VAR
+  bStart      : BOOL;
+  _localCount : INT;
+  nParts      : INT;
+END_VAR
+```
+
+`declarations`:
+
+```
+VAR
+  bStart     : BOOL;
+ _localCount : INT;
+  nParts     : INT;
+END_VAR
+```
+
+`everywhere`:
+
+```
+VAR
+  bStart     : BOOL;
+ _localCount : INT;
+  nParts     : INT;
+END_VAR
+```
+
 ### Continuation lines (`indent.continuation`)
 
 Continuation lines: keep their offset to the first line, or one level. Default: `preserve`.

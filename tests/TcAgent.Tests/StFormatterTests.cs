@@ -233,6 +233,17 @@ bLamp := (bEnable AND NOT bPhaseOff);";
     }
 
     [Fact]
+    public void NamesWithUnderscoreStandOneColumnLeft()
+    {
+        var cfg = With("indent.underscore", "declarations");
+        var r = F("VAR\nbStart : BOOL;\n_localCount : INT;\nEND_VAR", StPart.Declaration, cfg);
+        Assert.Equal("VAR\n  bStart     : BOOL;\n _localCount : INT;\nEND_VAR", N(r.Text));
+        Assert.Equal(r.Text, F(r.Text, StPart.Declaration, cfg).Text);
+        var code = With("indent.underscore", "everywhere");
+        Assert.Equal("IF a THEN\n _count := 1;\n  b := 2;\nEND_IF", N(F("IF a THEN\n_count := 1;\nb := 2;\nEND_IF", StPart.Implementation, code).Text));
+    }
+
+    [Fact]
     public void ConfigFromLevelsLocksAndUnset()
     {
         var c = new StFormatConfig();

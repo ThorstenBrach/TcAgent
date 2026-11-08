@@ -24,6 +24,7 @@ public static class StFormatExamples
         I("indent.style", "IF a THEN\n  b := 1;\nEND_IF", new[] { "spaces", "tabs" }),
         I("indent.size", "IF a THEN\n  IF b THEN\n    c := 1;\n  END_IF\nEND_IF", new[] { "2", "4" }),
         I("indent.case-labels", "CASE eState OF\nE_State.Idle:\nx := 1;\nE_State.Run:\nx := 2;\nEND_CASE", new[] { "true", "false" }),
+        D("indent.underscore", "VAR\n  bStart : BOOL;\n  _localCount : INT;\n  nParts : INT;\nEND_VAR", new[] { "off", "declarations", "everywhere" }, ("align.decl", "true")),
         I("indent.continuation", "nSum := nFirst +\n          nSecond;", new[] { "preserve", "indent" }),
         I("case.keywords", "if bStart then\n  bBusy := TRUE;\nend_if", new[] { "upper", "lower", "preserve" }),
         D("case.types", "VAR\n  nCount : int;\n  sName : string;\nEND_VAR", new[] { "upper", "lower", "preserve" }),

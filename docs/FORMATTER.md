@@ -65,6 +65,7 @@ Nothing is a fixed rule. The defaults (profile `twincat`) - **an example with be
 | `indent.size` | `2` | spaces per level |
 | `indent.tab-width` | `4` | width of a tab |
 | `indent.case-labels` | `true` | CASE labels one level in, their statements one more |
+| `indent.underscore` | `off` | `declarations` or `everywhere`: a name that starts with `_` one column further left, so its letters line up with the other names |
 | `indent.continuation` | `preserve` | continuation lines keep their offset to the first line, or `indent` one level |
 | `case.keywords`, `case.types`, `case.literals` | `upper` | upper, lower, preserve |
 | `space.operators` | `one` | one space around `:=`, `=>`, `S=`, `R=`, `REF=`, arithmetic and comparisons; or preserve |
