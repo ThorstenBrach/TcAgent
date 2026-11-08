@@ -1566,6 +1566,15 @@ namespace TcAgentBridge
         static readonly string[] FolderField = new string[0], FoldersField = new string[0];
 
         /// <summary>Like Prompt; required = the indexes of the text fields that must not be empty - OK stays off until they are filled.</summary>
+        /// <summary>A name for a source from its folder or Git URL: the last part, without .git, lowercase with hyphens.</summary>
+        internal static string SourceName(string urlOrPath)
+        {
+            var last = (urlOrPath ?? "").Trim().TrimEnd('/', '\\').Split('/', '\\', ':').LastOrDefault() ?? "";
+            if (last.EndsWith(".git", StringComparison.OrdinalIgnoreCase)) last = last.Substring(0, last.Length - 4);
+            var n = System.Text.RegularExpressions.Regex.Replace(last.ToLowerInvariant(), "[^a-z0-9]+", "-").Trim('-');
+            return n.Length > 0 ? n : null;
+        }
+
         string[] Ask(string title, int[] required, params (string Label, string[] Choices, string Value)[] fields)
         {
             var w = Dialog(title, 420);
@@ -1591,7 +1600,15 @@ namespace TcAgentBridge
                     };
                     var row = new DockPanel { MinWidth = 400 };
                     DockPanel.SetDock(browse, Dock.Right); row.Children.Add(browse); row.Children.Add(tb);
-                    tb.TextChanged += (s, e) => Check();
+                    // an empty "Name" field above takes the name of the folder or repository as a proposal (until the user types one)
+                    var nameBox = fields.Length > 0 && fields[0].Label.StartsWith("Name") ? first as TextBox : null;
+                    bool proposed = nameBox != null && nameBox.Text.Trim().Length == 0;
+                    if (nameBox != null) nameBox.TextChanged += (s, e) => { if (nameBox.IsKeyboardFocusWithin) proposed = nameBox.Text.Trim().Length == 0; };
+                    tb.TextChanged += (s, e) =>
+                    {
+                        if (proposed && !several && SourceName(tb.Text) is string n) nameBox.Text = n;
+                        Check();
+                    };
                     sp.Children.Add(row); getters.Add(() => tb.Text); first ??= tb;
                 }
                 else if (f.Choices != null)
