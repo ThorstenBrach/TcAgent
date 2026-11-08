@@ -15,10 +15,14 @@ The key can be changed or switched off: `"formatHotkey": "Ctrl+Alt+F"` (or `"off
 
 ## Settings with a preview
 
-**Tools > Formatter settings (TcAgent) ...** lists every rule with its value and the level it comes from. Change one and the
-preview shows at once what it does - before and after, for the declaration and the implementation, on an example or on the
-object open in the editor. **Save** writes the changed rules into `formatting.json` of the chosen level (project, user, team,
-company; a backup of the levels is made first). Rules a level above locked are shown with a lock and cannot be changed.
+**Tools > Formatter settings (TcAgent) ...** lists every rule in plain words, grouped, with its value and the level it comes
+from; **Search** (Ctrl+F) finds a rule by name, key or description, **Start from profile** puts the values of a profile into
+the window. The details of the selected rule say what it does, its values, the default and what applies now. Change a rule and
+the preview shows at once what it does - before and after, for the declaration and the implementation, on an example or on
+the object open in the editor, with the changed lines marked. The preview looks like the TwinCAT editor: its font and
+background, syntax colors for the light or the dark theme. **Save** writes the changed rules into `formatting.json` of the
+chosen level (project, user, team, company; a backup of the levels is made first). A rule a level above locked shows
+"⊘ locked by ..." and cannot be changed; a changed one shows "✎ changed, not saved" until it is saved.
 
 **Wish a rule or feature ...** opens a new issue on GitHub with the example of the preview: what the code looks like, what the
 formatter makes of it today, and a place for what you would like instead. Check it in the browser, remove names of customers

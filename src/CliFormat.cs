@@ -21,7 +21,7 @@ public static class CliFormat
     public static int Run(string[] args)
     {
         string solution = null, rules = null, file = null, part = null, save = null, level = null;
-        bool stdin = false, json = false, write = false, check = false, show = false;
+        bool stdin = false, json = false, write = false, check = false, show = false, tokens = false;
         try
         {
             for (int i = 1; i < args.Length; i++)
@@ -35,6 +35,7 @@ public static class CliFormat
                     case "--part": part = V(); break;
                     case "--stdin": stdin = true; break;
                     case "--json": json = true; break;
+                    case "--tokens": tokens = true; break;
                     case "--write": write = true; break;
                     case "--check": check = true; break;
                     case "--show-rules": show = true; break;
@@ -97,7 +98,8 @@ public static class CliFormat
             Console.WriteLine(new JsonObject
             {
                 ["ok"] = res.Error == null, ["changed"] = res.Changed, ["text"] = res.Text, ["error"] = res.Error, ["part"] = res.Part.ToString().ToLowerInvariant(),
-                ["notes"] = new JsonArray(res.Notes.Concat(cfg.Notes).Select(n => (JsonNode)n).ToArray()), ["rulesFromFiles"] = cfg.FromFiles
+                ["notes"] = new JsonArray(res.Notes.Concat(cfg.Notes).Select(n => (JsonNode)n).ToArray()), ["rulesFromFiles"] = cfg.FromFiles,
+                ["tokens"] = tokens ? Colored(res.Text) : null, ["inputTokens"] = tokens ? Colored(text) : null
             }.ToJsonString());
             return res.Error != null ? Cli.Infra : check && res.Changed ? Cli.Failed : Cli.Ok;
         }
@@ -115,6 +117,39 @@ public static class CliFormat
         }
         Console.Write(res.Text);
         return Cli.Ok;
+    }
+
+    /// <summary>The text as [class, text] pairs for syntax colors in the preview of the IDE: keyword, type, literal, comment,
+    /// pragma, string, number, newline, text. Text that cannot be read is one "text" piece.</summary>
+    static JsonArray Colored(string text)
+    {
+        List<StToken> t;
+        try { t = StLexer.Lex(text ?? ""); }
+        catch (StSyntaxException) { return new JsonArray(new JsonArray("text", text)); }
+        var r = new JsonArray();
+        StToken prev = null;
+        foreach (var x in t)
+        {
+            bool member = prev != null && prev.Kind == StTok.Op && prev.Text == ".";
+            string c = x.Kind switch
+            {
+                StTok.Newline => "newline",
+                StTok.LineComment or StTok.BlockComment => "comment",
+                StTok.Pragma => "pragma",
+                StTok.String => "string",
+                StTok.Number => "number",
+                StTok.Literal => "number",
+                StTok.Word when !member && StKeywords.Keywords.Contains(x.Text) => "keyword",
+                StTok.Word when !member && StKeywords.Types.Contains(x.Text) => "type",
+                StTok.Word when !member && StKeywords.Literals.Contains(x.Text) => "keyword",
+                _ => "text"
+            };
+            // neighbours of the same class become one piece
+            if (r.Count > 0 && r[^1] is JsonArray last && last[0]!.ToString() == c && c is "text") last[1] = last[1]!.ToString() + x.Text;
+            else r.Add(new JsonArray(c, x.Text));
+            if (!x.Trivia && !x.Comment) prev = x;
+        }
+        return r;
     }
 
     /// <summary>Merges {"rules": {...}, "profile": "..."} into the formatting.json of a level (after a backup of the levels).</summary>
