@@ -219,6 +219,23 @@ the PLC objects written during the run. The gate before `tc_activate` holds with
 | `note` | string |  | step: short note |
 | `abort` | boolean |  | finish: stop the run before all steps are done |
 
+### `tc_advisor`
+
+Advisor ([ADVISOR.md](ADVISOR.md)): look, advise, hand over an order – never change anything. `action=start` (kind, trigger) makes
+the session read only until `action=finish`: every tool that would change the project or the runtime is refused. `record` keeps
+one advice in `<solution folder>\.tcagent\advisor\` (finding, evidence, proposal, optional diff, confidence and the order – the
+prompt a person sends to an agent to act on it); `list`, `rate` (right, partly, wrong, n/a) and `stats` (the hit rate per kind of task).
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string | yes | start, record, finish, list, rate or stats |
+| `kind` | string |  | start/record: review, diagnose, cause or code |
+| `trigger` | string |  | start/record: chat, nightly, commit, pipeline |
+| `finding`, `evidence`, `proposal`, `diff`, `order`, `workflow`, `confidence`, `why` | string |  | record: the advice (evidence one per line) |
+| `id`, `rating`, `comment` | string |  | rate |
+| `open` | boolean |  | list: only advice not rated yet |
+| `max` | integer |  | list: how many (default 20) |
+
 ### `tc_improve`
 
 Self-improvement from the local run logs of the workflows (`%LOCALAPPDATA%\TcAgent\runs\<solution>\`, last 100 runs,

@@ -60,7 +60,13 @@ public static class CliAdvisor
                 default: throw new ArgumentException("unknown option " + a[i]);
             }
         }
-        if (string.IsNullOrEmpty(o.Solution)) throw new ArgumentException("--solution <sln> is required");
+        // in a pipeline: the only solution of the repository (as TcAgent.exe ci finds it)
+        if (string.IsNullOrEmpty(o.Solution))
+        {
+            var found = Directory.EnumerateFiles(Environment.CurrentDirectory, "*.sln", new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 3 })
+                                 .Where(f => !f.Contains("\\bin\\") && !f.Contains("\\obj\\")).Take(2).ToList();
+            o.Solution = found.Count == 1 ? found[0] : throw new ArgumentException("--solution <sln> is required" + (found.Count > 1 ? " (more than one solution found)" : ""));
+        }
         o.Solution = Path.GetFullPath(o.Solution);
         if (!File.Exists(o.Solution)) throw new ArgumentException("solution not found: " + o.Solution);
         if (o.Trigger is not ("nightly" or "commit" or "pipeline")) throw new ArgumentException("--trigger nightly, commit or pipeline");

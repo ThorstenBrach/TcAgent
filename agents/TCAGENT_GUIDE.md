@@ -148,6 +148,8 @@ says otherwise. If a rule contradicts the user's request, point it out briefly a
 of task. When the task fits one (new function → `requirements-interview`, malfunction → `plc-debugging`, review →
 `plc-code-review`, or the team's own skills), load it with `tc_skills action=show name=<name>` and follow it. Save a
 procedure as a new skill only when the user asks (`tc_skills action=add`, `dryRun` first).
+An Advisor run (`tc_advisor action=start`, or a server started by `TcAgent.exe advise`) only reads: record each proven finding
+with `tc_advisor action=record` and an order a person can send to an agent, then `action=finish`.
 A new function or a larger extension always runs through the workflow `new-feature`, unless the user says otherwise: first the
 interview and the specification, then the code.
 A skill or workflow the list shows as not available needs a plugin or a TcAgent version that is not there: tell the user what is
