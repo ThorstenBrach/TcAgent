@@ -181,6 +181,8 @@ namespace TcAgentBridge
             if (ok) Info(output.Trim().Split('\n')[0]);
             else Report(false, output, line.On ? "Switch on" : "Switch off");
             LoadModules();
+            // what waits for a module (or only names its tools) changes with it: read the files again in the background
+            if (ok) Load();
         }
 
         void ShowModule()

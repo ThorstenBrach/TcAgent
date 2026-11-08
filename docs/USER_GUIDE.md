@@ -242,7 +242,7 @@ The tool window **TcAgent Knowledge** (View > Other Windows, or **⋯ > Knowledg
 agent gets – coding rules, risk rules, skills, workflows, lessons, reference sources and templates of every level
 – where it comes from, and how the work develops. It is the place to add, change, move, switch off and back up this
 knowledge without editing folders by hand. The levels and what belongs to them: [Your files](#configuration-reference)
-and [docs/KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md).
+and [docs/KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md). Every list sorts by a click on a column header; a second click reverses it.
 
 *How the window works:* the tabs are on top – a badge on a tab counts what needs your attention there; on the right
 the platform of the project (a click opens the Platforms tab), **⟳** (F5) and **⋯** with **Levels …**, **Backup now …**,
