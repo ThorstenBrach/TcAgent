@@ -23,7 +23,7 @@ the object open in the editor, with the changed lines marked. The preview looks 
 background, syntax colors for the light or the dark theme. **Save** writes the changed rules into `formatting.json` of the
 chosen level (project, user, team, company; a backup of the levels is made first). A rule a level above locked shows
 "⊘ locked by ..." and cannot be changed; a changed one shows "✎ changed, not saved" until it is saved. The tab **Example of the rule**
-shows the selected rule alone: the code as written and the result for every value - one below the other, or side by side with **⇆ Side by side** (the window remembers the choice; it applies to before/after as well).
+shows the selected rule: the code as written and the result for every value, with all other rules as they are set in the window (FORMATTER_EXAMPLES.md shows each rule alone) - one below the other, or side by side with **⇆ Side by side** (the window remembers the choice; it applies to before/after as well).
 
 The window speaks German when the TcAgent Chat answers in German (or, without a set answer language, Windows is German), English otherwise; values are shown in plain words ("keep as written" for `preserve`, "UPPER CASE" for `upper` …), `formatting.json` keeps the short keys.
 

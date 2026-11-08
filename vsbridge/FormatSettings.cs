@@ -395,7 +395,7 @@ namespace TcAgentBridge
         {
             var rules = state["rules"] as Dictionary<string, object> ?? new Dictionary<string, object>();
             var profiles = state.TryGetValue("profiles", out var po) ? po as Dictionary<string, object> : null;
-            var examples = state.TryGetValue("__examples", out var eo0) ? eo0 as Dictionary<string, object> : null;
+            var examples = state.TryGetValue("__examples", out var eo0) ? eo0 as Dictionary<string, object> : null;   // replaced by the preview with the rules of the window
             var valueLabels = state.TryGetValue("valueLabels", out var vl0) ? vl0 as Dictionary<string, object> : null;
             // a value in plain words (a number stays a number; 0 of the line length means never)
             string Disp(string key, string v)
@@ -552,7 +552,7 @@ namespace TcAgentBridge
                 DockPanel.SetDock(title, Dock.Top); page.Children.Add(title);
                 if (examples != null && examples.TryGetValue(rr.Key, out var eo) && eo is Dictionary<string, object> ex)
                 {
-                    title.Inlines.Add(new Run(T(" – only this rule acts", " – nur diese Regel wirkt") + (FmtStr(ex, "with") is string with && with.Length > 0 ? T(", shown with ", ", gezeigt mit ") + with : "")) { Foreground = Brushes.Gray });
+                    title.Inlines.Add(new Run(T(" – with the rules as set in this window, only this one changes", " – mit den Regeln, wie sie im Fenster eingestellt sind; nur diese wechselt") + (FmtStr(ex, "with") is string with && with.Length > 0 ? T(", shown with ", ", gezeigt mit ") + with : "")) { Foreground = Brushes.Gray });
                     var samples = new List<(string Title, ArrayList Tokens, bool Now)> { (T("Written as", "So geschrieben"), ex["code"] as ArrayList, false) };
                     foreach (var v in (ex["values"] as ArrayList ?? new ArrayList()).OfType<Dictionary<string, object>>())
                     {
@@ -656,7 +656,9 @@ namespace TcAgentBridge
                 {
                     var dt = Task.Run(() => d.Length == 0 ? null : FmtJson(FmtRun(exe, $"format --stdin --json --tokens --part declaration --rules \"{rulesFile}\"" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), d)));
                     var it = Task.Run(() => i.Length == 0 ? null : FmtJson(FmtRun(exe, $"format --stdin --json --tokens --part implementation --rules \"{rulesFile}\"" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), i)));
-                    var dr = await dt; var ir = await it;
+                    var et = Task.Run(() => { try { return FmtJson(FmtRun(exe, $"format --examples --json --rules \"{rulesFile}\"", null)); } catch { return null; } });
+                    var dr = await dt; var ir = await it; var er = await et;
+                    if (my == version && er != null) { examples = er; if (selected != null) showDetail(selected); }
                     if (my != version) return;
                     lastDr = dr; lastIr = ir; haveResult = true;
                     FillBoth();
