@@ -202,6 +202,54 @@ namespace TcAgentBridge
         static string FromName(string f) => !fmtGerman || f == null ? f : f.Replace("default", "Standard").Replace("unset by", "zurückgesetzt von").Replace("profile", "Profil")
             .Replace("user", "Benutzer").Replace("project", "Projekt").Replace("company", "Firma").Replace("built-in", "eingebaut").Replace("platform", "Plattform");
 
+        // ------------------------------------------------------------------ examples and before/after: one below the other or side by side
+        static string LayoutFile => Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "bridge", "formatter-window.json");
+
+        static bool ReadStacked()
+        {
+            try { return !File.Exists(LayoutFile) || !File.ReadAllText(LayoutFile).Contains("\"stacked\": false"); } catch { return true; }
+        }
+
+        static void WriteStacked(bool stacked)
+        {
+            try { Directory.CreateDirectory(Path.GetDirectoryName(LayoutFile)); File.WriteAllText(LayoutFile, "{ \"stacked\": " + (stacked ? "true" : "false") + " }\n"); } catch { }
+        }
+
+        /// <summary>Code views with a title each, one below the other (the page scrolls) or side by side.</summary>
+        static UIElement Arrange(List<(string Title, FrameworkElement View, bool Now)> items, bool stacked)
+        {
+            Border Frame(FrameworkElement v, bool now, Thickness m)
+            {
+                var b = new Border { Child = v, BorderThickness = new Thickness(now ? 2 : 1), Margin = m };
+                if (now) b.BorderBrush = new SolidColorBrush(Color.FromRgb(0x3B, 0x6F, 0xD8));
+                else b.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+                return b;
+            }
+            TextBlock Title((string Title, FrameworkElement View, bool Now) x, Thickness m) =>
+                new TextBlock { Text = x.Title, Margin = m, Opacity = x.Now ? 1 : 0.7, FontWeight = x.Now ? FontWeights.SemiBold : FontWeights.Normal };
+            if (stacked)
+            {
+                var sp = new StackPanel();
+                for (int i = 0; i < items.Count; i++)
+                {
+                    sp.Children.Add(Title(items[i], new Thickness(0, i == 0 ? 2 : 10, 0, 2)));
+                    sp.Children.Add(Frame(items[i].View, items[i].Now, new Thickness(0)));
+                }
+                return new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
+            }
+            var g = new Grid();
+            g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); g.RowDefinitions.Add(new RowDefinition());
+            for (int c = 0; c < items.Count; c++)
+            {
+                g.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 160 });
+                var h = Title(items[c], new Thickness(c == 0 ? 0 : 6, 2, 0, 2));
+                var b = Frame(items[c].View, items[c].Now, new Thickness(c == 0 ? 0 : 6, 0, 0, 0));
+                Grid.SetColumn(h, c); Grid.SetColumn(b, c); Grid.SetRow(b, 1);
+                g.Children.Add(h); g.Children.Add(b);
+            }
+            return g;
+        }
+
         // ------------------------------------------------------------------ the window
         internal void ShowFormatSettings()
         {
@@ -356,6 +404,7 @@ namespace TcAgentBridge
             var selBrush = new SolidColorBrush(Color.FromArgb(70, 0x3B, 0x6F, 0xD8));
             var detail = new StackPanel { Margin = new Thickness(10, 8, 10, 8) };
             var folded = new HashSet<TextBlock>();
+            bool stacked = ReadStacked();
             var exampleTab = new TabItem { Header = T("Example of the rule", "Beispiel der Regel"), ToolTip = T("The selected rule alone: the code as written and the result for every value", "Die gewählte Regel allein: der Code, wie er geschrieben ist, und das Ergebnis für jeden Wert") };
             Action<RuleRow> showDetail = null;
             int r0 = 0;
@@ -482,19 +531,7 @@ namespace TcAgentBridge
                         var val = FmtStr(v, "value");
                         samples.Add((Disp(rr.Key, val) + (val == current[rr.Key] ? T("  ← set here", "  ← hier eingestellt") : ""), v["tokens"] as ArrayList, val == current[rr.Key]));
                     }
-                    var grid = new Grid();
-                    grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); grid.RowDefinitions.Add(new RowDefinition());
-                    for (int c = 0; c < samples.Count; c++)
-                    {
-                        grid.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 160 });
-                        var h = new TextBlock { Text = samples[c].Title, Margin = new Thickness(c == 0 ? 0 : 6, 0, 0, 2), Opacity = samples[c].Now ? 1 : 0.7, FontWeight = samples[c].Now ? FontWeights.SemiBold : FontWeights.Normal };
-                        var b = new Border { Child = CodeView(look, samples[c].Tokens ?? new ArrayList(), null), BorderThickness = new Thickness(samples[c].Now ? 2 : 1), Margin = new Thickness(c == 0 ? 0 : 6, 0, 0, 0) };
-                        if (samples[c].Now) b.BorderBrush = new SolidColorBrush(Color.FromRgb(0x3B, 0x6F, 0xD8));
-                        else b.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
-                        Grid.SetColumn(h, c); Grid.SetColumn(b, c); Grid.SetRow(b, 1);
-                        grid.Children.Add(h); grid.Children.Add(b);
-                    }
-                    page.Children.Add(grid);
+                    page.Children.Add(Arrange(samples.Select(x => (x.Title, (FrameworkElement)CodeView(look, x.Tokens ?? new ArrayList(), null), x.Now)).ToList(), stacked));
                 }
                 else page.Children.Add(new TextBlock { Text = T("This rule has no example: its effect cannot be seen in the text (tab width, line ends) or it works in the IDE.", "Diese Regel hat kein Beispiel: Ihre Wirkung ist im Text nicht sichtbar (Tab-Breite, Zeilenenden) oder sie wirkt in der IDE."), Opacity = 0.65, TextWrapping = TextWrapping.Wrap });
                 exampleTab.Content = page;
@@ -555,26 +592,25 @@ namespace TcAgentBridge
             tabs.Items.Add(declTab); tabs.Items.Add(implTab); tabs.Items.Add(exampleTab); tabs.SelectedIndex = 1;
             bool haveOpen = openImpl != null || openDecl != null;
             var useOpen = new CheckBox { Content = T("Preview the object open in the editor", "Vorschau mit dem Objekt im Editor") + (openName != null ? $" ({openName})" : ""), IsChecked = haveOpen, IsEnabled = haveOpen, VerticalAlignment = VerticalAlignment.Center };
-            var marks = new TextBlock { Text = T("changed lines are marked", "geänderte Zeilen sind markiert"), Opacity = 0.65, VerticalAlignment = VerticalAlignment.Center };
+            var marks = new TextBlock { Text = T("changed lines are marked", "geänderte Zeilen sind markiert"), Opacity = 0.65, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 0, 0) };
+            var layout = new Button { Padding = new Thickness(8, 1, 8, 1), Margin = new Thickness(10, 0, 0, 0) };
+            void LayoutText()
+            {
+                layout.Content = stacked ? T("⇆ Side by side", "⇆ Nebeneinander") : T("⇅ One below the other", "⇅ Untereinander");
+                layout.ToolTip = T("Show before/after and the examples ", "Vorher/Nachher und die Beispiele ") + (stacked ? T("side by side", "nebeneinander") : T("one below the other", "untereinander")) + T(" - the window remembers it", " zeigen - das Fenster merkt es sich");
+            }
+            LayoutText();
             var opts = new DockPanel { Margin = new Thickness(0, 6, 0, 4), LastChildFill = false };
-            DockPanel.SetDock(useOpen, Dock.Left); opts.Children.Add(useOpen); DockPanel.SetDock(marks, Dock.Right); opts.Children.Add(marks);
+            DockPanel.SetDock(useOpen, Dock.Left); opts.Children.Add(useOpen);
+            DockPanel.SetDock(marks, Dock.Right); opts.Children.Add(marks); DockPanel.SetDock(layout, Dock.Right); opts.Children.Add(layout);
             var right = new DockPanel();
             DockPanel.SetDock(opts, Dock.Top);
             right.Children.Add(opts); right.Children.Add(tabs);
             string lastBeforeDecl = "", lastBeforeImpl = "", lastAfterDecl = "", lastAfterImpl = "";
-            UIElement Pair(FrameworkElement a, FrameworkElement b)
-            {
-                var g = new Grid();
-                g.ColumnDefinitions.Add(new ColumnDefinition()); g.ColumnDefinitions.Add(new ColumnDefinition());
-                g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); g.RowDefinitions.Add(new RowDefinition());
-                var ha = new TextBlock { Text = T("Before", "Vorher"), Opacity = 0.65, Margin = new Thickness(0, 4, 0, 2) }; var hb = new TextBlock { Text = T("After", "Nachher"), Opacity = 0.65, Margin = new Thickness(6, 4, 0, 2) };
-                Grid.SetColumn(hb, 1);
-                var ba = new Border { Child = a, BorderThickness = new Thickness(1), Margin = new Thickness(0, 0, 3, 0) }; var bb = new Border { Child = b, BorderThickness = new Thickness(1), Margin = new Thickness(3, 0, 0, 0) };
-                ba.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey); bb.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
-                Grid.SetRow(ba, 1); Grid.SetRow(bb, 1); Grid.SetColumn(bb, 1);
-                g.Children.Add(ha); g.Children.Add(hb); g.Children.Add(ba); g.Children.Add(bb);
-                return g;
-            }
+            UIElement Pair(FrameworkElement a, FrameworkElement b) =>
+                Arrange(new List<(string, FrameworkElement, bool)> { (T("Before", "Vorher"), a, false), (T("After", "Nachher"), b, false) }, stacked);
+            Dictionary<string, object> lastDr = null, lastIr = null;
+            bool haveResult = false;
 
             int version = 0;
             var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(300) };
@@ -594,13 +630,8 @@ namespace TcAgentBridge
                     var it = Task.Run(() => i.Length == 0 ? null : FmtJson(FmtRun(exe, $"format --stdin --json --tokens --part implementation --rules \"{rulesFile}\"" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), i)));
                     var dr = await dt; var ir = await it;
                     if (my != version) return;
-                    void Fill(TabItem tab, Dictionary<string, object> res)
-                    {
-                        if (res == null) { tab.Content = new TextBlock { Text = T("This object has no " + tab.Header.ToString().ToLowerInvariant() + ".", "Dieses Objekt hat keine " + tab.Header + "."), Opacity = 0.65, Margin = new Thickness(6) }; return; }
-                        var bt = res["inputTokens"] as ArrayList ?? new ArrayList(); var at = res["tokens"] as ArrayList ?? new ArrayList();
-                        tab.Content = Pair(CodeView(look, bt, null), CodeView(look, at, Changed(LinesOf(bt), LinesOf(at))));
-                    }
-                    Fill(declTab, dr); Fill(implTab, ir);
+                    lastDr = dr; lastIr = ir; haveResult = true;
+                    FillBoth();
                     lastBeforeDecl = d; lastBeforeImpl = i; lastAfterDecl = FmtStr(dr, "text") ?? d; lastAfterImpl = FmtStr(ir, "text") ?? i;
                     var errs = new[] { (T("Declaration", "Deklaration"), FmtStr(dr, "error")), (T("Implementation", "Implementierung"), FmtStr(ir, "error")) }.Where(x => !string.IsNullOrEmpty(x.Item2)).Select(x => x.Item1 + ": " + x.Item2).ToList();
                     int n = current.Count(k => k.Value != loaded[k.Key]);
@@ -610,6 +641,19 @@ namespace TcAgentBridge
                 }
                 catch (Exception ex) { if (my == version) FormatMessage(T("The preview could not be formatted:", "Die Vorschau konnte nicht formatiert werden:") + "\n\n" + Inner(ex), true); }
                 finally { if (my == version) progress.Visibility = Visibility.Collapsed; }
+            };
+            void Fill(TabItem tab, Dictionary<string, object> res)
+            {
+                if (res == null) { tab.Content = new TextBlock { Text = T("This object has no " + tab.Header.ToString().ToLowerInvariant() + ".", "Dieses Objekt hat keine " + tab.Header + "."), Opacity = 0.65, Margin = new Thickness(6) }; return; }
+                var bt = res["inputTokens"] as ArrayList ?? new ArrayList(); var at = res["tokens"] as ArrayList ?? new ArrayList();
+                tab.Content = Pair(CodeView(look, bt, null), CodeView(look, at, Changed(LinesOf(bt), LinesOf(at))));
+            }
+            void FillBoth() { Fill(declTab, lastDr); Fill(implTab, lastIr); }
+            layout.Click += (s, e) =>
+            {
+                stacked = !stacked; WriteStacked(stacked); LayoutText();
+                if (haveResult) FillBoth();
+                if (selected != null) showDetail(selected);
             };
             changed = () => { States(); timer.Stop(); timer.Start(); };
             useOpen.Checked += (s, e) => changed(); useOpen.Unchecked += (s, e) => changed();
