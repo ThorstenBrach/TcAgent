@@ -7,6 +7,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Fixed
+- **Own windows and dialogs** (update, About, the knowledge dialogs, Ask from code, confirmations) show the TcAgent icon instead of the one of the IDE.
 - **New code without a specification:** outside a workflow the agent could create new functions without asking. Now TcAgent
   asks once per chat at the first new FB, program, function or method: go on without a specification, or clarify first.
 - **The question about the specification** follows the answer language of the chat (German or English), and the chat asks the agent

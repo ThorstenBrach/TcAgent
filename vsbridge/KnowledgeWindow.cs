@@ -1567,7 +1567,7 @@ namespace TcAgentBridge
         /// <summary>A dialog in the colors of the IDE (light, dark, blue theme).</summary>
         internal static Window Dialog(string title, double minWidth, bool fixedSize = true)
         {
-            var w = new Window { Title = title, MinWidth = minWidth, WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Application.Current?.MainWindow, ShowInTaskbar = false,
+            var w = new Window { Title = title, Icon = BridgePackage.AppIcon, MinWidth = minWidth, WindowStartupLocation = WindowStartupLocation.CenterOwner, Owner = Application.Current?.MainWindow, ShowInTaskbar = false,
                                  ResizeMode = fixedSize ? ResizeMode.NoResize : ResizeMode.CanResizeWithGrip, SizeToContent = fixedSize ? SizeToContent.WidthAndHeight : SizeToContent.Manual };
             ThemedDialogStyleLoader.SetUseDefaultThemedDialogStyles(w, true);
             w.SetResourceReference(BackgroundProperty, ThemedDialogColors.WindowPanelBrushKey);

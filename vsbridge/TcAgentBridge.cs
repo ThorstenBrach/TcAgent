@@ -26,6 +26,23 @@ namespace TcAgentBridge
     public sealed class BridgePackage : AsyncPackage
     {
         public const string BridgeVersion = "0.52.1";
+
+        /// <summary>The TcAgent icon for the own windows and dialogs (icon.png next to the extension), instead of the one of the IDE.</summary>
+        internal static System.Windows.Media.ImageSource AppIcon => appIcon ??= LoadIcon();
+        static System.Windows.Media.ImageSource appIcon;
+
+        static System.Windows.Media.ImageSource LoadIcon()
+        {
+            try
+            {
+                var f = Path.Combine(Path.GetDirectoryName(typeof(BridgePackage).Assembly.Location) ?? "", "icon.png");
+                if (!File.Exists(f)) return null;
+                var b = new System.Windows.Media.Imaging.BitmapImage();
+                b.BeginInit(); b.UriSource = new Uri(f); b.CacheOption = System.Windows.Media.Imaging.BitmapCacheOption.OnLoad; b.EndInit(); b.Freeze();
+                return b;
+            }
+            catch { return null; }
+        }
         internal static BridgePackage Instance;
         static readonly Guid ExportTypeGuid = new Guid("75161BEE-FB5F-434C-A3C6-86B7CEE2B8FC");
 
@@ -239,6 +256,7 @@ namespace TcAgentBridge
             string result = "cancel";
             var win = new System.Windows.Window
             {
+                Icon = AppIcon,
                 Title = title ?? "TcAgent",
                 SizeToContent = System.Windows.SizeToContent.WidthAndHeight,
                 ResizeMode = System.Windows.ResizeMode.NoResize,

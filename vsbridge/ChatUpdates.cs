@@ -132,7 +132,7 @@ namespace TcAgentBridge
 
         static Window Dialog(string title, double width, double height)
         {
-            var w = new Window { Title = title, Width = width, Height = height, MinWidth = 380, MinHeight = 300, ShowInTaskbar = false, Owner = ActiveOwner,
+            var w = new Window { Title = title, Icon = BridgePackage.AppIcon, Width = width, Height = height, MinWidth = 380, MinHeight = 300, ShowInTaskbar = false, Owner = ActiveOwner,
                                  WindowStartupLocation = WindowStartupLocation.CenterOwner, ResizeMode = ResizeMode.CanResizeWithGrip };
             if (Application.Current != null) ThemedDialogStyleLoader.SetUseDefaultThemedDialogStyles(w, true);
             w.SetResourceReference(BackgroundProperty, ThemedDialogColors.WindowPanelBrushKey);
