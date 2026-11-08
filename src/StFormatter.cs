@@ -513,6 +513,11 @@ public static class StFormatter
                 continue;
             }
             l.Indent = Levels(l.Depth);
+            // a name that starts with _ one column further left, so its letters stand under those of the other names
+            var under = cfg["indent.underscore"].ToLowerInvariant();
+            if (under != "off" && l.Depth > 0 && l.P.Count > 0 && l.P[0].T.Kind == StTok.Word && l.P[0].T.Text.StartsWith("_") && !l.P[0].T.Text.StartsWith("__")
+                && (under == "everywhere" || under == "declarations" && l.InBlock))
+                l.Indent = Spaces(Width(l.Indent, tab) - 1, cfg);
         }
     }
 

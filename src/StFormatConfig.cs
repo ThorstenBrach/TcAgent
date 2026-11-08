@@ -20,6 +20,7 @@ public sealed class StFormatConfig
         ("indent.tab-width", "4", "number", "width of a tab, for columns and line length"),
         ("indent.case-labels", "true", "true | false", "CASE labels one level under CASE, their statements one more"),
         ("indent.continuation", "preserve", "preserve | indent", "continuation lines: keep their offset to the first line, or one level"),
+        ("indent.underscore", "off", "off | declarations | everywhere", "a name that starts with _ one column further left, so its letters line up with the other names"),
         ("indent.from-ide", "false", "true | false", "take indent style and size from the TwinCAT editor settings (in the IDE)"),
         ("case.keywords", "upper", "upper | lower | preserve", "IF, THEN, END_IF, VAR ..."),
         ("case.types", "upper", "upper | lower | preserve", "BOOL, INT, TIME, STRING ..."),
@@ -55,7 +56,7 @@ public sealed class StFormatConfig
     public static readonly Dictionary<string, string> Labels = new(StringComparer.OrdinalIgnoreCase)
     {
         ["indent.style"] = "Indent with", ["indent.size"] = "Spaces per level", ["indent.tab-width"] = "Width of a tab",
-        ["indent.case-labels"] = "CASE labels one level in", ["indent.continuation"] = "Continuation lines", ["indent.from-ide"] = "Take indentation from the IDE",
+        ["indent.case-labels"] = "CASE labels one level in", ["indent.continuation"] = "Continuation lines", ["indent.underscore"] = "Names with _ one column left", ["indent.from-ide"] = "Take indentation from the IDE",
         ["case.keywords"] = "Keywords", ["case.types"] = "Data types", ["case.literals"] = "TRUE, FALSE, T#",
         ["space.operators"] = "Around operators", ["space.comma"] = "After commas", ["space.decl-colon"] = "Around the : of declarations",
         ["space.parens"] = "Inside brackets", ["space.keyword-paren"] = "Keyword and (", ["space.call-paren"] = "Name and (",
