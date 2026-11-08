@@ -52,8 +52,9 @@ namespace TcAgentBridge
                 Sep,
                 A("Copy order", "Copy the order (the prompt for an agent)", () => { try { Clipboard.SetText(S(SelectedAdvice, "order") ?? ""); status.Text = "Copied."; } catch (Exception ex) { Error(ex.Message); } }, Sel),
                 A("Refresh", "Read the advice again", LoadAdvice) };
-            Columns(adviceList, ("Time", 120, nameof(Line.C1)), ("Kind", 130, nameof(Line.C2)), ("Finding", 420, nameof(Line.C3)), ("Confidence", 90, nameof(Line.C4)),
-                    ("Rating", 110, "!" + nameof(Line.C5)), ("State", 90, nameof(Line.C6)));
+            // the short columns first: in a narrow window the finding is cut, not the state
+            Columns(adviceList, ("Time", 115, nameof(Line.C1)), ("State", 75, nameof(Line.C6)), ("Rating", 95, "!" + nameof(Line.C5)), ("Kind", 120, nameof(Line.C2)),
+                    ("Confidence", 80, nameof(Line.C4)), ("Finding", 700, nameof(Line.C3)));
             adviceList.PreviewKeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Delete && Sel()) { DeleteAdvice(); e.Handled = true; } };
             adviceList.ContextMenu = MenuOf(acts);
             adviceList.SelectionChanged += (s, e) => { ShowAdvice(); UpdateGates(); };
