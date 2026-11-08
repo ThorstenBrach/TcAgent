@@ -308,7 +308,7 @@ docs/                   installation, tool reference, CI pipelines (docs/pipelin
 
 ## Known limitations
 
-* Windows with Visual Studio 2022 or the TwinCAT XAE Shell (the XAE Shell is less tested).
+* Windows with Visual Studio 2022 or the TwinCAT XAE Shell (both tested the same way).
 * Scope and HMI changes are written to the project files while the project is unloaded in the IDE and reloaded afterwards –
   unsaved changes in their open editors are saved first. Scope needs matching Scope packages for the IDE (see troubleshooting).
 * Every Automation Interface call runs on the IDE's UI thread – while the agent works, the IDE can pause briefly.
