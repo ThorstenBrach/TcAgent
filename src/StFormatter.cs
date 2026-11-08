@@ -111,6 +111,7 @@ public static class StFormatter
         Structure(lines, cfg, part);
         foreach (var l in lines) if (!l.Frozen && !l.Blank) Spacing(l, cfg, part);
         Indentation(lines, cfg);
+        ExpandTabs(lines, cfg);
         if (part == StPart.Declaration) AlignDeclarations(lines, cfg);
         if (part == StPart.Implementation)
         {
@@ -518,6 +519,34 @@ public static class StFormatter
             if (under != "off" && l.Depth > 0 && l.P.Count > 0 && l.P[0].T.Kind == StTok.Word && l.P[0].T.Text.StartsWith("_") && !l.P[0].T.Text.StartsWith("__")
                 && (under == "everywhere" || under == "declarations" && l.InBlock))
                 l.Indent = Spaces(Width(l.Indent, tab) - 1, cfg);
+        }
+    }
+
+    /// <summary>space.tabs = replace: a tab between tokens becomes spaces up to the next tab stop (indent.tab-width), so the
+    /// text stays in its column. Tabs in comments and strings stay.</summary>
+    static void ExpandTabs(List<Line> lines, StFormatConfig cfg)
+    {
+        if (!cfg["space.tabs"].Equals("replace", StringComparison.OrdinalIgnoreCase)) return;
+        int tab = cfg.TabWidth;
+        foreach (var l in lines)
+        {
+            if (l.Frozen || l.Blank) continue;
+            int col = Width(l.Indent, tab);
+            foreach (var p in l.P)
+            {
+                if (p.Gap.IndexOf('\t') >= 0)
+                {
+                    var sb = new StringBuilder();
+                    foreach (var c in p.Gap)
+                    {
+                        if (c == '\t') { int n = tab - (col % tab); sb.Append(' ', n); col += n; }
+                        else { sb.Append(c); col++; }
+                    }
+                    p.Gap = sb.ToString();
+                }
+                else col += p.Gap.Length;
+                col = p.T.Text.Contains('\n') ? 0 : Width(new string('x', col) + p.T.Text, tab);
+            }
         }
     }
 

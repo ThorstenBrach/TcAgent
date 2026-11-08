@@ -32,6 +32,7 @@ public static class StFormatExamples
         I("space.operators", "nX:=nA+nB*2;\nbHigh:=nX>=10;", new[] { "one", "preserve" }),
         I("space.comma", "F_Sum(nA,nB ,nC);", new[] { "one", "preserve" }),
         D("space.decl-colon", "VAR\n  nCount:INT;\nEND_VAR", new[] { "one", "preserve" }),
+        I("space.tabs", "nA := 1;\t// first\nnB := 22;\t// second", new[] { "replace", "preserve" }),
         I("space.parens", "nX := ( nA + nB ) * (nC);", new[] { "none", "one", "preserve" }),
         I("space.keyword-paren", "bX := NOT(bA) AND(bB);", new[] { "one", "preserve" }),
         I("space.call-paren", "F_Sum (nA, nB);", new[] { "none", "preserve" }),
