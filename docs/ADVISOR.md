@@ -80,7 +80,7 @@ it never writes a variable and never starts, stops or acknowledges anything.
 then goes from the top level down only as far as it needs, and records the cause with an order.
 
 **The watch:** `TcAgent.exe advise watch --solution <sln> --target <AmsNetId>` looks every 2 s and reports what newly went
-wrong, the same event at most once an hour. With `--run` it starts an Advisor run for it; `--once` looks once (exit 1 when
+wrong, the same event at most once an hour. With `--run` it starts an Advisor run for it (`--max-runs n` ends the watch after n runs); `--once` looks once (exit 1 when
 something is wrong).
 
 What it notices, without any setup:

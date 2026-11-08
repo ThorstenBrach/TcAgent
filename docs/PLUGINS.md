@@ -128,12 +128,12 @@ switched on, it is not installed from a source and does not take effect.
 ### Fault signals for the Advisor
 
 A plugin can tell the Advisor ([ADVISOR.md](ADVISOR.md)) how its platform reports faults: an `advisor.json` next to
-`plugin.json`. `skill` names the skill a diagnosis loads; `signals` are fixed fault signals in the format of
+`plugin.json`. `platform` limits it to projects of that platform; `skill` names the skill a diagnosis loads; `signals` are fixed fault signals in the format of
 `.tcagent\advisor-watch.json`. Both apply while the plugin is ready and switched on. Where the variable names differ from
 project to project, the skill says how to find them, and the agent adds them to the project with `tc_advisor action=watch_add`.
 
 ```json
-{ "skill": "platform-a-diagnose", "signals": [ { "symbol": "GVL_PlatformA.nState", "when": "& 128", "text": "Error bit of the state" } ] }
+{ "platform": "platform-a", "skill": "platform-a-diagnose", "signals": [ { "symbol": "GVL_PlatformA.nState", "when": "& 128", "text": "Error bit of the state" } ] }
 ```
 
 ### Example

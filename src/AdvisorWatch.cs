@@ -4,6 +4,7 @@
 //   <plugin folder>\advisor.json                    a plugin brings what it knows about its platform
 //
 //   {
+//     "platform": "platform-a",                               (plugin only: applies only when the project has this platform)
 //     "skill": "my-platform-diagnose",                       (plugin only: the skill that knows how the platform reports faults)
 //     "signals": [
 //       { "symbol": "MAIN.fbStation.bError", "when": "true", "text": "Station reports a fault" },
@@ -63,7 +64,7 @@ public static class AdvisorWatch
     }
 
     /// <summary>The signals of the project and of the plugins that are ready, and the skills the plugins name.</summary>
-    public static (List<Signal> signals, List<Hint> hints) Load(string solutionDir, IEnumerable<(string id, string folder)> plugins)
+    public static (List<Signal> signals, List<Hint> hints) Load(string solutionDir, IEnumerable<(string id, string folder)> plugins, IEnumerable<string> platforms = null)
     {
         var signals = new List<Signal>();
         var hints = new List<Hint>();
@@ -74,6 +75,10 @@ public static class AdvisorWatch
             var f = string.IsNullOrEmpty(folder) ? null : Path.Combine(folder, "advisor.json");
             if (f == null || !File.Exists(f)) continue;
             var text = File.ReadAllText(f);
+            // a plugin for one platform: only in projects of that platform
+            string platform = null;
+            try { platform = (JsonNode.Parse(text) as JsonObject)?["platform"]?.ToString(); } catch { }
+            if (!string.IsNullOrWhiteSpace(platform) && !(platforms ?? Enumerable.Empty<string>()).Contains(platform.Trim(), StringComparer.OrdinalIgnoreCase)) continue;
             signals.AddRange(Parse(text, "plugin " + id));
             try { if ((JsonNode.Parse(text) as JsonObject)?["skill"]?.ToString() is { Length: > 0 } skill) hints.Add(new Hint(id, skill)); } catch { }
         }
