@@ -34,13 +34,18 @@ public static class Workflows
 
     /// <summary>The question about the specification in the answer language of the chat (German or English; the labels in German
     /// are understood by SpecAnswer too).</summary>
-    public sealed record SpecText(string Ask, string AskSkip, string Confirm, string ConfirmWhat, string NotYet, string NotYetWhat, string Skip, string SkipWhat);
+    public sealed record SpecText(string Ask, string AskSkip, string Confirm, string ConfirmWhat, string NotYet, string NotYetWhat, string Skip, string SkipWhat,
+                                  string NewCode, string Go, string GoWhat, string Clarify, string ClarifyWhat);
 
     public static SpecText SpecTexts(string language) => (language ?? "").StartsWith("de", StringComparison.OrdinalIgnoreCase)
         ? new SpecText("Ist die Spezifikation vollständig, sodass die Umsetzung beginnen kann?", "Der Agent will ohne Spezifikation weitermachen. Überspringen?",
-                       "Bestätigt", "Die Umsetzung beginnt", "Noch nicht", "Der Agent klärt weiter", "Spezifikation überspringen", "Die Umsetzung beginnt ohne Spezifikation")
+                       "Bestätigt", "Die Umsetzung beginnt", "Noch nicht", "Der Agent klärt weiter", "Spezifikation überspringen", "Die Umsetzung beginnt ohne Spezifikation",
+                       "Der Agent will ein neues Objekt anlegen, ohne Workflow new-feature und ohne Spezifikation.", "Ohne Spezifikation weiter",
+                       "Gilt für diesen Chat", "Erst klären", "Der Agent startet new-feature mit dem Interview")
         : new SpecText("Is the specification complete, so that the implementation can start?", "The agent wants to go on without a specification. Skip it?",
-                       SpecConfirm, "The implementation starts", SpecNotYet, "The agent goes on clarifying", SpecSkip, "The implementation starts without a specification");
+                       SpecConfirm, "The implementation starts", SpecNotYet, "The agent goes on clarifying", SpecSkip, "The implementation starts without a specification",
+                       "The agent wants to create a new object without the workflow new-feature and without a specification.", "Go on without a specification",
+                       "For this chat", "Clarify first", "The agent starts new-feature with the interview");
 
     public sealed class Step
     {
@@ -162,6 +167,15 @@ public static class Workflows
     /// <summary>The step whose specification is still open: until the user decided, the run writes no PLC code.</summary>
     public static Step SpecPending(Run run) =>
         run?.Steps.FirstOrDefault(s => s.Requires == "spec-ok" && !s.SpecDecided && s.Status is "pending" or "active");
+
+    /// <summary>The objects whose creation means new function - not tests, types or folders.</summary>
+    public static bool IsNewFunction(string kind) => (kind ?? "").Trim().ToLowerInvariant() is "function_block" or "program" or "function" or "method";
+
+    /// <summary>The answer to "new object without a specification": true = go on, false = clarify first, null = no clear answer.</summary>
+    public static bool? NewCodeAnswer(string answer) =>
+        answer?.Trim() is not { } a ? null
+        : a.StartsWith("Ohne Spezifikation", StringComparison.OrdinalIgnoreCase) || a.StartsWith("Go on", StringComparison.OrdinalIgnoreCase) ? true
+        : a.StartsWith("Erst klären", StringComparison.OrdinalIgnoreCase) || a.StartsWith("Clarify", StringComparison.OrdinalIgnoreCase) ? false : null;
 
     /// <summary>What the user decided: true = go on with the specification, false = go on without one, null = not yet.</summary>
     public static bool? SpecAnswer(string answer) =>

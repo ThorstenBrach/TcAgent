@@ -203,6 +203,8 @@ checks per step and refuses to mark a checkpoint step done until its check holds
 
 For `spec-ok` TcAgent asks the user itself when the agent marks the step done, also with `skip=true`, so an agent cannot confirm its
 own specification. Until the user decided, the run writes no PLC code. With `TCAGENT_CONFIRM=off` nobody is asked.
+Outside a workflow, the first `tc_plc_create` of a new function (FB, program, function, method) in a chat makes TcAgent ask the
+user once: go on without a specification, or clarify first (then the agent starts `new-feature`). `TCAGENT_SPEC_GATE=0` switches it off.
 
 The other checkpoint steps cannot be skipped. When the agent marks a `check-ok` / `build-ok` step done while its check is missing
 or failed, TcAgent runs `tc_check` itself (since 0.36) and completes the step if it passes; for `build-ok` (since 0.39) it runs
