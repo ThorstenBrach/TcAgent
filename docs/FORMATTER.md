@@ -68,19 +68,41 @@ Nothing is a fixed rule. The defaults (profile `twincat`):
 | `space.keyword-paren` | `one` | `IF (`, `AND (`; or preserve |
 | `space.call-paren` | `none` | `F(x)`; or preserve |
 | `comment.eol-spaces` | `preserve` | spaces before a comment at the end of a code line |
+| `layout.blocks` | `preserve` | `expand`: one statement per line, the bodies of IF, CASE, FOR, WHILE and REPEAT on their own lines |
+| `layout.then` | `preserve` | `same-line` or `own-line`: THEN, DO and OF at the end of the condition or on a line of their own |
 | `align.decl`, `align.decl-init`, `align.eol-comments` | `true` | `:`, `:=` and end-of-line comments of declarations in columns |
+| `align.assignments` | `false` | the `:=` of consecutive assignments in a column |
+| `align.named-args` | `true` | the `:=` and `=>` of named parameters in a column when a call has one per line |
 | `align.max-pad` | `40` | no alignment when a line would need more filling |
 | `wrap.max-length` | `120` | longest line, `0` = never wrap |
 | `wrap.call-args` | `when-long` | a call that is too long: one parameter per line, `)` on its own line; or never |
+| `wrap.conditions` | `when-long` | a condition or boolean assignment that is too long: one term per line at the weakest AND/OR; or never |
+| `wrap.operator` | `first` | `first` or `last`: where AND/OR stand when a condition is wrapped |
 | `blank.max` | `1` | most blank lines in a row, or preserve |
 | `blank.body-edges` | `remove` | blank lines at the start and end of a part |
+| `blank.around-blocks` | `preserve` | `add`: a blank line before and after IF, CASE, FOR, WHILE and REPEAT blocks (a comment above a block stays with it) |
 | `eol.trim-trailing` | `true` | spaces at the end of lines |
 | `eol.style` | `preserve` | preserve, crlf, lf |
 | `paren.precedence` | `true` | brackets around AND groups inside OR, so the order is visible |
 
 A group of aligned declarations ends at a blank line and at a comment line; attribute lines do not break it.
 
-Profiles: `twincat` (the defaults), `compact` (no alignment), `preserve` (only what is switched on explicitly).
+Profiles: `twincat` (the defaults), `compact` (no alignment), `structured` (one statement per line, THEN/DO/OF on their own
+line, blank lines around blocks, aligned assignments), `preserve` (only what is switched on explicitly).
+
+Fewer switches than other formatters on purpose: one rule with clear values instead of a switch for every case - for example
+`layout.then` decides THEN, DO and OF together, `wrap.conditions` covers IF, ELSIF, WHILE, UNTIL and boolean assignments.
+
+### Long conditions
+
+```
+IF bStartButton
+  AND bDoorClosed
+  AND NOT bEmergencyStop THEN
+```
+
+With `wrap.operator: last` the terms stand under the first one and AND/OR end the line. Only the weakest operator of the
+condition is wrapped (OR before AND), so the structure stays readable; brackets keep their content together.
 
 ### Brackets in conditions
 

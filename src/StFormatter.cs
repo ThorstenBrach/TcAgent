@@ -55,6 +55,8 @@ public static class StFormatter
             var twice = Core(after, cfg, part, new List<string>(), out _);
             if (twice != once)
             {
+                if (Environment.GetEnvironmentVariable("TCAGENT_FORMAT_DEBUG") is { Length: > 0 } dbg)
+                { File.WriteAllText(Path.Combine(dbg, "once.st"), once); File.WriteAllText(Path.Combine(dbg, "twice.st"), twice); }
                 r.Error = "safety net: a second run would format differently - nothing changed. Please report it (tc_feedback).";
                 return r;
             }
@@ -102,13 +104,21 @@ public static class StFormatter
             var (t2, f2, added) = StExpr.AddPrecedenceParens(toks, frozenTok);
             if (added > 0) { toks = t2; frozenTok = f2; parens = true; notes.Add($"paren.precedence: {added} bracket pair(s)"); }
         }
+        DefaultNewline = toks.FirstOrDefault(t => t.Kind == StTok.Newline)?.Text ?? "\r\n";
         var lines = Split(toks, frozenTok, out bool finalNewline);
         CaseWords(lines, cfg);
+        if (part == StPart.Implementation) lines = Restructure(lines, cfg);
         Structure(lines, cfg, part);
         foreach (var l in lines) if (!l.Frozen && !l.Blank) Spacing(l, cfg, part);
         Indentation(lines, cfg);
         if (part == StPart.Declaration) AlignDeclarations(lines, cfg);
-        if (part == StPart.Implementation) lines = WrapCalls(lines, cfg);
+        if (part == StPart.Implementation)
+        {
+            lines = WrapConditions(lines, cfg);
+            lines = WrapCalls(lines, cfg);
+            AlignCode(lines, cfg);
+            lines = BlankAroundBlocks(lines, cfg);
+        }
         lines = BlankLines(lines, cfg);
         return Render(lines, cfg, finalNewline);
     }
@@ -630,6 +640,229 @@ public static class StFormatter
             r.Add(Part(start, close, inner, nlx));
             var lastPart = Part(close, l.P.Count, l.Indent, l.Newline);
             r.Add(lastPart);
+        }
+        return r;
+    }
+
+    // ------------------------------------------------------------------ layout: one statement per line, THEN/DO/OF
+    static bool Kw(StToken t, params string[] words) => t != null && t.Kind == StTok.Word && words.Contains(t.Upper);
+    static readonly string[] Openers = { "THEN", "DO", "OF" };
+    static readonly string[] Closers = { "END_IF", "END_CASE", "END_FOR", "END_WHILE", "END_REPEAT", "ELSE", "ELSIF", "UNTIL" };
+
+    [ThreadStatic] static string DefaultNewline;
+
+    static Line Segment(Line l, int from, int to, bool first, bool last = false)
+    {
+        var x = new Line { Newline = last ? l.Newline : l.Newline ?? DefaultNewline, OrigIndent = first ? l.OrigIndent : "", Original = l.Original };
+        for (int i = from; i < to; i++) x.P.Add(new Piece { T = l.P[i].T, Gap = i == from ? "" : l.P[i].Gap });
+        x.Blank = x.P.Count == 0;
+        return x;
+    }
+
+    /// <summary>layout.blocks = expand: one statement per line, the body of IF/CASE/FOR/WHILE/REPEAT on its own lines.
+    /// layout.then: THEN, DO and OF at the end of the condition (same-line) or on their own line (own-line).</summary>
+    static List<Line> Restructure(List<Line> lines, StFormatConfig cfg)
+    {
+        bool expand = cfg["layout.blocks"].Equals("expand", StringComparison.OrdinalIgnoreCase);
+        string then = cfg["layout.then"].ToLowerInvariant();
+        if (!expand && then == "preserve") return lines;
+        var r = new List<Line>();
+        foreach (var l in lines)
+        {
+            if (l.Frozen || l.Blank) { r.Add(l); continue; }
+            // where the line is cut: before index i
+            var cuts = new SortedSet<int>();
+            int paren = 0;
+            StToken prev = null;
+            for (int i = 0; i < l.P.Count; i++)
+            {
+                var t = l.P[i].T;
+                if (t.Comment || t.Kind == StTok.Pragma) continue;
+                bool member = prev != null && prev.Kind == StTok.Op && prev.Text == ".";
+                bool rest = l.P.Skip(i + 1).Any(p => !p.T.Comment);       // code follows on this line
+                if (t.Text is "(" or "[") paren++;
+                else if (t.Text is ")" or "]") paren = Math.Max(0, paren - 1);
+                else if (!member && paren == 0)
+                {
+                    if (expand && t.Text == ";" && t.Kind == StTok.Punct && rest) cuts.Add(i + 1);
+                    if (expand && Kw(t, "THEN", "DO", "OF", "ELSE", "REPEAT") && rest) cuts.Add(i + 1);
+                    if (expand && Kw(t, Closers) && i > 0) cuts.Add(i);
+                    if (then == "own-line" && Kw(t, Openers) && i > 0) { cuts.Add(i); if (rest) cuts.Add(i + 1); }
+                }
+                prev = t;
+            }
+            // a THEN/DO/OF that starts the line joins the condition above (same-line)
+            var target = l;
+            if (then == "same-line" && Kw(l.First, Openers) && l.P[0].T == l.First && r.Count > 0)
+            {
+                var above = r[^1];
+                if (!above.Frozen && !above.Blank && !above.CommentOnly && !(above.P.Count > 0 && above.P[^1].T.Comment) && !Kw(above.Last, Openers)
+                    && above.Last?.Text != ";")
+                {
+                    l.P[0].Gap = " ";
+                    // the whole line moves up, cut points shift by the length of the line above
+                    int shift = above.P.Count;
+                    above.P.AddRange(l.P);
+                    above.Newline = l.Newline;
+                    var moved = new SortedSet<int>(cuts.Select(c => c + shift));
+                    r.RemoveAt(r.Count - 1);
+                    target = above; cuts = moved;
+                }
+            }
+            if (cuts.Count == 0) { r.Add(target); continue; }
+            int start = 0;
+            bool firstSeg = true;
+            foreach (var c in cuts.Where(c => c > 0 && c < target.P.Count))
+            {
+                if (c <= start) continue;
+                r.Add(Segment(target, start, c, firstSeg)); firstSeg = false; start = c;
+            }
+            r.Add(Segment(target, start, target.P.Count, firstSeg, true));
+        }
+        return r;
+    }
+
+    // ------------------------------------------------------------------ long conditions: one term per line
+    static List<Line> WrapConditions(List<Line> lines, StFormatConfig cfg)
+    {
+        int max = cfg.Int("wrap.max-length", 120);
+        if (max <= 0 || !cfg["wrap.conditions"].Equals("when-long", StringComparison.OrdinalIgnoreCase)) return lines;
+        bool opFirst = !cfg["wrap.operator"].Equals("last", StringComparison.OrdinalIgnoreCase);
+        int tab = cfg.TabWidth;
+        string unit = cfg.IndentUnit;
+        var r = new List<Line>();
+        foreach (var l in lines)
+        {
+            if (l.Frozen || l.Blank || l.CommentOnly || l.Cont || Width(l.Indent, tab) + TextWidth(l, 0, l.P.Count, tab) <= max) { r.Add(l); continue; }
+            // the condition: after IF/ELSIF/WHILE/UNTIL up to THEN/DO (or the end), or the right side of an assignment
+            int start = -1, end = l.P.Count;
+            var f = l.P[0].T;
+            if (Kw(f, "IF", "ELSIF", "WHILE", "UNTIL")) start = 1;
+            else for (int i = 0, d0 = 0; i < l.P.Count; i++)
+                {
+                    var t0 = l.P[i].T;
+                    if (t0.Text is "(" or "[") d0++; else if (t0.Text is ")" or "]") d0--;
+                    else if (d0 == 0 && t0.Kind == StTok.Op && t0.Text == ":=") { start = i + 1; break; }
+                }
+            if (start < 0) { r.Add(l); continue; }
+            for (int i = start; i < l.P.Count; i++)
+                if (Kw(l.P[i].T, "THEN", "DO") || l.P[i].T.Text == ";" || l.P[i].T.Comment) { end = i; break; }
+            // the operators at bracket depth 0 of the weakest kind present (OR before XOR before AND)
+            var ops = new List<(int I, int Rank)>();
+            int depth = 0;
+            for (int i = start; i < end; i++)
+            {
+                var t = l.P[i].T;
+                if (t.Text is "(" or "[") depth++;
+                else if (t.Text is ")" or "]") depth--;
+                else if (depth == 0 && t.Kind == StTok.Word && t.Upper is "OR" or "OR_ELSE") ops.Add((i, 1));
+                else if (depth == 0 && t.Kind == StTok.Word && t.Upper == "XOR") ops.Add((i, 2));
+                else if (depth == 0 && (t.Kind == StTok.Word && t.Upper is "AND" or "AND_THEN" || t.Kind == StTok.Op && t.Text == "&")) ops.Add((i, 3));
+            }
+            if (ops.Count == 0 || l.P.Skip(start).Take(end - start).Any(p => p.T.Comment || p.T.Kind == StTok.Pragma)) { r.Add(l); continue; }
+            int rank = ops.Min(o => o.Rank);
+            var at = ops.Where(o => o.Rank == rank).Select(o => o.I).Where(i => opFirst ? i > start : i + 1 < end).ToList();
+            if (at.Count == 0) { r.Add(l); continue; }   // already wrapped: the operator ends the line
+            // continuation: operator first - one level in; operator last - under the first term
+            int firstCol = Width(l.Indent, tab) + TextWidth(l, 0, start, tab) + (start > 0 ? l.P[start].Gap.Length : 0);
+            string contIndent = opFirst ? l.Indent + unit : Spaces(firstCol, cfg);
+            int from = 0;
+            foreach (var i in at)
+            {
+                int cut = opFirst ? i : i + 1;
+                var seg = Segment(l, from, cut, from == 0);
+                seg.Indent = from == 0 ? l.Indent : contIndent; seg.Fixed = true; seg.Depth = l.Depth;
+                r.Add(seg);
+                from = cut;
+            }
+            var last = Segment(l, from, l.P.Count, false, true);
+            last.Indent = contIndent; last.Fixed = true; last.Depth = l.Depth;
+            r.Add(last);
+        }
+        return r;
+    }
+
+    // ------------------------------------------------------------------ alignment in the code
+    static void AlignCode(List<Line> lines, StFormatConfig cfg)
+    {
+        int tab = cfg.TabWidth, maxPad = cfg.Int("align.max-pad", 40);
+        void Align(List<(Line L, int I)> g)
+        {
+            if (g.Count < 2) return;
+            int col = g.Max(x => Width(x.L.Indent, tab) + TextWidth(x.L, 0, x.I, tab)) + 1;
+            if (g.Any(x => col - (Width(x.L.Indent, tab) + TextWidth(x.L, 0, x.I, tab)) > maxPad)) return;
+            foreach (var x in g) x.L.P[x.I].Gap = new string(' ', col - (Width(x.L.Indent, tab) + TextWidth(x.L, 0, x.I, tab)));
+        }
+        // named parameters, one per line: name := value, / name => target,
+        if (cfg.Flag("align.named-args"))
+        {
+            var g = new List<(Line, int)>();
+            string ind = null;
+            foreach (var l in lines)
+            {
+                bool named = !l.Frozen && !l.Blank && (l.Cont || l.Fixed) && l.P.Count >= 3 && l.P[0].T.Kind == StTok.Word
+                             && l.P[1].T.Kind == StTok.Op && l.P[1].T.Text is ":=" or "=>";
+                if (named && (ind == null || ind == l.Indent)) { g.Add((l, 1)); ind = l.Indent; continue; }
+                Align(g); g.Clear(); ind = null;
+                if (named) { g.Add((l, 1)); ind = l.Indent; }
+            }
+            Align(g);
+        }
+        // consecutive assignments: x := value;
+        if (cfg.Flag("align.assignments"))
+        {
+            var g = new List<(Line, int)>();
+            string ind = null;
+            foreach (var l in lines)
+            {
+                int a = -1;
+                bool simple = !l.Frozen && !l.Blank && !l.CommentOnly && !l.Cont && !l.Fixed && l.Last?.Text == ";";
+                if (simple)
+                {
+                    int paren = 0;
+                    for (int i = 0; i < l.P.Count; i++)
+                    {
+                        var t = l.P[i].T;
+                        if (t.Text is "(" or "[") paren++; else if (t.Text is ")" or "]") paren--;
+                        else if (paren == 0 && t.Kind == StTok.Op && t.Text is ":=" or "S=" or "R=" or "REF=") { a = i; break; }
+                        else if (t.Kind == StTok.Word && StKeywords.IsKeyword(t.Text) && !(t.Upper is "THIS" or "SUPER")) break;
+                    }
+                }
+                if (a > 0 && (ind == null || ind == l.Indent)) { g.Add((l, a)); ind = l.Indent; continue; }
+                Align(g); g.Clear(); ind = null;
+                if (a > 0) { g.Add((l, a)); ind = l.Indent; }
+            }
+            Align(g);
+        }
+    }
+
+    // ------------------------------------------------------------------ blank lines around blocks
+    static List<Line> BlankAroundBlocks(List<Line> lines, StFormatConfig cfg)
+    {
+        if (!cfg["blank.around-blocks"].Equals("add", StringComparison.OrdinalIgnoreCase)) return lines;
+        var r = new List<Line>();
+        Line Blank(Line like) => new Line { Blank = true, Newline = like.Newline ?? "\r\n", Original = "" };
+        bool OpensBody(Line x) => x == null || Kw(x.Last, "THEN", "DO", "OF", "ELSE", "REPEAT") || x.Label || x.Last?.Text == "(";
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var l = lines[i];
+            bool block = !l.Frozen && !l.Blank && !l.CommentOnly && !l.Cont && Kw(l.First, "IF", "CASE", "FOR", "WHILE", "REPEAT") && l.P[0].T == l.First;
+            if (block)
+            {
+                // the comment lines right above belong to the block: the blank line goes above them
+                int k = r.Count;
+                while (k > 0 && r[k - 1].CommentOnly && !r[k - 1].Frozen) k--;
+                var before = k > 0 ? r[k - 1] : null;
+                if (before != null && !before.Blank && !OpensBody(before)) r.Insert(k, Blank(before));
+            }
+            r.Add(l);
+            bool closes = !l.Frozen && !l.Blank && Kw(l.First, "END_IF", "END_CASE", "END_FOR", "END_WHILE", "END_REPEAT") && l.Last?.Text is not null;
+            if (closes && i + 1 < lines.Count)
+            {
+                var next = lines[i + 1];
+                bool closing = Kw(next.First, Closers) || next.Last?.Text == ")" && next.Cont;
+                if (!next.Blank && !closing && !(next.Label)) r.Add(Blank(l));
+            }
         }
         return r;
     }

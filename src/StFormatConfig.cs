@@ -31,14 +31,21 @@ public sealed class StFormatConfig
         ("space.keyword-paren", "one", "one | preserve", "IF (, AND (, NOT ("),
         ("space.call-paren", "none", "none | preserve", "no space between a name and its ("),
         ("comment.eol-spaces", "preserve", "preserve | number", "spaces before a comment at the end of a code line (implementation)"),
+        ("layout.blocks", "preserve", "expand | preserve", "one statement per line; the bodies of IF, CASE, FOR, WHILE and REPEAT on their own lines"),
+        ("layout.then", "preserve", "same-line | own-line | preserve", "THEN, DO and OF at the end of the condition or on their own line"),
         ("align.decl", "true", "true | false", "the : of declarations in a column"),
         ("align.decl-init", "true", "true | false", "the := of initial values in a column"),
         ("align.eol-comments", "true", "true | false", "comments at the end of declarations in a column"),
+        ("align.assignments", "false", "true | false", "the := of consecutive assignments in a column"),
+        ("align.named-args", "true", "true | false", "the := and => of named parameters in a column when a call has one per line"),
         ("align.max-pad", "40", "number", "no alignment of a group when a line would need more filling"),
         ("wrap.max-length", "120", "number | 0", "longest line; 0 = never wrap"),
         ("wrap.call-args", "when-long", "when-long | never", "a call too long: one parameter per line, ) on its own line"),
+        ("wrap.conditions", "when-long", "when-long | never", "a condition or boolean assignment too long: one term per line at the weakest AND/OR"),
+        ("wrap.operator", "first", "first | last", "where AND/OR stand when a condition is wrapped"),
         ("blank.max", "1", "number | preserve", "most blank lines in a row"),
         ("blank.body-edges", "remove", "remove | preserve", "blank lines at the start and end of a part"),
+        ("blank.around-blocks", "preserve", "add | preserve", "a blank line before and after IF, CASE, FOR, WHILE and REPEAT blocks"),
         ("eol.trim-trailing", "true", "true | false", "remove spaces at the end of lines"),
         ("eol.style", "preserve", "preserve | crlf | lf", "line endings"),
         ("paren.precedence", "true", "true | false", "brackets around AND groups inside OR, so the order is visible (the meaning stays)"),
@@ -47,9 +54,10 @@ public sealed class StFormatConfig
     public static readonly Dictionary<string, Dictionary<string, string>> Profiles = new(StringComparer.OrdinalIgnoreCase)
     {
         ["twincat"] = new(),
-        ["compact"] = new() { ["align.decl"] = "false", ["align.decl-init"] = "false", ["align.eol-comments"] = "false" },
+        ["compact"] = new() { ["align.decl"] = "false", ["align.decl-init"] = "false", ["align.eol-comments"] = "false", ["align.named-args"] = "false" },
+        ["structured"] = new() { ["layout.blocks"] = "expand", ["layout.then"] = "own-line", ["blank.around-blocks"] = "add", ["align.assignments"] = "true" },
         ["preserve"] = Rules.Where(r => r.Values.Contains("preserve")).ToDictionary(r => r.Key, _ => "preserve")
-            .Concat(new Dictionary<string, string> { ["align.decl"] = "false", ["align.decl-init"] = "false", ["align.eol-comments"] = "false",
+            .Concat(new Dictionary<string, string> { ["align.decl"] = "false", ["align.decl-init"] = "false", ["align.eol-comments"] = "false", ["align.named-args"] = "false",
                 ["wrap.max-length"] = "0", ["paren.precedence"] = "false", ["eol.trim-trailing"] = "false" }).ToDictionary(k => k.Key, k => k.Value),
     };
 

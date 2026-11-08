@@ -40,7 +40,12 @@ public static class CliFormat
                     case "--show-rules": show = true; break;
                     case "--save": save = V(); break;
                     case "--level": level = V(); break;
-                    case "--survey": return Survey(V(), json: args.Contains("--json"));
+                    case "--survey":
+                        {
+                            var folder = V();
+                            int ri = Array.FindIndex(args, a => a.Equals("--rules", StringComparison.OrdinalIgnoreCase));
+                            return Survey(folder, args.Contains("--json"), ri >= 0 && ri + 1 < args.Length ? StFormatConfig.FromFile(args[ri + 1]) : new StFormatConfig());
+                        }
                     default: throw new ArgumentException("unknown option " + args[i]);
                 }
             }
@@ -157,9 +162,8 @@ public static class CliFormat
 
     /// <summary>--survey &lt;folder&gt;: formats every section of every TwinCAT source file in memory (nothing is written)
     /// and counts what would change and what could not be formatted - to test the formatter on real code.</summary>
-    static int Survey(string folder, bool json)
+    static int Survey(string folder, bool json, StFormatConfig cfg)
     {
-        var cfg = new StFormatConfig();
         int files = 0, sections = 0, changed = 0, failed = 0;
         var errors = new Dictionary<string, int>();
         var examples = new List<string>();
