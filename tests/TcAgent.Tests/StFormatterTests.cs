@@ -244,6 +244,15 @@ bLamp := (bEnable AND NOT bPhaseOff);";
     }
 
     [Fact]
+    public void TabsInsideALineBecomeSpacesUpToTheNextTabStop()
+    {
+        var r = F("nA := 1;\t// first\nnB := 22;\t// second", StPart.Implementation);
+        Assert.Equal("nA := 1;    // first\nnB := 22;   // second", N(r.Text));
+        var keep = F("nA := 1;\t// first", StPart.Implementation, With("space.tabs", "preserve"));
+        Assert.Equal("nA := 1;\t// first", keep.Text);
+    }
+
+    [Fact]
     public void ConfigFromLevelsLocksAndUnset()
     {
         var c = new StFormatConfig();

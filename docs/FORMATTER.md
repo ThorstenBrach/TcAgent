@@ -71,6 +71,7 @@ Nothing is a fixed rule. The defaults (profile `twincat`) - **an example with be
 | `space.operators` | `one` | one space around `:=`, `=>`, `S=`, `R=`, `REF=`, arithmetic and comparisons; or preserve |
 | `space.comma` | `one` | no space before a comma, one after; or preserve |
 | `space.decl-colon` | `one` | `name : TYPE`; or preserve |
+| `space.tabs` | `replace` | a tab inside a line becomes spaces up to the next tab stop (`indent.tab-width`), the text keeps its column; or preserve |
 | `space.parens` | `preserve` | none, one, preserve - spaces inside `( )` and `[ ]` |
 | `space.keyword-paren` | `one` | `IF (`, `AND (`; or preserve |
 | `space.call-paren` | `none` | `F(x)`; or preserve |

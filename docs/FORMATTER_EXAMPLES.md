@@ -361,6 +361,31 @@ VAR
 END_VAR
 ```
 
+### Tabs inside a line (`space.tabs`)
+
+A tab inside a line becomes spaces up to the next tab stop (indent.tab-width), the text keeps its column. Default: `replace`.
+
+Written as:
+
+```
+nA := 1;	// first
+nB := 22;	// second
+```
+
+`replace`:
+
+```
+nA := 1;    // first
+nB := 22;   // second
+```
+
+`preserve`:
+
+```
+nA := 1;	// first
+nB := 22;	// second
+```
+
 ### Inside brackets (`space.parens`)
 
 Spaces inside ( ) and [ ]. Default: `preserve`.
