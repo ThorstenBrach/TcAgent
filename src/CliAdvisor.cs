@@ -107,6 +107,12 @@ public static class CliAdvisor
     static int RunShadow(Args o, string dir)
     {
         var context = Context(o, dir);
+        // deterministic first: nothing changed, nothing to review - no AI, no tokens
+        if (o.Trigger is "nightly" or "commit" && context.Contains("\n(none)"))
+        {
+            Console.WriteLine($"Nothing was committed since {o.Since} - no Advisor run.");
+            return Cli.Ok;
+        }
         var prompt = Prompt(o, context);
         if (o.DryRun) { Console.WriteLine(prompt); return Cli.Ok; }
 

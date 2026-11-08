@@ -97,8 +97,8 @@ namespace TcAgentBridge
                               InfoBack = TcUnitControl.Frozen(Color.FromArgb(0x30, 0xE8, 0xB0, 0x1A)), InfoBorder = TcUnitControl.Frozen(Color.FromArgb(0x80, 0xE8, 0xB0, 0x1A));
 
         readonly ToggleButton tOverview = Tab("Overview"), tEffective = Tab("Files"), tSources = Tab("Sources"), tPlatforms = Tab("Platforms"), tDocs = Tab("Reference"),
-                              tFeedback = Tab("Feedback"), tBackups = Tab("Backups"), tHistory = Tab("Workflow runs"), tModules = Tab("Modules");
-        ToggleButton[] AllTabs => new[] { tOverview, tEffective, tSources, tPlatforms, tModules, tDocs, tFeedback, tBackups, tHistory };
+                              tFeedback = Tab("Feedback"), tBackups = Tab("Backups"), tHistory = Tab("Workflow runs"), tModules = Tab("Modules"), tAdvisor = Tab("Advisor");
+        ToggleButton[] AllTabs => new[] { tOverview, tEffective, tSources, tPlatforms, tModules, tDocs, tAdvisor, tFeedback, tBackups, tHistory };
         readonly ContentControl page = new ContentControl();
         readonly TextBlock status = new TextBlock { Margin = new Thickness(6, 2, 6, 4), Opacity = 0.8, TextTrimming = TextTrimming.CharacterEllipsis };
         readonly TextBlock summary = new TextBlock { Margin = new Thickness(12, 2, 6, 4), Opacity = 0.8 };
@@ -631,6 +631,7 @@ namespace TcAgentBridge
             LoadDocs();
             if (backupsPage != null) LoadBackups();
             if (modulesPage != null) LoadModules();
+            if (advisorPage != null) LoadAdvice();
         }
 
         void Show(ToggleButton tab)
@@ -640,7 +641,7 @@ namespace TcAgentBridge
             try
             {
                 page.Content = tab == tOverview ? OverviewPage() : tab == tEffective ? EffectivePage() : tab == tSources ? SourcesPage()
-                             : tab == tPlatforms ? PlatformsPage() : tab == tModules ? ModulesPage() : tab == tDocs ? DocsPage() : tab == tFeedback ? FeedbackPage() : tab == tBackups ? BackupsPage() : (object)HistoryPage();
+                             : tab == tPlatforms ? PlatformsPage() : tab == tModules ? ModulesPage() : tab == tDocs ? DocsPage() : tab == tAdvisor ? AdvisorPage() : tab == tFeedback ? FeedbackPage() : tab == tBackups ? BackupsPage() : (object)HistoryPage();
             }
             catch (Exception ex)
             {
@@ -671,6 +672,7 @@ namespace TcAgentBridge
             else if (tPlatforms.IsChecked == true) summary.Text = $"{Count(platformList.ItemsSource as IEnumerable<Line>)} platform(s)" + read;
             else if (tModules.IsChecked == true) summary.Text = ModulesSummary();
             else if (tDocs.IsChecked == true) summary.Text = $"{docsSources} source(s) · {docsDocuments} document(s) in folders" + (docsUnreachable > 0 ? $" · {docsUnreachable} not reachable" : "");
+            else if (tAdvisor.IsChecked == true) summary.Text = $"{Count(adviceList.ItemsSource as IEnumerable<Line>)} advice shown" + read;
             else if (tFeedback.IsChecked == true) summary.Text = $"{Count(feedbackList.ItemsSource as IEnumerable<Line>)} report(s) shown" + read;
             else if (tBackups.IsChecked == true) summary.Text = $"{Count(backupList.ItemsSource as IEnumerable<Line>)} backup(s) · the last 20 per level are kept";
             else if (tHistory.IsChecked == true) summary.Text = Workflow() is Dictionary<string, object> w ? $"{Arr(w["series"]).Count()} run(s) of {S(w, "name")}" + read : "";
