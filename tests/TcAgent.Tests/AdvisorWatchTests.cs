@@ -61,6 +61,24 @@ public class AdvisorWatchTests : IDisposable
         Assert.Single(AdvisorWatch.Load(dir, null).signals);
     }
 
+    static readonly DateTime Build = new(2026, 11, 8, 13, 49, 37);
+
+    [Fact]
+    public void TheSameBuildMatches() =>
+        Assert.Null(AdvisorWatch.CodeMismatch("PlcProject", Build.AddSeconds(1), new[] { new AdvisorWatch.Built("PlcProject", Build, Build.AddSeconds(-12)) }, TimeSpan.FromMinutes(2)));
+
+    [Fact]
+    public void AnotherProjectOnThePlcIsNamed() =>
+        Assert.Contains("runs the project 'OtherProject'", AdvisorWatch.CodeMismatch("OtherProject", Build, new[] { new AdvisorWatch.Built("PlcProject", Build, null) }, TimeSpan.FromMinutes(2)));
+
+    [Fact]
+    public void AnOlderBuildOnThePlcIsNamed() =>
+        Assert.Contains("runs a build of", AdvisorWatch.CodeMismatch("PlcProject", Build.AddDays(-3), new[] { new AdvisorWatch.Built("PlcProject", Build, null) }, TimeSpan.FromMinutes(2)));
+
+    [Fact]
+    public void ChangesAfterTheBuildAreNamed() =>
+        Assert.Contains("changed after the build", AdvisorWatch.CodeMismatch("PlcProject", Build, new[] { new AdvisorWatch.Built("PlcProject", Build, Build.AddMinutes(30)) }, TimeSpan.FromMinutes(2)));
+
     [Fact]
     public void APlatformPluginOnlyAppliesToItsPlatform()
     {

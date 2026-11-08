@@ -119,7 +119,10 @@ public sealed partial class ToolRegistry
                         using var r = new AdvisorReader(net);
                         var ports = signals.Select(s => s.Port).Append(851);
                         var found = AdvisorLook.Look(r, ports, signals, new AdvisorWatch.State(), DateTime.Now);
-                        var head = $"{r.NetId}: runtime {r.State(10000)}, PLC 851 {r.State(851)}; {signals.Count} fault signal(s) checked.";
+                        bool dirty = false;
+                        try { dirty = tc.Sta.Run(() => tc.RequireDte().Documents.Cast<EnvDTE.Document>().Any(d => !d.Saved)); } catch { }
+                        var code = AdvisorCode.Check(r, 851, dir, dirty);
+                        var head = $"{r.NetId}: runtime {r.State(10000)}, PLC 851 {r.State(851)}; {signals.Count} fault signal(s) checked.\nCode: {code}";
                         return found.Count == 0 ? head + "\nNothing is wrong now."
                             : head + "\n" + string.Join("\n", found.Select(f => "  " + f.Text + (f.Details.Count > 0 ? "\n    " + string.Join("\n    ", f.Details) : "")));
                     }

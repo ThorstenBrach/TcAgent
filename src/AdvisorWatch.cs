@@ -155,6 +155,25 @@ public static class AdvisorWatch
         };
     }
 
+    // ------------------------------------------------------------------ does the project match what runs?
+    /// <summary>A PLC project of the solution: its name, when it was built last (the .tmc) and its newest source file.</summary>
+    public sealed record Built(string Name, DateTime? BuiltAt, DateTime? NewestSource);
+
+    /// <summary>Compares what runs on the PLC (_AppInfo.ProjectName and AppTimestamp - the time of the build that was
+    /// loaded) with the PLC projects of the solution. null = it matches; otherwise why the code in the IDE may not be the
+    /// code that runs - then a diagnosis must not conclude from the code.</summary>
+    public static string CodeMismatch(string plcProject, DateTime? plcBuild, IEnumerable<Built> projects, TimeSpan tolerance)
+    {
+        var p = projects.FirstOrDefault(x => x.Name.Equals(plcProject ?? "", StringComparison.OrdinalIgnoreCase));
+        if (p == null) return $"the PLC runs the project '{plcProject}', the solution has {string.Join(", ", projects.Select(x => x.Name))}";
+        if (plcBuild == null || p.BuiltAt == null) return $"the build time of '{p.Name}' is not known on the PLC or in the project - it cannot be compared";
+        if ((plcBuild.Value - p.BuiltAt.Value).Duration() > tolerance)
+            return $"the PLC runs a build of {plcBuild:yyyy-MM-dd HH:mm:ss}, the last build of the project is from {p.BuiltAt:yyyy-MM-dd HH:mm:ss}";
+        if (p.NewestSource is { } src && src > p.BuiltAt.Value + tolerance)
+            return $"the project was changed after the build that runs ({src:yyyy-MM-dd HH:mm:ss})";
+        return null;
+    }
+
     public static string Describe(Signal s) =>
         $"{s.Symbol} {s.When} - {s.Text}" + (s.Details.Count > 0 ? $" (details: {string.Join(", ", s.Details)})" : "") + (s.Port != 851 ? $" port {s.Port}" : "") +
         (s.Source != "project" ? $" [{s.Source}]" : "");

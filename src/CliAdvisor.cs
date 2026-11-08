@@ -236,6 +236,7 @@ public static class CliAdvisor
             {
                 var context = "## What went wrong\n" + string.Join("\n", fresh.Select(f => "- " + f.Text + string.Concat(f.Details.Select(d => "\n  - " + d)))) +
                               $"\n\nRuntime: {r.State(10000)}; " + string.Join("; ", ports.Select(p => $"PLC port {p}: {r.State(p)}")) +
+                              "\n\nCode: " + string.Join("\n", ports.Select(p => AdvisorCode.Check(r, p, dir))) +
                               (hints.Count > 0 ? "\n\nPlatform: load the skill " + string.Join(" and ", hints.Select(h => h.Skill)) + " - it knows how the platform reports faults.\n" : "\n");
                 o.Trigger = "machine";
                 StartRun(o, dir, LivePrompt(o.Solution, o.Target, context), "Advisor Live");
@@ -251,7 +252,8 @@ public static class CliAdvisor
         $"Solution: {solution}\n" +
         "1. Connect: tc_attach with the solution; if no IDE has it open, tc_open with visible=false. Then tc_coding_rules.\n" +
         "2. tc_advisor action=start kind=diagnose trigger=machine.\n" +
-        "3. Find where it hangs and why: tc_plc_state, ads_read of the signals and their details below, the runtime messages (tc_errors kind=runtime), " +
+        "3. Look at the Code line below first: if the project may not match the code on the PLC, conclude only from values and say so in the finding. " +
+        "Find where it hangs and why: tc_plc_state, ads_read of the signals and their details below, the runtime messages (tc_errors kind=runtime), " +
         "the code that sets the signal (tc_find_references, tc_plc_read), the step chains (tc_sfc). Load the skill plc-debugging, and the platform skill if one " +
         "is named below. Go from the top level down only as far as you need. Prove it with values and code.\n" +
         "4. tc_advisor action=record with kind=diagnose: finding, evidence (variable = value, object and line), proposal, confidence and order - a " +
