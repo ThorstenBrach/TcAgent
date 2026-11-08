@@ -1,0 +1,185 @@
+using TcAgent;
+using Xunit;
+
+public class StFormatterTests
+{
+    static string N(string s) => s.Replace("\r\n", "\n");
+    static StFormatResult F(string s, StPart part = StPart.Auto, StFormatConfig cfg = null) => StFormatter.Format(s, cfg ?? new StFormatConfig(), part);
+
+    [Fact]
+    public void LexerIsLossless()
+    {
+        var src = "IF a(* x (* nested *) *)THEN b := 'it$'s {x} $$'; // c\r\n  c := T#1s500ms + INT#5 + 16#FF + 1.5E3; {attribute 'x' := '}'}\r\nEND_IF\n%IX0.1 x S= y; p REF= q;";
+        Assert.Equal(src, StLexer.Join(StLexer.Lex(src)));
+    }
+
+    [Fact]
+    public void UnclosedCommentIsNotFormatted()
+    {
+        var r = F("IF a THEN (* open\nb := 1;\nEND_IF");
+        Assert.NotNull(r.Error);
+        Assert.False(r.Changed);
+    }
+
+    [Fact]
+    public void IndentsBlocksWithTwoSpacesAndUppercasesKeywords()
+    {
+        var r = F("if a then\nb:=1;\nelsif c then\nfor i:=1 to 10 do\nx[i]:=-i;\nend_for\nelse\nwhile not d do\nd:=true;\nend_while\nend_if\n", StPart.Implementation);
+        Assert.Null(r.Error);
+        Assert.Equal("IF a THEN\n  b := 1;\nELSIF c THEN\n  FOR i := 1 TO 10 DO\n    x[i] := -i;\n  END_FOR\nELSE\n  WHILE NOT d DO\n    d := TRUE;\n  END_WHILE\nEND_IF\n", N(r.Text));
+    }
+
+    [Fact]
+    public void ThenOnItsOwnLineStaysAtTheLevelOfIf()
+    {
+        var r = F("IF NOT bEnable\nTHEN\nbPhaseOff := FALSE;\nEND_IF", StPart.Implementation);
+        Assert.Equal("IF NOT bEnable\nTHEN\n  bPhaseOff := FALSE;\nEND_IF", N(r.Text));
+    }
+
+    [Fact]
+    public void CaseLabelsAndStatements()
+    {
+        var r = F("CASE eState OF\nE_State.Idle:\nx := 1;\nE_State.Run, E_State.Wait:\ny := 2;\nELSE\nz := 3;\nEND_CASE", StPart.Implementation);
+        Assert.Equal("CASE eState OF\n  E_State.Idle:\n    x := 1;\n  E_State.Run, E_State.Wait:\n    y := 2;\n  ELSE\n    z := 3;\nEND_CASE", N(r.Text));
+    }
+
+    [Fact]
+    public void DeclarationsAreAlignedInColumns()
+    {
+        var r = F("FUNCTION_BLOCK FB_X\nVAR\nbStart:BOOL; // start\nnCount : INT:=0; // count\nfbTimer   :   TON;\nEND_VAR", StPart.Declaration);
+        Assert.Null(r.Error);
+        Assert.Equal("FUNCTION_BLOCK FB_X\nVAR\n  bStart  : BOOL;     // start\n  nCount  : INT := 0; // count\n  fbTimer : TON;\nEND_VAR", N(r.Text));
+    }
+
+    [Fact]
+    public void CommentLinesBreakAlignmentGroupsAndTakeTheIndentOfTheNextLine()
+    {
+        var r = F("VAR_INPUT\n/// lamp\nbEnable : BOOL;\n/// on time\ntOn : TIME := T#500MS;\nEND_VAR", StPart.Declaration);
+        Assert.Equal("VAR_INPUT\n  /// lamp\n  bEnable : BOOL;\n  /// on time\n  tOn : TIME := T#500MS;\nEND_VAR", N(r.Text));
+    }
+
+    [Fact]
+    public void BracketsMakeThePrecedenceVisible()
+    {
+        var r = F("bRelease := NOT bRunning AND bDoorOk OR bSetup AND bKeySwitch;", StPart.Implementation);
+        Assert.Null(r.Error);
+        Assert.Equal("bRelease := (NOT bRunning AND bDoorOk) OR (bSetup AND bKeySwitch);", r.Text);
+    }
+
+    [Fact]
+    public void BracketsAlsoInConditionsAndCallArguments()
+    {
+        var r = F("IF a AND b OR c THEN\n  fb(IN := x AND y OR z);\nEND_IF", StPart.Implementation);
+        Assert.Equal("IF (a AND b) OR c THEN\n  fb(IN := (x AND y) OR z);\nEND_IF", N(r.Text));
+    }
+
+    [Fact]
+    public void ExistingBracketsAndPureChainsStay()
+    {
+        var src = "x := (a AND b) OR c;\ny := a AND b AND c;\nz := a OR b OR c;";
+        Assert.Equal(src, F(src, StPart.Implementation).Text);
+    }
+
+    [Fact]
+    public void SwitchedOffSectionsStayAsTheyAre()
+    {
+        var src = "// tcagent-format: off\nif   a then x:=1; end_if\n// tcagent-format: on\nif b then\ny:=2;\nend_if";
+        var r = F(src, StPart.Implementation);
+        Assert.Equal("// tcagent-format: off\nif   a then x:=1; end_if\n// tcagent-format: on\nIF b THEN\n  y := 2;\nEND_IF", N(r.Text));
+        var pragma = "{attribute 'tcagent.format' := 'off'}\nx:=1;\n{attribute 'tcagent.format' := 'on'}\ny:=2;";
+        Assert.Equal("{attribute 'tcagent.format' := 'off'}\nx:=1;\n{attribute 'tcagent.format' := 'on'}\ny := 2;", N(F(pragma, StPart.Implementation).Text));
+        var whole = "// tcagent-format: file\nx:=1;";
+        Assert.Equal(whole, F(whole, StPart.Implementation).Text);
+    }
+
+    [Fact]
+    public void LongCallsGetOneParameterPerLine()
+    {
+        var cfg = new StFormatConfig();
+        cfg.Set("wrap.max-length", "40", "test");
+        var r = F("fbTimer(IN := bEnable AND NOT bPhaseOff, PT := tOnTime);", StPart.Implementation, cfg);
+        Assert.Equal("fbTimer(\n  IN := bEnable AND NOT bPhaseOff,\n  PT := tOnTime\n);", N(r.Text));
+        Assert.Equal(r.Text, F(r.Text, StPart.Implementation, cfg).Text);
+    }
+
+    [Fact]
+    public void BlankLinesAreLimited()
+    {
+        var r = F("\n\nx := 1;\n\n\n\ny := 2;\n\n", StPart.Implementation);
+        Assert.Equal("x := 1;\n\ny := 2;\n", N(r.Text));
+    }
+
+    [Fact]
+    public void LineEndingsStay()
+    {
+        var r = F("IF a THEN\r\nb := 1;\r\nEND_IF\r\n", StPart.Implementation);
+        Assert.Equal("IF a THEN\r\n  b := 1;\r\nEND_IF\r\n", r.Text);
+    }
+
+    [Fact]
+    public void ContinuationLinesKeepTheirOffset()
+    {
+        var src = "IF a\n   AND b\nTHEN\nx := 1;\nEND_IF";
+        Assert.Equal("IF a\n   AND b\nTHEN\n  x := 1;\nEND_IF", N(F(src, StPart.Implementation).Text));
+    }
+
+    [Fact]
+    public void TabsAndPreserveCanBeChosen()
+    {
+        var cfg = new StFormatConfig();
+        cfg.Set("indent.style", "tabs", "test");
+        cfg.Set("case.keywords", "preserve", "test");
+        var r = F("if a then\nb := 1;\nend_if", StPart.Implementation, cfg);
+        Assert.Equal("if a then\n\tb := 1;\nend_if", N(r.Text));
+    }
+
+    [Fact]
+    public void MembersNamedLikeKeywordsAndIdentifiersStay()
+    {
+        var r = F("x := fb.Done AND st.Time > T#1s;\nfbTimer(IN := bIn, PT := t);", StPart.Implementation);
+        Assert.Equal("x := fb.Done AND st.Time > T#1s;\nfbTimer(IN := bIn, PT := t);", N(r.Text));
+    }
+
+    [Fact]
+    public void IsIdempotentOnAProgram()
+    {
+        var src = @"// Disabled: start the next blink period with the on phase
+IF NOT bEnable
+THEN
+	bPhaseOff := FALSE;
+END_IF
+
+// Timers are called every cycle, the phase is in IN
+tOnTimer(IN := (bEnable AND NOT bPhaseOff), PT := tOn);
+tOffTimer(IN := (bEnable AND bPhaseOff), PT := tOff);
+
+IF tOnTimer.Q
+THEN
+	bPhaseOff := TRUE;
+ELSIF tOffTimer.Q
+THEN
+	bPhaseOff := FALSE;
+END_IF
+
+bLamp := (bEnable AND NOT bPhaseOff);";
+        var once = F(src, StPart.Implementation);
+        Assert.Null(once.Error);
+        Assert.Equal(once.Text, F(once.Text, StPart.Implementation).Text);
+        Assert.Contains("\n  bPhaseOff := FALSE;", N(once.Text));
+    }
+
+    [Fact]
+    public void ConfigFromLevelsLocksAndUnset()
+    {
+        var c = new StFormatConfig();
+        var locked = new Dictionary<string, string>();
+        c.Apply(System.Text.Json.Nodes.JsonNode.Parse("{\"rules\":{\"indent.size\":4},\"locked\":[\"indent.size\"]}")!.AsObject(), "company", locked);
+        c.Apply(System.Text.Json.Nodes.JsonNode.Parse("{\"profile\":\"compact\",\"rules\":{\"indent.size\":8,\"case.keywords\":\"lower\"}}")!.AsObject(), "project", locked);
+        Assert.Equal("4", c["indent.size"]);
+        Assert.Equal("lower", c["case.keywords"]);
+        Assert.Equal("false", c["align.decl"]);
+        Assert.Contains(c.Notes, n => n.Contains("locked by company"));
+        c.Set("case.keywords", "unset", "user");
+        Assert.Equal("upper", c["case.keywords"]);
+    }
+}

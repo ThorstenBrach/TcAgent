@@ -23,9 +23,9 @@ namespace TcAgentBridge
 {
     [ComVisible(true)]
     [Guid("86c8609c-4aac-4e7e-95e6-6b96179a3c4f")]
-    public sealed class BridgePackage : AsyncPackage
+    public sealed partial class BridgePackage : AsyncPackage
     {
-        public const string BridgeVersion = "0.53.0";
+        public const string BridgeVersion = "0.54.0";
 
         /// <summary>The TcAgent icon for the own windows and dialogs (icon.png next to the extension), instead of the one of the IDE.</summary>
         internal static System.Windows.Media.ImageSource AppIcon => appIcon ??= LoadIcon();
@@ -323,8 +323,10 @@ namespace TcAgentBridge
             {
                 statusWatch = !(ChatSetting("statusLog") is bool sw0 && !sw0);   // on by default for now (diagnostics)
                 StartStallMonitor();
+                try { ReadFormatHotkey(); } catch (Exception ex) { Log("Format hotkey: " + Inner(ex)); }
                 var spec = ChatSetting("askHotkey") as string ?? "Ctrl+Shift+Q";
-                if (spec.Trim().Length == 0 || spec.Equals("off", StringComparison.OrdinalIgnoreCase)) { Log("Hotkey disabled"); return; }
+                bool askOff = spec.Trim().Length == 0 || spec.Equals("off", StringComparison.OrdinalIgnoreCase);
+                if (askOff) { Log("Hotkey disabled"); hotKey = 0; if (!fmtOn) return; spec = "off"; }
                 System.Windows.Forms.Keys mods = 0, key = 0;
                 foreach (var part in spec.Split('+').Select(x => x.Trim()))
                 {
@@ -332,7 +334,7 @@ namespace TcAgentBridge
                     if (p == "ctrl" || p == "strg" || p == "control") mods |= System.Windows.Forms.Keys.Control;
                     else if (p == "shift" || p == "umschalt") mods |= System.Windows.Forms.Keys.Shift;
                     else if (p == "alt") mods |= System.Windows.Forms.Keys.Alt;
-                    else key = (System.Windows.Forms.Keys)Enum.Parse(typeof(System.Windows.Forms.Keys), part, true);
+                    else if (!askOff) key = (System.Windows.Forms.Keys)Enum.Parse(typeof(System.Windows.Forms.Keys), part, true);
                 }
                 if (key != 0) { hotKey = key; hotMods = mods; }
                 // Keyboard hook only for the VS UI thread: sees the key before VS/the TwinCAT editor process it
@@ -411,7 +413,17 @@ namespace TcAgentBridge
             {
                 long lp = lParam.ToInt64();
                 bool down = (lp & 0x80000000L) == 0, repeat = (lp & 0x40000000L) != 0;
-                if (code == 0 && down && (int)wParam.ToInt64() == (int)hotKey && System.Windows.Forms.Control.ModifierKeys == hotMods)
+                if (code == 0 && down && IsFormatKey((int)wParam.ToInt64()))
+                {
+                    if (!repeat)
+                        ui.BeginInvoke(new Action(() =>
+                        {
+                            Log("Format hotkey pressed");
+                            try { FormatFromEditor(); } catch (Exception ex) { Log("Format: " + Inner(ex)); }
+                        }));
+                    return (IntPtr)1;
+                }
+                if (code == 0 && down && hotKey != 0 && (int)wParam.ToInt64() == (int)hotKey && System.Windows.Forms.Control.ModifierKeys == hotMods)
                 {
                     if (!repeat)
                         ui.BeginInvoke(new Action(() =>
@@ -547,7 +559,7 @@ namespace TcAgentBridge
 
         // Commands of TcAgentBridge.vsct: View > Other Windows > TcAgent Chat / TcUnit Tests / TcAgent Knowledge
         static readonly Guid CommandSet = new Guid("c3f1a2d4-7b8e-4c5a-9d6f-1e2b3a4c5d6e");
-        const int CmdTcUnitTests = 0x0100, CmdChat = 0x0101, CmdKnowledge = 0x0102;
+        const int CmdTcUnitTests = 0x0100, CmdChat = 0x0101, CmdKnowledge = 0x0102;   // CmdFormat = 0x0103 (FormatCode.cs)
 
         void AddMenuCommands()
         {
@@ -566,6 +578,10 @@ namespace TcAgentBridge
                 {
                     try { ShowKnowledge(true); } catch (Exception ex) { Log("Knowledge window: " + Inner(ex)); }
                 }, new System.ComponentModel.Design.CommandID(CommandSet, CmdKnowledge)));
+                mcs.AddCommand(new System.ComponentModel.Design.MenuCommand((s, e) =>
+                {
+                    try { FormatFromEditor(); } catch (Exception ex) { Log("Format: " + Inner(ex)); }
+                }, new System.ComponentModel.Design.CommandID(CommandSet, CmdFormat)));
                 Log("Menu commands registered");
             }
             catch (Exception ex) { Log("Menu: " + Inner(ex)); }

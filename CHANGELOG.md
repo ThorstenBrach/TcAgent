@@ -4,6 +4,17 @@ All notable changes to TcAgent (MCP server `TcAgent.exe` and the Visual Studio e
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/); server and extension share one version number.
 
+## [Unreleased]
+
+### Added
+- **ST formatter:** Ctrl+Alt+F (or Tools > Format ST code (TcAgent)) formats the PLC object in the editor - indentation,
+  case of keywords, spacing, aligned declarations, blank lines, long calls with one parameter per line, and brackets around
+  AND groups inside OR so the order is visible. Declaration and implementation, also unsaved; Ctrl+Z takes it back.
+  A safety net keeps the meaning (the same tokens, the same expression trees, a second run gives the same text); a part
+  it cannot read stays unchanged. Every rule is configurable in `formatting.json` on the knowledge levels, with locks;
+  `// tcagent-format: off` ... `on` and the pragma form keep sections as they are. `TcAgent.exe format --stdin|--file|--show-rules`.
+  [docs/FORMATTER.md](docs/FORMATTER.md)
+
 ## [0.53.0] – 2026-11-08
 
 The built-in knowledge in this version is TcAgent_Knowledge 1.1.0.
