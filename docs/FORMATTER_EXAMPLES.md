@@ -561,6 +561,34 @@ IF bReset THEN nCount := 0; END_IF
 IF bStartConditionsComplete THEN eState := E_State.Run; END_IF
 ```
 
+### Longer IF on one line (`layout.long-if`)
+
+An IF ... END_IF on one line that is longer than layout.short-if (or wrap.max-length): one statement per line. Default: `preserve`; shown with `layout.short-if: 40`.
+
+Written as:
+
+```
+IF bReset THEN nCount := 0; END_IF
+IF bStartConditionsComplete THEN eState := E_State.Run; nCount := 0; END_IF;
+```
+
+`expand`:
+
+```
+IF bReset THEN nCount := 0; END_IF
+IF bStartConditionsComplete THEN
+  eState := E_State.Run;
+  nCount := 0;
+END_IF;
+```
+
+`preserve`:
+
+```
+IF bReset THEN nCount := 0; END_IF
+IF bStartConditionsComplete THEN eState := E_State.Run; nCount := 0; END_IF;
+```
+
 ### THEN, DO, OF (`layout.then`)
 
 THEN, DO and OF at the end of the condition or on their own line. Default: `preserve`.

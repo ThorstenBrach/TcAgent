@@ -78,6 +78,7 @@ Nothing is a fixed rule. The defaults (profile `twincat`) - **an example with be
 | `comment.eol-spaces` | `preserve` | spaces before a comment at the end of a code line |
 | `layout.blocks` | `preserve` | `expand`: one statement per line, the bodies of IF, CASE, FOR, WHILE and REPEAT on their own lines |
 | `layout.short-if` | `preserve` | a number: `IF … THEN` with one statement and `END_IF` on one line when it stays within that many characters (not with ELSE/ELSIF, comments, or `layout.then: own-line`) |
+| `layout.long-if` | `preserve` | `expand`: an `IF … END_IF` written on one line that is longer than `layout.short-if` (or `wrap.max-length`) gets one statement per line, with ELSIF/ELSE and END_IF on their own lines |
 | `layout.then` | `preserve` | `same-line` or `own-line`: THEN, DO and OF at the end of the condition or on a line of their own |
 | `align.decl`, `align.decl-init`, `align.eol-comments` | `true` | `:`, `:=` and end-of-line comments of declarations in columns |
 | `align.assignments` | `false` | the `:=` of consecutive assignments in a column |

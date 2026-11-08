@@ -24,7 +24,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   assignments: one term per line at the weakest AND/OR), `align.assignments`, `align.named-args`, `blank.around-blocks`;
   profile `structured`. Checked on 66,618 parts of real code with several rule sets: no change of meaning, every result stable.
 - **Formatter rule `layout.short-if`:** `IF … THEN` with one statement and `END_IF` on one line when it stays within the set
-  number of characters.
+  number of characters; `layout.long-if: expand` gives a one-line IF that is longer than that its own lines.
 - **Formatter rule `space.tabs`:** a tab inside a line becomes spaces up to the next tab stop of `indent.tab-width`, so the
   text keeps its column (default); tabs in comments and strings stay.
 - **Formatter rule `indent.underscore`:** a name that starts with `_` one column further left (in declarations or everywhere),

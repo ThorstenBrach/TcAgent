@@ -39,6 +39,7 @@ public static class StFormatExamples
         I("comment.eol-spaces", "nA := 1;// first\nnLonger := 22;    // second", new[] { "preserve", "1", "2" }),
         I("layout.blocks", "IF bStart THEN nCount := 0; bBusy := TRUE; END_IF", new[] { "expand", "preserve" }),
         I("layout.short-if", "IF bReset THEN\n  nCount := 0;\nEND_IF\nIF bStartConditionsComplete THEN\n  eState := E_State.Run;\nEND_IF", new[] { "preserve", "40", "80" }),
+        I("layout.long-if", "IF bReset THEN nCount := 0; END_IF\nIF bStartConditionsComplete THEN eState := E_State.Run; nCount := 0; END_IF;", new[] { "expand", "preserve" }, ("layout.short-if", "40")),
         I("layout.then", "IF bStart THEN\n  bBusy := TRUE;\nEND_IF\nWHILE nIndex < 10\nDO\n  nIndex := nIndex + 1;\nEND_WHILE", new[] { "same-line", "own-line", "preserve" }),
         D("align.decl", "VAR\n  bStart : BOOL;\n  nCount : INT;\n  fbTimer : TON;\nEND_VAR", new[] { "true", "false" }),
         D("align.decl-init", "VAR\n  nCount : INT := 0;\n  tTimeout : TIME := T#5S;\nEND_VAR", new[] { "true", "false" }),
