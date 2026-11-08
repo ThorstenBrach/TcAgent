@@ -37,7 +37,8 @@ public static class CliAdvisor
         "      Advisor Live: watches the plant (runtime and PLC state, cycle time, the fault signals of .tcagent\\advisor-watch.json\n" +
         "      and of the plugins) and only reads. --run starts an Advisor run when something goes wrong, --once looks once.\n" +
         "  TcAgent.exe advise list|stats --solution <sln> [--open] [--json]\n" +
-        "  TcAgent.exe advise rate --solution <sln> --id AD-... --rating right|partly|wrong|n/a [--comment <text>]";
+        "  TcAgent.exe advise rate --solution <sln> --id AD-... --rating right|partly|wrong|n/a [--comment <text>]\n" +
+        "  TcAgent.exe advise acted|done|delete --solution <sln> --id AD-... [--comment <text>]";
 
     static Args Parse(string[] a)
     {
@@ -112,9 +113,13 @@ public static class CliAdvisor
                     Advisor.Rate(dir, o.Id ?? throw new ArgumentException("--id is required"), o.Rating, Environment.UserName, o.Comment);
                     Console.WriteLine($"{o.Id}: {o.Rating}");
                     return Cli.Ok;
+                case "acted" or "done" or "delete":
+                    Advisor.Mark(dir, o.Id ?? throw new ArgumentException("--id is required"), o.Sub, Environment.UserName, o.Comment);
+                    Console.WriteLine($"{o.Id}: {o.Sub}");
+                    return Cli.Ok;
                 case "run": return RunShadow(o, dir);
                 case "watch": return Watch(o, dir);
-                default: throw new ArgumentException("advise run, watch, list, stats or rate");
+                default: throw new ArgumentException("advise run, watch, list, stats, rate, acted, done or delete");
             }
         }
         catch (ArgumentException ex) { Console.Error.WriteLine("Error: " + ex.Message); return Cli.Usage; }

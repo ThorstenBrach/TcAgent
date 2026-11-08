@@ -23,7 +23,7 @@ public sealed partial class ToolRegistry
                           "of the project, rate records a person's rating, stats the hit rate per kind of task. Live, at the running plant: watch_list shows the " +
                           "fault signals of the project (.tcagent\\advisor-watch.json) and of the plugins, watch_add / watch_remove change them (after the user " +
                           "agreed), watch_check looks now: runtime and PLC state, cycle time, the signals that fire with their details.",
-            Schema(Req(P("action", "string", "start, record, finish, list, rate, stats; Live: watch_list, watch_add, watch_remove, watch_check")),
+            Schema(Req(P("action", "string", "start, record, finish, list, rate, done (the finding is dealt with), stats; Live: watch_list, watch_add, watch_remove, watch_check")),
                    P("symbol", "string", "watch_add/remove: the variable that signals a fault, e.g. MAIN.fbStation.bError"),
                    P("when", "string", "watch_add: true, false, == n, != n, > n, >= n, < n, <= n, & n (bit mask) or unchanged <n>s (default true)"),
                    P("text", "string", "watch_add: what the fault means"),
@@ -83,6 +83,10 @@ public sealed partial class ToolRegistry
                         try { Advisor.Rate(dir, Str(a, "id"), Str(a, "rating"), Environment.UserName, Str(a, "comment")); }
                         catch (ArgumentException ex) { throw new Exception("NOT rated: " + ex.Message); }
                         return $"{Str(a, "id")}: {Str(a, "rating")}";
+                    case "done":
+                        try { Advisor.Mark(dir, Str(a, "id"), "done", Environment.UserName, Str(a, "comment")); }
+                        catch (ArgumentException ex) { throw new Exception("NOT marked: " + ex.Message); }
+                        return $"{Str(a, "id")}: done";
                     case "stats":
                     {
                         var q = Advisor.Quotas(Advisor.Load(dir), DateTime.Now);

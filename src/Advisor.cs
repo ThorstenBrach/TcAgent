@@ -6,6 +6,9 @@
 //     {"id":"AD-1a2b3c4d","time":"…","trigger":"nightly","kind":"review","finding":"…","evidence":["…"],"proposal":"…",
 //      "diff":"…","order":"…","workflow":"bug-fix","confidence":"high","why":"…"}
 //     {"rate":"AD-1a2b3c4d","rating":"right","by":"name","time":"…","comment":"…"}      a rating, appended later
+//     {"acted":"AD-1a2b3c4d","by":"name","time":"…"}                                    the order was sent to an agent
+//     {"done":"AD-1a2b3c4d","by":"name","time":"…","comment":"…"}                       the finding is dealt with
+//     {"delete":"AD-1a2b3c4d","by":"name","time":"…"}                                   removed from the list (stays in Git history)
 //
 // Append only: a rating is a line of its own, so two people never edit the same line and Git merges cleanly.
 // Pure logic, so the unit tests link this file.
@@ -29,8 +32,10 @@ public static class Advisor
         public string Id, Trigger, Kind, Finding, Proposal, Diff, Order, Workflow, Confidence, Why, Run;
         public DateTime Time;
         public List<string> Evidence = new();
-        public string Rating, RatedBy, Comment;
-        public DateTime? RatedAt;
+        public string Rating, RatedBy, Comment, DoneBy, DoneComment;
+        public DateTime? RatedAt, ActedAt, DoneAt;
+        /// <summary>open, acted (the order went to an agent) or done.</summary>
+        public string State => DoneAt != null ? "done" : ActedAt != null ? "acted" : "open";
     }
 
     public static string Folder(string solutionDir) =>
@@ -82,6 +87,17 @@ public static class Advisor
         Append(solutionDir, now, o);
     }
 
+    /// <summary>The order of an advice went to an agent, the finding is dealt with, or the advice is removed from the list.</summary>
+    public static void Mark(string solutionDir, string id, string what, string by, string comment = null)
+    {
+        if (what is not ("acted" or "done" or "delete")) throw new ArgumentException("acted, done or delete");
+        if (Load(solutionDir).All(x => x.Id != id)) throw new ArgumentException($"no advice {id}");
+        var now = DateTime.Now;
+        var o = new JsonObject { [what] = id, ["by"] = by, ["time"] = now.ToString("o", CultureInfo.InvariantCulture) };
+        if (!string.IsNullOrWhiteSpace(comment)) o["comment"] = comment.Trim();
+        Append(solutionDir, now, o);
+    }
+
     /// <summary>All advice of the project, oldest first, with the latest rating of each.</summary>
     public static List<Item> Load(string solutionDir)
     {
@@ -102,6 +118,9 @@ public static class Advisor
             if (o == null) continue;
             string S(string k) => o[k] is JsonValue v ? v.ToString() : null;
             DateTime? T(string k) => DateTime.TryParse(S(k), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var d) ? d : null;
+            if (S("delete") is { } did) { if (byId.Remove(did, out var gone)) items.Remove(gone); continue; }
+            if (S("acted") is { } aid) { if (byId.TryGetValue(aid, out var ai)) ai.ActedAt ??= T("time"); continue; }
+            if (S("done") is { } xid) { if (byId.TryGetValue(xid, out var xi)) { xi.DoneAt = T("time") ?? DateTime.Now; xi.DoneBy = S("by"); xi.DoneComment = S("comment"); } continue; }
             if (S("rate") is { } rid)
             {
                 if (byId.TryGetValue(rid, out var r)) { r.Rating = S("rating"); r.RatedBy = S("by"); r.RatedAt = T("time"); r.Comment = S("comment"); }
@@ -141,7 +160,7 @@ public static class Advisor
         if (shown.Count == 0) return openOnly ? "No open advice." : "No advice yet.";
         var sb = new StringBuilder();
         foreach (var i in shown)
-            sb.AppendLine($"{i.Id}  {i.Time:yyyy-MM-dd HH:mm}  {i.Kind}/{i.Trigger}  {i.Confidence}  {(i.Rating ?? "not rated")}\n  {i.Finding}");
+            sb.AppendLine($"{i.Id}  {i.Time:yyyy-MM-dd HH:mm}  {i.Kind}/{i.Trigger}  {i.Confidence}  {(i.Rating ?? "not rated")}  {i.State}\n  {i.Finding}");
         return sb.ToString();
     }
 
@@ -150,6 +169,8 @@ public static class Advisor
         ["id"] = i.Id, ["time"] = i.Time.ToString("o", CultureInfo.InvariantCulture), ["trigger"] = i.Trigger, ["kind"] = i.Kind, ["finding"] = i.Finding,
         ["evidence"] = new JsonArray(i.Evidence.Select(e => (JsonNode)e).ToArray()), ["proposal"] = i.Proposal, ["diff"] = i.Diff, ["order"] = i.Order,
         ["workflow"] = i.Workflow, ["confidence"] = i.Confidence, ["why"] = i.Why, ["rating"] = i.Rating, ["ratedBy"] = i.RatedBy,
-        ["ratedAt"] = i.RatedAt?.ToString("o", CultureInfo.InvariantCulture), ["comment"] = i.Comment,
+        ["ratedAt"] = i.RatedAt?.ToString("o", CultureInfo.InvariantCulture), ["comment"] = i.Comment, ["state"] = i.State,
+        ["actedAt"] = i.ActedAt?.ToString("o", CultureInfo.InvariantCulture), ["doneAt"] = i.DoneAt?.ToString("o", CultureInfo.InvariantCulture),
+        ["doneBy"] = i.DoneBy, ["doneComment"] = i.DoneComment,
     };
 }

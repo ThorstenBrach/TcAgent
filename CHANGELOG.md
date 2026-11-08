@@ -33,7 +33,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **Advisor (Shadow):** an agent that reads and advises, never changes. `tc_advisor` keeps advice with evidence and a ready
   order in the project (`.tcagent\advisor`), a run is read only (TcAgent refuses every change). `TcAgent.exe advise` runs it
   without a window at night or after a failed pipeline, `/advise` in the chat. The Knowledge window has a tab Advisor: rate
-  with one click, **Act on it …** puts the order into the chat. [docs/ADVISOR.md](docs/ADVISOR.md)
+  with one click, **Act on it …** puts the order into the chat and marks the advice sent; the agent marks it done when the work
+  is proven, or you do. Advice can be deleted from the list. [docs/ADVISOR.md](docs/ADVISOR.md)
 - **Review of a whole project:** workflow `project-review` and prompt `/review-prj` - deterministic checks over everything first,
   then the structure, deep reviews of at most 10 hotspots, a report with a traffic light per area; findings become advice.
   `TcAgent.exe advise --trigger project` runs it without a window, e.g. once a month.

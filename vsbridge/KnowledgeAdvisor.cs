@@ -4,7 +4,9 @@
 //   details  finding, evidence, proposal, the order (the prompt for an agent) and a diff if there is one
 //   rate     Right / Partly / Wrong / n/a - one click, stored with the name of the person (TcAgent.exe advise rate)
 //   act      "Act on it …" opens the TcAgent Chat with the order in the input - the person reads it, changes it and sends it;
-//            the Advisor itself never changes anything
+//            the Advisor itself never changes anything. The advice is then marked "sent"; the agent that did the work marks it
+//            done (tc_advisor action=done), or the person does (Mark as done).
+//   delete   removes an advice from the list (Delete …, after a question) - it stays in the Git history of the project
 //
 // SPDX-License-Identifier: MIT
 using System;
@@ -24,7 +26,7 @@ namespace TcAgentBridge
     {
         readonly ListView adviceList = NewList();
         readonly ComboBox adviceShow = new ComboBox { MinWidth = 110, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center,
-                                                      ItemsSource = new[] { "not rated", "all" }, SelectedIndex = 0 };
+                                                      ItemsSource = new[] { "open", "not rated", "done", "all" }, SelectedIndex = 0 };
         readonly TextBox adviceText = new TextBox { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Padding = new Thickness(6),
                                                     BorderThickness = new Thickness(0), FontFamily = new System.Windows.Media.FontFamily("Consolas") };
         readonly TextBlock adviceHeading = Heading("");
@@ -40,6 +42,8 @@ namespace TcAgentBridge
             bool Sel() => SelectedAdvice != null;
             var acts = new[] {
                 A("Act on it …", "Opens the TcAgent Chat with the order of the selected advice - read it, change it, send it", ActOnAdvice, Sel),
+                A("Mark as done", "The finding is dealt with", () => MarkAdvice("done"), () => Sel() && S(SelectedAdvice, "state") != "done"),
+                A("Delete …", "Removes the selected advice from the list (it stays in the Git history of the project)", DeleteAdvice, Sel, "Del"),
                 Sep,
                 A("Right", "The advice is right", () => RateAdvice("right"), Sel),
                 A("Partly", "The advice is partly right", () => RateAdvice("partly"), Sel),
@@ -48,8 +52,9 @@ namespace TcAgentBridge
                 Sep,
                 A("Copy order", "Copy the order (the prompt for an agent)", () => { try { Clipboard.SetText(S(SelectedAdvice, "order") ?? ""); status.Text = "Copied."; } catch (Exception ex) { Error(ex.Message); } }, Sel),
                 A("Refresh", "Read the advice again", LoadAdvice) };
-            Columns(adviceList, ("Time", 120, nameof(Line.C1)), ("Kind", 130, nameof(Line.C2)), ("Finding", 460, nameof(Line.C3)), ("Confidence", 90, nameof(Line.C4)),
-                    ("Rating", 120, "!" + nameof(Line.C5)));
+            Columns(adviceList, ("Time", 120, nameof(Line.C1)), ("Kind", 130, nameof(Line.C2)), ("Finding", 420, nameof(Line.C3)), ("Confidence", 90, nameof(Line.C4)),
+                    ("Rating", 110, "!" + nameof(Line.C5)), ("State", 90, nameof(Line.C6)));
+            adviceList.PreviewKeyDown += (s, e) => { if (e.Key == System.Windows.Input.Key.Delete && Sel()) { DeleteAdvice(); e.Handled = true; } };
             adviceList.ContextMenu = MenuOf(acts);
             adviceList.SelectionChanged += (s, e) => { ShowAdvice(); UpdateGates(); };
             adviceList.MouseDoubleClick += (s, e) => { if (Sel()) ActOnAdvice(); };
@@ -90,14 +95,16 @@ namespace TcAgentBridge
         void FillAdvice()
         {
             var keep = S(SelectedAdvice, "id");
-            bool all = adviceShow.SelectedIndex == 1;
-            var lines = advice.Where(a => all || S(a, "rating") == null).Select(a => new Line
+            var show = adviceShow.SelectedItem as string ?? "open";
+            var lines = advice.Where(a => show == "all" || show == "open" && S(a, "state") != "done" || show == "not rated" && S(a, "rating") == null
+                                         || show == "done" && S(a, "state") == "done").Select(a => new Line
             {
                 D = a,
                 C1 = DateTime.TryParse(S(a, "time"), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var t) ? t.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture) : "",
                 C2 = $"{S(a, "kind")} · {S(a, "trigger")}", C3 = S(a, "finding"), C4 = S(a, "confidence"),
                 C5 = S(a, "rating") is string r ? (r == "right" ? "✓ right" : r == "partly" ? "◐ partly" : r == "wrong" ? "✗ wrong" : "– n/a") : "● not rated",
-                Mark = S(a, "rating") switch { "right" => Green, "partly" => Orange, "wrong" => Red, null => Blue, _ => Gray },
+                C6 = S(a, "state") == "done" ? "✓ done" : S(a, "state") == "acted" ? "➜ sent" : "● open",
+                Mark = S(a, "state") == "done" ? Gray : S(a, "rating") switch { "right" => Green, "partly" => Orange, "wrong" => Red, null => Blue, _ => Gray },
                 Tip = S(a, "order")
             }).ToList();
             adviceList.ItemsSource = lines;
@@ -121,6 +128,8 @@ namespace TcAgentBridge
             sb.AppendLine().AppendLine("Order" + (S(a, "workflow") is string wf ? $" (workflow {wf})" : "") + ":").AppendLine(S(a, "order"));
             if (S(a, "diff") is string d) sb.AppendLine().AppendLine("Diff:").AppendLine(d);
             if (S(a, "rating") is string r) sb.AppendLine().AppendLine($"Rated {r} by {S(a, "ratedBy")}" + (S(a, "comment") is string c ? ": " + c : ""));
+            if (S(a, "state") == "done") sb.AppendLine($"Done by {S(a, "doneBy")} ({S(a, "doneAt")})" + (S(a, "doneComment") is string dc ? ": " + dc : ""));
+            else if (S(a, "state") == "acted") sb.AppendLine($"Sent to an agent ({S(a, "actedAt")})");
             sb.AppendLine().AppendLine($"{S(a, "id")} · {S(a, "time")}");
             adviceText.Text = sb.ToString();
         }
@@ -157,10 +166,33 @@ namespace TcAgentBridge
             return w.ShowDialog() == true ? box.Text.Trim() : null;
         }
 
-        void ActOnAdvice()
+        async void MarkAdvice(string what)
         {
+            var id = S(SelectedAdvice, "id");
+            if (id == null) return;
+            var (ok, output) = await Cli($"advise {what} --id {id}", "Saving");
+            if (!ok) { Report(false, output, "Advisor"); return; }
+            status.Text = $"{id}: {what}";
+            LoadAdvice();
+        }
+
+        void DeleteAdvice()
+        {
+            var a = SelectedAdvice;
+            if (a == null) return;
+            if (MessageBox.Show($"Remove this advice from the list?\n\n{S(a, "finding")}\n\nIt stays in the Git history of the project.", "TcAgent Knowledge",
+                                MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            MarkAdvice("delete");
+        }
+
+        async void ActOnAdvice()
+        {
+            var id = S(SelectedAdvice, "id");
             var order = S(SelectedAdvice, "order");
             if (string.IsNullOrWhiteSpace(order)) return;
+            // the agent that does the work closes the advice when it is done
+            order = order.TrimEnd() + $"\n\nWhen it is done and proven: tc_advisor action=done id={id}.";
+            if (S(SelectedAdvice, "state") == "open") { await Cli($"advise acted --id {id}"); LoadAdvice(); }
             try
             {
                 BridgePackage.Instance?.ShowChat(true);
