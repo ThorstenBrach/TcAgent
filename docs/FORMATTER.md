@@ -13,6 +13,17 @@ a message says why.
 
 The key can be changed or switched off: `"formatHotkey": "Ctrl+Alt+F"` (or `"off"`) in `chat-backends.json`.
 
+## Settings with a preview
+
+**Tools > Formatter settings (TcAgent) ...** lists every rule with its value and the level it comes from. Change one and the
+preview shows at once what it does - before and after, for the declaration and the implementation, on an example or on the
+object open in the editor. **Save** writes the changed rules into `formatting.json` of the chosen level (project, user, team,
+company; a backup of the levels is made first). Rules a level above locked are shown with a lock and cannot be changed.
+
+**Wish a rule or feature ...** opens a new issue on GitHub with the example of the preview: what the code looks like, what the
+formatter makes of it today, and a place for what you would like instead. Check it in the browser, remove names of customers
+or plants, and send it yourself.
+
 ## The safety net
 
 - The lexer keeps every character: comments, pragmas, strings, typed and time literals, direct addresses.
@@ -106,7 +117,8 @@ level wins, a level can lock rules:
 ```
 TcAgent.exe format --stdin --part implementation --solution <sln> [--json]   text from stdin, formatted to stdout
 TcAgent.exe format --file <file.st> [--write | --check]                      a plain-text file
-TcAgent.exe format --show-rules --solution <sln>                             the effective rules
+TcAgent.exe format --show-rules --solution <sln> [--json]                    the effective rules
+TcAgent.exe format --save <changes.json> --level project --solution <sln>   rules into formatting.json of a level
 ```
 
 Exit codes: 0 formatted or nothing to do, 1 `--check`: it would change, 2 wrong call, 3 not formatted (safety net or a part
