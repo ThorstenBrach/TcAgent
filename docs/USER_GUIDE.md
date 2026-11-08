@@ -296,8 +296,8 @@ first, then **New …**, **Open** (the repository in the browser; double-click),
 **Edit …**, **Delete …**, **Copy URL**. **Browse and install …** lists everything a source offers – search, filter by
 kind, "Only not installed", the state (✓ installed and where, ○ not installed, ✗ not installable), license, scripts and
 the details of the selected line (description, license, files, scripts); tick the items to install – several at once,
-the ticks stay when you change the filter (Space or a double-click ticks the selected line, **Tick all shown**,
-**Untick all**).
+the ticks stay when you change the filter (Space or a double-click ticks the selected line, **Select all**,
+**Select none**).
 Before installing you confirm the license, the files and any scripts – source-available and unlicensed items are
 refused, others only after you accept the license. Installing offers every level – you, the project, the team, the company and the platforms; a
 shared level kept in Git gets a commit on a new branch for a pull request instead of a direct change. Below the items

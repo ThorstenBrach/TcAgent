@@ -1846,8 +1846,8 @@ namespace TcAgentBridge
             notYet.Click += (s, e) => Filter();
             Filter();
             // tick: the shown items, none (the ticks stay when the filter changes)
-            var tickAll = Text("Tick all shown", "Tick every item the filter shows");
-            var tickNone = Text("Untick all", "Remove every tick");
+            var tickAll = Text("Select all", "Tick every item the filter shows");
+            var tickNone = Text("Select none", "Remove every tick");
             var top = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
             foreach (var e in new UIElement[] { SearchBox(query, "Search name, license, description", 280), kind, notYet, TcUnitControl.Separator(), tickAll, tickNone }) top.Children.Add(e);
             // the details of the selected item
