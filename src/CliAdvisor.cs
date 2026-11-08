@@ -21,9 +21,10 @@ public static class CliAdvisor
 {
     sealed class Args
     {
-        public string Sub = "run", Solution, Trigger = "nightly", Since = "24 hours ago", Results, Id, Rating, Comment, Out;
-        public int Minutes = 15, MaxTurns = 80;
-        public bool Open, Json, DryRun;
+        public string Sub = "run", Solution, Trigger = "nightly", Since = "24 hours ago", Results, Id, Rating, Comment, Out, Target = "local";
+        public int Minutes = 15, MaxTurns = 80, Interval = 2;
+        public List<int> Ports = new() { 851 };
+        public bool Open, Json, DryRun, Once, StartRuns;
     }
 
     public const string Usage =
@@ -31,6 +32,9 @@ public static class CliAdvisor
         "                     [--minutes 15] [--out <log file>] [--dry-run]\n" +
         "      Advisor Shadow: an AI client without a window reads the project and records advice with an order (.tcagent\\advisor).\n" +
         "      It changes nothing (TCAGENT_MODE=ask). --dry-run prints the prompt only.\n" +
+        "  TcAgent.exe advise watch --solution <sln> [--target <AmsNetId>] [--ports 851,852] [--interval 2] [--run] [--once]\n" +
+        "      Advisor Live: watches the plant (runtime and PLC state, cycle time, the fault signals of .tcagent\\advisor-watch.json\n" +
+        "      and of the plugins) and only reads. --run starts an Advisor run when something goes wrong, --once looks once.\n" +
         "  TcAgent.exe advise list|stats --solution <sln> [--open] [--json]\n" +
         "  TcAgent.exe advise rate --solution <sln> --id AD-... --rating right|partly|wrong|n/a [--comment <text>]";
 
@@ -57,6 +61,11 @@ public static class CliAdvisor
                 case "--open": o.Open = true; break;
                 case "--json": o.Json = true; break;
                 case "--dry-run": o.DryRun = true; break;
+                case "--target": o.Target = V(); break;
+                case "--ports": o.Ports = V().Split(',', StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToList(); break;
+                case "--interval": o.Interval = Math.Max(1, int.Parse(V())); break;
+                case "--once": o.Once = true; break;
+                case "--run": o.StartRuns = true; break;
                 default: throw new ArgumentException("unknown option " + a[i]);
             }
         }
@@ -69,7 +78,7 @@ public static class CliAdvisor
         }
         o.Solution = Path.GetFullPath(o.Solution);
         if (!File.Exists(o.Solution)) throw new ArgumentException("solution not found: " + o.Solution);
-        if (o.Trigger is not ("nightly" or "commit" or "pipeline")) throw new ArgumentException("--trigger nightly, commit or pipeline");
+        if (o.Trigger is not ("nightly" or "commit" or "pipeline" or "machine")) throw new ArgumentException("--trigger nightly, commit or pipeline");
         return o;
     }
 
@@ -102,7 +111,8 @@ public static class CliAdvisor
                     Console.WriteLine($"{o.Id}: {o.Rating}");
                     return Cli.Ok;
                 case "run": return RunShadow(o, dir);
-                default: throw new ArgumentException("advise run, list, stats or rate");
+                case "watch": return Watch(o, dir);
+                default: throw new ArgumentException("advise run, watch, list, stats or rate");
             }
         }
         catch (ArgumentException ex) { Console.Error.WriteLine("Error: " + ex.Message); return Cli.Usage; }
@@ -122,10 +132,16 @@ public static class CliAdvisor
         var prompt = Prompt(o, context);
         if (o.DryRun) { Console.WriteLine(prompt); return Cli.Ok; }
 
+        return StartRun(o, dir, prompt, "Advisor Shadow");
+    }
+
+    /// <summary>Starts the AI client of the chat without a window, read only, with this prompt; the advice it records is printed.</summary>
+    static int StartRun(Args o, string dir, string prompt, string what)
+    {
         var (key, exe) = ChatBackend();
         if (exe == null || exe.IndexOf("claude", StringComparison.OrdinalIgnoreCase) < 0)
         {
-            Console.Error.WriteLine($"Advisor Shadow without a window runs with Claude Code for now; the chat uses '{key}'. " +
+            Console.Error.WriteLine($"{what} without a window runs with Claude Code for now; the chat uses '{key}'. " +
                                     "Choose Claude in the chat, or start the run in the chat with /advise.");
             return Cli.Usage;
         }
@@ -153,7 +169,7 @@ public static class CliAdvisor
         psi.WorkingDirectory = dir;
         psi.EnvironmentVariables["TCAGENT_CLIENT"] = "advisor";
 
-        Console.WriteLine($"Advisor Shadow ({o.Trigger}) with Claude Code, at most {o.Minutes} min, read only.");
+        Console.WriteLine($"{what} ({o.Trigger}) with Claude Code, at most {o.Minutes} min, read only.");
         var log = new StringBuilder();
         bool timedOut;
         using (var p = Process.Start(psi)!)
@@ -177,6 +193,64 @@ public static class CliAdvisor
         Console.WriteLine(advice.Count == 0 ? "No advice recorded." : $"{advice.Count} advice recorded:\n" + Advisor.List(advice, false, 50));
         return timedOut && advice.Count == 0 ? Cli.Infra : Cli.Ok;
     }
+
+
+
+    // ------------------------------------------------------------------ the watch (Advisor Live)
+    static int Watch(Args o, string dir)
+    {
+        var plugins = new List<(string, string)>();
+        try { plugins = Plugins.Usable(dir).Where(p => p.Ready).Select(p => (p.Id, p.Folder)).ToList(); } catch { }
+        var (signals, hints) = AdvisorWatch.Load(dir, plugins);
+        var ports = signals.Select(s => s.Port).Concat(o.Ports).Distinct().ToList();
+        var state = new AdvisorWatch.State();
+        var reported = new Dictionary<string, DateTime>();
+        var active = new HashSet<string>();
+        Console.WriteLine($"Advisor Live watches {o.Target}: runtime, PLC port(s) {string.Join(", ", ports)}, {signals.Count} fault signal(s)" +
+                          (hints.Count > 0 ? $", skills {string.Join(", ", hints.Select(h => h.Skill))}" : "") + ". It only reads. Ctrl+C ends it.");
+        using var r = new AdvisorReader(o.Target);
+        while (true)
+        {
+            var now = DateTime.Now;
+            var found = AdvisorLook.Look(r, ports, signals, state, now);
+            if (o.Once)
+            {
+                Console.WriteLine($"runtime {r.State(10000)}; " + string.Join("; ", ports.Select(p => $"PLC {p} {r.State(p)}")));
+                Console.WriteLine(found.Count == 0 ? "Nothing is wrong now." : string.Join("\n", found.Select(f => f.Text + string.Concat(f.Details.Select(d => "\n  " + d)))));
+                return found.Count == 0 ? Cli.Ok : Cli.Failed;
+            }
+            // only what newly went wrong; the same event at most once an hour
+            var fresh = found.Where(f => !active.Contains(f.Key) && (!reported.TryGetValue(f.Key, out var t) || (now - t).TotalHours >= 1)).ToList();
+            active = found.Select(f => f.Key).ToHashSet();
+            foreach (var f in fresh)
+            {
+                reported[f.Key] = now;
+                Console.WriteLine($"{now:HH:mm:ss}  {f.Text}" + string.Concat(f.Details.Select(d => "\n          " + d)));
+            }
+            if (fresh.Count > 0 && o.StartRuns)
+            {
+                var context = "## What went wrong\n" + string.Join("\n", fresh.Select(f => "- " + f.Text + string.Concat(f.Details.Select(d => "\n  - " + d)))) +
+                              $"\n\nRuntime: {r.State(10000)}; " + string.Join("; ", ports.Select(p => $"PLC port {p}: {r.State(p)}")) +
+                              (hints.Count > 0 ? "\n\nPlatform: load the skill " + string.Join(" and ", hints.Select(h => h.Skill)) + " - it knows how the platform reports faults.\n" : "\n");
+                o.Trigger = "machine";
+                StartRun(o, dir, LivePrompt(o.Solution, o.Target, context), "Advisor Live");
+            }
+            Thread.Sleep(o.Interval * 1000);
+        }
+    }
+
+    public static string LivePrompt(string solution, string target, string context) =>
+        $"You are the TcAgent Advisor (Live, trigger: machine). Something went wrong at the running plant ({target}). You read and advise; you change " +
+        "nothing - TcAgent refuses every change, and you never write a variable or start, stop or acknowledge anything: people can be at the machine.\n\n" +
+        $"Solution: {solution}\n" +
+        "1. Connect: tc_attach with the solution; if no IDE has it open, tc_open with visible=false. Then tc_coding_rules.\n" +
+        "2. tc_advisor action=start kind=diagnose trigger=machine.\n" +
+        "3. Find where it hangs and why: tc_plc_state, ads_read of the signals and their details below, the runtime messages (tc_errors kind=runtime), " +
+        "the code that sets the signal (tc_find_references, tc_plc_read), the step chains (tc_sfc). Load the skill plc-debugging, and the platform skill if one " +
+        "is named below. Go from the top level down only as far as you need. Prove it with values and code.\n" +
+        "4. tc_advisor action=record with kind=diagnose: finding, evidence (variable = value, object and line), proposal, confidence and order - a " +
+        "self-contained prompt a person sends to an agent, naming the workflow (bug-fix). Say what a person at the machine should check first.\n" +
+        "5. tc_advisor action=finish.\n\n# Context\n" + context;
 
     /// <summary>What the run looks at, collected without an AI: the commits and the diff since --since, the results of the pipeline.</summary>
     static string Context(Args o, string dir)
