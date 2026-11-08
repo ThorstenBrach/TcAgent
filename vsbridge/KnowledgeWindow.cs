@@ -1235,6 +1235,8 @@ namespace TcAgentBridge
             var lockedNote = B(e, "locked") ? ", locked" : "";
             if (st == "replaced") return ("↷ replaced" + lockedNote, Gray);
             if (st == "disabled") return ("⊘ switched off" + lockedNote, Gray);
+            // waits for a plugin, a module or another TcAgent - the column Why says what is missing
+            if (st is "needs plugin" or "needs module" or "needs TcAgent") return ("✗ " + st + lockedNote, Orange);
             var (srcText, srcMark) = SourceState(S(e, "sourceState"));
             if (srcText != null) return (srcText, srcMark);
             return ((st == "forced" ? "✓ applies (forced)" : "✓ applies") + lockedNote, Green);

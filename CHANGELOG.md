@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Fixed
+- **Knowledge window:** an item that waits for a plugin, a module or another TcAgent showed `✓ applies`. It now shows `✗ needs …`,
+  the column Why says what is missing.
 - **`tc_check` and `TcAgent.exe check` said OK despite compiler errors in solutions with several PLC projects**, for example a
   program and a TcUnit project. The next PLC project clears the messages of the one before, and the error list was read only at
   the end, so only the last project counted. The list is now read after each PLC project; the same for `analyze`, `tc_static_analysis` and for
