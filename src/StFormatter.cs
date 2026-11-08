@@ -116,6 +116,7 @@ public static class StFormatter
         if (part == StPart.Implementation)
         {
             lines = JoinShortIfs(lines, cfg);
+            lines = ExpandLongIfs(lines, cfg);
             lines = WrapConditions(lines, cfg);
             lines = WrapCalls(lines, cfg);
             AlignCode(lines, cfg);
@@ -784,6 +785,61 @@ public static class StFormatter
                 }
             }
             r.Add(a);
+        }
+        return r;
+    }
+
+    static bool EndsWithEndIf(Line l)
+    {
+        var sig = l.P.Where(p => !p.T.Comment).Select(p => p.T).ToList();
+        return sig.Count > 0 && (Kw(sig[^1], "END_IF") || sig.Count > 1 && sig[^1].Text == ";" && Kw(sig[^2], "END_IF"));
+    }
+
+    /// <summary>The limit of a one-line IF: layout.short-if when it is a number, otherwise wrap.max-length.</summary>
+    static int OneLineIfLimit(StFormatConfig cfg) => int.TryParse(cfg["layout.short-if"], out int s) && s > 0 ? s : cfg.Int("wrap.max-length", 120);
+
+    /// <summary>layout.long-if = expand: an IF ... END_IF written on one line that is longer than the limit gets its lines:
+    /// IF ... THEN, each statement one level in, ELSIF/ELSE, END_IF. Nested IFs on the line stay as they are.</summary>
+    static List<Line> ExpandLongIfs(List<Line> lines, StFormatConfig cfg)
+    {
+        if (!cfg["layout.long-if"].Equals("expand", StringComparison.OrdinalIgnoreCase)) return lines;
+        int limit = OneLineIfLimit(cfg), tab = cfg.TabWidth;
+        if (limit <= 0) return lines;
+        bool own = cfg["layout.then"].Equals("own-line", StringComparison.OrdinalIgnoreCase);
+        string unit = cfg.IndentUnit;
+        var r = new List<Line>();
+        foreach (var l in lines)
+        {
+            bool one = !l.Frozen && !l.Blank && !l.CommentOnly && !l.Cont && l.P.Count > 3 && Kw(l.P[0].T, "IF") && EndsWithEndIf(l)
+                       && l.P.Count(p => Kw(p.T, "IF")) == 1 && l.P.Count(p => Kw(p.T, "END_IF")) == 1 && l.P.All(p => p.T.Kind != StTok.Pragma)
+                       && !l.P.Take(l.P.Count - 1).Any(p => p.T.Comment);
+            if (!one || Width(l.Indent, tab) + TextWidth(l, 0, l.P.Count, tab) <= limit) { r.Add(l); continue; }
+            var cuts = new SortedSet<int>();
+            int depth = 0;
+            for (int i = 0; i < l.P.Count; i++)
+            {
+                var t = l.P[i].T;
+                if (t.Text is "(" or "[") depth++; else if (t.Text is ")" or "]") depth--;
+                if (depth != 0 || t.Comment) continue;
+                bool rest = l.P.Skip(i + 1).Any(p => !p.T.Comment);
+                if (Kw(t, "THEN", "ELSE") && rest) cuts.Add(i + 1);
+                if (t.Text == ";" && t.Kind == StTok.Punct && rest) cuts.Add(i + 1);
+                if (Kw(t, "ELSIF", "ELSE", "END_IF") && i > 0) cuts.Add(i);
+                if (own && Kw(t, "THEN") && i > 0) cuts.Add(i);
+            }
+            int start = 0;
+            var segs = new List<(int From, int To)>();
+            foreach (var c in cuts) { if (c > start && c < l.P.Count) { segs.Add((start, c)); start = c; } }
+            segs.Add((start, l.P.Count));
+            for (int s = 0; s < segs.Count; s++)
+            {
+                var seg = Segment(l, segs[s].From, segs[s].To, s == 0, s == segs.Count - 1);
+                var f = seg.P.Count > 0 ? seg.P[0].T : null;
+                bool head = s == 0 || Kw(f, "ELSIF", "ELSE", "END_IF", "THEN");
+                seg.Indent = head ? l.Indent : l.Indent + unit;
+                seg.Fixed = true; seg.Depth = l.Depth + (head ? 0 : 1);
+                r.Add(seg);
+            }
         }
         return r;
     }

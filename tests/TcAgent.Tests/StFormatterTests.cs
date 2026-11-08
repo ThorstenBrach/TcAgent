@@ -267,6 +267,16 @@ bLamp := (bEnable AND NOT bPhaseOff);";
     }
 
     [Fact]
+    public void LongerIfsOnOneLineAreExpanded()
+    {
+        var cfg = With("layout.short-if", "40", "layout.long-if", "expand");
+        var r = F("IF bReset THEN nCount := 0; END_IF\nIF bStartConditionsComplete THEN eState := E_State.Run; nCount := 0; ELSE eState := E_State.Idle; END_IF;", StPart.Implementation, cfg);
+        Assert.Null(r.Error);
+        Assert.Equal("IF bReset THEN nCount := 0; END_IF\nIF bStartConditionsComplete THEN\n  eState := E_State.Run;\n  nCount := 0;\nELSE\n  eState := E_State.Idle;\nEND_IF;", N(r.Text));
+        Stable(r.Text, cfg);
+    }
+
+    [Fact]
     public void ConfigFromLevelsLocksAndUnset()
     {
         var c = new StFormatConfig();
