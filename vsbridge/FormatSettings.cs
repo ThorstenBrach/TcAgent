@@ -327,6 +327,7 @@ namespace TcAgentBridge
             list.ColumnDefinitions.Add(new ColumnDefinition());
             var selBrush = new SolidColorBrush(Color.FromArgb(70, 0x3B, 0x6F, 0xD8));
             var detail = new StackPanel { Margin = new Thickness(10, 8, 10, 8) };
+            var folded = new HashSet<TextBlock>();
             var exampleTab = new TabItem { Header = "Example of the rule", ToolTip = "The selected rule alone: the code as written and the result for every value" };
             Action<RuleRow> showDetail = null;
             int r0 = 0;
@@ -345,7 +346,10 @@ namespace TcAgentBridge
                 if (group != lastGroup)
                 {
                     list.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-                    header = new TextBlock { Text = GroupName(group), FontWeight = FontWeights.SemiBold, Margin = new Thickness(4, r0 == 0 ? 2 : 10, 0, 2) };
+                    header = new TextBlock { Text = "▾ " + GroupName(group), Tag = GroupName(group), FontWeight = FontWeights.SemiBold, Margin = new Thickness(4, r0 == 0 ? 2 : 10, 0, 2),
+                                             Cursor = Cursors.Hand, ToolTip = "Click to fold or unfold the rules of this group", Background = Brushes.Transparent };
+                    var h0 = header;
+                    h0.MouseLeftButtonDown += (s, e) => { if (!folded.Add(h0)) folded.Remove(h0); Filter(); e.Handled = true; };
                     AddRow(header, 0, 3); r0++;
                     lastGroup = group;
                 }
@@ -473,13 +477,21 @@ namespace TcAgentBridge
                 var q = search.Text.Trim();
                 hint.Visibility = q.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
                 clear.Visibility = q.Length == 0 ? Visibility.Collapsed : Visibility.Visible;
+                // a folded group shows only its heading; while searching, every match shows
+                var match = rows.ToDictionary(rr => rr, rr => q.Length == 0 || (rr.Label + " " + rr.Key + " " + rr.Description).IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0);
                 foreach (var rr in rows)
                 {
-                    bool show = q.Length == 0 || (rr.Label + " " + rr.Key + " " + rr.Description).IndexOf(q, StringComparison.OrdinalIgnoreCase) >= 0;
+                    bool show = match[rr] && (q.Length > 0 || !folded.Contains(rr.Header));
                     foreach (UIElement el in (UIElement[])rr.Row.Tag) el.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
                 }
                 foreach (var h in rows.Select(x => x.Header).Distinct())
-                    h.Visibility = rows.Any(x => x.Header == h && x.Box.Visibility == Visibility.Visible) ? Visibility.Visible : Visibility.Collapsed;
+                {
+                    bool any = rows.Any(x => x.Header == h && match[x]);
+                    bool open = q.Length > 0 || !folded.Contains(h);
+                    h.Visibility = any ? Visibility.Visible : Visibility.Collapsed;
+                    int n = rows.Count(x => x.Header == h);
+                    h.Text = (open ? "▾ " : "▸ ") + h.Tag + (open ? "" : $"  ({n})");
+                }
             }
             search.TextChanged += (s, e) => Filter();
             clear.Click += (s, e) => { search.Text = ""; search.Focus(); };

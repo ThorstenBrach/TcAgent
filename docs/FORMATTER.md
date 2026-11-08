@@ -15,7 +15,7 @@ The key can be changed or switched off: `"formatHotkey": "Ctrl+Alt+F"` (or `"off
 
 ## Settings with a preview
 
-**Tools > Formatter settings (TcAgent) ...** lists every rule in plain words, grouped, with its value and the level it comes
+**Tools > Formatter settings (TcAgent) ...** lists every rule in plain words, grouped (a click on a heading folds the group), with its value and the level it comes
 from; **Search** (Ctrl+F) finds a rule by name, key or description, **Start from profile** puts the values of a profile into
 the window. The details of the selected rule say what it does, its values, the default and what applies now. Change a rule and
 the preview shows at once what it does - before and after, for the declaration and the implementation, on an example or on
