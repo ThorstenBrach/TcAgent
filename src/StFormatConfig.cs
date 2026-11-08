@@ -75,6 +75,68 @@ public sealed class StFormatConfig
         ["eol.trim-trailing"] = "Spaces at line ends", ["eol.style"] = "Line endings", ["paren.precedence"] = "Brackets for AND in OR",
     };
 
+    /// <summary>The names in German, for the settings window when the chat answers in German (English for every other language).</summary>
+    public static readonly Dictionary<string, (string Label, string Description)> German = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["indent.style"] = ("Einrücken mit", "mit Leerzeichen oder Tabs einrücken"),
+        ["indent.size"] = ("Leerzeichen pro Ebene", "Leerzeichen pro Einrückungsebene (mit Tabs: ein Tab pro Ebene)"),
+        ["indent.tab-width"] = ("Breite eines Tabs", "Breite eines Tabs, für Spalten und Zeilenlänge"),
+        ["indent.case-labels"] = ("CASE-Labels eine Ebene tiefer", "CASE-Labels eine Ebene unter CASE, ihre Anweisungen eine weitere"),
+        ["indent.underscore"] = ("Namen mit _ eine Spalte links", "ein Name mit _ am Anfang eine Spalte weiter links, damit seine Buchstaben unter denen der anderen Namen stehen"),
+        ["indent.continuation"] = ("Fortsetzungszeilen", "Fortsetzungszeilen behalten ihren Versatz zur ersten Zeile, oder eine Ebene"),
+        ["indent.from-ide"] = ("Einrückung aus der IDE", "Einrückungsart und -breite aus den Einstellungen des TwinCAT-Editors übernehmen (in der IDE)"),
+        ["case.keywords"] = ("Schlüsselwörter", "IF, THEN, END_IF, VAR …"),
+        ["case.types"] = ("Datentypen", "BOOL, INT, TIME, STRING …"),
+        ["case.literals"] = ("TRUE, FALSE, T#", "TRUE, FALSE und die Präfixe von Literalen wie T#, INT#"),
+        ["space.operators"] = ("Um Operatoren", "ein Leerzeichen um :=, =>, S=, R=, REF=, + - * /, Vergleiche, AND/OR"),
+        ["space.comma"] = ("Nach Kommas", "kein Leerzeichen vor einem Komma, eins danach"),
+        ["space.decl-colon"] = ("Um den : von Deklarationen", "ein Leerzeichen um den : einer Deklaration"),
+        ["space.tabs"] = ("Tabs innerhalb der Zeile", "ein Tab in der Zeile wird bis zur nächsten Tab-Position mit Leerzeichen aufgefüllt, der Text bleibt in seiner Spalte"),
+        ["space.parens"] = ("In Klammern", "Leerzeichen innerhalb von ( ) und [ ]"),
+        ["space.keyword-paren"] = ("Schlüsselwort und (", "IF (, AND (, NOT ("),
+        ["space.call-paren"] = ("Name und (", "kein Leerzeichen zwischen einem Namen und seiner ("),
+        ["comment.case-labels"] = ("Kommentar über CASE-Labels", "ein Kommentar über jedem CASE-Label ohne Kommentar: der Kommentar des Enum-Werts, sonst sein Name"),
+        ["comment.eol-spaces"] = ("Vor Kommentaren am Zeilenende", "Leerzeichen vor einem Kommentar am Ende einer Codezeile (Implementierung)"),
+        ["layout.blocks"] = ("Eine Anweisung pro Zeile", "eine Anweisung pro Zeile; die Rümpfe von IF, CASE, FOR, WHILE und REPEAT auf eigenen Zeilen"),
+        ["layout.short-if"] = ("Kurzes IF in einer Zeile bis", "IF … THEN mit einer Anweisung und END_IF in einer Zeile, wenn es höchstens so viele Zeichen lang ist"),
+        ["layout.long-if"] = ("Längeres IF in einer Zeile", "ein einzeiliges IF … END_IF, das länger als die Grenze ist, bekommt eine Anweisung pro Zeile"),
+        ["layout.then"] = ("THEN, DO, OF", "THEN, DO und OF am Ende der Bedingung oder in einer eigenen Zeile"),
+        ["align.decl"] = ("Deklarationen: der :", "der : von Deklarationen in einer Spalte"),
+        ["align.decl-init"] = ("Deklarationen: das :=", "das := der Anfangswerte in einer Spalte"),
+        ["align.eol-comments"] = ("Deklarationen: Kommentare", "Kommentare am Ende von Deklarationen in einer Spalte"),
+        ["align.assignments"] = ("Zuweisungen: das :=", "das := aufeinander folgender Zuweisungen in einer Spalte"),
+        ["align.named-args"] = ("Benannte Parameter", "das := und => benannter Parameter in einer Spalte, wenn ein Aufruf einen pro Zeile hat"),
+        ["align.max-pad"] = ("Höchste Auffüllung einer Spalte", "keine Ausrichtung einer Gruppe, wenn eine Zeile mehr Auffüllung bräuchte"),
+        ["wrap.max-length"] = ("Längste Zeile", "längste Zeile; 0 = nie umbrechen"),
+        ["wrap.call-args"] = ("Lange Aufrufe", "ein zu langer Aufruf: ein Parameter pro Zeile, ) in eigener Zeile"),
+        ["wrap.conditions"] = ("Lange Bedingungen", "eine zu lange Bedingung oder boolesche Zuweisung: ein Term pro Zeile am schwächsten AND/OR"),
+        ["wrap.operator"] = ("AND / OR stehen", "wo AND/OR stehen, wenn eine Bedingung umbrochen wird"),
+        ["blank.max"] = ("Leerzeilen hintereinander", "höchstens so viele Leerzeilen hintereinander"),
+        ["blank.body-edges"] = ("Leerzeilen an den Rändern", "Leerzeilen am Anfang und Ende eines Teils"),
+        ["blank.case-branches"] = ("Leerzeilen in CASE", "eine Leerzeile zwischen den CASE-Zweigen, nach der Label-Zeile, oder beides"),
+        ["blank.around-blocks"] = ("Leerzeilen um Blöcke", "eine Leerzeile vor und nach IF-, CASE-, FOR-, WHILE- und REPEAT-Blöcken"),
+        ["eol.trim-trailing"] = ("Leerzeichen am Zeilenende", "Leerzeichen am Ende von Zeilen entfernen"),
+        ["eol.style"] = ("Zeilenenden", "Zeilenenden"),
+        ["paren.precedence"] = ("Klammern für AND in OR", "Klammern um AND-Gruppen in einem OR, damit die Reihenfolge sichtbar ist (die Bedeutung bleibt)"),
+    };
+
+    /// <summary>The values in plain words: value → (English, German). A number stays a number.</summary>
+    public static readonly Dictionary<string, (string En, string De)> ValueLabels = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["preserve"] = ("keep as written", "so lassen, wie geschrieben"), ["true"] = ("yes", "ja"), ["false"] = ("no", "nein"),
+        ["one"] = ("one space", "ein Leerzeichen"), ["none"] = ("no space", "kein Leerzeichen"),
+        ["upper"] = ("UPPER CASE", "GROSS"), ["lower"] = ("lower case", "klein"),
+        ["spaces"] = ("spaces", "Leerzeichen"), ["tabs"] = ("tabs", "Tabs"),
+        ["expand"] = ("split into lines", "auf Zeilen aufteilen"), ["when-long"] = ("when too long", "wenn zu lang"), ["never"] = ("never", "nie"),
+        ["first"] = ("at the start of the line", "am Zeilenanfang"), ["last"] = ("at the end of the line", "am Zeilenende"),
+        ["add"] = ("add", "einfügen"), ["remove"] = ("remove", "entfernen"), ["replace"] = ("replace with spaces", "durch Leerzeichen ersetzen"),
+        ["off"] = ("off", "aus"), ["enum"] = ("from the enum, else the name", "aus der Enum, sonst der Name"),
+        ["between"] = ("between the branches", "zwischen den Zweigen"), ["after-label"] = ("after the label", "nach dem Label"), ["both"] = ("both", "beides"),
+        ["same-line"] = ("at the end of the condition", "am Ende der Bedingung"), ["own-line"] = ("on its own line", "in eigener Zeile"),
+        ["declarations"] = ("in declarations", "in Deklarationen"), ["everywhere"] = ("everywhere", "überall"),
+        ["indent"] = ("one level in", "eine Ebene eingerückt"), ["crlf"] = ("CRLF (Windows)", "CRLF (Windows)"), ["lf"] = ("LF (Unix)", "LF (Unix)"),
+    };
+
     public static readonly Dictionary<string, Dictionary<string, string>> Profiles = new(StringComparer.OrdinalIgnoreCase)
     {
         ["twincat"] = new(),
@@ -185,8 +247,11 @@ public sealed class StFormatConfig
         {
             ["value"] = this[r.Key], ["from"] = Source[r.Key], ["default"] = r.Default, ["values"] = r.Values, ["description"] = r.Description,
             ["label"] = Labels.TryGetValue(r.Key, out var lab) ? lab : r.Key,
+            ["labelDe"] = German.TryGetValue(r.Key, out var de) ? de.Label : null,
+            ["descriptionDe"] = German.TryGetValue(r.Key, out var de2) ? de2.Description : null,
             ["locked"] = Locked.TryGetValue(r.Key, out var by) ? by : null
         }))),
+        ["valueLabels"] = new JsonObject(ValueLabels.Select(v => KeyValuePair.Create(v.Key, (JsonNode)new JsonObject { ["en"] = v.Value.En, ["de"] = v.Value.De }))),
         ["profiles"] = new JsonObject(Profiles.Select(p => KeyValuePair.Create(p.Key,
             (JsonNode)new JsonObject(Rules.Select(r => KeyValuePair.Create(r.Key, (JsonNode)(p.Value.TryGetValue(r.Key, out var v) ? v : r.Default))))))),
         ["fromFiles"] = FromFiles,

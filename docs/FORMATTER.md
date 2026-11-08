@@ -25,6 +25,8 @@ chosen level (project, user, team, company; a backup of the levels is made first
 "⊘ locked by ..." and cannot be changed; a changed one shows "✎ changed, not saved" until it is saved. The tab **Example of the rule**
 shows the selected rule alone: the code as written and the result for every value, side by side.
 
+The window speaks German when the TcAgent Chat answers in German (or, without a set answer language, Windows is German), English otherwise; values are shown in plain words ("keep as written" for `preserve`, "UPPER CASE" for `upper` …), `formatting.json` keeps the short keys.
+
 **Wish a rule or feature ...** opens a new issue on GitHub with the example of the preview: what the code looks like, what the
 formatter makes of it today, and a place for what you would like instead. Check it in the browser, remove names of customers
 or plants, and send it yourself.
