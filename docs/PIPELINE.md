@@ -207,6 +207,36 @@ TcAgent.exe hil --solution .\MyMachine.sln --target 5.80.201.232.1.1 --allow 5.8
   (outputs off) unless `--keep-running` is given.
 * One HIL job per test PLC at a time (GitLab `resource_group`, Azure exclusive lock / environment, GitHub `concurrency`).
 
+## Advisor
+
+Advisor Shadow ([ADVISOR.md](ADVISOR.md)) reads and advises, it changes nothing. In the pipeline it runs after a failure and,
+as a job of its own, at night; the advice goes into `.tcagent\advisor` of the checkout (commit it, or upload it as an artifact)
+and is rated in the Knowledge window.
+
+```yaml
+      - name: Advisor (cause of the failure)
+        if: failure()
+        run: '& $env:TCAGENT advise --trigger pipeline --results results; exit 0'
+```
+
+```yaml
+on:
+  schedule:
+    - cron: "0 1 * * *"          # every night at 1:00 UTC
+jobs:
+  advisor:
+    runs-on: [self-hosted, windows, twincat]
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 50 }
+      - run: '& $env:TCAGENT advise --trigger nightly; exit 0'
+        shell: powershell
+```
+
+- Without `--solution` the only solution of the repository is taken.
+- The run uses Claude Code for now: sign it in once for the user the runner runs as.
+- Nothing committed in the last 24 hours: no run, no tokens. A run stops after 15 minutes (`--minutes`).
+
 ## Library and its tests in one solution
 
 Keep the library code and its tests as **two PLC projects in one solution** – the library project never contains test

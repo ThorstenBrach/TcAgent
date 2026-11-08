@@ -55,7 +55,7 @@ public static class Modules
         ["scope"] = "tc_scope_new tc_scope",
         ["safety"] = "tc_safety",
         ["docs"] = "tc_doc tc_userdoc tc_risk_rules",
-        ["knowledge"] = "tc_docs tc_docs_add tc_knowledge tc_skills tc_workflow tc_lessons tc_improve tc_sources",
+        ["knowledge"] = "tc_docs tc_docs_add tc_knowledge tc_skills tc_workflow tc_lessons tc_improve tc_sources tc_advisor",
         ["packages"] = "tc_packages tc_packages_change tc_library tc_library_save tc_plc_library_add tc_sbom tc_library_lock",
         ["system"] = "tc_new_solution tc_plc_project_add tc_task tc_licenses tc_realtime tc_coe tc_twincat_version tc_platform tc_archive tc_variant " +
                      "tc_route_search tc_route_add tc_tccom",

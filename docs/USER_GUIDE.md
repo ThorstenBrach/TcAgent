@@ -397,6 +397,14 @@ than two runs the chart says so instead of staying empty.
 
 <p><img src="img/knowledge/workflow-runs.png" width="900" alt="Workflow runs: the course of a workflow and the adopted improvements"><br><em>Workflow runs: the course of a workflow and the adopted improvements (here before the first run)</em></p>
 
+### Advisor
+
+The advice of the Advisor runs ([ADVISOR.md](ADVISOR.md)), newest first, with its finding, evidence, proposal and order.
+**Right**, **Partly**, **Wrong** and **n/a** rate it with one click (a "wrong" asks what is wrong); the heading shows the
+hit rate per kind of task. **Act on it …** (or a double-click) opens the TcAgent Chat with the order in the input: you read
+it, change it and send it. The Advisor itself never changes anything. A run starts in the chat with `/advise`, or without a
+window with `TcAgent.exe advise`.
+
 ### Backup and restore
 
 The tab **Backups** (and **⋯ > Backup now … / Restore …**): the knowledge of every level – coding rules, risk rules, skills, workflows,
@@ -2088,7 +2096,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 97 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 98 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
@@ -2117,5 +2125,5 @@ All 97 tools and the section of this guide that covers them. Parameters: [TOOLS.
 | `tc_docs`, `tc_docs_add`, `tc_lessons` | [Knowledge: documentation and lessons learned](#knowledge-documentation-and-lessons-learned) |
 | `tc_dialogs` | [IDE dialogs](#ide-dialogs) |
 | `tc_feedback`, `tc_policy` | [Feedback and audit](#feedback-and-audit) |
-| `tc_knowledge`, `tc_skills`, `tc_workflow`, `tc_improve`, `tc_sources` | [Coding rules](#coding-rules) (levels, platform, skills) |
+| `tc_knowledge`, `tc_skills`, `tc_workflow`, `tc_improve`, `tc_sources`, `tc_advisor` | [Coding rules](#coding-rules) (levels, platform, skills) |
 | `tc_ask_user` | [What the VS extension adds](#what-the-vs-extension-tcagentbridge-adds) (questions to the user, every client) |

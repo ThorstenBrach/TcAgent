@@ -74,13 +74,14 @@ as lessons, rules and skills for the next job.
 | **Your risk checks** | Extend the risk analysis with your own rules (regex, tested on the project first), tune or switch off the built-in ones, add checks the agent reviews by reading the code – per project/person/company | `tc_risk_rules` |
 | **Skills & workflows** | How your team does a task, in the open Agent Skills format (built-in: requirements interview, PLC debugging, code review, spec review, alarm diagnosis, ST patterns and more), workflows with checkpoints TcAgent enforces (e.g. `tc_check` with 0 errors before the review; activation only after a clean build), levels company / user / platform / project | `tc_skills`, `tc_workflow`, `tc_knowledge` |
 | **Self-improvement** | Local run logs of the workflows (counts only), KPIs and trends, improvement proposals found by fixed rules – applied only after you agree, measured over the next 10 runs, reverted if they did not help; window **TcAgent Knowledge** with overview, effective knowledge, sources and history | `tc_improve` |
+| **Advisor** | An agent that reads and advises, never changes: at night or after a failed pipeline it reviews what changed and records findings with evidence and a ready order; you rate them and send the order to an agent with one click | `tc_advisor`, `TcAgent.exe advise` – [docs/ADVISOR.md](docs/ADVISOR.md) |
 | **Prompt library** | Prepared prompts in the TcAgent Chat: `/` or **Prompts** lists them with search and preview, placeholders from the editor; on every knowledge level and from Git repositories | `TcAgent.exe prompts` |
 | **TcAgent Chat** | Answer language, folders shared with the agent (read without asking, kept for this chat or in the knowledge), notice of new versions with release notes and a checked download, About with versions and licenses, Reset TcAgent | **⋯** in the chat |
 | **Skill sources** | Skills, workflows and rules from Git repositories with lock file, license check, plugin and version check, and overlay; `TcAgent.exe sources sync` restores the pinned set in a pipeline | `tc_sources` |
 | **Reference** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 | **Modules & plugins** | Switch groups of tools on or off per user, project, team or company (a shorter tool list for the agent; the command line keeps everything); your own tools as plugins – any program that speaks MCP, with the same policy, confirmation and audit, project plugins only after your approval; tab **Modules** in the Knowledge window | `TcAgent.exe modules`, `TcAgent.exe plugins` – [docs/PLUGINS.md](docs/PLUGINS.md) |
 
-All 97 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 98 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 What you can do, explained step by step with example prompts: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 

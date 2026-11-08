@@ -29,6 +29,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **`tc_library action=resolve`:** the name alone is enough, and the answer is the effective version instead of `*`.
 
 ### Added
+- **Advisor (Shadow):** an agent that reads and advises, never changes. `tc_advisor` keeps advice with evidence and a ready
+  order in the project (`.tcagent\advisor`), a run is read only (TcAgent refuses every change). `TcAgent.exe advise` runs it
+  without a window at night or after a failed pipeline, `/advise` in the chat. The Knowledge window has a tab Advisor: rate
+  with one click, **Act on it …** puts the order into the chat. [docs/ADVISOR.md](docs/ADVISOR.md)
 - **Knowledge follows the modules:** skills, workflows, prompts, rules and lessons can name the modules they need
   (`tcagent-requires-module: scope`). While one is switched off they show `needs module` and do not take effect. Items that only
   name tools of a switched-off module stay active, with a note in the lists.

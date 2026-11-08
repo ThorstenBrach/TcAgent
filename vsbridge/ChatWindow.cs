@@ -229,6 +229,13 @@ namespace TcAgentBridge
             UpdateVersionLabel();      // e.g. after the automatic setup at startup ("TcAgent x registered")
         }
 
+        /// <summary>Puts a text into the input without sending it (Knowledge window: the order of an advice) - the person reads and sends.</summary>
+        internal void Prefill(string text)
+        {
+            input.Text = text ?? "";
+            FocusInput();
+        }
+
         internal void FocusInput()
         {
             input.Focus();

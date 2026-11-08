@@ -16,6 +16,7 @@
     <Compile Include="..\..\src\Guards.cs" Link="src\Guards.cs" />
     <Compile Include="..\..\src\TcUnitResults.cs" Link="src\TcUnitResults.cs" />
     <Compile Include="..\..\src\ToolReports.cs" Link="src\ToolReports.cs" />
+    <Compile Include="..\..\src\Advisor.cs" Link="src\Advisor.cs" />
     <Compile Include="..\..\src\LibApi.cs" Link="src\LibApi.cs" />
     <Compile Include="..\..\src\SourceControlBindings.cs" Link="src\SourceControlBindings.cs" />
     <Compile Include="..\..\src\AskQuestions.cs" Link="src\AskQuestions.cs" />
