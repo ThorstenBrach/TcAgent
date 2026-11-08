@@ -377,6 +377,10 @@ public static class Sources
         return list;
     }
 
+    /// <summary>Does the lock key (kind/name) mean the item: by its name, or by kind/name when a skill and a prompt share a name.</summary>
+    public static bool IsItem(string key, string item) =>
+        item != null && (item.Contains('/') ? key.Equals(item, StringComparison.OrdinalIgnoreCase) : key.Split('/')[1].Equals(item, StringComparison.OrdinalIgnoreCase));
+
     /// <summary>The installed path of a lock entry.</summary>
     public static string InstalledPath(string root, string key, LockEntry e) =>
         FolderKinds.ContainsKey(KindDir(key)) ? Path.Combine(root, KindDir(key), key.Split('/')[1]) : Path.Combine(root, KindDir(key), Path.GetFileName(e.Path));

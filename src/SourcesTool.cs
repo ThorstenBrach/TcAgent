@@ -62,11 +62,11 @@ public sealed partial class ToolRegistry
     // local changes of an installed item (SourcesMerge.cs)
     static string SourcesLocal(JsonObject a, string dir)
     {
-        var name = (Str(a, "item") ?? throw new ArgumentException("item is required")).Split('/').Last();
-        var hits = InstallRoots(dir).SelectMany(r => Sources.LoadLock(r.Root).Where(x => x.Key.Split('/')[1].Equals(name, StringComparison.OrdinalIgnoreCase))
+        var name = Str(a, "item") ?? throw new ArgumentException("item is required");      // a name, or kind/name when a name is used by two kinds
+        var hits = InstallRoots(dir).SelectMany(r => Sources.LoadLock(r.Root).Where(x => Sources.IsItem(x.Key, name))
                                                                             .Select(x => (r.Label, r.Root, x.Key, x.Value)))
                                     .Where(h => Str(a, "scope") is not { } sc || h.Label.Equals(sc, StringComparison.OrdinalIgnoreCase)).ToList();
-        if (hits.Count != 1) throw new ArgumentException(hits.Count == 0 ? $"'{name}' is not installed from a source" : $"'{name}' is installed on several levels - give scope");
+        if (hits.Count != 1) throw new ArgumentException(hits.Count == 0 ? $"'{name}' is not installed from a source" : $"'{name}' is installed several times ({string.Join(", ", hits.Select(h => $"{h.Key} on {h.Label}"))}) - give item as kind/name, or scope");
         var (label, root, key, e) = hits[0];
         var src = Sources.All(dir).FirstOrDefault(x => x.Name == e.Source) ?? new Sources.Source { Name = e.Source, Url = e.Url };
         switch (Str(a, "action")!.ToLowerInvariant())
@@ -189,7 +189,7 @@ public sealed partial class ToolRegistry
         foreach (var (label, root) in InstallRoots(dir))
             foreach (var (key, e) in Sources.LoadLock(root))
             {
-                if (only != null && !key.Split('/')[1].Equals(only, StringComparison.OrdinalIgnoreCase)) continue;
+                if (only != null && !Sources.IsItem(key, only)) continue;
                 var src = Sources.All(dir).FirstOrDefault(x => x.Name == e.Source) ?? new Sources.Source { Name = e.Source, Url = e.Url };
                 if (!fetched.TryGetValue(src.Name, out var up))
                     try { fetched[src.Name] = up = Sources.Fetch(src); }
@@ -229,7 +229,7 @@ public sealed partial class ToolRegistry
     {
         var name = item.Split('/').Last();
         foreach (var (label, root) in InstallRoots(dir))
-            foreach (var (key, e) in Sources.LoadLock(root).Where(x => x.Key.Split('/')[1].Equals(name, StringComparison.OrdinalIgnoreCase)))
+            foreach (var (key, e) in Sources.LoadLock(root).Where(x => Sources.IsItem(x.Key, name)))
             {
                 var src = Sources.All(dir).FirstOrDefault(x => x.Name == e.Source) ?? new Sources.Source { Name = e.Source, Url = e.Url };
                 var up = Sources.Fetch(src);
