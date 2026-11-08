@@ -57,6 +57,7 @@ namespace TcAgentBridge
 
         InlineAsk(string ctx, System.Windows.Forms.Control editor, bool busy, string backendName)
         {
+            Icon = BridgePackage.AppIcon;
             this.ctx = ctx;
             this.editor = editor;
             WindowStyle = WindowStyle.None;
