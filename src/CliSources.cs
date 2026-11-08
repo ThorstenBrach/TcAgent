@@ -59,11 +59,11 @@ public static partial class Cli
         // an installed item by name (and level label, if it is installed on several levels)
         (string Label, string Root, string Key, Sources.LockEntry E, Sources.Source Src) Locate()
         {
-            var hits = roots.SelectMany(r => Sources.LoadLock(r.Root).Where(x => x.Key.Split('/')[1].Equals(o.Item ?? "", StringComparison.OrdinalIgnoreCase))
+            var hits = roots.SelectMany(r => Sources.LoadLock(r.Root).Where(x => Sources.IsItem(x.Key, o.Item ?? ""))
                                                                       .Select(x => (r.Label, r.Root, x.Key, x.Value)))
                             .Where(h => o.Level == null || h.Label.Equals(o.Level, StringComparison.OrdinalIgnoreCase)).ToList();
             if (hits.Count == 0) throw new ArgumentException($"'{o.Item}' is not installed from a source");
-            if (hits.Count > 1) throw new ArgumentException($"'{o.Item}' is installed on several levels ({string.Join(", ", hits.Select(h => h.Label))}) - give --level");
+            if (hits.Count > 1) throw new ArgumentException($"'{o.Item}' is installed several times ({string.Join(", ", hits.Select(h => $"{h.Key} on {h.Label}"))}) - give --item kind/name or --level");
             var h = hits[0];
             return (h.Label, h.Root, h.Key, h.Value, Sources.All(dir).FirstOrDefault(x => x.Name == h.Value.Source) ?? new Sources.Source { Name = h.Value.Source, Url = h.Value.Url });
         }
@@ -197,7 +197,7 @@ public static partial class Cli
                 foreach (var (label, root) in roots)
                     foreach (var (key, e) in Sources.LoadLock(root))
                     {
-                        if (o.Item != null && !key.Split('/')[1].Equals(o.Item, StringComparison.OrdinalIgnoreCase)) continue;
+                        if (o.Item != null && !Sources.IsItem(key, o.Item)) continue;
                         var src = Sources.All(dir).FirstOrDefault(x => x.Name == e.Source) ?? new Sources.Source { Name = e.Source, Url = e.Url };
                         var up = Sources.Fetch(src);
                         if (up == e.Commit || Sources.Git(Sources.CacheOf(src.Name), $"log --format=%h {e.Commit}..{up} -- \"{e.Path}\"").Length == 0) continue;
@@ -218,7 +218,7 @@ public static partial class Cli
             default:   // diff
             {
                 foreach (var (label, root) in roots)
-                    foreach (var (key, e) in Sources.LoadLock(root).Where(x => x.Key.Split('/')[1].Equals(o.Item ?? "", StringComparison.OrdinalIgnoreCase)))
+                    foreach (var (key, e) in Sources.LoadLock(root).Where(x => Sources.IsItem(x.Key, o.Item ?? "")))
                     {
                         var src = Sources.All(dir).FirstOrDefault(x => x.Name == e.Source) ?? new Sources.Source { Name = e.Source, Url = e.Url };
                         var up = Sources.Fetch(src);

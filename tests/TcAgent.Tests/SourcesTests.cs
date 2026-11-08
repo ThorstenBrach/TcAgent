@@ -55,6 +55,16 @@ public sealed class SourcesTests : IDisposable
     public void Licenses(string text, string id, string cls) => Assert.Equal((id, cls), Sources.ClassifyLicense(text));
 
     [Fact]
+    public void ItemByNameOrByKindAndName()
+    {
+        Assert.True(Sources.IsItem("skills/new-command", "new-command"));
+        Assert.True(Sources.IsItem("prompts/new-command", "new-command"));        // by name: both - the caller says it is ambiguous
+        Assert.True(Sources.IsItem("skills/new-command", "Skills/New-Command"));
+        Assert.False(Sources.IsItem("prompts/new-command", "skills/new-command"));
+        Assert.False(Sources.IsItem("skills/other", "new-command"));
+    }
+
+    [Fact]
     public void MetadataIsAddedOrReplaced()
     {
         var t = Sources.AddMeta("---\nname: a\nmetadata:\n  tcagent-owner: x\n---\nbody\n", new Dictionary<string, string> { ["tcagent-source"] = "s/a" });

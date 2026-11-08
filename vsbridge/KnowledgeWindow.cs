@@ -1836,14 +1836,14 @@ namespace TcAgentBridge
             {
                 foreach (var i in tied)
                 {
-                    var item = (S(i, "key") ?? "").Split('/').Last();
+                    var item = S(i, "key") ?? "";
                     var verb = changed.Contains(i) ? "detach" : "uninstall";
                     var (iok, iout) = await Cli($"sources {verb} --item {Quote(item)} --level {Quote(S(i, "level"))}", (verb == "detach" ? "Keeping " : "Uninstalling ") + item);
                     if (!iok) failed.Add($"{S(i, "key")}: {iout.Trim().Split('\n')[0]}");
                 }
             }
             var (ok, output) = await Cli($"sources remove --name {Quote(name)} --level {(S(l.D, "level") == "project" ? "project" : "personal")}", "Deleting the source");
-            if (failed.Count > 0) Report(false, "Not removed:\n" + string.Join("\n", failed), "Delete source");
+            if (failed.Count > 0) Report(false, (ok ? $"Source {name} deleted, but these items were not removed - uninstall them in \"Installed from sources\":\n" : "Not removed:\n") + string.Join("\n", failed), "Delete source");
             else Report(ok, removeItems ? $"Source {name} deleted; {plain.Count} item(s) uninstalled" + (changed.Count > 0 ? $", {changed.Count} kept as your own version." : ".") : output, "Delete source");
             Load();
         }
@@ -2011,7 +2011,7 @@ namespace TcAgentBridge
         (string Name, string Level) Installed()
         {
             if (!(installedList.SelectedItem is Line l)) { Hint("Select an installed item first."); return (null, null); }
-            return ((S(l.D, "key") ?? "").Split('/').Last(), S(l.D, "level"));
+            return (S(l.D, "key"), S(l.D, "level"));     // kind/name: a skill and a prompt may share a name
         }
 
         // a preview first (nothing changed), then the merge after asking; conflicts stay marked in the file
@@ -2162,7 +2162,7 @@ namespace TcAgentBridge
         void DiffInstalled()
         {
             if (!(installedList.SelectedItem is Line l)) { Hint("Select an installed item first."); return; }
-            RunAsyncTo("sources diff --item " + Quote((S(l.D, "key") ?? "").Split('/').Last()), sourceDetail);
+            RunAsyncTo("sources diff --item " + Quote(S(l.D, "key") ?? ""), sourceDetail);
         }
 
         // ------------------------------------------------------------------ backups of the knowledge levels
