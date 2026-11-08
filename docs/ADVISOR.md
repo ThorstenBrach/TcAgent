@@ -4,6 +4,8 @@ The Advisor is an agent that looks, advises and hands over a ready order – it 
 advice, rates it, and sends the order to an agent when it should be acted on. That agent then works as usual, with
 workflows, checkpoints and confirmations.
 
+<p align="center"><img src="img/advisor-phases.svg" width="900" alt="The Advisor goes with the plant from development to operation: Advisor Shadow at night in the pipeline, Advisor Live at commissioning and in operation. It reads and advises, it changes nothing."></p>
+
 | | Advisor Shadow | Advisor Live |
 |---|---|---|
 | When | in the background: at night, after a commit, after a failed pipeline | at the running plant: commissioning, troubleshooting in operation |

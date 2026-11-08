@@ -42,6 +42,22 @@ a workflow only goes on when its checkpoint is proven, and nothing reaches a PLC
 The same steps run without an AI in your pipeline, see [In your CI pipeline](#in-your-ci-pipeline). What the agent learns on the way stays
 as lessons, rules and skills for the next job.
 
+### And after the deploy: the Advisor goes with the plant
+
+The job does not end when the code is on the PLC. The **Advisor** stays with the project through all phases - it reads and
+advises, it never changes the project or the PLC. Each finding comes with evidence and a ready order; you rate it, and
+**Act on it** hands the order to an agent that works through the steps above.
+
+<p align="center"><img src="docs/img/advisor-phases.svg" width="900" alt="The Advisor goes with the plant from development to operation: Advisor Shadow at night in the pipeline, Advisor Live at commissioning and in operation. It reads and advises, it changes nothing."></p>
+
+| Phase | The Advisor | Started by |
+|---|---|---|
+| **Development** | **Shadow:** at night, after a commit or a failed pipeline it reviews what changed and finds the cause - the findings wait for you in the morning | `TcAgent.exe advise --trigger nightly\|commit\|pipeline`, `/advise`, `/review-prj` |
+| **Commissioning** | **Live:** at the running plant it reads values, step chains and I/O and tells you why a station hangs, in the conversation | `/advise-live` in the chat |
+| **Operation** | **Live:** for maintenance it finds the cause of a fault - started by a person, or by a watch on alarms, PLC exceptions and your fault signals | `/advise-live`, `TcAgent.exe advise watch --run` |
+
+Details: [docs/ADVISOR.md](docs/ADVISOR.md).
+
 ## What the agent can do
 
 | Area | What it means for you | Tools |
