@@ -27,6 +27,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **`tc_library action=resolve`:** the name alone is enough, and the answer is the effective version instead of `*`.
 
 ### Added
+- **Knowledge follows the modules:** skills, workflows, prompts, rules and lessons can name the modules they need
+  (`tcagent-requires-module: scope`). While one is switched off they show `needs module` and do not take effect. Items that only
+  name tools of a switched-off module stay active, with a note in the lists.
 - **Specification before code:** the new checkpoint `spec-ok` in the workflow `new-feature`. The agent interviews you, TcAgent then asks
   you itself to confirm the specification or to skip it, and until then the run writes no PLC code.
 - Agent guide: a result counts only with a tool output from after the last change, and a check-and-fix loop stops after 3 rounds

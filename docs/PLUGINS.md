@@ -37,6 +37,9 @@ switch it on. A module that needs a switched-off one is off as well (`test` with
 The later level wins (company → team → user → project), except for modules that the company or team level lists under
 `locked` – a user or project cannot change those. `core` cannot be switched off.
 
+Knowledge follows the modules: skills, workflows, prompts, rules and lessons with `tcagent-requires-module` wait while their
+module is off, and those that only name its tools get a note ([KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md)).
+
 ```
 TcAgent.exe modules                                  the state of every module and where it was set
 TcAgent.exe modules --solution <sln> --json          the same with the project level, as JSON

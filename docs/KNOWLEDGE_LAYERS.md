@@ -233,6 +233,10 @@ metadata:
 - **And a version of TcAgent:** `tcagent-requires-tcagent: >=0.53` under `metadata`, for an item that uses a tool or
   function older versions do not have. It works the same way: refused at install and `pull`, the status `needs TcAgent`
   for an item already there. Set it only when the item really needs that version.
+- **And modules:** `tcagent-requires-module: scope, hmi` under `metadata`, for an item that cannot work without them. While one
+  of them is switched off (`modules.json`), the item has the status `needs module` and does not take effect; it can still be
+  installed, because switching a module on again is enough. An item that only names tools of a switched-off module stays
+  active and gets a note in the lists and in the knowledge window: a review works without the static analysis.
 - **`tc_skills`** (actions `list`, `show`, `add`) delivers the skills through MCP in every AI client, independent of
   where a client looks for skills. TcAgent resolves levels, platform, `locked` and `force`. The agent gets the list
   (name and description) together with the coding rules and loads a skill only when the task fits – the context stays
