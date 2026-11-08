@@ -50,6 +50,7 @@ least one AI client is signed in.
 - [Knowledge: documentation and lessons learned](#knowledge-documentation-and-lessons-learned)
 - [IDE dialogs](#ide-dialogs)
 - [Feedback and audit](#feedback-and-audit)
+- [Advisor: findings that change nothing](#advisor-findings-that-change-nothing)
 - [CI pipeline](#ci-pipeline)
 - [Safety and guardrails](#safety-and-guardrails)
 - [Configuration reference](#configuration-reference)
@@ -1765,6 +1766,26 @@ feedback"* (`action=summary`), *"Mark FB-1A2B3C4D as resolved in 0.22.3"* (`acti
   audit file, …). `date` accepts `2026-10-12`, `12.10.` or `yesterday`.
 
 ---
+
+## Advisor: findings that change nothing
+
+The Advisor reads, finds and hands you a ready order for an agent - it never changes the project or the PLC. Details:
+[ADVISOR.md](ADVISOR.md).
+
+### Example prompts
+
+- `/advise` – a review of the open object or of today's changes
+- `/advise-live` – "Station 3 hangs in step 40": a diagnosis at the running plant, from values and code
+- `/review-prj` – the whole project, e.g. for an acceptance: checks over everything, deep reviews of the hotspots, a report
+- "Remember: `MAIN.fbStation.nFault` other than 0 is a fault" – a fault signal for the watch (after you agreed)
+
+### What happens
+
+- The session is read only until the run ends; TcAgent refuses every change. Before reading code at a running plant, it checks
+  that the project matches what runs on the PLC - if not, it says so and concludes only from values.
+- Each finding is recorded with evidence and an order (tab **Advisor** of the knowledge window). **Act on it …** puts the
+  order into the chat; the agent that does the work marks it done.
+- Without a window: `TcAgent.exe advise` at night or after a failed pipeline, `TcAgent.exe advise watch --run` at the plant.
 
 ## CI pipeline
 
