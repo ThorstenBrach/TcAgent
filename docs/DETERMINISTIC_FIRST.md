@@ -23,6 +23,8 @@ slightly different result every time for work that follows fixed rules. TcAgent 
 | Refactoring | `tc_refactor action=analyze`: missing comments, unclear names, external use (callers, I/O, HMI, persistent) | the new names and comments |
 | Risk analysis | Built-in and own regex rules on the code (`tc_doc action=risks`, `tc_risk_rules`) | judging the findings |
 | Documentation | Call hierarchy, call graph, class diagram, step chains, reference per object (`tc_doc`) | overview and short explanations |
+| Advisor | Context of a run without AI (commits and diff, pipeline results); no run when nothing was committed; runtime and PLC state, cycle time and fault signals of the watch; does the code in the IDE match the PLC (project name, build time, newer sources) | finding the cause, the order |
+| Specification | `spec-ok`: TcAgent asks the user itself and refuses code before the answer; the question at the first new function outside a workflow | the interview and the specification |
 | Plain-text ST | Export/import of the whole PLC code with a check that the text reproduces the project | – |
 | Tests | TcUnit discovery from the code, selection by enable bools, run, report | writing the tests |
 | Supply chain | SBOM, library lock, skill lock file with license check (0.34) | – |

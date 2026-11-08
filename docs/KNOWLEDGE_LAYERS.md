@@ -333,6 +333,9 @@ description: Add a driver FB for a new device
     much faster - errors are fixed with checks, the build runs once); a workflow for other work TcAgent does (documentation, I/O
     configuration, analysis, commissioning) defines its own checkpoints or none. Only the gate before `tc_activate` is
     global, because an activation always needs code that builds.
+  - `new-feature` starts with **`spec-ok`**: the user confirms the specification, or chooses to go on without one - TcAgent
+    asks them itself, and no PLC code is written before. Outside a workflow, the first new function of a chat makes TcAgent ask the
+    same once. The Advisor ([ADVISOR.md](ADVISOR.md)) reads only: its findings carry an order a person sends to an agent.
 
 ## Self-improvement
 

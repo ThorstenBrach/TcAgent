@@ -53,7 +53,8 @@ Advice that stays unrated for 14 days no longer counts as open.
 
 ## Starting a run
 
-**In the chat:** the prompt `/advise` – choose the kind (review, diagnose, cause) and what to look at.
+**In the chat:** the prompt `/advise` – choose the kind (review, diagnose, cause) and what to look at. `/review-prj` reviews a
+whole project with the workflow `project-review` and records its findings as advice too.
 
 **Without a window** (pipeline, scheduled task):
 

@@ -201,6 +201,12 @@ The template is a start; add steps as needed (all in [PIPELINE.md](PIPELINE.md))
 | SBOM (CycloneDX) | `TcAgent.exe sbom --solution … --out results/sbom.cdx.json` |
 | all steps from `.tcagent/pipeline.json` | `TcAgent.exe ci` (template [github-actions-ci.yml](pipeline/github-actions-ci.yml)) |
 
+## Advisor on the runner
+
+The Advisor ([ADVISOR.md](ADVISOR.md)) can run in the pipeline: after a failure (`TcAgent.exe advise --trigger pipeline --results results`)
+or at night (`--trigger nightly`). It needs Claude Code installed and signed in for the user the runner runs as - sign in once in a
+normal window of that user (`claude`). It only reads; nothing is committed or loaded.
+
 ## Troubleshooting
 
 | Symptom | Cause / remedy |
