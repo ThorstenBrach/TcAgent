@@ -672,7 +672,8 @@ format (a folder with `SKILL.md`), so every agent CLI understands them, and come
 - **Built-in workflows:** `new-feature`, `bug-fix` (a signal that shows the fault, proven cause, fix, the same signal good),
   `safe-activation` (changes, backup, your release, load, check of the state), `online-change` (risks first, then your release),
   `refactoring` (tests before and after), `library-update` (compare interfaces, check usages), `io-commissioning` (signal by signal,
-  with a record; outputs only with your release).
+  with a record; outputs only with your release), `project-review` (the whole project: checks over everything, deep reviews of
+  at most 10 hotspots, a report with a traffic light per area; prompt `/review-prj`).
 - **Your own:** `<level>\skills\<name>\SKILL.md` on the company, user, platform or project level – or by talking:
   *"Save this procedure as a skill for the project."* (`tc_skills action=add`, after you agreed).
 - The agent sees the list with the coding rules and loads a skill when the task fits (*"Review the changes of today"* →

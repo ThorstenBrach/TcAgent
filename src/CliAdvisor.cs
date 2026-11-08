@@ -31,6 +31,7 @@ public static class CliAdvisor
         "  TcAgent.exe advise [run] --solution <sln> [--trigger nightly|commit|pipeline] [--since \"24 hours ago\"] [--results <dir>]\n" +
         "                     [--minutes 15] [--out <log file>] [--dry-run]\n" +
         "      Advisor Shadow: an AI client without a window reads the project and records advice with an order (.tcagent\\advisor).\n" +
+        "      --trigger project reviews the whole project (workflow project-review), e.g. once a month.\n" +
         "      It changes nothing (TCAGENT_MODE=ask). --dry-run prints the prompt only.\n" +
         "  TcAgent.exe advise watch --solution <sln> [--target <AmsNetId>] [--ports 851,852] [--interval 2] [--run] [--once]\n" +
         "      Advisor Live: watches the plant (runtime and PLC state, cycle time, the fault signals of .tcagent\\advisor-watch.json\n" +
@@ -78,7 +79,7 @@ public static class CliAdvisor
         }
         o.Solution = Path.GetFullPath(o.Solution);
         if (!File.Exists(o.Solution)) throw new ArgumentException("solution not found: " + o.Solution);
-        if (o.Trigger is not ("nightly" or "commit" or "pipeline" or "machine")) throw new ArgumentException("--trigger nightly, commit or pipeline");
+        if (o.Trigger is not ("nightly" or "commit" or "pipeline" or "project" or "machine")) throw new ArgumentException("--trigger nightly, commit, pipeline or project");
         return o;
     }
 
@@ -272,7 +273,21 @@ public static class CliAdvisor
         return sb.ToString();
     }
 
-    public static string Prompt(string trigger, string solution, string context) =>
+    public static string Prompt(string trigger, string solution, string context) => trigger == "project" ? ProjectPrompt(solution) : ShadowPrompt(trigger, solution, context);
+
+    /// <summary>The whole project, e.g. once a month: the workflow project-review, without a person to ask.</summary>
+    static string ProjectPrompt(string solution) =>
+        $"You are the TcAgent Advisor (Shadow, trigger: project). You read and advise; you change nothing - TcAgent refuses every change in this run.\n\n" +
+        $"Solution: {solution}\n" +
+        "1. Connect: tc_attach with the solution; if no IDE has it open, tc_open with visible=false. Then tc_coding_rules.\n" +
+        "2. tc_advisor action=start kind=review trigger=project.\n" +
+        "3. tc_workflow action=start name=project-review and follow its steps. Nobody can be asked in this run: the goal is a regular review of the " +
+        "whole project, the scope is the code of the project without libraries; choose the hotspots yourself and say why.\n" +
+        "4. Record each finding that should be acted on with tc_advisor action=record (evidence with object and line, an order naming the workflow), " +
+        "and one more record with kind=report: the traffic light per area as the finding, the counts as evidence, and as the order a prompt to discuss the report.\n" +
+        "5. tc_workflow action=finish, tc_advisor action=finish.\n";
+
+    static string ShadowPrompt(string trigger, string solution, string context) =>
         $"You are the TcAgent Advisor (Shadow, trigger: {trigger}). You read and advise; you change nothing - TcAgent refuses every change in this run.\n\n" +
         $"Solution: {solution}\n" +
         "1. Connect: tc_attach with the solution; if no IDE has it open, tc_open with visible=false. Then tc_coding_rules.\n" +

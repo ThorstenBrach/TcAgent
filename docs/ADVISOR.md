@@ -58,6 +58,7 @@ Advice that stays unrated for 14 days no longer counts as open.
 ```powershell
 TcAgent.exe advise --solution MyMachine.sln --trigger nightly                      # review of the commits of the last 24 hours
 TcAgent.exe advise --solution MyMachine.sln --trigger pipeline --results results   # cause of a failed pipeline
+TcAgent.exe advise --solution MyMachine.sln --trigger project                      # the whole project (workflow project-review), e.g. monthly
 ```
 
 - The context is collected without an AI: the commits and the diff since `--since` (default "24 hours ago"), the result
