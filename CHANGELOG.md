@@ -38,7 +38,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `TcAgent.exe advise --trigger project` runs it without a window, e.g. once a month.
 - **Advisor (Live):** at the running plant, read only. `/advise-live` in the chat, `TcAgent.exe advise watch` notices a PLC or
   the runtime leaving Run, an exceeded cycle time and the fault signals of `.tcagent\advisor-watch.json` (by hand or in the
-  chat), and starts a run with `--run`. A plugin brings its diagnosis skill and signals in an `advisor.json`.
+  chat), and starts a run with `--run`. A plugin brings its diagnosis skill and signals in an `advisor.json`. Before it reads
+  code it checks that the project matches what runs (project name and build time on the PLC, newer sources, unsaved changes).
 - **Knowledge follows the modules:** skills, workflows, prompts, rules and lessons can name the modules they need
   (`tcagent-requires-module: scope`). While one is switched off they show `needs module` and do not take effect. Items that only
   name tools of a switched-off module stay active, with a note in the lists.

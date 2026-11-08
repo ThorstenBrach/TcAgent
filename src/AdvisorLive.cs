@@ -74,6 +74,37 @@ public sealed class AdvisorReader : IDisposable
     }
 }
 
+/// <summary>Is the code in the project the code that runs? (AdvisorWatch.CodeMismatch reads the facts collected here.)</summary>
+public static class AdvisorCode
+{
+    /// <summary>"matches" or the reason why the code in the IDE may not be the code that runs on this PLC port.</summary>
+    public static string Check(AdvisorReader r, int port, string solutionDir, bool ideHasUnsavedChanges = false)
+    {
+        var name = r.Read(port, "TwinCAT_SystemInfoVarList._AppInfo.ProjectName", out _);
+        var ts = r.Read(port, "TwinCAT_SystemInfoVarList._AppInfo.AppTimestamp", out _);
+        DateTime? plcBuild = DateTime.TryParse(ts, CultureInfo.InvariantCulture, DateTimeStyles.None, out var t) ? t : null;
+        var projects = new List<AdvisorWatch.Built>();
+        foreach (var plcproj in Directory.EnumerateFiles(solutionDir, "*.plcproj", new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 4 }))
+        {
+            var dir = Path.GetDirectoryName(plcproj)!;
+            var pname = Path.GetFileNameWithoutExtension(plcproj);
+            var tmc = Path.Combine(dir, pname + ".tmc");
+            DateTime? newest = null;
+            foreach (var f in Directory.EnumerateFiles(dir, "*.Tc*", new EnumerationOptions { RecurseSubdirectories = true, MaxRecursionDepth = 6 }))
+                if (Path.GetExtension(f).ToLowerInvariant() is ".tcpou" or ".tcgvl" or ".tcdut" or ".tcio" or ".tctto")
+                {
+                    var w = File.GetLastWriteTime(f);
+                    if (newest == null || w > newest) newest = w;
+                }
+            projects.Add(new AdvisorWatch.Built(pname, File.Exists(tmc) ? File.GetLastWriteTime(tmc) : null, newest));
+        }
+        var why = AdvisorWatch.CodeMismatch(name, plcBuild, projects, TimeSpan.FromMinutes(2));
+        if (why == null && ideHasUnsavedChanges) why = "the IDE has unsaved changes - what it shows may not be what runs";
+        return why == null ? $"the project matches the code on PLC port {port} ({name}, build {plcBuild:yyyy-MM-dd HH:mm:ss})"
+                           : $"CODE MAY NOT MATCH on PLC port {port}: {why}. Do not conclude from the code; base the diagnosis on values and say so.";
+    }
+}
+
 /// <summary>One look at the plant: what is wrong now. The watch compares two looks and reports what newly went wrong.</summary>
 public static class AdvisorLook
 {

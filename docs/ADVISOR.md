@@ -76,6 +76,10 @@ In a pipeline: [PIPELINE.md](PIPELINE.md#advisor).
 At the running plant the Advisor helps the person in front of it: commissioning, troubleshooting in operation. It only reads:
 it never writes a variable and never starts, stops or acknowledges anything.
 
+**Same code?** Before it reads code, the Advisor compares what runs with the project: the project name and the time of the build
+on the PLC (`_AppInfo.ProjectName`, `AppTimestamp`) with the last build of the project and its source files, and unsaved
+changes in the IDE. If they may differ, it says so and concludes only from values - not from code that may not run.
+
 **In the chat:** `/advise-live` with what is wrong. The agent first looks at the state of the plant (`tc_advisor action=watch_check`),
 then goes from the top level down only as far as it needs, and records the cause with an order.
 
