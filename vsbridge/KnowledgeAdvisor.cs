@@ -88,7 +88,7 @@ namespace TcAgentBridge
         async void LoadAdvice()
         {
             var (ok, output) = await Cli("advise list --json", "Reading the advice");
-            if (!ok) { status.Text = "Advisor: " + output.Trim().Split('\n')[0] + " (TcAgent.exe of version 0.52.1 or newer is needed)"; return; }
+            if (!ok) { status.Text = "Advisor: " + output.Trim().Split('\n')[0] + " (TcAgent.exe of version 0.53.0 or newer is needed)"; return; }
             var (okS, outS) = await Cli("advise stats --json");
             try
             {

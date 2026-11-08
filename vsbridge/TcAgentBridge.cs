@@ -25,7 +25,7 @@ namespace TcAgentBridge
     [Guid("86c8609c-4aac-4e7e-95e6-6b96179a3c4f")]
     public sealed class BridgePackage : AsyncPackage
     {
-        public const string BridgeVersion = "0.52.1";
+        public const string BridgeVersion = "0.53.0";
 
         /// <summary>The TcAgent icon for the own windows and dialogs (icon.png next to the extension), instead of the one of the IDE.</summary>
         internal static System.Windows.Media.ImageSource AppIcon => appIcon ??= LoadIcon();

@@ -4,7 +4,9 @@ All notable changes to TcAgent (MCP server `TcAgent.exe` and the Visual Studio e
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versions follow
 [Semantic Versioning](https://semver.org/); server and extension share one version number.
 
-## [Unreleased]
+## [0.53.0] – 2026-11-08
+
+The built-in knowledge in this version is TcAgent_Knowledge 1.1.0.
 
 ### Fixed
 - **Own windows and dialogs** (update, About, the knowledge dialogs, Ask from code, confirmations) show the TcAgent icon instead of the one of the IDE.
@@ -60,7 +62,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   you itself to confirm the specification or to skip it, and until then the run writes no PLC code.
 - Agent guide: a result counts only with a tool output from after the last change, and a check-and-fix loop stops after 3 rounds
   or when the same error comes back.
-- Built-in knowledge (next version of TcAgent_Knowledge): workflows `bug-fix`, `safe-activation`, `online-change`, `refactoring`,
+- Built-in knowledge TcAgent_Knowledge 1.1.0: workflows `bug-fix`, `safe-activation`, `online-change`, `refactoring`,
   `library-update`, `io-commissioning`; skills `plc-spec-review`, `plc-fix-compile`, `plc-alarm-diagnosis`, `plc-traceability`,
   `plc-multi-review`, `plc-st-patterns`, `plc-skill-authoring`, `plc-retro`; 14 prompts for them.
 - **Skills, workflows, prompts, rules and lessons can name the plugin they need:** `tcagent-requires-plugin` in their metadata, with versions
