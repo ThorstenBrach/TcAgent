@@ -22,8 +22,8 @@ the preview shows at once what it does - before and after, for the declaration a
 the object open in the editor, with the changed lines marked. The preview looks like the TwinCAT editor: its font and
 background, syntax colors for the light or the dark theme. **Save** writes the changed rules into `formatting.json` of the
 chosen level (project, user, team, company; a backup of the levels is made first). A rule a level above locked shows
-"⊘ locked by ..." and cannot be changed; a changed one shows "✎ changed, not saved" until it is saved. The details of a rule
-show its example: the code as written and the result for every value, only this rule acting.
+"⊘ locked by ..." and cannot be changed; a changed one shows "✎ changed, not saved" until it is saved. The tab **Example of the rule**
+shows the selected rule alone: the code as written and the result for every value, side by side.
 
 **Wish a rule or feature ...** opens a new issue on GitHub with the example of the preview: what the code looks like, what the
 formatter makes of it today, and a place for what you would like instead. Check it in the browser, remove names of customers

@@ -327,6 +327,7 @@ namespace TcAgentBridge
             list.ColumnDefinitions.Add(new ColumnDefinition());
             var selBrush = new SolidColorBrush(Color.FromArgb(70, 0x3B, 0x6F, 0xD8));
             var detail = new StackPanel { Margin = new Thickness(10, 8, 10, 8) };
+            var exampleTab = new TabItem { Header = "Example of the rule", ToolTip = "The selected rule alone: the code as written and the result for every value" };
             Action<RuleRow> showDetail = null;
             int r0 = 0;
             void AddRow(UIElement e, int col, int span = 1) { Grid.SetRow(e, r0); Grid.SetColumn(e, col); Grid.SetColumnSpan(e, span); list.Children.Add(e); }
@@ -422,29 +423,36 @@ namespace TcAgentBridge
                 Fact("Default", rr.Default);
                 Fact("Now applies", loaded[rr.Key] + " – from " + rr.From + (ch ? $"; {current[rr.Key]} after Save on level {level.SelectedItem}" : ""));
                 detail.Children.Add(g);
-                // the example of this rule: the code as written and the result for every value (all other rules leave it alone)
+                // the tab "Example of the rule": the code as written and the result for every value, side by side
+                var page = new DockPanel { Margin = new Thickness(0, 6, 0, 0) };
+                var title = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 0, 0, 6) };
+                title.Inlines.Add(new Run(rr.Label) { FontWeight = FontWeights.SemiBold });
+                DockPanel.SetDock(title, Dock.Top); page.Children.Add(title);
                 if (examples != null && examples.TryGetValue(rr.Key, out var eo) && eo is Dictionary<string, object> ex)
                 {
-                    detail.Children.Add(new TextBlock { Text = "Example – only this rule acts", FontWeight = FontWeights.SemiBold, Margin = new Thickness(0, 10, 0, 2) });
-                    if (FmtStr(ex, "with") is string with && with.Length > 0) detail.Children.Add(new TextBlock { Text = "shown with " + with, Opacity = 0.65, TextWrapping = TextWrapping.Wrap });
-                    UIElement Sample(string title, ArrayList tokens, bool now)
-                    {
-                        var sp = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
-                        var t = new TextBlock { Text = title, Opacity = now ? 1 : 0.7, FontWeight = now ? FontWeights.SemiBold : FontWeights.Normal };
-                        sp.Children.Add(t);
-                        var code = CodeView(look, tokens ?? new ArrayList(), null);
-                        var b = new Border { Child = code, BorderThickness = new Thickness(1), MaxHeight = 160 };
-                        b.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
-                        sp.Children.Add(b);
-                        return sp;
-                    }
-                    detail.Children.Add(Sample("Written as", ex["code"] as ArrayList, false));
+                    title.Inlines.Add(new Run(" – only this rule acts" + (FmtStr(ex, "with") is string with && with.Length > 0 ? ", shown with " + with : "")) { Foreground = Brushes.Gray });
+                    var samples = new List<(string Title, ArrayList Tokens, bool Now)> { ("Written as", ex["code"] as ArrayList, false) };
                     foreach (var v in (ex["values"] as ArrayList ?? new ArrayList()).OfType<Dictionary<string, object>>())
                     {
                         var val = FmtStr(v, "value");
-                        detail.Children.Add(Sample(val + (val == current[rr.Key] ? "   ← set in this window" : ""), v["tokens"] as ArrayList, val == current[rr.Key]));
+                        samples.Add((val + (val == current[rr.Key] ? "  ← set here" : ""), v["tokens"] as ArrayList, val == current[rr.Key]));
                     }
+                    var grid = new Grid();
+                    grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto }); grid.RowDefinitions.Add(new RowDefinition());
+                    for (int c = 0; c < samples.Count; c++)
+                    {
+                        grid.ColumnDefinitions.Add(new ColumnDefinition { MinWidth = 160 });
+                        var h = new TextBlock { Text = samples[c].Title, Margin = new Thickness(c == 0 ? 0 : 6, 0, 0, 2), Opacity = samples[c].Now ? 1 : 0.7, FontWeight = samples[c].Now ? FontWeights.SemiBold : FontWeights.Normal };
+                        var b = new Border { Child = CodeView(look, samples[c].Tokens ?? new ArrayList(), null), BorderThickness = new Thickness(samples[c].Now ? 2 : 1), Margin = new Thickness(c == 0 ? 0 : 6, 0, 0, 0) };
+                        if (samples[c].Now) b.BorderBrush = new SolidColorBrush(Color.FromRgb(0x3B, 0x6F, 0xD8));
+                        else b.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+                        Grid.SetColumn(h, c); Grid.SetColumn(b, c); Grid.SetRow(b, 1);
+                        grid.Children.Add(h); grid.Children.Add(b);
+                    }
+                    page.Children.Add(grid);
                 }
+                else page.Children.Add(new TextBlock { Text = "This rule has no example: its effect cannot be seen in the text (tab width, line ends) or it works in the IDE.", Opacity = 0.65, TextWrapping = TextWrapping.Wrap });
+                exampleTab.Content = page;
             };
             var listScroll = new ScrollViewer { Content = list, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled };
             var listBorder = new Border { Child = listScroll, BorderThickness = new Thickness(1) };
@@ -452,7 +460,7 @@ namespace TcAgentBridge
             var detailBorder = new Border
             {
                 Child = new ScrollViewer { Content = detail, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled },
-                BorderThickness = new Thickness(1), Margin = new Thickness(0, 8, 0, 0), Height = 300
+                BorderThickness = new Thickness(1), Margin = new Thickness(0, 8, 0, 0), Height = 170
             };
             detailBorder.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
             detail.Children.Add(new TextBlock { Text = "Select a rule to see what it does, its values and where it comes from.", Opacity = 0.65, TextWrapping = TextWrapping.Wrap });
@@ -491,7 +499,7 @@ namespace TcAgentBridge
             // ---- right: the preview
             var tabs = new TabControl { Margin = new Thickness(0) };
             var declTab = new TabItem { Header = "Declaration" }; var implTab = new TabItem { Header = "Implementation" };
-            tabs.Items.Add(declTab); tabs.Items.Add(implTab); tabs.SelectedIndex = 1;
+            tabs.Items.Add(declTab); tabs.Items.Add(implTab); tabs.Items.Add(exampleTab); tabs.SelectedIndex = 1;
             bool haveOpen = openImpl != null || openDecl != null;
             var useOpen = new CheckBox { Content = "Preview the object open in the editor" + (openName != null ? $" ({openName})" : ""), IsChecked = haveOpen, IsEnabled = haveOpen, VerticalAlignment = VerticalAlignment.Center };
             var marks = new TextBlock { Text = "changed lines are marked", Opacity = 0.65, VerticalAlignment = VerticalAlignment.Center };
