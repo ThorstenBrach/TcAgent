@@ -274,8 +274,36 @@ namespace TcAgentBridge
                 }
                 else c.DisplayMemberBinding = new Binding(col.Prop);
                 g.Columns.Add(c);
+                if (!col.Prop.StartsWith("?")) sortable[c] = (col.Header, col.Prop.TrimStart('!'));
             }
             l.View = g;
+            // a click on a header sorts by that column, a second click the other way; the order stays when the list is filled again
+            l.AddHandler(GridViewColumnHeader.ClickEvent, new RoutedEventHandler((s, e) =>
+            {
+                if (!(e.OriginalSource is GridViewColumnHeader h) || h.Column == null || !sortable.TryGetValue(h.Column, out var info)) return;
+                var now = sorts.TryGetValue(l, out var st) && st.Prop == info.Prop && st.Dir == System.ComponentModel.ListSortDirection.Ascending ? System.ComponentModel.ListSortDirection.Descending : System.ComponentModel.ListSortDirection.Ascending;
+                sorts.Remove(l); sorts.Add(l, new SortState { Prop = info.Prop, Dir = now });
+                foreach (var col in g.Columns)
+                    if (sortable.TryGetValue(col, out var ci)) col.Header = ci.Header + (col == h.Column ? (now == System.ComponentModel.ListSortDirection.Ascending ? "  ▲" : "  ▼") : "");
+                ApplySort(l);
+            }));
+            System.ComponentModel.DependencyPropertyDescriptor.FromProperty(ItemsControl.ItemsSourceProperty, typeof(ListView))?.AddValueChanged(l, (s, e) => ApplySort(l));
+        }
+
+        sealed class SortState { public string Prop; public System.ComponentModel.ListSortDirection Dir; }
+        static readonly System.Runtime.CompilerServices.ConditionalWeakTable<ListView, SortState> sorts = new System.Runtime.CompilerServices.ConditionalWeakTable<ListView, SortState>();
+        static readonly Dictionary<GridViewColumn, (string Header, string Prop)> sortable = new Dictionary<GridViewColumn, (string Header, string Prop)>();
+
+        static void ApplySort(ListView l)
+        {
+            if (l.ItemsSource == null) return;
+            var view = CollectionViewSource.GetDefaultView(l.ItemsSource);
+            if (view == null) return;
+            using (view.DeferRefresh())
+            {
+                view.SortDescriptions.Clear();
+                if (sorts.TryGetValue(l, out var st)) view.SortDescriptions.Add(new System.ComponentModel.SortDescription(st.Prop, st.Dir));
+            }
         }
 
         /// <summary>An action of a list - the toolbar and the context menu show the same entries with the same names.

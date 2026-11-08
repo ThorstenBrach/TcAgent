@@ -33,6 +33,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **`tc_library action=resolve`:** the name alone is enough, and the answer is the effective version instead of `*`.
 
 ### Added
+- **Knowledge window:** every list sorts by a click on a column header (again: the other way), and keeps the order when it is read again.
+  Switching a module on or off reads the files again at once, so items that wait for it show it without a refresh.
 - **Knowledge window:** a … button picks a folder in the dialogs New source / Edit source and Levels (company, team, platform repositories; with several, it adds one). An empty name of a new source takes the name of the folder or repository.
 - **Advisor (Shadow):** an agent that reads and advises, never changes. `tc_advisor` keeps advice with evidence and a ready
   order in the project (`.tcagent\advisor`), a run is read only (TcAgent refuses every change). `TcAgent.exe advise` runs it
