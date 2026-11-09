@@ -1,4 +1,4 @@
-// The history of variables for the Mini-Scope of the IDE: TcAgent.exe watch reads the variables over ADS at a fixed interval
+// The history of variables for the Inline-Scope of the IDE: TcAgent.exe watch reads the variables over ADS at a fixed interval
 // (default 20 ms) and writes their samples with a time stamp as JSON lines (every 100 ms one line with the samples since the
 // last one) until stdin closes. Each variable is followed to its ADS path like a condition (SymbolResolve: inherited, reference,
 // pointer, array index, GVL). Only reads; reading is allowed on every target.
@@ -47,7 +47,7 @@ public static class VariableWatch
             {
                 if (errors[i] != null) continue;
                 var path = vars[i].Path;
-                // array indexes read once at the start (the Mini-Scope follows one element)
+                // array indexes read once at the start (the Inline-Scope follows one element)
                 if (vars[i].Op != null)
                     for (int k = 0; k < vars[i].Op.Indexes.Count; k++)
                         if (loader.TryGetInstance(vars[i].Op.Indexes[k].Path, out var ix) && ix is IValueSymbol ixv)

@@ -73,7 +73,7 @@ public static partial class Cli
         { Console.WriteLine("Asked every running TcAgent server to read its settings again (" + Reload.Request() + ")."); return Ok; }
         if (args[0].Equals("settings", StringComparison.OrdinalIgnoreCase)) return CliSettings.Settings(args);
         if (args[0].Equals("condition", StringComparison.OrdinalIgnoreCase)) return CliCondition.Run(args);
-        if (args[0].Equals("watch", StringComparison.OrdinalIgnoreCase)) return VariableWatch.Run(args);           // VariableWatch.cs - the history of variables (Mini-Scope), reads only      // StLogic.cs - a condition as logic, files only     // CliSettings.cs - the settings window, files only
+        if (args[0].Equals("watch", StringComparison.OrdinalIgnoreCase)) return VariableWatch.Run(args);           // VariableWatch.cs - the history of variables (Inline-Scope), reads only      // StLogic.cs - a condition as logic, files only     // CliSettings.cs - the settings window, files only
         if (args[0].Equals("targets", StringComparison.OrdinalIgnoreCase)) return CliSettings.TargetsCli(args);    // Targets.cs - released target systems, files only
         // the elevated part of tc_packages_change (Packages.cs), started by TcAgent itself through the UAC prompt
         if (args[0].Equals("tcpkg-elevated", StringComparison.Ordinal)) return ToolRegistry.RunElevatedTcpkg(args);

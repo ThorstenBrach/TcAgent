@@ -69,7 +69,9 @@ Details: [docs/ADVISOR.md](docs/ADVISOR.md).
 | **Lessons learned** | The agent remembers hard-won solutions – what the problem was, why, and how it was solved – and recalls them by itself when the same error comes up again (project, personal or team file) | `tc_lessons` |
 | **Program documentation** | Explains the project: call hierarchy, call graph, inheritance hierarchy, class diagram, step chains (SFC and CASE), a short description for every FB, method and function (from comments or derived from the code), findings – one HTML page with zoomable diagrams, explanations kept as project memory; task overview with cycle times and a static risk analysis | `tc_doc` |
 | **User manual** | Manual of FBs, functions and their structs/enums – in the style of your own example documents (Markdown, AsciiDoc or HTML), missing comments explained from the code | `tc_userdoc` |
-| **Formatting** | Ctrl+Alt+F formats the open object the same way every time - indentation, keyword case, aligned declarations, long calls, brackets that show the order of AND/OR; every rule configurable per company, team or project, a safety net keeps the meaning, Ctrl+Z takes it back | `TcAgent.exe format` – [docs/FORMATTER.md](docs/FORMATTER.md) |
+| **Formatting** | Ctrl+Alt+F formats the open object the same way every time - indentation, keyword case, aligned declarations, long calls, brackets that show the order of AND/OR, long conditions one operand per line with aligned brackets; every rule configurable per company, team or project, a safety net keeps the meaning, Ctrl+Z takes it back | `TcAgent.exe format` – [docs/FORMATTER.md](docs/FORMATTER.md) |
+| **Inline-Logic-View** | Ctrl+Alt+B shows the condition at the cursor (IF, ELSIF, WHILE, assignment of a BOOL) as a logic diagram - online green where fulfilled, with the operands that are still missing, fulfilled branches folded; variables followed through inheritance, references, pointers and libraries; simplifications and De Morgan rewrites with a proof that the meaning stays | `tc_condition`, `TcAgent.exe condition` |
+| **Inline-Scope** | Alt+click any variable in the code (or Ctrl+Alt+T) and see its value over time in a small popup - 20 ms samples, time axis from 5 s to 10 min, zoom with the wheel, pause and scroll back, CSV export; reads only | `TcAgent.exe watch` |
 | **Refactoring** | Meaningful names and comments for what you marked or clicked – every change confirmed by you (Apply / Apply all / Reject) | `tc_refactor` |
 | **Navigation** | Go to definition and find references (read/write) – resolved like TwinCAT itself, across inheritance; opens the object in the editor at the right line | `tc_goto_definition`, `tc_editor_open`, `tc_find_references`, `tc_plc_search` |
 | **Library APIs** | Full interfaces of referenced libraries – also compiled libraries – so the agent never invents an API | `tc_lib_signatures`, `tc_plc_references` |
@@ -93,12 +95,13 @@ Details: [docs/ADVISOR.md](docs/ADVISOR.md).
 | **Self-improvement** | Local run logs of the workflows (counts only), KPIs and trends, improvement proposals found by fixed rules – applied only after you agree, measured over the next 10 runs, reverted if they did not help; window **TcAgent Knowledge** with overview, effective knowledge, sources and history | `tc_improve` |
 | **Advisor** | An agent that reads and advises, never changes: at night or after a failed pipeline it reviews what changed (Shadow), at the running plant it finds where it hangs (Live, also started by a watch); findings with evidence and a ready order - you rate them and send the order to an agent with one click | `tc_advisor`, `TcAgent.exe advise` – [docs/ADVISOR.md](docs/ADVISOR.md) |
 | **Prompt library** | Prepared prompts in the TcAgent Chat: `/` or **Prompts** lists them with search and preview, placeholders from the editor; on every knowledge level and from Git repositories | `TcAgent.exe prompts` |
+| **Settings & targets** | **Tools > TcAgent settings**: every TcAgent setting in one window with description and default, export/import, reload of the agent servers; target systems with read/write access (writing time-limited), imported from the TwinCAT routes | `TcAgent.exe settings`, `TcAgent.exe targets` |
 | **TcAgent Chat** | Answer language, folders shared with the agent (read without asking, kept for this chat or in the knowledge), notice of new versions with release notes and a checked download, About with versions and licenses, Reset TcAgent | **⋯** in the chat |
 | **Skill sources** | Skills, workflows and rules from Git repositories with lock file, license check, plugin and version check, and overlay; `TcAgent.exe sources sync` restores the pinned set in a pipeline | `tc_sources` |
 | **Reference** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 | **Modules & plugins** | Switch groups of tools on or off per user, project, team or company (a shorter tool list for the agent; the command line keeps everything); your own tools as plugins – any program that speaks MCP, with the same policy, confirmation and audit, project plugins only after your approval; tab **Modules** in the Knowledge window | `TcAgent.exe modules`, `TcAgent.exe plugins` – [docs/PLUGINS.md](docs/PLUGINS.md) |
 
-All 98 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 99 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 What you can do, explained step by step with example prompts: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 
@@ -152,7 +155,8 @@ What changed in each version: [CHANGELOG.md](CHANGELOG.md).
 ## Use it where you work
 
 **Inline question** – in the TwinCAT editor press **Ctrl+Shift+Q**, type, press Enter. You stay in the code; the answer
-streams into the chat window. **TcAgent Chat** – a tool window with backend selection (Claude Code, Copilot CLI,
+streams into the chat window. **Conditions and values in the code** – **Ctrl+Alt+B** shows the condition at the cursor as
+a logic diagram (Inline-Logic-View), **Alt+click** on a variable (or **Ctrl+Alt+T**) opens the Inline-Scope. **TcAgent Chat** – a tool window with backend selection (Claude Code, Copilot CLI,
 Gemini CLI, Codex CLI); the editor context is sent along automatically. Your prompts on the right, the agent's answers on
 the left, ↑/↓ brings back earlier prompts, and documents (manuals, data sheets, screenshots, long texts) can be pasted or
 dropped into the input box for the agent to use. **Any MCP client** – Claude Desktop, Copilot agent mode in Visual Studio,

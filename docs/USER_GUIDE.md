@@ -188,6 +188,8 @@ work without the extension. The extension runs **inside** the IDE process and ad
 - **Inline question** – press **Ctrl+Shift+Q** in the TwinCAT editor, type, press Enter. You stay in the code; the answer
   streams into the chat window. Esc cancels. (The hotkey can be changed with `askHotkey` in
   `%LOCALAPPDATA%\TcAgent\chat-backends.json`.)
+- **Inline-Logic-View and Inline-Scope** – **Ctrl+Alt+B** shows the condition at the cursor as a logic diagram, **Alt+click** on a
+  variable (or **Ctrl+Alt+T**) shows its value over time; see [Inline-Logic-View](#inline-logic-view-conditions-as-a-logic-diagram).
 - **Cursor and selection** for `tc_editor_context`.
 - **Go to definition and cross references** resolved like TwinCAT itself (`tc_goto_definition`, `tc_find_references`).
 - **Library interfaces**, including compiled third-party libraries (`tc_lib_signatures`).
@@ -658,10 +660,11 @@ ones, and **Wish a rule or feature ...** opens a GitHub issue with the example. 
 [FORMATTER_EXAMPLES.md](FORMATTER_EXAMPLES.md). Rules, profiles and configuration:
 [FORMATTER.md](FORMATTER.md).
 
-## Conditions as a logic diagram
+## Inline-Logic-View: conditions as a logic diagram
 
 Put the cursor into a condition - an IF, ELSIF, WHILE, UNTIL or a boolean assignment, or select one - and press
-**Ctrl+Alt+B** ("conditionHotkey" in `chat-backends.json`). A small popup at the code shows it as a logic diagram:
+**Ctrl+Alt+B** ("conditionHotkey" in `chat-backends.json`). The **Inline-Logic-View**, a small popup at the code, shows it as a logic
+diagram:
 
 - the sub-conditions as a list with a lamp, the name and the comment of the declaration (for a comparison its values),
 - gates `&`, `≥1`, `=1` with right-angled lines, NOT as a dot at the input,
@@ -676,19 +679,22 @@ Interface members, properties without `{attribute 'monitoring' := 'call'}`, meth
 never read - the popup says why. It only reads, on any target. ⏸ freezes the values, 📌 keeps the popup open, Esc closes.
 Without a running PLC it shows the structure. A large condition gets scroll bars; a click on a gate folds its branch into
 one row (a click on the row opens it again), **⊟** folds every fulfilled branch at once. A click on a sub-condition opens its
-history in the Mini-Scope.
+history in the Inline-Scope.
 
-### Mini-Scope: the history of a variable
+<p align="center"><img src="img/guide/inline-logic-view.png" width="860" alt="Inline-Logic-View of a nested IF condition, online"><br><sub>The Inline-Logic-View of a nested IF online: fulfilled operands and lines green, a dashed gate cannot be read yet, the line on top says the result.</sub></p>
+<p align="center"><img src="img/guide/inline-logic-view-code.png" width="860" alt="The same IF in the TwinCAT online view"><br><sub>The same condition in the TwinCAT editor online - the popup shows which part decides.</sub></p>
 
-Put the cursor on a variable (or select one) and press **Ctrl+Alt+T** ("scopeHotkey" in `chat-backends.json`), or click a
-sub-condition in the condition popup. A small popup shows how the value changes: BOOL as a step, numbers as a line with
+### Inline-Scope: the history of a variable
+
+**Alt+click** any variable in the code ("scopeClick" in `chat-backends.json`: Alt, Ctrl+Alt or off), put the cursor on one and press **Ctrl+Alt+T** ("scopeHotkey"), or click a
+sub-condition in the Inline-Logic-View. The **Inline-Scope**, a small popup, shows how the value changes in a tall chart with a value axis: BOOL as a step, numbers as a line with
 their range, enums as steps with their names; **+ Variable** adds more, one below the other.
 
 - **Time axis:** 5 s, 30 s, 1 min, 5 min, 10 min, and the mouse wheel zooms in between (1 s to 10 min). ⏸ freezes it; then
   dragging moves back through the last 10 minutes.
 - A **cursor** under the mouse shows the time and every value; below: current, min and max.
 - **Copy CSV** puts the samples of the visible time on the clipboard.
-- The variable is followed to its ADS path like in the condition popup (inherited, reference, pointer, index, GVL); the
+- The variable is followed to its ADS path like in the Inline-Logic-View (inherited, reference, pointer, index, GVL); the
   instance is chosen in the popup. The values are read every 20 ms (`TcAgent.exe watch`), only read, on any target.
 
 The agent has the same as `tc_condition`, the command line as `TcAgent.exe condition --text "IF …"`: the sub-conditions,
@@ -2300,7 +2306,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 98 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 99 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
@@ -2313,6 +2319,7 @@ All 98 tools and the section of this guide that covers them. Parameters: [TOOLS.
 | `tc_plaintext` | [Plain-text ST files](#plain-text-st-files) |
 | `tc_sfc` | [SFC step chains](#sfc-step-chains) |
 | `tc_refactor` | [Refactoring names and comments](#refactoring-names-and-comments) |
+| `tc_condition` | [Inline-Logic-View](#inline-logic-view-conditions-as-a-logic-diagram) |
 | `tc_test_run`, `tc_test_results`, `tc_test_skeleton` | [Tests with TcUnit](#tests-with-tcunit) |
 | `tc_doc` | [Program documentation](#program-documentation) |
 | `tc_risk_rules` | [Risk analysis and your own risk rules](#risk-analysis-and-your-own-risk-rules) |

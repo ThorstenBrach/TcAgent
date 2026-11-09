@@ -1,5 +1,5 @@
-// TcAgentBridge - Mini-Scope: the history of a variable in a small popup at the code (Ctrl+Alt+T on a variable, "scopeHotkey" in
-// chat-backends.json; or a click on a sub-condition in the condition popup). Built after the approved mockup.
+// TcAgentBridge - Inline-Scope: the history of a variable in a small popup at the code (Ctrl+Alt+T on a variable, "scopeHotkey" in
+// chat-backends.json; or a click on a sub-condition in the Inline-Logic-View). Built after the approved mockup.
 //
 //   TcAgent.exe watch --vars ... --interval 20   reads over ADS (only reads) and streams the samples
 //   BOOL as a step, numbers as a line, enums as steps with their names; several variables one below the other.
@@ -56,7 +56,7 @@ namespace TcAgentBridge
 
         bool IsScopeKey(int vk) => scopeOn && vk == (int)scopeKey && System.Windows.Forms.Control.ModifierKeys == scopeMods;
 
-        // Alt+click on a variable in the code editor opens the Mini-Scope ("scopeClick" in chat-backends.json: Alt, Ctrl+Alt or off)
+        // Alt+click on a variable in the code editor opens the Inline-Scope ("scopeClick" in chat-backends.json: Alt, Ctrl+Alt or off)
         delegate IntPtr MouseProc(int code, IntPtr wParam, IntPtr lParam);
         [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)] static extern IntPtr SetWindowsHookEx(int idHook, MouseProc fn, IntPtr hMod, uint threadId);
         [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] struct MOUSEHOOKSTRUCT { public int X, Y; public IntPtr Hwnd; public uint HitTest; public IntPtr Extra; }
@@ -99,7 +99,7 @@ namespace TcAgentBridge
             return CallNextHookEx(mouseHandle, code, wParam, lParam);
         }
 
-        /// <summary>The variable at the cursor (a.b[i]^.c) in the Mini-Scope.</summary>
+        /// <summary>The variable at the cursor (a.b[i]^.c) in the Inline-Scope.</summary>
         internal void ShowScopeFromEditor()
         {
             fmtGerman = UiGerman();
@@ -336,7 +336,7 @@ namespace TcAgentBridge
 
         async void Load()
         {
-            // the instances of the POU (the same as in the condition popup)
+            // the instances of the POU (the same as in the Inline-Logic-View)
             try
             {
                 var list = await Task.Run(() =>

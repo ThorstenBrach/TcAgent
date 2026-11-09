@@ -276,7 +276,7 @@ namespace TcAgentBridge
             Closed += (s, e) => StopWatch();
         }
 
-        /// <summary>The variables of a sub-condition in the Mini-Scope (constants and what cannot be read stay out).</summary>
+        /// <summary>The variables of a sub-condition in the Inline-Scope (constants and what cannot be read stay out).</summary>
         void OpenScope(int atom)
         {
             var ops = L(L(structure, "atoms").ElementAtOrDefault(atom), "operands").Where(o => B(o, "constant") != true && S(o, "path") != null).Select(o => S(o, "text")).ToList();
@@ -534,7 +534,7 @@ namespace TcAgentBridge
                 tb.Inlines.Add(new System.Windows.Documents.Run(name) { FontWeight = FontWeights.SemiBold, Foreground = unreadable ? Grey : fore });
                 if (note != null) tb.Inlines.Add(new System.Windows.Documents.Run(": " + note) { Foreground = Grey });
                 Canvas.SetLeft(tb, 28); Canvas.SetTop(tb, y - 9); canvas.Children.Add(tb);
-                // a click: a folded branch opens; a sub-condition shows its history (Mini-Scope)
+                // a click: a folded branch opens; a sub-condition shows its history (Inline-Scope)
                 var leaf = leaves[i].G;
                 foreach (var el in new FrameworkElement[] { lamp, tb })
                 {
