@@ -17,7 +17,7 @@ public sealed partial class ToolRegistry
 
     readonly List<Tool> tools = new();
     readonly TwinCatSession tc;
-    readonly Policy policy = new();
+    Policy policy = new();
 
     /// <summary>The MCP server (Program.cs): switched-off modules are left out and refused, plugins are started (Modules.cs,
     /// Plugins.cs). The command line uses every tool.</summary>
@@ -1742,6 +1742,32 @@ public sealed partial class ToolRegistry
     }
 
     string listedNames;
+
+    /// <summary>The settings read again (Reload.cs): settings.json, the policy, modules.json and the plugins; the client gets
+    /// notifications/tools/list_changed when its tool list changed. Returns what changed.</summary>
+    public List<string> ReloadSettings()
+    {
+        var changes = KnowledgeLayers.ReloadSettingsEnv();
+        var oldMode = policy.Mode;
+        policy = new Policy();
+        if (policy.Mode != oldMode) changes.Add($"mode: {oldMode} → {policy.Mode}");
+        lock (tools) { moduleStates = null; moduleDir = "\0"; }
+        if (UseModules)
+        {
+            var now = string.Join(",", List().Select(x => x?["name"]?.ToString()));
+            if (listedNames != null && now != listedNames)
+            {
+                var a = listedNames.Split(','); var b = now.Split(',');
+                var added = b.Except(a).ToList(); var removed = a.Except(b).ToList();
+                changes.Add("tools: " + string.Join(", ", added.Select(x => "+" + x).Concat(removed.Select(x => "-" + x)).Take(12)) + (added.Count + removed.Count > 12 ? " …" : ""));
+                Mcp.Send(new JsonObject { ["jsonrpc"] = "2.0", ["method"] = "notifications/tools/list_changed" });
+            }
+        }
+        if (Environment.GetEnvironmentVariable("TCAGENT_SKILL_MIRROR") != "0")
+            try { Skills.Mirror(Skills.Entries(null, Array.Empty<string>()), Skills.DefaultMirrors()); } catch (Exception ex) { Log.Info("Skill mirror: " + ex.Message); }
+        Log.Info("Settings read again" + (changes.Count > 0 ? ": " + string.Join("; ", changes) : " - nothing changed"));
+        return changes;
+    }
 
     /// <summary>tools/list of the MCP server: remembers what the client got (for notifications/tools/list_changed).</summary>
     public JsonArray ListForClient()
