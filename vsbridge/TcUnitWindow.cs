@@ -183,6 +183,48 @@ namespace TcAgentBridge
         internal static readonly ControlTemplate FlatButton = Flat(typeof(Button)), FlatToggle = Flat(typeof(ToggleButton));
 
         /// <summary>Column header: flat, with the gripper that resizes the column (PART_HeaderGripper).</summary>
+        /// <summary>The selected row in the colors of the VS theme (the WPF default is a light blue on which the light text of the
+        /// dark theme cannot be read). For a ListView with a GridView (rows) or a ListBox (one content).</summary>
+        internal static void ThemedSelection(Style item, bool gridRows)
+        {
+            var border = new FrameworkElementFactory(typeof(Border));
+            border.SetValue(Border.BackgroundProperty, new TemplateBindingExtension(Control.BackgroundProperty));
+            border.SetValue(Border.PaddingProperty, new TemplateBindingExtension(Control.PaddingProperty));
+            border.SetValue(UIElement.SnapsToDevicePixelsProperty, true);
+            FrameworkElementFactory content;
+            if (gridRows)
+            {
+                content = new FrameworkElementFactory(typeof(GridViewRowPresenter));
+                content.SetValue(GridViewRowPresenter.ColumnsProperty, new TemplateBindingExtension(GridView.ColumnCollectionProperty));
+                content.SetValue(GridViewRowPresenter.ContentProperty, new TemplateBindingExtension(ContentControl.ContentProperty));
+            }
+            else
+            {
+                content = new FrameworkElementFactory(typeof(ContentPresenter));
+                content.SetValue(ContentPresenter.HorizontalAlignmentProperty, new TemplateBindingExtension(Control.HorizontalContentAlignmentProperty));
+            }
+            content.SetValue(FrameworkElement.VerticalAlignmentProperty, VerticalAlignment.Center);
+            border.AppendChild(content);
+            var template = new ControlTemplate(gridRows ? typeof(ListViewItem) : typeof(ListBoxItem)) { VisualTree = border };
+            item.Setters.Add(new Setter(Control.TemplateProperty, template));
+            item.Setters.Add(new Setter(Control.BackgroundProperty, Brushes.Transparent));
+            var selected = new Trigger { Property = ListBoxItem.IsSelectedProperty, Value = true };
+            selected.Setters.Add(new Setter(Control.BackgroundProperty, new DynamicResourceExtension(TreeViewColors.SelectedItemActiveBrushKey)));
+            selected.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension(TreeViewColors.SelectedItemActiveTextBrushKey)));
+            item.Triggers.Add(selected);
+            var inactive = new MultiTrigger();
+            inactive.Conditions.Add(new Condition(ListBoxItem.IsSelectedProperty, true));
+            inactive.Conditions.Add(new Condition(Selector.IsSelectionActiveProperty, false));
+            inactive.Setters.Add(new Setter(Control.BackgroundProperty, new DynamicResourceExtension(TreeViewColors.SelectedItemInactiveBrushKey)));
+            inactive.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension(TreeViewColors.SelectedItemInactiveTextBrushKey)));
+            item.Triggers.Add(inactive);
+            var hover = new MultiTrigger();
+            hover.Conditions.Add(new Condition(UIElement.IsMouseOverProperty, true));
+            hover.Conditions.Add(new Condition(ListBoxItem.IsSelectedProperty, false));
+            hover.Setters.Add(new Setter(Control.BackgroundProperty, new SolidColorBrush(Color.FromArgb(0x22, 0x80, 0x80, 0x80))));
+            item.Triggers.Add(hover);
+        }
+
         internal static ControlTemplate HeaderTemplate()
         {
             var grid = new FrameworkElementFactory(typeof(Grid));
@@ -321,6 +363,7 @@ namespace TcAgentBridge
             item.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension(EnvironmentColors.ToolWindowTextBrushKey)));
             item.Setters.Add(new Setter(ToolTipProperty, new Binding(nameof(Row.Tip))));
             item.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(0)));
+            ThemedSelection(item, true);
             list.ItemContainerStyle = item;
             list.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             list.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);

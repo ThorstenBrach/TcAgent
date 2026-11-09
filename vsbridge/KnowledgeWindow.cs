@@ -239,6 +239,7 @@ namespace TcAgentBridge
             var item = new Style(typeof(ListViewItem));
             item.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension(EnvironmentColors.ToolWindowTextBrushKey)));
             item.Setters.Add(new Setter(ToolTipProperty, new Binding(nameof(Line.Tip))));
+            TcUnitControl.ThemedSelection(item, true);
             l.ItemContainerStyle = item;
             return l;
         }
@@ -2890,6 +2891,7 @@ namespace TcAgentBridge
             var item = new Style(typeof(ListViewItem));
             item.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension(EnvironmentColors.ToolWindowTextBrushKey)));
             item.Setters.Add(new Setter(ToolTipProperty, new Binding(nameof(Line.Tip))));
+            TcUnitControl.ThemedSelection(item, true);
             feedbackList.ItemContainerStyle = item;
             feedbackStatus.SelectionChanged += (s, e) => FillFeedback();
             feedbackList.SelectionChanged += (s, e) => PrepareIssue();

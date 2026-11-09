@@ -88,6 +88,11 @@ namespace TcAgentBridge
             var search = new TextBox { Margin = new Thickness(10, 10, 10, 8), Padding = new Thickness(3, 2, 3, 2), ToolTip = T("Search settings by name, variable or description (Ctrl+F)", "Einstellungen nach Name, Variable oder Beschreibung suchen (Strg+F)") };
             var hint = new TextBlock { Text = T("Search settings (Ctrl+F)", "Einstellungen suchen (Strg+F)"), Opacity = 0.55, IsHitTestVisible = false, Margin = new Thickness(16, 13, 0, 0) };
             var pages = new ListBox { BorderThickness = new Thickness(0), Background = Brushes.Transparent };
+            var pageStyle = new Style(typeof(ListBoxItem));
+            pageStyle.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension(EnvironmentColors.ToolWindowTextBrushKey)));
+            pageStyle.Setters.Add(new Setter(Control.PaddingProperty, new Thickness(2)));
+            TcUnitControl.ThemedSelection(pageStyle, false);
+            pages.ItemContainerStyle = pageStyle;
             var left = new DockPanel { Width = 220 };
             var sg = new Grid(); sg.Children.Add(search); sg.Children.Add(hint);
             DockPanel.SetDock(sg, Dock.Top); left.Children.Add(sg); left.Children.Add(pages);
@@ -424,6 +429,11 @@ namespace TcAgentBridge
                 // the list
                 var lv = new ListView { BorderThickness = new Thickness(1), MinHeight = 120 };
                 lv.SetResourceReference(Control.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+                lv.SetResourceReference(Control.BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
+                var rowStyle = new Style(typeof(ListViewItem));
+                rowStyle.Setters.Add(new Setter(Control.ForegroundProperty, new DynamicResourceExtension(EnvironmentColors.ToolWindowTextBrushKey)));
+                TcUnitControl.ThemedSelection(rowStyle, true);
+                lv.ItemContainerStyle = rowStyle;
                 var gv = new GridView();
                 GridViewColumn Col(string h, double wd, Func<Dictionary<string, object>, string> text, Func<Dictionary<string, object>, Brush> color = null, bool mono = false)
                 {
