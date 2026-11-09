@@ -460,6 +460,50 @@ F_Sum (nA, nB);
 
 ## Comments
 
+### Comments of declarations (`comment.decl-position`)
+
+The comment of a declaration on its own line above it, or at the end of its line. Default: `preserve`.
+
+Written as:
+
+```
+VAR_INPUT
+  /// start the cycle
+  bStart : BOOL;
+  nParts : INT; // parts so far
+END_VAR
+```
+
+`preserve`:
+
+```
+VAR_INPUT
+  /// start the cycle
+  bStart : BOOL;
+  nParts : INT; // parts so far
+END_VAR
+```
+
+`above`:
+
+```
+VAR_INPUT
+  /// start the cycle
+  bStart : BOOL;
+  // parts so far
+  nParts : INT;
+END_VAR
+```
+
+`behind`:
+
+```
+VAR_INPUT
+  bStart : BOOL; /// start the cycle
+  nParts : INT; // parts so far
+END_VAR
+```
+
 ### Comment above CASE labels (`comment.case-labels`)
 
 A comment above each CASE label that has none: the comment of the enum value, otherwise its name. Default: `off`.

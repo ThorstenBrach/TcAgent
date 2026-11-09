@@ -302,6 +302,22 @@ bLamp := (bEnable AND NOT bPhaseOff);";
     }
 
     [Fact]
+    public void CommentsOfDeclarationsAboveOrBehind()
+    {
+        var src = "VAR_INPUT\n/// start the cycle\nbStart : BOOL;\nnParts : INT; // parts so far\n// two lines\n// stay above\nbReset : BOOL;\nEND_VAR";
+        var above = With("comment.decl-position", "above");
+        var a = F(src, StPart.Declaration, above);
+        Assert.Null(a.Error);
+        Assert.Equal("VAR_INPUT\n  /// start the cycle\n  bStart : BOOL;\n  // parts so far\n  nParts : INT;\n  // two lines\n  // stay above\n  bReset : BOOL;\nEND_VAR", N(a.Text));
+        Stable(a.Text, above);
+        var behind = With("comment.decl-position", "behind");
+        var b = F(src, StPart.Declaration, behind);
+        Assert.Null(b.Error);
+        Assert.Equal("VAR_INPUT\n  bStart : BOOL; /// start the cycle\n  nParts : INT;  // parts so far\n  // two lines\n  // stay above\n  bReset : BOOL;\nEND_VAR", N(b.Text));
+        Assert.Equal(b.Text, F(b.Text, StPart.Declaration, behind).Text);
+    }
+
+    [Fact]
     public void ConfigFromLevelsLocksAndUnset()
     {
         var c = new StFormatConfig();

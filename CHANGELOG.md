@@ -25,6 +25,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   profile `structured`. Checked on 66,618 parts of real code with several rule sets: no change of meaning, every result stable.
 - **Formatter settings in German or English** (by the answer language of the chat, English for every other language), values in
   plain words ("keep as written" instead of `preserve`); Format ST code speaks the same language.
+- **Formatter rule `comment.decl-position`:** the comment of a declaration above it or at the end of its line; the safety net checks that every comment is still there.
 - **Formatter rules for CASE:** `comment.case-labels: enum` writes a comment above each label that has none - the comment
   of the enum value from the DUTs of the project, otherwise its name; `blank.case-branches` puts a blank line between the
   branches, after the label line, or both.
