@@ -1972,6 +1972,9 @@ without agreement.** The agent cannot widen the list - only you can.
   30 minutes, 1 hour, 4 hours, today, 7 days, until a date, or for good. **Extend ▾** gives the selected target more time,
   **Delete …** removes it (the agent may then only read it). A change takes effect at once - no reload, no restart; a
   release that ran out stops at once too.
+- **From routes …** takes over targets from the ADS routes of the TwinCAT router on this PC (`StaticRoutes.xml` of the
+  system runtime and of each user mode runtime): tick the routes, then *read only* (the default) or *read and write* for
+  1 hour, 4 hours, today or for good.
 - **User mode runtime:** TwinCAT's user mode runtime has an AMS Net ID of its own, different from the runtime of this PC.
   The window finds the user mode runtimes installed on this PC and offers to release them (info bar and a badge on the page).
 - The releases apply to every project on this PC and are kept in `%LOCALAPPDATA%\TcAgent\targets.json`. Every change is

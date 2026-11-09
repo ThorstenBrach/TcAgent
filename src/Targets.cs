@@ -145,6 +145,47 @@ public static class Targets
         return found;
     }
 
+    /// <summary>The ADS routes of this PC from the TwinCAT router (StaticRoutes.xml): of the system runtime (TargetDir from the
+    /// registry, else the default folders) and of each user mode runtime. Name, AMS Net ID, address, and whose route it is.</summary>
+    public static List<(string Name, string NetId, string Address, string Runtime)> Routes(IEnumerable<string> files = null)
+    {
+        var list = new List<(string, string, string, string)>();
+        foreach (var (file, runtime) in files?.Select(f => (f, "")) ?? RouteFiles())
+        {
+            try
+            {
+                if (!File.Exists(file)) continue;
+                var x = System.Xml.Linq.XDocument.Load(file);
+                foreach (var r in x.Descendants().Where(e => e.Name.LocalName == "Route"))
+                {
+                    string V(string n) => r.Elements().FirstOrDefault(e => e.Name.LocalName == n)?.Value.Trim() ?? "";
+                    var id = V("NetId");
+                    if (IsNetId(id) && !list.Any(l => l.Item2 == id))
+                        list.Add((V("Name"), id, V("Address"), runtime));
+                }
+            }
+            catch (Exception ex) { Log.Error("routes " + file + ": " + ex.Message); }
+        }
+        return list;
+    }
+
+    static IEnumerable<(string File, string Runtime)> RouteFiles()
+    {
+        var dirs = new List<string>();
+        try
+        {
+            using var k = Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\WOW6432Node\Beckhoff\TwinCAT3\3.1") ?? Microsoft.Win32.Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Beckhoff\TwinCAT3\3.1");
+            if (k?.GetValue("TargetDir") is string td) dirs.Add(td);
+        }
+        catch { }
+        dirs.Add(@"C:\TwinCAT\3.1\Target");
+        dirs.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "Beckhoff", "TwinCAT", "3.1", "Target"));
+        foreach (var d in dirs.Distinct(StringComparer.OrdinalIgnoreCase)) yield return (Path.Combine(d, "StaticRoutes.xml"), "");
+        var um = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Beckhoff", "TwinCAT", "3.1", "Runtimes");
+        if (Directory.Exists(um))
+            foreach (var d in Directory.GetDirectories(um)) yield return (Path.Combine(d, "3.1", "Target", "StaticRoutes.xml"), Path.GetFileName(d));
+    }
+
     /// <summary>One line per entry for tc_policy / the command line.</summary>
     public static string Describe(TargetEntry t, DateTime now) =>
         $"{(string.IsNullOrEmpty(t.Name) ? "(no name)" : t.Name)} {t.NetId}: " +

@@ -78,6 +78,19 @@ public class TargetsTests : IDisposable
     }
 
     [Fact]
+    public void Routes_are_read_from_static_routes()
+    {
+        var f = Path.Combine(dir, "StaticRoutes.xml");
+        File.WriteAllText(f, "<?xml version=\"1.0\"?><TcConfig><RemoteConnections>" +
+            "<Route><Name>TestRig</Name><Address>test-rig</Address><NetId>5.80.123.4.1.1</NetId><Type>TCP_IP</Type></Route>" +
+            "<Route><Name>Broken</Name><Address>x</Address><NetId>not-an-id</NetId></Route>" +
+            "</RemoteConnections></TcConfig>");
+        var routes = Targets.Routes(new[] { f, Path.Combine(dir, "missing.xml") });
+        Assert.Single(routes);
+        Assert.Equal(("TestRig", "5.80.123.4.1.1", "test-rig", ""), routes[0]);
+    }
+
+    [Fact]
     public void User_mode_runtime_is_found_with_its_net_id()
     {
         var rt = Path.Combine(dir, "Runtimes", "UmRT_Default", "3.1");

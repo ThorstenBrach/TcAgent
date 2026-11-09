@@ -15,7 +15,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   it and in the User Guide (9 were missing there).
 - **Release target systems, also for a time:** Target systems in the settings window or `TcAgent.exe targets add <netId>
   [--access read] [--until 1h|today|<date>]` - write (and read) or read only, for good or until a time; a release that ran
-  out stops at once. The user mode runtimes of this PC (their own AMS Net ID) are found and offered. Only a person
+  out stops at once. The user mode runtimes of this PC (their own AMS Net ID) are found and offered; "From routes ..." takes over targets from the ADS routes of the TwinCAT router (read only by default). Only a person
   releases (no agent tool), every change goes to the audit log, a refused call says why. Reading stays free for every
   target. `targets.json` applies to all projects on the PC, in addition to `TCAGENT_ALLOW_TARGETS`.
 - **Reload settings without a restart:** ⋯ > Reload settings in the TcAgent Chat (or `TcAgent.exe reload`) - every running TcAgent

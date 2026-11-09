@@ -391,10 +391,15 @@ namespace TcAgentBridge
                 var extend = SetButton(T("⏱ Extend ▾", "⏱ Verlängern ▾"), T("Release the selected target for more time", "Das gewählte Ziel länger freigeben"));
                 var edit = SetButton(T("Edit …", "Bearbeiten …"), T("Name, right and time of the selected target (Enter)", "Name, Recht und Dauer des gewählten Ziels (Enter)"));
                 var del = SetButton(T("Delete …", "Löschen …"), T("Remove the selected target - the agent may then only read it (Del)", "Das gewählte Ziel entfernen - der Agent darf es dann nur noch lesen (Entf)"));
+                var fromRoutes = SetButton(T("From routes …", "Aus Routen übernehmen …"), T("Take over targets from the ADS routes of TwinCAT on this PC", "Ziele aus den ADS-Routen von TwinCAT auf diesem PC übernehmen"));
+                var newRoutes = SList(targets, "routes").Where(rt => !list.Any(t => SStr(t, "netId") == SStr(rt, "netId"))).ToList();
+                fromRoutes.IsEnabled = newRoutes.Count > 0;
+                if (newRoutes.Count == 0) fromRoutes.ToolTip = T("Every ADS route of this PC is in the list already (or there is none)", "Alle ADS-Routen dieses PCs stehen schon in der Liste (oder es gibt keine)");
                 var tb = new WrapPanel { Margin = new Thickness(0, 0, 0, 8) };
-                foreach (var b in new[] { add, extend, edit, del }) tb.Children.Add(b);
+                foreach (var b in new[] { add, fromRoutes, extend, edit, del }) tb.Children.Add(b);
                 DockPanel.SetDock(tb, Dock.Top); panel.Children.Add(tb);
                 add.Click += (s, e) => EditTarget("", "", true, "1h");
+                fromRoutes.Click += (s, e) => ImportRoutes(newRoutes);
                 List<MenuItem> ExtendItems()
                 {
                     var l = new List<MenuItem>();
@@ -595,6 +600,73 @@ namespace TcAgentBridge
                 if (d.ShowDialog() != true) return;
                 var how = ro.IsChecked == true ? "forever" : forever.IsChecked == true ? "forever" : untilDate.IsChecked == true ? date.Value.ToString("s") : (string)((ComboBoxItem)dur.SelectedItem).Tag;
                 SaveTarget(idBox.Text.Trim(), nameBox.Text.Trim(), rw.IsChecked == true, how);
+            }
+
+            // ---- take over ADS routes: tick the routes, choose the right and how long (read only is the safe default)
+            async void ImportRoutes(List<Dictionary<string, object>> routes)
+            {
+                var d = SetWindow(T("Take over from the ADS routes", "Aus den ADS-Routen übernehmen"), 620, 420, w);
+                var head = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(14, 12, 14, 8),
+                                           Text = T("The routes of the TwinCAT router on this PC that are not in the list yet. Tick the ones to take over.",
+                                                    "Die Routen des TwinCAT-Routers auf diesem PC, die noch nicht in der Liste stehen. Hake an, welche du übernehmen willst.") };
+                var boxes = new List<(CheckBox Box, Dictionary<string, object> Route)>();
+                var sp = new StackPanel { Margin = new Thickness(14, 0, 14, 0) };
+                foreach (var rt in routes)
+                {
+                    var cb = new CheckBox { Margin = new Thickness(0, 3, 0, 3) };
+                    var tx = new TextBlock();
+                    tx.Inlines.Add(new Run(SStr(rt, "name")) { FontWeight = FontWeights.SemiBold });
+                    tx.Inlines.Add(new Run("   " + SStr(rt, "netId")) { FontFamily = new FontFamily("Consolas") });
+                    var extra = string.Join(" · ", new[] { SStr(rt, "address"), string.IsNullOrEmpty(SStr(rt, "runtime")) ? null : T("route of ", "Route von ") + SStr(rt, "runtime") }.Where(x => !string.IsNullOrEmpty(x)));
+                    if (extra.Length > 0) tx.Inlines.Add(new Run("   " + extra) { Foreground = Brushes.Gray });
+                    cb.Content = tx;
+                    boxes.Add((cb, rt));
+                    sp.Children.Add(cb);
+                }
+                var all = new TextBlock { Margin = new Thickness(14, 4, 14, 0) };
+                all.Inlines.Add(Link(T("Select all", "Alle auswählen"), () => boxes.ForEach(b => b.Box.IsChecked = true)));
+                all.Inlines.Add(new Run(" · "));
+                all.Inlines.Add(Link(T("Select none", "Keine auswählen"), () => boxes.ForEach(b => b.Box.IsChecked = false)));
+                var ro = new RadioButton { Content = T("read only", "nur lesen"), IsChecked = true, Margin = new Thickness(0, 0, 14, 0) };
+                var rw = new RadioButton { Content = T("read and write for", "lesen und schreiben für"), VerticalAlignment = VerticalAlignment.Center };
+                var dur = new ComboBox { Margin = new Thickness(4, 0, 0, 0), MinWidth = 110, IsEnabled = false };
+                foreach (var (k, en, de) in new[] { ("1h", "1 hour", "1 Stunde"), ("4h", "4 hours", "4 Stunden"), ("today", "today", "heute"), ("forever", "for good", "dauerhaft") })
+                    dur.Items.Add(new ComboBoxItem { Content = T(en, de), Tag = k });
+                dur.SelectedIndex = 0;
+                rw.Checked += (s, e) => dur.IsEnabled = true; ro.Checked += (s, e) => dur.IsEnabled = false;
+                var may = new WrapPanel { Margin = new Thickness(14, 10, 14, 0) };
+                may.Children.Add(new TextBlock { Text = T("The agent may: ", "Der Agent darf: "), VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) });
+                foreach (var x in new UIElement[] { ro, rw, dur }) may.Children.Add(x);
+                var ok = SetButton(T("Take over", "Übernehmen"), null, true); ok.IsDefault = true; ok.IsEnabled = false;
+                var cancel = SetButton(T("Cancel", "Abbrechen"), null); cancel.IsCancel = true; cancel.Margin = new Thickness(0);
+                foreach (var b in boxes) { b.Box.Checked += (s, e) => ok.IsEnabled = true; b.Box.Unchecked += (s, e) => ok.IsEnabled = boxes.Any(x => x.Box.IsChecked == true); }
+                var bb = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right, Margin = new Thickness(14, 10, 14, 12) };
+                bb.Children.Add(ok); bb.Children.Add(cancel);
+                var dp = new DockPanel();
+                foreach (var x in new UIElement[] { head, all }) { DockPanel.SetDock(x, Dock.Top); }
+                DockPanel.SetDock(bb, Dock.Bottom); DockPanel.SetDock(may, Dock.Bottom);
+                dp.Children.Add(head); dp.Children.Add(bb); dp.Children.Add(may); dp.Children.Add(all);
+                dp.Children.Add(new ScrollViewer { Content = sp, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0, 6, 0, 0) });
+                d.Content = dp;
+                ok.Click += (s, e) => d.DialogResult = true;
+                if (d.ShowDialog() != true) return;
+                var chosen = boxes.Where(b => b.Box.IsChecked == true).Select(b => b.Route).ToList();
+                var write = rw.IsChecked == true;
+                var until = write ? (string)((ComboBoxItem)dur.SelectedItem).Tag : "forever";
+                busy = true; progress.Visibility = Visibility.Visible;
+                try
+                {
+                    foreach (var rt in chosen)
+                    {
+                        var a = $"targets add {SStr(rt, "netId")} --name \"{(SStr(rt, "name") ?? "").Replace("\"", "")}\" --access {(write ? "write" : "read")} --until {until} --by \"settings window (ADS route)\"";
+                        await Task.Run(() => FmtRun(exe, a, null));
+                    }
+                    await Load();
+                    statusLeft.Text = fmtGerman ? $"{chosen.Count} Route{(chosen.Count == 1 ? "" : "n")} übernommen - {(write ? "lesen und schreiben" : "nur lesen")}"
+                                                : $"{chosen.Count} route{(chosen.Count == 1 ? "" : "s")} taken over - {(write ? "read and write" : "read only")}";
+                }
+                catch (Exception ex) { MessageBox.Show(w, Inner(ex), T("TcAgent settings", "TcAgent-Einstellungen"), MessageBoxButton.OK, MessageBoxImage.Error); }
+                finally { busy = false; progress.Visibility = Visibility.Collapsed; Changed(); }
             }
 
             async void SaveTarget(string netId, string name, bool write, string until)

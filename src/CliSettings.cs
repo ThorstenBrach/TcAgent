@@ -139,12 +139,15 @@ public static class CliSettings
                     ["configuredFrom"] = SettingsSchema.Show(SettingsFile, McpConfigs)["settings"]!.AsArray().OfType<JsonObject>()
                                            .First(x => x["key"]?.ToString() == "TCAGENT_ALLOW_TARGETS")["from"]?.ToString(),
                     ["writable"] = new JsonArray(policy.AllowedForWriting().Select(x => (JsonNode)x).ToArray()),
-                    ["userModeRuntimes"] = new JsonArray(um.Select(u => (JsonNode)new JsonObject { ["name"] = u.Name, ["netId"] = u.NetId }).ToArray())
+                    ["userModeRuntimes"] = new JsonArray(um.Select(u => (JsonNode)new JsonObject { ["name"] = u.Name, ["netId"] = u.NetId }).ToArray()),
+                    ["routes"] = new JsonArray(Targets.Routes().Select(r => (JsonNode)new JsonObject { ["name"] = r.Name, ["netId"] = r.NetId, ["address"] = r.Address, ["runtime"] = r.Runtime }).ToArray())
                 };
                 Console.WriteLine(o.ToJsonString(Pretty));
                 return Cli.Ok;
             }
             Console.WriteLine(policy.Describe());
+            foreach (var r in Targets.Routes().Where(r => !list.Any(t => t.NetId == r.NetId)))
+                Console.WriteLine($"ADS route, not released: {r.Name} ({r.NetId}{(r.Address.Length > 0 ? ", " + r.Address : "")}){(r.Runtime.Length > 0 ? " - route of " + r.Runtime : "")}");
             foreach (var u in um.Where(u => !list.Any(t => t.NetId == u.NetId)))
                 Console.WriteLine($"Found on this PC, not released: user mode runtime {u.Name} ({u.NetId}) - TcAgent.exe targets add {u.NetId} --name \"{u.Name}\" --until 1h");
             return Cli.Ok;
