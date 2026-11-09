@@ -343,6 +343,7 @@ namespace TcAgentBridge
                 // (ComponentDispatcher does not see the keys of the WinForms editor - tested).
                 keyHook = OnKeyHook;
                 hookHandle = SetWindowsHookEx(2 /* WH_KEYBOARD */, keyHook, IntPtr.Zero, GetCurrentThreadId());
+                try { InstallScopeClick(); } catch (Exception ex) { Log("Scope click: " + Inner(ex)); }
                 Log($"Chat hotkey: {spec}" + (hookHandle == IntPtr.Zero ? $" - hook FAILED ({Marshal.GetLastWin32Error()})" : ""));
             }
             catch (Exception ex) { Log("Hotkey: " + Inner(ex)); }

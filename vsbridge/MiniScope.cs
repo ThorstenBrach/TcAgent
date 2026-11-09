@@ -56,6 +56,49 @@ namespace TcAgentBridge
 
         bool IsScopeKey(int vk) => scopeOn && vk == (int)scopeKey && System.Windows.Forms.Control.ModifierKeys == scopeMods;
 
+        // Alt+click on a variable in the code editor opens the Mini-Scope ("scopeClick" in chat-backends.json: Alt, Ctrl+Alt or off)
+        delegate IntPtr MouseProc(int code, IntPtr wParam, IntPtr lParam);
+        [System.Runtime.InteropServices.DllImport("user32.dll", SetLastError = true)] static extern IntPtr SetWindowsHookEx(int idHook, MouseProc fn, IntPtr hMod, uint threadId);
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)] struct MOUSEHOOKSTRUCT { public int X, Y; public IntPtr Hwnd; public uint HitTest; public IntPtr Extra; }
+        MouseProc mouseHook;           // the field keeps the delegate alive
+        IntPtr mouseHandle;
+        System.Windows.Forms.Keys scopeClickMods = System.Windows.Forms.Keys.Alt;
+
+        void InstallScopeClick()
+        {
+            var spec = ChatSetting("scopeClick") as string ?? "Alt";
+            if (spec.Trim().Length == 0 || spec.Equals("off", StringComparison.OrdinalIgnoreCase)) return;
+            System.Windows.Forms.Keys mods = 0;
+            foreach (var part in spec.Split('+').Select(x => x.Trim().ToLowerInvariant()))
+                mods |= part is "ctrl" or "strg" or "control" ? System.Windows.Forms.Keys.Control : part is "shift" or "umschalt" ? System.Windows.Forms.Keys.Shift : part == "alt" ? System.Windows.Forms.Keys.Alt : 0;
+            if (mods == 0) return;
+            scopeClickMods = mods;
+            mouseHook = OnMouseHook;
+            mouseHandle = SetWindowsHookEx(7 /* WH_MOUSE */, mouseHook, IntPtr.Zero, GetCurrentThreadId());
+            Log("Scope click: " + spec + "+click" + (mouseHandle == IntPtr.Zero ? " - hook FAILED" : ""));
+        }
+
+        IntPtr OnMouseHook(int code, IntPtr wParam, IntPtr lParam)
+        {
+            try
+            {
+                // WM_LBUTTONUP in a TwinCAT code editor with the modifier held: the click has set the caret - then the scope
+                if (code == 0 && wParam.ToInt64() == 0x0202 && System.Windows.Forms.Control.ModifierKeys == scopeClickMods)
+                {
+                    var ms = (MOUSEHOOKSTRUCT)System.Runtime.InteropServices.Marshal.PtrToStructure(lParam, typeof(MOUSEHOOKSTRUCT));
+                    var ctl = System.Windows.Forms.Control.FromChildHandle(ms.Hwnd);
+                    if (ctl != null && ctl.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0)
+                        ui.BeginInvoke(new Action(() =>
+                        {
+                            Log("Scope click");
+                            try { ShowScopeFromEditor(); } catch (Exception ex) { Log("Scope: " + Inner(ex)); }
+                        }));
+                }
+            }
+            catch { }
+            return CallNextHookEx(mouseHandle, code, wParam, lParam);
+        }
+
         /// <summary>The variable at the cursor (a.b[i]^.c) in the Mini-Scope.</summary>
         internal void ShowScopeFromEditor()
         {
