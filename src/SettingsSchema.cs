@@ -145,7 +145,8 @@ public static class SettingsSchema
     };
 
     /// <summary>Set by TcAgent itself for the processes it starts - not shown, not to be set by hand.</summary>
-    public static readonly string[] Internal = { "TCAGENT_CLIENT", "TCAGENT_VS_PID", "TCAGENT_ADVISOR" };
+    public static readonly string[] Internal = { "TCAGENT_CLIENT", "TCAGENT_VS_PID", "TCAGENT_ADVISOR",
+                                                 "TCAGENT_FORMAT_SURVEY_DETAIL" };   // a switch for format --survey while developing the formatter
 
     public static Setting Find(string key) => All.FirstOrDefault(s => s.Key.Equals(key, StringComparison.OrdinalIgnoreCase));
 

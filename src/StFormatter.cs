@@ -109,7 +109,7 @@ public static class StFormatter
         public readonly List<Piece> P = new();
         public string Newline;
         public string OrigIndent = "";
-        public bool Frozen, Blank, CommentOnly, Cont, Label, InBlock, Fixed, CaseElse;
+        public bool Frozen, Blank, CommentOnly, Cont, Label, InBlock, Fixed, CaseElse, CondDone;
         public int Depth, DepthHere;
         public Line ContBase;
         public string Original;
@@ -144,6 +144,7 @@ public static class StFormatter
         {
             lines = JoinShortIfs(lines, cfg);
             lines = ExpandLongIfs(lines, cfg);
+            if (LayoutConditions(ref lines, cfg, notes)) parens = true;
             lines = WrapConditions(lines, cfg);
             lines = WrapCalls(lines, cfg);
             AlignCode(lines, cfg);
@@ -458,6 +459,8 @@ public static class StFormatter
         }
         if (b.Kind == StTok.Punct && b.Text == "(")
         {
+            if (a.Kind == StTok.Word && a.Upper is "IF" or "ELSIF" or "WHILE" or "UNTIL" && !cfg.Preserve("cond.keyword-paren"))
+                return cfg["cond.keyword-paren"].Equals("none", StringComparison.OrdinalIgnoreCase) ? "" : " ";
             if (a.Kind == StTok.Word && StKeywords.IsKeyword(a.Text) && !(a.Upper is "THIS" or "SUPER" or "ADR" or "SIZEOF" or "BITADR" or "__NEW" or "__DELETE"
                 or "__QUERYINTERFACE" or "__QUERYPOINTER" or "__ISVALIDREF"))
                 return One(orig, cfg["space.keyword-paren"], " ");
@@ -995,7 +998,7 @@ public static class StFormatter
         var r = new List<Line>();
         foreach (var l in lines)
         {
-            if (l.Frozen || l.Blank || l.CommentOnly || l.Cont || Width(l.Indent, tab) + TextWidth(l, 0, l.P.Count, tab) <= max) { r.Add(l); continue; }
+            if (l.Frozen || l.Blank || l.CommentOnly || l.Cont || l.CondDone || Width(l.Indent, tab) + TextWidth(l, 0, l.P.Count, tab) <= max) { r.Add(l); continue; }
             // the condition: after IF/ELSIF/WHILE/UNTIL up to THEN/DO (or the end), or the right side of an assignment
             int start = -1, end = l.P.Count;
             var f = l.P[0].T;
@@ -1042,6 +1045,432 @@ public static class StFormatter
             r.Add(last);
         }
         return r;
+    }
+
+    // ------------------------------------------------------------------ conditions: brackets, one sub-condition per line, columns (cond.*)
+    // The condition after IF/ELSIF/WHILE/UNTIL (and, with cond.assignments, the right side of a boolean assignment) is read as a
+    // tree of AND/OR/XOR groups, NOT and sub-conditions (a name, a comparison, a call ...) and written again from it. Brackets
+    // are only added (never removed), so the tree stays the same - the safety net checks it (StExpr.SameTrees).
+
+    sealed class CNode
+    {
+        public string Op;                                 // "term", "NOT" or the operator: OR, OR_ELSE, XOR, AND, AND_THEN, &
+        public readonly List<CNode> Kids = new();
+        public readonly List<Piece> Ops = new();          // the operator tokens between the kids
+        public List<Piece> Term;                          // the tokens of a sub-condition
+        public Piece Not;
+        public int Parens;                                // brackets written around it
+        public Piece Comment;                             // a line comment behind it
+        public int First;                                 // index of its first token in the condition
+        public bool IsTerm => Op == "term";
+        public bool IsNotTerm => Op == "NOT" && Kids[0].IsTerm;
+        public int Prec => Op switch { "OR" or "OR_ELSE" => 1, "XOR" => 2, "AND" or "AND_THEN" or "&" => 3, _ => 9 };
+    }
+
+    sealed class CFail : Exception { }
+
+    sealed class CParser
+    {
+        readonly List<Piece> s;
+        int pos;
+        public CParser(List<Piece> sig) { s = sig; }
+        Piece Peek => pos < s.Count ? s[pos] : null;
+
+        public CNode Parse() { var n = Level(1); if (pos != s.Count) throw new CFail(); return n; }
+
+        static int Prec(Piece p) => p == null ? 0
+            : p.T.Kind == StTok.Word ? p.T.Upper switch { "OR" or "OR_ELSE" => 1, "XOR" => 2, "AND" or "AND_THEN" => 3, _ => 0 }
+            : p.T.Kind == StTok.Op && p.T.Text == "&" ? 3 : 0;
+
+        CNode Level(int prec)
+        {
+            if (prec > 3) return Unary();
+            var left = Level(prec + 1);
+            while (Prec(Peek) == prec)
+            {
+                var op = s[pos++];
+                var right = Level(prec + 1);
+                var key = op.T.Kind == StTok.Word ? op.T.Upper : op.T.Text;
+                if (left.Op == key && left.Parens == 0) { left.Ops.Add(op); left.Kids.Add(right); }
+                else
+                {
+                    var n = new CNode { Op = key, First = left.First };
+                    n.Kids.Add(left); n.Kids.Add(right); n.Ops.Add(op);
+                    left = n;
+                }
+            }
+            return left;
+        }
+
+        /// <summary>An operator outside brackets: a comparison or arithmetic, so the tokens are more than one operand.</summary>
+        public static bool Binary(List<Piece> term)
+        {
+            int d = 0;
+            foreach (var x in term)
+            {
+                if (x.T.Text is "(" or "[") d++; else if (x.T.Text is ")" or "]") d--;
+                else if (d == 0 && (x.T.Kind == StTok.Op && x.T.Text is not ("." or "^") || x.T.Kind == StTok.Word && x.T.Upper == "MOD")) return true;
+            }
+            return false;
+        }
+
+        int Match(int open)
+        {
+            int d = 0;
+            for (int i = open; i < s.Count; i++)
+            {
+                if (s[i].T.Text is "(" or "[") d++;
+                else if (s[i].T.Text is ")" or "]" && --d == 0) return i;
+            }
+            return -1;
+        }
+
+        CNode Unary()
+        {
+            var p = Peek ?? throw new CFail();
+            int start = pos;
+            if (p.T.Kind == StTok.Word && p.T.Upper == "NOT")
+            {
+                pos++;
+                var k = Unary();
+                // NOT binds stronger than a comparison: NOT a = b is (NOT a) = b - one sub-condition, the NOT stays where it is
+                if (k.IsTerm && k.Parens == 0 && Binary(k.Term)) return new CNode { Op = "term", Term = s.GetRange(start, pos - start), First = start };
+                var n = new CNode { Op = "NOT", Not = p, First = start };
+                n.Kids.Add(k);
+                return n;
+            }
+            if (p.T.Kind == StTok.Punct && p.T.Text == "(")
+            {
+                int close = Match(pos);
+                var after = close >= 0 && close + 1 < s.Count ? s[close + 1] : null;
+                // a bracket around a (part of the) condition - not the start of a sub-condition such as (a + b) > 5
+                if (close > 0 && (after == null || Prec(after) > 0 || after.T.Text == ")"))
+                {
+                    pos++;
+                    try
+                    {
+                        var inner = Level(1);
+                        if (pos == close) { pos++; inner.Parens++; inner.First = start; return inner; }
+                    }
+                    catch (CFail) { }
+                    pos = start;
+                }
+            }
+            // a sub-condition: up to the next AND/OR/XOR or the bracket that closes the group
+            int d = 0;
+            while (pos < s.Count)
+            {
+                var t = s[pos].T;
+                if (t.Text is "(" or "[") d++;
+                else if (t.Text is ")" or "]") { if (d == 0) break; d--; }
+                else if (d == 0 && Prec(s[pos]) > 0) break;
+                pos++;
+            }
+            if (pos == start) throw new CFail();
+            return new CNode { Op = "term", Term = s.GetRange(start, pos - start), First = start };
+        }
+    }
+
+    sealed class CRow
+    {
+        public int Col;
+        public readonly List<Piece> P = new();
+        public int TermAt = -1, CmpAt = -1, CloseAt = -1;   // where the sub-condition, its comparison and its closing bracket are
+        public bool HasNot, TermParen;
+        public Piece Comment;
+    }
+
+    static int RowWidth(CRow r, int upTo = -1)
+    {
+        int w = 0, n = upTo < 0 ? r.P.Count : upTo;
+        for (int i = 0; i < n; i++) w += (i == 0 ? 0 : r.P[i].Gap.Length) + r.P[i].T.Text.Length;
+        return w;
+    }
+
+    /// <summary>The cond.* rules on every condition. True when it ran (brackets may have been added - the trees are checked).</summary>
+    static bool LayoutConditions(ref List<Line> lines, StFormatConfig cfg, List<string> notes)
+    {
+        string mode = cfg["cond.lines"].ToLowerInvariant();
+        if (mode is not ("per-term" or "when-long")) return false;
+        bool assignments = cfg.Flag("cond.assignments");
+        int tab = cfg.TabWidth, max = cfg.Int("wrap.max-length", 120);
+        var r = new List<Line>();
+        bool any = false;
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var head = lines[i];
+            if (head.Frozen || head.Blank || head.CommentOnly || head.Cont || head.P.Count == 0) { r.Add(head); continue; }
+            // where the condition starts: after the keyword, or after the := of a boolean assignment
+            int start = -1;
+            bool assign = false;
+            var f = head.P[0].T;
+            if (Kw(f, "IF", "ELSIF", "WHILE", "UNTIL")) start = 1;
+            else if (assignments && f.Kind == StTok.Word && !StKeywords.IsKeyword(f.Text))
+                for (int k = 0, d0 = 0; k < head.P.Count; k++)
+                {
+                    var t0 = head.P[k].T;
+                    if (t0.Text is "(" or "[") d0++; else if (t0.Text is ")" or "]") d0--;
+                    else if (d0 == 0 && t0.Kind == StTok.Op && t0.Text == ":=") { start = k + 1; assign = true; break; }
+                    else if (t0.Kind == StTok.Word && StKeywords.IsKeyword(t0.Text) && !StKeywords.IsWordOperator(t0.Text)) break;
+                }
+            if (start < 0) { r.Add(head); continue; }
+            // the lines of the condition: the head and its continuation lines up to THEN / DO / ;
+            var group = new List<Line> { head };
+            int j = i + 1;
+            bool Ends(Line x) => x.P.Any(p => Kw(p.T, "THEN", "DO") || p.T.Text == ";" && p.T.Kind == StTok.Punct);
+            if (!Ends(head))
+                while (j < lines.Count && lines[j].Cont && lines[j].ContBase == head && !lines[j].Frozen) { group.Add(lines[j]); if (Ends(lines[j])) { j++; break; } j++; }
+            var all = group.SelectMany(x => x.P).ToList();
+            int end = all.Count, depth = 0;
+            for (int k = start; k < all.Count; k++)
+            {
+                var t = all[k].T;
+                if (t.Text is "(" or "[") depth++; else if (t.Text is ")" or "]") depth--;
+                if (depth == 0 && (Kw(t, "THEN", "DO") || t.Text == ";" && t.Kind == StTok.Punct)) { end = k; break; }
+            }
+            var trailer = all.Skip(end).ToList();
+            // only THEN / DO / ; and a comment may follow on the line (not the body of a one-line IF)
+            bool simpleTrailer = trailer.Count == 0 || trailer.Count <= 2 && (Kw(trailer[0].T, "THEN", "DO") || trailer[0].T.Text == ";")
+                                 && (trailer.Count == 1 || trailer[1].T.Comment);
+            var cond = all.Skip(start).Take(end - start).ToList();
+            var done = TryLayout(head, group, start, cond, trailer, simpleTrailer, assign, cfg, mode, max, tab, notes);
+            if (done == null) { r.AddRange(group); i += group.Count - 1; continue; }
+            r.AddRange(done); any = true;
+            i += group.Count - 1;
+        }
+        lines = r;
+        return any;
+    }
+
+    /// <summary>One condition written again, or null when it stays as it is (comments inside, pragmas, a part it cannot read).</summary>
+    static List<Line> TryLayout(Line head, List<Line> group, int start, List<Piece> cond, List<Piece> trailer, bool simpleTrailer, bool assign,
+                                StFormatConfig cfg, string mode, int max, int tab, List<string> notes)
+    {
+        if (cond.Count == 0 || cond.Any(p => p.T.Kind == StTok.Pragma || p.T.Kind == StTok.BlockComment || p.T.Kind == StTok.Other)) return null;
+        var sig = cond.Where(p => !p.T.Comment).ToList();
+        // the whole condition must be here: brackets balanced (a comment line inside a condition ends what is gathered)
+        int bal = 0;
+        foreach (var p in sig) { if (p.T.Text is "(" or "[") bal++; else if (p.T.Text is ")" or "]" && --bal < 0) return null; }
+        if (bal != 0) return null;
+        if (assign && !sig.Any(p => p.T.Kind == StTok.Word && p.T.Upper is "AND" or "OR" or "XOR" or "AND_THEN" or "OR_ELSE")) return null;
+        CNode root;
+        try { root = new CParser(sig).Parse(); } catch (CFail) { return null; }
+        // the sub-conditions in order, with the index of their first token
+        var terms = new List<CNode>();
+        bool doubled = false;
+        void Collect(CNode n)
+        {
+            if (n.Parens > 1 || n.IsNotTerm && n.Parens + n.Kids[0].Parens > 1) doubled = true;
+            if (n.IsTerm || n.IsNotTerm) { terms.Add(n); return; }
+            foreach (var k in n.Kids) Collect(k);
+        }
+        Collect(root);
+        if (doubled) return null;
+        // a sub-condition written over several lines (a call with one parameter per line) stays as written
+        var lineOf = new Dictionary<Piece, Line>();
+        foreach (var gl in group) foreach (var p in gl.P) lineOf[p] = gl;
+        if (terms.Any(t => (t.IsNotTerm ? t.Kids[0] : t).Term.Select(p => lineOf[p]).Distinct().Count() > 1)) return null;                       // (( a )) stays as written: no bracket is ever removed
+        // line comments behind a sub-condition (or its operator) go with it
+        var index = new Dictionary<Piece, int>();
+        for (int k = 0; k < sig.Count; k++) index[sig[k]] = k;
+        int lastSig = -1;
+        foreach (var p in cond)
+        {
+            if (!p.T.Comment) { lastSig = index[p]; continue; }
+            var owner = terms.LastOrDefault(t => t.First <= lastSig);
+            if (owner == null || owner.Comment != null) return null;
+            owner.Comment = p;
+        }
+        bool hasComments = terms.Any(t => t.Comment != null);
+        // AND / OR at the start of the line would move behind the comment of the line before: keep such a condition
+        if (hasComments && cfg["cond.operator"].Equals("first", StringComparison.OrdinalIgnoreCase)) return null;
+
+        string pt = cfg["cond.paren-terms"].ToLowerInvariant(), pg = cfg["cond.paren-groups"].ToLowerInvariant(), notMode = cfg["cond.not"].ToLowerInvariant();
+        bool tight = cfg["cond.group-space"].Equals("tight", StringComparison.OrdinalIgnoreCase);
+        bool opLast = !cfg["cond.operator"].Equals("first", StringComparison.OrdinalIgnoreCase);
+        bool nest = !cfg["cond.nest-indent"].Equals("flat", StringComparison.OrdinalIgnoreCase);
+        bool below = cfg["cond.continuation"].Equals("indent", StringComparison.OrdinalIgnoreCase);
+        string inner = cfg["space.parens"].Equals("none", StringComparison.OrdinalIgnoreCase) ? "" : " ";
+        bool several = !(root.IsTerm || root.IsNotTerm);
+        bool alignCompare = cfg.Flag("cond.align-compare");
+
+        bool TermParen(CNode n) => pt == "always" || pt == "when-several" && several || n.Parens > 0 || n.IsNotTerm && n.Kids[0].Parens > 0;
+        bool GroupParen(CNode n, CNode parent)
+        {
+            bool required = parent != null && (parent.Op == "NOT" || n.Prec < parent.Prec || n.Prec == parent.Prec && n.Op != parent.Op);
+            return required || n.Parens > 0 || pg == "outer" || pg == "or-groups" && parent != null && parent.Op != n.Op;
+        }
+        StToken Open() => new(StTok.Punct, "(");
+        StToken Close() => new(StTok.Punct, ")");
+
+        // ---- rows: one sub-condition per row (oneLine: everything in one row)
+        List<CRow> Build(bool oneLine, int baseCol)
+        {
+            var rows = new List<CRow>();
+            CRow cur = null;
+            int minCol = baseCol;
+            void Row(int col) { if (cur == null) { cur = new CRow { Col = Math.Max(minCol, col) }; rows.Add(cur); } }
+            string GapBefore(StToken t)
+            {
+                if (cur.P.Count == 0) return "";
+                var prev = cur.P[^1].T;
+                bool prevOpen = prev.Kind == StTok.Punct && prev.Text == "(", open = t.Kind == StTok.Punct && t.Text == "(";
+                bool close = t.Kind == StTok.Punct && t.Text == ")", prevClose = prev.Kind == StTok.Punct && prev.Text == ")";
+                if (prevOpen && open || prevClose && close) return tight ? "" : " ";
+                if (prevOpen || close) return inner;
+                return " ";
+            }
+            void Put(StToken t, string gap = null) => cur.P.Add(new Piece { T = t, Gap = gap ?? GapBefore(t) });
+
+            void Emit(CNode n, CNode parent, int col)
+            {
+                Row(col);
+                if (n.IsTerm || n.IsNotTerm)
+                {
+                    var term = n.IsNotTerm ? n.Kids[0] : n;
+                    bool p = TermParen(n);
+                    // NOT ( a = b ) keeps its place: inside, NOT would bind to a alone
+                    bool notInside = n.IsNotTerm && p && (notMode == "inside" || notMode == "preserve" && term.Parens == 0) && !(term.Parens > 0 && CParser.Binary(term.Term));
+                    if (n.IsNotTerm && !notInside) { Put(n.Not.T); cur.HasNot = true; }
+                    if (p) Put(Open());
+                    cur.TermAt = cur.P.Count; cur.TermParen = p;
+                    if (notInside) { Put(n.Not.T); cur.HasNot = true; }
+                    for (int k = 0; k < term.Term.Count; k++)
+                    {
+                        var x = term.Term[k];
+                        bool cmp = x.T.Kind == StTok.Op && x.T.Text is "=" or "<>" or "<" or ">" or "<=" or ">=";
+                        int depthHere = term.Term.Take(k).Count(y => y.T.Text is "(" or "[") - term.Term.Take(k).Count(y => y.T.Text is ")" or "]");
+                        if (cmp && depthHere == 0 && cur.CmpAt < 0 && !oneLine) { Put(x.T, " "); cur.CmpAt = cur.P.Count - 1; continue; }
+                        Put(x.T, k == 0 ? null : x.Gap);
+                    }
+                    if (p) { Put(Close()); cur.CloseAt = cur.P.Count - 1; }
+                    if (term.Comment != null) cur.Comment = term.Comment;
+                    if (n.Comment != null) cur.Comment = n.Comment;
+                    return;
+                }
+                if (n.Op == "NOT")
+                {
+                    Put(n.Not.T);
+                    Emit(n.Kids[0], n, cur.Col + RowWidth(cur) + 1);
+                    return;
+                }
+                bool gp = GroupParen(n, parent);
+                if (gp) Put(Open());
+                int childCol = minCol;
+                for (int k = 0; k < n.Kids.Count; k++)
+                {
+                    if (k == 0)
+                    {
+                        // the next kids start where the first one really starts (after its gap)
+                        var startRow = cur;
+                        int before = cur.P.Count;
+                        Emit(n.Kids[0], n, cur.Col + RowWidth(cur));
+                        if (nest) childCol = startRow.Col + RowWidth(startRow, before) + (before < startRow.P.Count && before > 0 ? startRow.P[before].Gap.Length : 0);
+                        continue;
+                    }
+                    if (k > 0)
+                    {
+                        var op = n.Ops[k - 1].T;
+                        if (oneLine) Put(op, " ");
+                        else if (opLast) { Put(op, " "); cur = null; }
+                        else { cur = null; Row(childCol); Put(op, ""); }
+                    }
+                    Emit(n.Kids[k], n, childCol);
+                }
+                if (gp) Put(Close());
+            }
+            Emit(root, null, baseCol);
+            return rows;
+        }
+
+        // ---- where the condition starts
+        int headW = Width(head.Indent, tab) + head.P.Take(start).Select((p, k) => (k == 0 ? 0 : p.Gap.Length) + p.T.Text.Length).Sum();
+        string kwGap;
+        var kp = cfg["cond.keyword-paren"].ToLowerInvariant();
+        int unitW = Width(cfg.IndentUnit, tab);
+
+        List<CRow> rowsOne = Build(true, 0);
+        var firstTok = rowsOne[0].P[0].T;
+        bool parenFirst = firstTok.Kind == StTok.Punct && firstTok.Text == "(";
+        kwGap = assign ? " " : parenFirst && kp == "none" ? "" : parenFirst && kp == "one" ? " " : parenFirst && kp == "preserve" ? (cfg.Preserve("space.keyword-paren") ? head.P[start].Gap : " ") : " ";
+        if (kwGap.Length == 0 && !parenFirst) kwGap = " ";
+        int oneW = headW + kwGap.Length + RowWidth(rowsOne[0]) + (trailer.Count > 0 && simpleTrailer ? 1 + trailer.Select((p, k) => (k == 0 ? 0 : p.Gap.Length) + p.T.Text.Length).Sum() : 0);
+        bool oneLine = mode == "when-long" && !hasComments && (max <= 0 || oneW <= max) || terms.Count == 1 && !hasComments;
+        if (!oneLine && !simpleTrailer) return null;      // a one-line IF with its body stays on its line
+        bool ownLine = !oneLine && below;
+        int baseCol = ownLine ? Width(head.Indent, tab) + unitW : headW + kwGap.Length;
+        var rows = oneLine ? rowsOne : Build(false, baseCol);
+        if (oneLine) rows[0].Col = baseCol;
+
+        // ---- columns
+        int maxPad = cfg.Int("align.max-pad", 40);
+        int At(CRow row, int idx) => row.Col + RowWidth(row, idx) + (idx == 0 ? 0 : row.P[idx].Gap.Length);
+        void AlignAt(List<(CRow R, int I)> g, bool right)
+        {
+            if (g.Count < 2) return;
+            var ends = g.Select(x => At(x.R, x.I) + (right ? x.R.P[x.I].T.Text.Length : 0)).ToList();
+            int target = ends.Max();
+            if (ends.Any(e => target - e > maxPad)) return;
+            for (int k = 0; k < g.Count; k++) g[k].R.P[g[k].I].Gap += new string(' ', target - ends[k]);
+        }
+        if (!oneLine)
+        {
+            if (cfg.Flag("cond.not-align") && rows.Any(x => x.HasNot))
+                foreach (var row in rows.Where(x => !x.HasNot && x.TermAt >= 0 && x.TermParen && x.TermAt < x.P.Count && rows.Any(y => y.HasNot && y.TermAt < y.P.Count && Kw(y.P[y.TermAt].T, "NOT"))))
+                    row.P[row.TermAt].Gap += "    ";
+            if (alignCompare) AlignAt(rows.Where(x => x.CmpAt > 0).Select(x => (x, x.CmpAt)).ToList(), true);
+            if (cfg.Flag("cond.align-close")) AlignAt(rows.Where(x => x.CloseAt > 0).Select(x => (x, x.CloseAt)).ToList(), false);
+        }
+        // comments at the end of their rows
+        var withComment = rows.Where(x => x.Comment != null).ToList();
+        int commentCol = cfg["cond.comments"].Equals("align", StringComparison.OrdinalIgnoreCase) && withComment.Count > 1
+                         ? withComment.Max(x => x.Col + RowWidth(x)) + 1 : -1;
+        foreach (var row in withComment)
+        {
+            int endCol = row.Col + RowWidth(row);
+            string g = commentCol > 0 && commentCol - endCol <= maxPad ? new string(' ', commentCol - endCol) : row.Comment.Gap.Length > 0 ? row.Comment.Gap : " ";
+            row.P.Add(new Piece { T = row.Comment.T, Gap = g });
+        }
+
+        // ---- the lines
+        var result = new List<Line>();
+        string nl = head.Newline ?? DefaultNewline;
+        var h = new Line { Indent = head.Indent, OrigIndent = head.OrigIndent, Depth = head.Depth, DepthHere = head.DepthHere, Original = head.Original,
+                           Newline = nl, CondDone = true, Fixed = !oneLine, Label = head.Label, InBlock = head.InBlock };
+        for (int k = 0; k < start; k++) h.P.Add(new Piece { T = head.P[k].T, Gap = k == 0 ? "" : head.P[k].Gap });
+        result.Add(h);
+        for (int k = 0; k < rows.Count; k++)
+        {
+            Line target;
+            if (k == 0 && !ownLine)
+            {
+                target = h;
+                for (int q = 0; q < rows[0].P.Count; q++) h.P.Add(new Piece { T = rows[0].P[q].T, Gap = q == 0 ? kwGap : rows[0].P[q].Gap });
+            }
+            else
+            {
+                target = new Line { Indent = Spaces(rows[k].Col, cfg), OrigIndent = "", Depth = head.Depth, Newline = nl, Fixed = true, Cont = true, ContBase = h, CondDone = true, Original = "" };
+                for (int q = 0; q < rows[k].P.Count; q++) target.P.Add(new Piece { T = rows[k].P[q].T, Gap = q == 0 ? "" : rows[k].P[q].Gap });
+                result.Add(target);
+            }
+        }
+        // THEN / DO / ; and what follows stay on the last line they were on
+        if (trailer.Count > 0)
+        {
+            var last = group[^1];
+            if (last.P.Count > 0 && last.P[0] == trailer[0] && group.Count > 1)
+            {
+                var t = new Line { Indent = last.Indent, OrigIndent = last.OrigIndent, Depth = last.Depth, Newline = last.Newline, Original = last.Original };
+                for (int q = 0; q < trailer.Count; q++) t.P.Add(new Piece { T = trailer[q].T, Gap = q == 0 ? "" : trailer[q].Gap });
+                result.Add(t);
+            }
+            else
+                for (int q = 0; q < trailer.Count; q++)
+                    result[^1].P.Add(new Piece { T = trailer[q].T, Gap = q == 0 ? (trailer[q].T.Text == ";" ? "" : " ") : trailer[q].Gap });
+        }
+        result[^1].Newline = group[^1].Newline;
+        if (result.Count > 1) result[0].Newline = nl;
+        return result;
     }
 
     // ------------------------------------------------------------------ alignment in the code

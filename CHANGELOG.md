@@ -7,6 +7,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **Formatter: brackets, lines and columns for conditions** - 14 `cond.*` rules (one sub-condition per line, brackets
+  around sub-conditions and groups, tight or spaced group brackets, NOT inside or in front, room for NOT, AND/OR at the end
+  or the start, next lines under the bracket or indented, inner groups indented or flat, closing brackets, comparisons and
+  comments in columns, `IF(` or `IF (`, also boolean assignments) and the profile `conditions-aligned`. Brackets are only
+  added, never removed; the safety net checks the expression trees. Tested on 66,618 sections with several combinations.
+  [docs/FORMATTER.md](docs/FORMATTER.md#conditions-brackets-lines-and-columns)
 - **TcAgent settings window:** Tools > TcAgent settings ... (also ⋯ in the TcAgent Chat and the Knowledge window) - every
   setting of TcAgent in plain words on pages (general and mode, target systems, gates and confirmations, knowledge and
   levels, advanced), with its value, where it comes from (default, saved, set from outside) and the details; Save writes
@@ -18,6 +24,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   out stops at once. The user mode runtimes of this PC (their own AMS Net ID) are found and offered; "From routes ..." takes over targets from the ADS routes of the TwinCAT router (read only by default). Only a person
   releases (no agent tool), every change goes to the audit log, a refused call says why. Reading stays free for every
   target. `targets.json` applies to all projects on the PC, in addition to `TCAGENT_ALLOW_TARGETS`.
+- **Formatter fixes found by the condition rules:** a bit access (`dwStatus.4`) is read as one operand by the expression
+  check of the safety net.
 - **Reload settings without a restart:** ⟳ Reload (F5) in the TcAgent settings window (or `TcAgent.exe reload`) - every running TcAgent
   reads settings.json, targets and mode, modules.json and the plugins again, the agent gets the new tool list, the chat says what changed.
 - **ST formatter:** Ctrl+Alt+F (or Tools > Format ST code (TcAgent)) formats the PLC object in the editor - indentation,

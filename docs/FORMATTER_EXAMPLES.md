@@ -1242,3 +1242,563 @@ bRelease := (bAuto AND bDoorClosed) OR (bSetup AND bKey);
 ```
 bRelease := bAuto AND bDoorClosed OR bSetup AND bKey;
 ```
+
+## cond
+
+### One sub-condition per line (`cond.lines`)
+
+Conditions after IF, ELSIF, WHILE, UNTIL: one sub-condition per line - always, only when too long, or as written (then the other cond rules do nothing). Default: `preserve`; shown with `layout.then: own-line`, `cond.paren-terms: always`, `cond.paren-groups: outer`, `cond.group-space: tight`, `cond.not: inside`, `cond.not-align: true`, `cond.operator: last`, `cond.continuation: paren`, `cond.nest-indent: indent`, `cond.align-close: true`, `cond.align-compare: true`, `cond.keyword-paren: one`, `cond.comments: align`, `wrap.max-length: 100`.
+
+Written as:
+
+```
+IF bAuto AND NOT bError AND nPressure >= nMin OR bSetup AND bKey THEN
+  x := 1;
+END_IF
+```
+
+`per-term`:
+
+```
+IF (((     bAuto             ) AND
+     ( NOT bError            ) AND
+     (     nPressure >= nMin )) OR
+    ((     bSetup            ) AND
+     (     bKey              )))
+THEN
+  x := 1;
+END_IF
+```
+
+`when-long`:
+
+```
+IF ((( bAuto ) AND ( NOT bError ) AND ( nPressure >= nMin )) OR (( bSetup ) AND ( bKey )))
+THEN
+  x := 1;
+END_IF
+```
+
+`preserve`:
+
+```
+IF bAuto AND NOT bError AND nPressure >= nMin OR bSetup AND bKey
+THEN
+  x := 1;
+END_IF
+```
+
+### Brackets around sub-conditions (`cond.paren-terms`)
+
+Every sub-condition in its own brackets - always (also a single one), only when there are several, or as written. Default: `preserve`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.group-space: tight`, `cond.not: inside`, `cond.not-align: true`, `cond.operator: last`, `cond.continuation: paren`, `cond.nest-indent: indent`, `cond.align-close: true`, `cond.align-compare: true`, `cond.keyword-paren: one`, `cond.comments: align`, `cond.paren-groups: or-groups`.
+
+Written as:
+
+```
+IF bReady THEN
+  x := 1;
+END_IF
+IF bA AND bB THEN
+  x := 2;
+END_IF
+```
+
+`always`:
+
+```
+IF ( bReady )
+THEN
+  x := 1;
+END_IF
+IF ( bA ) AND
+   ( bB )
+THEN
+  x := 2;
+END_IF
+```
+
+`when-several`:
+
+```
+IF bReady
+THEN
+  x := 1;
+END_IF
+IF ( bA ) AND
+   ( bB )
+THEN
+  x := 2;
+END_IF
+```
+
+`preserve`:
+
+```
+IF bReady
+THEN
+  x := 1;
+END_IF
+IF bA AND
+   bB
+THEN
+  x := 2;
+END_IF
+```
+
+### Brackets around groups (`cond.paren-groups`)
+
+Brackets around groups: also one around the whole condition, only around AND groups inside OR, or as written. Default: `preserve`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.paren-terms: always`, `cond.group-space: tight`, `cond.not: inside`, `cond.not-align: true`, `cond.operator: last`, `cond.continuation: paren`, `cond.nest-indent: indent`, `cond.align-close: true`, `cond.align-compare: true`, `cond.keyword-paren: one`, `cond.comments: align`.
+
+Written as:
+
+```
+IF bAuto AND NOT bError AND nPressure >= nMin OR bSetup AND bKey THEN
+  x := 1;
+END_IF
+```
+
+`outer`:
+
+```
+IF (((     bAuto             ) AND
+     ( NOT bError            ) AND
+     (     nPressure >= nMin )) OR
+    ((     bSetup            ) AND
+     (     bKey              )))
+THEN
+  x := 1;
+END_IF
+```
+
+`or-groups`:
+
+```
+IF ((     bAuto             ) AND
+    ( NOT bError            ) AND
+    (     nPressure >= nMin )) OR
+   ((     bSetup            ) AND
+    (     bKey              ))
+THEN
+  x := 1;
+END_IF
+```
+
+`preserve`:
+
+```
+IF (     bAuto             ) AND
+   ( NOT bError            ) AND
+   (     nPressure >= nMin ) OR
+   (     bSetup            ) AND
+   (     bKey              )
+THEN
+  x := 1;
+END_IF
+```
+
+### Group brackets (`cond.group-space`)
+
+Brackets of a group next to the brackets inside it: (( and )) or ( ( and ) ). Default: `spaced`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.paren-terms: always`, `cond.paren-groups: outer`, `cond.not: inside`, `cond.not-align: true`, `cond.operator: last`, `cond.continuation: paren`, `cond.nest-indent: indent`, `cond.align-close: true`, `cond.align-compare: true`, `cond.keyword-paren: one`, `cond.comments: align`.
+
+Written as:
+
+```
+IF bAuto AND NOT bError AND nPressure >= nMin OR bSetup AND bKey THEN
+  x := 1;
+END_IF
+```
+
+`tight`:
+
+```
+IF (((     bAuto             ) AND
+     ( NOT bError            ) AND
+     (     nPressure >= nMin )) OR
+    ((     bSetup            ) AND
+     (     bKey              )))
+THEN
+  x := 1;
+END_IF
+```
+
+`spaced`:
+
+```
+IF ( ( (     bAuto             ) AND
+       ( NOT bError            ) AND
+       (     nPressure >= nMin ) ) OR
+     ( (     bSetup            ) AND
+       (     bKey              ) ) )
+THEN
+  x := 1;
+END_IF
+```
+
+### NOT and its brackets (`cond.not`)
+
+NOT of a sub-condition inside its brackets ( NOT a ) or in front of them NOT ( a ). Default: `preserve`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.paren-terms: always`, `cond.paren-groups: outer`, `cond.group-space: tight`, `cond.not-align: true`, `cond.operator: last`, `cond.continuation: paren`, `cond.nest-indent: indent`, `cond.align-close: true`, `cond.align-compare: true`, `cond.keyword-paren: one`, `cond.comments: align`.
+
+Written as:
+
+```
+IF NOT bError AND NOT (bStop) THEN
+  x := 1;
+END_IF
+```
+
+`inside`:
+
+```
+IF (( NOT bError ) AND
+    ( NOT bStop  ))
+THEN
+  x := 1;
+END_IF
+```
+
+`outside`:
+
+```
+IF ( NOT ( bError ) AND
+     NOT ( bStop  ))
+THEN
+  x := 1;
+END_IF
+```
+
+`preserve`:
+
+```
+IF (( NOT bError ) AND
+    NOT ( bStop  ))
+THEN
+  x := 1;
+END_IF
+```
+
+### Make room for NOT (`cond.not-align`)
+
+In a condition with NOT, the other sub-conditions one NOT further in, so all names start in one column. Default: `false`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.paren-terms: always`, `cond.paren-groups: outer`, `cond.group-space: tight`, `cond.not: inside`, `cond.operator: last`, `cond.continuation: paren`, `cond.nest-indent: indent`, `cond.align-close: true`, `cond.align-compare: true`, `cond.keyword-paren: one`, `cond.comments: align`.
+
+Written as:
+
+```
+IF bAuto AND NOT bError AND nPressure >= nMin OR bSetup AND bKey THEN
+  x := 1;
+END_IF
+```
+
+`true`:
+
+```
+IF (((     bAuto             ) AND
+     ( NOT bError            ) AND
+     (     nPressure >= nMin )) OR
+    ((     bSetup            ) AND
+     (     bKey              )))
+THEN
+  x := 1;
+END_IF
+```
+
+`false`:
+
+```
+IF ((( bAuto             ) AND
+     ( NOT bError        ) AND
+     ( nPressure >= nMin )) OR
+    (( bSetup            ) AND
+     ( bKey              )))
+THEN
+  x := 1;
+END_IF
+```
+
+### AND / OR in conditions (`cond.operator`)
+
+AND / OR at the end of the line or at the start of the next one. Default: `last`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.paren-terms: always`, `cond.paren-groups: outer`, `cond.group-space: tight`, `cond.not: inside`, `cond.not-align: true`, `cond.continuation: paren`, `cond.nest-indent: indent`, `cond.align-close: true`, `cond.align-compare: true`, `cond.keyword-paren: one`, `cond.comments: align`.
+
+Written as:
+
+```
+IF bAuto AND NOT bError AND nPressure >= nMin OR bSetup AND bKey THEN
+  x := 1;
+END_IF
+```
+
+`last`:
+
+```
+IF (((     bAuto             ) AND
+     ( NOT bError            ) AND
+     (     nPressure >= nMin )) OR
+    ((     bSetup            ) AND
+     (     bKey              )))
+THEN
+  x := 1;
+END_IF
+```
+
+`first`:
+
+```
+IF (((     bAuto                 )
+     AND ( NOT bError            )
+     AND (     nPressure >= nMin ))
+    OR ((     bSetup             )
+        AND (     bKey           )))
+THEN
+  x := 1;
+END_IF
+```
+
+### Next lines of a condition (`cond.continuation`)
+
+The next lines under the first bracket after IF, or the condition one level in below the IF. Default: `paren`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.paren-terms: always`, `cond.paren-groups: outer`, `cond.group-space: tight`, `cond.not: inside`, `cond.not-align: true`, `cond.operator: last`, `cond.nest-indent: indent`, `cond.align-close: true`, `cond.align-compare: true`, `cond.keyword-paren: one`, `cond.comments: align`.
+
+Written as:
+
+```
+IF bAuto AND NOT bError AND nPressure >= nMin OR bSetup AND bKey THEN
+  x := 1;
+END_IF
+```
+
+`paren`:
+
+```
+IF (((     bAuto             ) AND
+     ( NOT bError            ) AND
+     (     nPressure >= nMin )) OR
+    ((     bSetup            ) AND
+     (     bKey              )))
+THEN
+  x := 1;
+END_IF
+```
+
+`indent`:
+
+```
+IF
+  (((     bAuto             ) AND
+    ( NOT bError            ) AND
+    (     nPressure >= nMin )) OR
+   ((     bSetup            ) AND
+    (     bKey              )))
+THEN
+  x := 1;
+END_IF
+```
+
+### Inner groups (`cond.nest-indent`)
+
+An inner group one bracket further right, so you see what the AND and OR act on - or all sub-conditions in one column. Default: `indent`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.paren-terms: always`, `cond.paren-groups: outer`, `cond.group-space: tight`, `cond.not: inside`, `cond.not-align: true`, `cond.operator: last`, `cond.continuation: paren`, `cond.align-close: true`, `cond.align-compare: true`, `cond.keyword-paren: one`, `cond.comments: align`.
+
+Written as:
+
+```
+IF bAuto AND NOT bError AND nPressure >= nMin OR bSetup AND bKey THEN
+  x := 1;
+END_IF
+```
+
+`indent`:
+
+```
+IF (((     bAuto             ) AND
+     ( NOT bError            ) AND
+     (     nPressure >= nMin )) OR
+    ((     bSetup            ) AND
+     (     bKey              )))
+THEN
+  x := 1;
+END_IF
+```
+
+`flat`:
+
+```
+IF (((     bAuto           ) AND
+   ( NOT bError            ) AND
+   (     nPressure >= nMin )) OR
+   ((     bSetup           ) AND
+   (     bKey              )))
+THEN
+  x := 1;
+END_IF
+```
+
+### Closing brackets in a column (`cond.align-close`)
+
+The closing brackets of the sub-conditions in one column. Default: `false`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.paren-terms: always`, `cond.paren-groups: outer`, `cond.group-space: tight`, `cond.not: inside`, `cond.not-align: true`, `cond.operator: last`, `cond.continuation: paren`, `cond.nest-indent: indent`, `cond.align-compare: true`, `cond.keyword-paren: one`, `cond.comments: align`.
+
+Written as:
+
+```
+IF nErrorNo <> 0 AND NOT bErrorActive AND sPartId = '' THEN
+  x := 1;
+END_IF
+```
+
+`true`:
+
+```
+IF ((     nErrorNo <> 0  ) AND
+    ( NOT bErrorActive   ) AND
+    (     sPartId   = '' ))
+THEN
+  x := 1;
+END_IF
+```
+
+`false`:
+
+```
+IF ((     nErrorNo <> 0 ) AND
+    ( NOT bErrorActive ) AND
+    (     sPartId   = '' ))
+THEN
+  x := 1;
+END_IF
+```
+
+### Comparisons in a column (`cond.align-compare`)
+
+The comparison operators (= <> < >) of the sub-conditions in one column, right-aligned. Default: `false`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.paren-terms: always`, `cond.paren-groups: outer`, `cond.group-space: tight`, `cond.not: inside`, `cond.not-align: true`, `cond.operator: last`, `cond.continuation: paren`, `cond.nest-indent: indent`, `cond.align-close: true`, `cond.keyword-paren: one`, `cond.comments: align`.
+
+Written as:
+
+```
+IF nErrorNo <> 0 AND NOT bErrorActive AND sPartId = '' THEN
+  x := 1;
+END_IF
+```
+
+`true`:
+
+```
+IF ((     nErrorNo <> 0  ) AND
+    ( NOT bErrorActive   ) AND
+    (     sPartId   = '' ))
+THEN
+  x := 1;
+END_IF
+```
+
+`false`:
+
+```
+IF ((     nErrorNo <> 0 ) AND
+    ( NOT bErrorActive  ) AND
+    (     sPartId = ''  ))
+THEN
+  x := 1;
+END_IF
+```
+
+### IF and ( (`cond.keyword-paren`)
+
+IF( or IF ( - for every bracket right after IF, ELSIF, WHILE, UNTIL (preserve: as space.keyword-paren). Default: `preserve`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.paren-terms: always`, `cond.paren-groups: outer`, `cond.group-space: tight`, `cond.not: inside`, `cond.not-align: true`, `cond.operator: last`, `cond.continuation: paren`, `cond.nest-indent: indent`, `cond.align-close: true`, `cond.align-compare: true`, `cond.comments: align`.
+
+Written as:
+
+```
+IF nErrorNo <> 0 AND NOT bErrorActive AND sPartId = '' THEN
+  x := 1;
+END_IF
+```
+
+`one`:
+
+```
+IF ((     nErrorNo <> 0  ) AND
+    ( NOT bErrorActive   ) AND
+    (     sPartId   = '' ))
+THEN
+  x := 1;
+END_IF
+```
+
+`none`:
+
+```
+IF((     nErrorNo <> 0  ) AND
+   ( NOT bErrorActive   ) AND
+   (     sPartId   = '' ))
+THEN
+  x := 1;
+END_IF
+```
+
+`preserve`:
+
+```
+IF ((     nErrorNo <> 0  ) AND
+    ( NOT bErrorActive   ) AND
+    (     sPartId   = '' ))
+THEN
+  x := 1;
+END_IF
+```
+
+### Comments in conditions (`cond.comments`)
+
+Comments at the end of the lines of a condition in one column. Default: `preserve`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.paren-terms: always`, `cond.paren-groups: outer`, `cond.group-space: tight`, `cond.not: inside`, `cond.not-align: true`, `cond.operator: last`, `cond.continuation: paren`, `cond.nest-indent: indent`, `cond.align-close: true`, `cond.align-compare: true`, `cond.keyword-paren: one`.
+
+Written as:
+
+```
+IF nState = 3 AND // in the cycle
+   bRun OR // started
+   bEmpty // nothing left
+THEN
+  x := 1;
+END_IF
+```
+
+`align`:
+
+```
+IF ((( nState = 3 ) AND // in the cycle
+     ( bRun       )) OR // started
+    ( bEmpty      ))    // nothing left
+THEN
+  x := 1;
+END_IF
+```
+
+`preserve`:
+
+```
+IF ((( nState = 3 ) AND // in the cycle
+     ( bRun       )) OR // started
+    ( bEmpty      )) // nothing left
+THEN
+  x := 1;
+END_IF
+```
+
+### Also boolean assignments (`cond.assignments`)
+
+The cond rules also for boolean assignments: bRelease := a AND b;. Default: `false`; shown with `layout.then: own-line`, `cond.lines: per-term`, `cond.paren-terms: always`, `cond.paren-groups: outer`, `cond.group-space: tight`, `cond.not: inside`, `cond.not-align: true`, `cond.operator: last`, `cond.continuation: paren`, `cond.nest-indent: indent`, `cond.align-close: true`, `cond.align-compare: true`, `cond.keyword-paren: one`, `cond.comments: align`.
+
+Written as:
+
+```
+bRelease := bAuto AND NOT bError OR bSetup;
+```
+
+`true`:
+
+```
+bRelease := (((     bAuto  ) AND
+              ( NOT bError )) OR
+             (     bSetup  ));
+```
+
+`false`:
+
+```
+bRelease := bAuto AND NOT bError OR bSetup;
+```

@@ -105,11 +105,26 @@ Nothing is a fixed rule. The defaults (profile `twincat`) - **an example with be
 | `eol.trim-trailing` | `true` | spaces at the end of lines |
 | `eol.style` | `preserve` | preserve, crlf, lf |
 | `paren.precedence` | `true` | brackets around AND groups inside OR, so the order is visible |
+| `cond.lines` | `preserve` | `per-term` (one sub-condition per line), `when-long`, or preserve - with preserve the other `cond.*` rules do nothing (see [Conditions](#conditions-brackets-lines-and-columns)) |
+| `cond.paren-terms` | `preserve` | `always` (also a single sub-condition), `when-several` |
+| `cond.paren-groups` | `preserve` | `outer` (also one bracket around the whole condition), `or-groups` (only AND groups inside OR) |
+| `cond.group-space` | `spaced` | `tight`: `((` and `))`; `spaced`: `( (` and `) )` |
+| `cond.not` | `preserve` | `inside`: `( NOT a )`; `outside`: `NOT ( a )` |
+| `cond.not-align` | `false` | in a condition with NOT, the other sub-conditions one `NOT ` further in |
+| `cond.operator` | `last` | AND/OR at the end of the line or at the start of the next |
+| `cond.continuation` | `paren` | the next lines under the first bracket after IF, or `indent`: the condition one level in below the IF |
+| `cond.nest-indent` | `indent` | an inner group one bracket further right; `flat`: all sub-conditions in one column |
+| `cond.align-close` | `false` | the closing brackets of the sub-conditions in one column |
+| `cond.align-compare` | `false` | the comparison operators in one column, right-aligned |
+| `cond.keyword-paren` | `preserve` | `none`: `IF(`; `one`: `IF (` - for every bracket right after IF, ELSIF, WHILE, UNTIL |
+| `cond.comments` | `preserve` | `align`: comments at the end of the lines of a condition in one column |
+| `cond.assignments` | `false` | the `cond.*` rules also for boolean assignments (`bRelease := a AND b;`) |
 
 A group of aligned declarations ends at a blank line and at a comment line; attribute lines do not break it.
 
 Profiles: `twincat` (the defaults), `compact` (no alignment), `structured` (one statement per line, THEN/DO/OF on their own
-line, blank lines around blocks, aligned assignments), `preserve` (only what is switched on explicitly).
+line, blank lines around blocks, aligned assignments), `conditions-aligned` (every sub-condition in brackets, one per line,
+brackets and comparisons in columns - see below), `preserve` (only what is switched on explicitly).
 
 Fewer switches than other formatters on purpose: one rule with clear values instead of a switch for every case - for example
 `layout.then` decides THEN, DO and OF together, `wrap.conditions` covers IF, ELSIF, WHILE, UNTIL and boolean assignments.
@@ -136,6 +151,39 @@ bRelease := (NOT bRunning AND bDoorOk) OR (bSetup AND bKeySwitch);
 
 The brackets always follow the order that applies (`NOT`, then `AND`, `XOR`, `OR`); they never change the meaning. Where
 they show something else than what was meant, a person corrects the code.
+
+### Conditions: brackets, lines and columns
+
+The `cond.*` rules write a condition after IF, ELSIF, WHILE, UNTIL (and with `cond.assignments` the right side of a
+boolean assignment) again from its structure: groups of AND, OR and XOR, NOT, and the sub-conditions - a name, a
+comparison, a call. The profile `conditions-aligned` switches them all on, in the style of many machine projects:
+
+```
+// before
+IF bAuto AND NOT bError AND nPressure >= nMin OR bSetup AND bKey THEN
+// after
+IF (((     bAuto             ) AND
+     ( NOT bError            ) AND
+     (     nPressure >= nMin )) OR
+    ((     bSetup            ) AND
+     (     bKey              )))
+THEN
+```
+
+Every rule can be changed on its own - the space after IF, the group brackets tight or spaced, NOT inside or in front
+of the brackets, AND/OR at the end or the start of a line, inner groups indented or flat, the columns of brackets,
+comparisons and comments. The defaults leave conditions as written; the profile is one click in the settings window.
+
+- **Brackets are only added, never removed**; NOT stays with what it applies to - `NOT ( a = b )` keeps its place, because
+  `( NOT a = b )` would mean `(NOT a) = b`. The safety net compares the expression trees before and after.
+- A comment at the end of a line of the condition stays with its sub-condition (`cond.comments: align` puts them in a
+  column). A condition with a comment between its parts, a pragma, a sub-condition written over several lines (a call
+  with one parameter per line) or `(( a ))` stays as written; so does one with comments when AND/OR go to the start of
+  the line.
+- Tested on 66,618 sections of real projects with several combinations of the rules: everything formatted is stable on a
+  second run, nothing changes its meaning.
+- Planned, not yet in the formatter: De Morgan (`NOT ( a OR b )` → `NOT a AND NOT b`) and making `= TRUE` uniform - these
+  change the expression and come with the *Conditions* feature (logic diagram, truth table, rewrites with a proof).
 
 ## formatting.json on the knowledge levels
 

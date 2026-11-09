@@ -244,6 +244,7 @@ public static class CliFormat
         int files = 0, sections = 0, changed = 0, failed = 0;
         var errors = new Dictionary<string, int>();
         var examples = new List<string>();
+        var details = new List<string>();
         foreach (var f in Directory.EnumerateFiles(folder, "*.*", SearchOption.AllDirectories)
                      .Where(x => x.EndsWith(".TcPOU", StringComparison.OrdinalIgnoreCase) || x.EndsWith(".TcGVL", StringComparison.OrdinalIgnoreCase)
                               || x.EndsWith(".TcDUT", StringComparison.OrdinalIgnoreCase) || x.EndsWith(".TcIO", StringComparison.OrdinalIgnoreCase)))
@@ -261,6 +262,14 @@ public static class CliFormat
                     var key = System.Text.RegularExpressions.Regex.Replace(r.Error, @"line \d+|token \d+", "#");
                     errors[key] = errors.GetValueOrDefault(key) + 1;
                     if (examples.Count < 20) examples.Add($"{f} [{part}]: {r.Error}");
+                    // TCAGENT_FORMAT_SURVEY_DETAIL: the first condition of the section that fails on its own (to find the cause)
+                    if (Environment.GetEnvironmentVariable("TCAGENT_FORMAT_SURVEY_DETAIL") == "1" && part == StPart.Implementation && details.Count < 60)
+                        foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(text, @"(?ms)^[ \t]*(IF|WHILE)\b.*?\b(THEN|DO)\b"))
+                        {
+                            var snip = m.Value + "\n  x := 1;\n" + (m.Value.TrimStart().StartsWith("WHILE") ? "END_WHILE" : "END_IF");
+                            var e1 = StFormatter.Format(snip, cfg, StPart.Implementation).Error;
+                            if (e1 != null) { details.Add(e1[..Math.Min(50, e1.Length)] + " | " + m.Value.Trim()); break; }
+                        }
                 }
                 else if (r.Changed) changed++;
             }
@@ -270,7 +279,8 @@ public static class CliFormat
             {
                 ["files"] = files, ["sections"] = sections, ["changed"] = changed, ["failed"] = failed,
                 ["errors"] = new JsonObject(errors.OrderByDescending(e => e.Value).Select(e => KeyValuePair.Create(e.Key, (JsonNode)e.Value))),
-                ["examples"] = new JsonArray(examples.Select(e => (JsonNode)e).ToArray())
+                ["examples"] = new JsonArray(examples.Select(e => (JsonNode)e).ToArray()),
+                ["details"] = new JsonArray(details.Select(e => (JsonNode)e).ToArray())
             }.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
         else
         {

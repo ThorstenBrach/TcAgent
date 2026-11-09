@@ -56,6 +56,20 @@ public sealed class StFormatConfig
         ("eol.trim-trailing", "true", "true | false", "remove spaces at the end of lines"),
         ("eol.style", "preserve", "preserve | crlf | lf", "line endings"),
         ("paren.precedence", "true", "true | false", "brackets around AND groups inside OR, so the order is visible (the meaning stays)"),
+        ("cond.lines", "preserve", "per-term | when-long | preserve", "conditions after IF, ELSIF, WHILE, UNTIL: one sub-condition per line - always, only when too long, or as written (then the other cond rules do nothing)"),
+        ("cond.paren-terms", "preserve", "always | when-several | preserve", "every sub-condition in its own brackets - always (also a single one), only when there are several, or as written"),
+        ("cond.paren-groups", "preserve", "outer | or-groups | preserve", "brackets around groups: also one around the whole condition, only around AND groups inside OR, or as written"),
+        ("cond.group-space", "spaced", "tight | spaced", "brackets of a group next to the brackets inside it: (( and )) or ( ( and ) )"),
+        ("cond.not", "preserve", "inside | outside | preserve", "NOT of a sub-condition inside its brackets ( NOT a ) or in front of them NOT ( a )"),
+        ("cond.not-align", "false", "true | false", "in a condition with NOT, the other sub-conditions one NOT further in, so all names start in one column"),
+        ("cond.operator", "last", "last | first", "AND / OR at the end of the line or at the start of the next one"),
+        ("cond.continuation", "paren", "paren | indent", "the next lines under the first bracket after IF, or the condition one level in below the IF"),
+        ("cond.nest-indent", "indent", "indent | flat", "an inner group one bracket further right, so you see what the AND and OR act on - or all sub-conditions in one column"),
+        ("cond.align-close", "false", "true | false", "the closing brackets of the sub-conditions in one column"),
+        ("cond.align-compare", "false", "true | false", "the comparison operators (= <> < >) of the sub-conditions in one column, right-aligned"),
+        ("cond.keyword-paren", "preserve", "none | one | preserve", "IF( or IF ( - for every bracket right after IF, ELSIF, WHILE, UNTIL (preserve: as space.keyword-paren)"),
+        ("cond.comments", "preserve", "align | preserve", "comments at the end of the lines of a condition in one column"),
+        ("cond.assignments", "false", "true | false", "the cond rules also for boolean assignments: bRelease := a AND b;"),
     };
 
     /// <summary>Short names in plain words for the settings window (the key stays in the details).</summary>
@@ -74,6 +88,11 @@ public sealed class StFormatConfig
         ["wrap.max-length"] = "Longest line", ["wrap.call-args"] = "Long calls", ["wrap.conditions"] = "Long conditions", ["wrap.operator"] = "AND / OR stand",
         ["blank.max"] = "Blank lines in a row", ["blank.body-edges"] = "Blank lines at the edges", ["blank.around-blocks"] = "Blank lines around blocks",
         ["eol.trim-trailing"] = "Spaces at line ends", ["eol.style"] = "Line endings", ["paren.precedence"] = "Brackets for AND in OR",
+        ["cond.lines"] = "One sub-condition per line", ["cond.paren-terms"] = "Brackets around sub-conditions", ["cond.paren-groups"] = "Brackets around groups",
+        ["cond.group-space"] = "Group brackets", ["cond.not"] = "NOT and its brackets", ["cond.not-align"] = "Make room for NOT",
+        ["cond.operator"] = "AND / OR in conditions", ["cond.continuation"] = "Next lines of a condition", ["cond.nest-indent"] = "Inner groups",
+        ["cond.align-close"] = "Closing brackets in a column", ["cond.align-compare"] = "Comparisons in a column", ["cond.keyword-paren"] = "IF and (",
+        ["cond.comments"] = "Comments in conditions", ["cond.assignments"] = "Also boolean assignments",
     };
 
     /// <summary>The names in German, for the settings window when the chat answers in German (English for every other language).</summary>
@@ -120,6 +139,20 @@ public sealed class StFormatConfig
         ["eol.trim-trailing"] = ("Leerzeichen am Zeilenende", "Leerzeichen am Ende von Zeilen entfernen"),
         ["eol.style"] = ("Zeilenenden", "Zeilenenden"),
         ["paren.precedence"] = ("Klammern für AND in OR", "Klammern um AND-Gruppen in einem OR, damit die Reihenfolge sichtbar ist (die Bedeutung bleibt)"),
+        ["cond.lines"] = ("Eine Teilbedingung pro Zeile", "Bedingungen nach IF, ELSIF, WHILE, UNTIL: eine Teilbedingung pro Zeile - immer, nur wenn zu lang, oder wie geschrieben (dann wirken die anderen Bedingungsregeln nicht)"),
+        ["cond.paren-terms"] = ("Klammern um Teilbedingungen", "jede Teilbedingung in eigene Klammern - immer (auch eine einzelne), nur wenn es mehrere gibt, oder wie geschrieben"),
+        ["cond.paren-groups"] = ("Klammern um Gruppen", "Klammern um Gruppen: auch eine um die ganze Bedingung, nur um UND-Gruppen in einem OR, oder wie geschrieben"),
+        ["cond.group-space"] = ("Gruppenklammern", "die Klammern einer Gruppe direkt an den Klammern darin: (( und )) oder ( ( und ) )"),
+        ["cond.not"] = ("NOT und seine Klammern", "NOT einer Teilbedingung in ihren Klammern ( NOT a ) oder davor NOT ( a )"),
+        ["cond.not-align"] = ("Platz für NOT", "in einer Bedingung mit NOT die anderen Teilbedingungen um ein NOT eingerückt, damit alle Namen in einer Spalte beginnen"),
+        ["cond.operator"] = ("AND / OR in Bedingungen", "AND / OR am Ende der Zeile oder am Anfang der nächsten"),
+        ["cond.continuation"] = ("Folgezeilen einer Bedingung", "die nächsten Zeilen unter der ersten Klammer nach dem IF, oder die Bedingung eine Ebene eingerückt unter dem IF"),
+        ["cond.nest-indent"] = ("Innere Gruppen", "eine innere Gruppe eine Klammer weiter rechts, damit man sieht, worauf AND und OR wirken - oder alle Teilbedingungen in einer Spalte"),
+        ["cond.align-close"] = ("Schließende Klammern in einer Spalte", "die schließenden Klammern der Teilbedingungen in einer Spalte"),
+        ["cond.align-compare"] = ("Vergleiche in einer Spalte", "die Vergleichsoperatoren (= <> < >) der Teilbedingungen in einer Spalte, rechtsbündig"),
+        ["cond.keyword-paren"] = ("IF und (", "IF( oder IF ( - für jede Klammer direkt nach IF, ELSIF, WHILE, UNTIL (so lassen: wie „Schlüsselwort und (“)"),
+        ["cond.comments"] = ("Kommentare in Bedingungen", "Kommentare am Ende der Zeilen einer Bedingung in einer Spalte"),
+        ["cond.assignments"] = ("Auch boolesche Zuweisungen", "die Bedingungsregeln auch für boolesche Zuweisungen: bRelease := a AND b;"),
     };
 
     /// <summary>The values in plain words: value → (English, German). A number stays a number.</summary>
@@ -138,6 +171,12 @@ public sealed class StFormatConfig
         ["declarations"] = ("in declarations", "in Deklarationen"),
         ["above"] = ("above the declaration", "über der Deklaration"), ["behind"] = ("at the end of the line", "am Ende der Zeile"), ["everywhere"] = ("everywhere", "überall"),
         ["indent"] = ("one level in", "eine Ebene eingerückt"), ["crlf"] = ("CRLF (Windows)", "CRLF (Windows)"), ["lf"] = ("LF (Unix)", "LF (Unix)"),
+        ["per-term"] = ("always, one per line", "immer, eine pro Zeile"), ["always"] = ("always", "immer"), ["when-several"] = ("when there are several", "wenn es mehrere gibt"),
+        ["outer"] = ("also around the whole condition", "auch um die ganze Bedingung"), ["or-groups"] = ("only AND groups inside OR", "nur UND-Gruppen in einem OR"),
+        ["tight"] = ("tight: ((", "eng: (("), ["spaced"] = ("with a space: ( (", "mit Leerzeichen: ( ("),
+        ["inside"] = ("inside: ( NOT a )", "innen: ( NOT a )"), ["outside"] = ("in front: NOT ( a )", "davor: NOT ( a )"),
+        ["paren"] = ("under the first bracket", "unter der ersten Klammer"), ["flat"] = ("all in one column", "alle in einer Spalte"),
+        ["align"] = ("in a column", "in einer Spalte"),
     };
 
     public static readonly Dictionary<string, Dictionary<string, string>> Profiles = new(StringComparer.OrdinalIgnoreCase)
@@ -145,6 +184,14 @@ public sealed class StFormatConfig
         ["twincat"] = new(),
         ["compact"] = new() { ["align.decl"] = "false", ["align.decl-init"] = "false", ["align.eol-comments"] = "false", ["align.named-args"] = "false" },
         ["structured"] = new() { ["layout.blocks"] = "expand", ["layout.then"] = "own-line", ["blank.around-blocks"] = "add", ["align.assignments"] = "true" },
+        // every sub-condition in brackets, one per line, columns - the style of many machine projects (interview 09.11.)
+        ["conditions-aligned"] = new()
+        {
+            ["layout.then"] = "own-line", ["cond.lines"] = "per-term", ["cond.paren-terms"] = "always", ["cond.paren-groups"] = "outer",
+            ["cond.group-space"] = "tight", ["cond.not"] = "inside", ["cond.not-align"] = "true", ["cond.operator"] = "last",
+            ["cond.continuation"] = "paren", ["cond.nest-indent"] = "indent", ["cond.align-close"] = "true", ["cond.align-compare"] = "true",
+            ["cond.keyword-paren"] = "one", ["cond.comments"] = "align",
+        },
         ["preserve"] = Rules.Where(r => r.Values.Contains("preserve")).ToDictionary(r => r.Key, _ => "preserve")
             .Concat(new Dictionary<string, string> { ["align.decl"] = "false", ["align.decl-init"] = "false", ["align.eol-comments"] = "false", ["align.named-args"] = "false",
                 ["wrap.max-length"] = "0", ["paren.precedence"] = "false", ["eol.trim-trailing"] = "false" }).ToDictionary(k => k.Key, k => k.Value),

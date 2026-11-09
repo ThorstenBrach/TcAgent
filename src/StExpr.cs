@@ -105,7 +105,7 @@ public static class StExpr
             {
                 var t = Peek();
                 if (t == null) return n;
-                if (t.Kind == StTok.Op && t.Text == "." && Peek(1)?.Kind == StTok.Word)
+                if (t.Kind == StTok.Op && t.Text == "." && Peek(1)?.Kind is StTok.Word or StTok.Number)   // a member, or a bit: dwStatus.4
                 {
                     Pos += 2;
                     var m = new Node { Op = ".", Start = n.Start, End = Pos - 1, Leaf = s[Pos - 1].Text };

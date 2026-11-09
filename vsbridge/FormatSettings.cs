@@ -789,7 +789,7 @@ namespace TcAgentBridge
         {
             "indent" => T("Indentation", "Einrückung"), "case" => T("Case", "Schreibweise"), "space" => T("Spaces", "Leerzeichen"), "comment" => T("Comments", "Kommentare"),
             "layout" => "Layout", "align" => T("Columns", "Spalten"), "wrap" => T("Long lines", "Lange Zeilen"), "blank" => T("Blank lines", "Leerzeilen"),
-            "eol" => T("Line ends", "Zeilenenden"), "paren" => T("Brackets in conditions", "Klammern in Bedingungen"), _ => g
+            "eol" => T("Line ends", "Zeilenenden"), "paren" => T("Brackets in conditions", "Klammern in Bedingungen"), "cond" => T("Conditions", "Bedingungen"), _ => g
         };
 
         static string FmtStr(Dictionary<string, object> d, string k) => d != null && d.TryGetValue(k, out var v) && v != null ? v.ToString() : null;
