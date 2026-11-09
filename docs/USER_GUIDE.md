@@ -681,8 +681,8 @@ Without a running PLC it shows the structure. A large condition gets scroll bars
 one row (a click on the row opens it again), **⊟** folds every fulfilled branch at once. A click on a sub-condition opens its
 history in the Inline-Scope.
 
-<p align="center"><img src="img/guide/inline-logic-view.png" width="860" alt="Inline-Logic-View of a nested IF condition, online"><br><sub>The Inline-Logic-View of a nested IF online: fulfilled operands and lines green, a dashed gate cannot be read yet, the line on top says the result.</sub></p>
-<p align="center"><img src="img/guide/inline-logic-view-code.png" width="860" alt="The same IF in the TwinCAT online view"><br><sub>The same condition in the TwinCAT editor online - the popup shows which part decides.</sub></p>
+<p align="center"><img src="img/guide/inline-logic-view.png" width="744" alt="Inline-Logic-View of a nested IF condition, online"><br><sub>The Inline-Logic-View of a nested IF online: fulfilled operands and lines green, a dashed gate cannot be read yet, the line on top says the result.</sub></p>
+<p align="center"><img src="img/guide/inline-logic-view-code.png" width="744" alt="The same IF in the TwinCAT online view"><br><sub>The same condition in the TwinCAT editor online - the popup shows which part decides.</sub></p>
 
 ### Inline-Scope: the history of a variable
 
@@ -697,7 +697,7 @@ their range, enums as steps with their names; **+ Variable** adds more, one belo
 - The variable is followed to its ADS path like in the Inline-Logic-View (inherited, reference, pointer, index, GVL); the
   instance is chosen in the popup. The values are read every 20 ms (`TcAgent.exe watch`), only read, on any target.
 
-<p align="center"><img src="img/guide/inline-scope-code.png" width="760" alt="Alt+click on a variable in the TwinCAT editor"><br><sub>Alt+click on <code>fDemoSine</code> in the editor ...</sub></p>
+<p align="center"><img src="img/guide/inline-scope-code.png" width="744" alt="Alt+click on a variable in the TwinCAT editor"><br><sub>Alt+click on <code>fDemoSine</code> in the editor ...</sub></p>
 <p align="center"><img src="img/guide/inline-scope.png" width="744" alt="Inline-Scope of a sine signal over 5 seconds"><br><sub>... opens the Inline-Scope: the value over the last 5 s with its value axis, below the current value, min and max.</sub></p>
 
 The agent has the same as `tc_condition`, the command line as `TcAgent.exe condition --text "IF …"`: the sub-conditions,
