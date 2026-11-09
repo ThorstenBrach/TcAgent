@@ -61,32 +61,32 @@ namespace TcAgentBridge
             try
             {
                 var dv = ActiveDocView(out var doc);
-                var syn = SafeCall(dv, "GetActiveSynEdControl", SafeGet(dv, "EditorView")) as System.Windows.Forms.Control;
-                if (syn == null)
-                {
-                    var cds = SafeGet(dv, "EditorView") ?? SafeGet(SafeGet(EnvProp("Engine"), "Frame"), "ActiveView");
-                    if (SafeGet(cds, "ImplementationEditorView") is System.Windows.Forms.Control ctl)
-                        syn = ctl.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0 ? ctl : Descendants(ctl).FirstOrDefault(c => c.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0);
-                }
+                // the two editors of the object (declaration, implementation): the one with the focus, otherwise the implementation -
+                // the same way tc_editor_context reads them (the VS view reports another pane in online mode)
+                var cds = SafeGet(dv, "EditorView") ?? SafeGet(SafeGet(EnvProp("Engine"), "Frame"), "ActiveView");
+                System.Windows.Forms.Control Syn(string pane) =>
+                    SafeGet(cds, pane) is System.Windows.Forms.Control ctl
+                        ? (ctl.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0 ? ctl : Descendants(ctl).FirstOrDefault(c => c.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0))
+                        : null;
+                var impl = Syn("ImplementationEditorView");
+                var decl = Syn("InterfaceEditorView");
+                var syn = decl != null && (decl.Focused || decl.ContainsFocus) ? decl : impl
+                          ?? SafeCall(dv, "GetActiveSynEdControl", SafeGet(dv, "EditorView")) as System.Windows.Forms.Control;
                 var text = SafeGet(syn, "Text") as string;
                 if (string.IsNullOrEmpty(text)) { SetStatus(T("TcAgent: put the cursor into a condition (IF, ELSIF, WHILE, UNTIL) of an open POU first", "TcAgent: Setze den Cursor zuerst in eine Bedingung (IF, ELSIF, WHILE, UNTIL) einer offenen POU")); return; }
-                // the caret: line and column of the VS view (IVsTextView.GetCaretPos), otherwise CaretLine of the editor control
+                // the caret: the position in the text of this editor (CaretPosition), otherwise its line (CaretLine)
                 var textLines = text.Replace("\r\n", "\n").Split('\n');
-                int caretLine = -1, caretCol = 0;
-                var a2 = new object[2];
-                try { if (dv != null && TryInvoke(dv, "GetCaretPos", a2, out _)) { caretLine = Convert.ToInt32(a2[0]); caretCol = Convert.ToInt32(a2[1]); } } catch { }
-                if (caretLine < 0 && SafeGet(syn, "CaretLine") is int cl) caretLine = cl;
-                if (caretLine < 0) caretLine = 0;
-                caretLine = Math.Min(caretLine, textLines.Length - 1);
-                int nl = text.Contains("\r\n") ? 2 : 1, caret = 0;
-                for (int i = 0; i < caretLine; i++) caret += textLines[i].Length + nl;
-                caret += Math.Min(caretCol, textLines[caretLine].Length);
-                Log($"Condition: caret line {caretLine + 1} column {caretCol + 1}");
-                // the selection: from the VS view (IVsTextView.GetSelectedText), otherwise from the editor control
-                string sel = null;
-                var a1 = new object[1];
-                try { if (dv != null && TryInvoke(dv, "GetSelectedText", a1, out _)) sel = a1[0] as string; } catch { }
-                if (string.IsNullOrWhiteSpace(sel)) sel = SafeGet(syn, "SelectedText") as string;
+                int nl = text.Contains("\r\n") ? 2 : 1, caret = -1;
+                var cpos = SafeGet(syn, "CaretPosition");
+                if (cpos is int cpi && cpi >= 0 && cpi <= text.Length) caret = cpi;
+                else if (cpos is long cpl && cpl >= 0 && cpl <= text.Length) caret = (int)cpl;
+                if (caret < 0 && SafeGet(syn, "CaretLine") is int cl)
+                    for (int i = 0, k = 0; i < textLines.Length; k += textLines[i].Length + nl, i++) if (i == cl) { caret = k; break; }
+                if (caret < 0) caret = 0;
+                Log($"Condition: caret at {caret} of {text.Length} (line {text.Take(caret).Count(c => c == '\n') + 1}), {(syn == decl ? "declaration" : "implementation")}");
+                // the selection of this editor: only a condition counts (a word clicked in online mode is not one)
+                string sel = SafeGet(syn, "SelectedText") as string;
+                if (!string.IsNullOrWhiteSpace(sel) && !(sel.Contains("\n") || Regex.IsMatch(sel, @"\b(AND|OR|XOR|NOT|AND_THEN|OR_ELSE)\b|[<>=]", RegexOptions.IgnoreCase))) sel = null;
                 Log($"Condition: selection {(string.IsNullOrWhiteSpace(sel) ? "none" : sel.Length + " characters")}");
                 var (cond, line) = ConditionAt(text, caret, sel);
                 if (cond == null) { SetStatus(T("TcAgent: no condition at the cursor - put it into an IF, ELSIF, WHILE or UNTIL (or a boolean assignment)", "TcAgent: Keine Bedingung am Cursor - setze ihn in ein IF, ELSIF, WHILE oder UNTIL (oder eine boolesche Zuweisung)")); return; }
@@ -201,11 +201,19 @@ namespace TcAgentBridge
         {
             german = isGerman;
             open?.CloseNow();
+            // where: the caret of the editor, otherwise the mouse when it is over the editor, otherwise the top of the editor -
+            // always on the monitor of the editor
             var hwnd = GetFocus();
             POINT p = default;
+            System.Drawing.Rectangle er = default;
+            try { if (editor != null) er = editor.RectangleToScreen(editor.ClientRectangle); } catch { }
             bool haveCaret = hwnd != IntPtr.Zero && GetCaretPos(out p) && ClientToScreen(hwnd, ref p);
-            if (haveCaret && editor != null && !editor.RectangleToScreen(editor.ClientRectangle).Contains(p.X, p.Y)) haveCaret = false;
-            if (!haveCaret && editor != null) { var r = editor.RectangleToScreen(editor.ClientRectangle); p = new POINT { X = r.Left + 80, Y = r.Top + 60 }; }
+            if (haveCaret && (er.IsEmpty || !er.Contains(p.X, p.Y))) haveCaret = false;
+            if (!haveCaret)
+            {
+                var m = System.Windows.Forms.Cursor.Position;
+                p = !er.IsEmpty && er.Contains(m) ? new POINT { X = m.X, Y = m.Y } : !er.IsEmpty ? new POINT { X = er.Left + 80, Y = er.Top + 60 } : new POINT { X = m.X, Y = m.Y };
+            }
             var w = new ConditionPopup(pkg, editor, exe, sln, cond, pou, method, line, netId);
             open = w;
             w.PlaceAt(p.X + 40, p.Y + (editor?.Font?.Height ?? 16) + 6);
