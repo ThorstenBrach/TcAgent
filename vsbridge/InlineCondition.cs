@@ -70,7 +70,18 @@ namespace TcAgentBridge
                 }
                 var text = SafeGet(syn, "Text") as string;
                 if (string.IsNullOrEmpty(text)) { SetStatus(T("TcAgent: put the cursor into a condition (IF, ELSIF, WHILE, UNTIL) of an open POU first", "TcAgent: Setze den Cursor zuerst in eine Bedingung (IF, ELSIF, WHILE, UNTIL) einer offenen POU")); return; }
-                int caret = SafeGet(syn, "CaretPosition") is int cp ? cp : 0;
+                // the caret: line and column of the VS view (IVsTextView.GetCaretPos), otherwise CaretLine of the editor control
+                var textLines = text.Replace("\r\n", "\n").Split('\n');
+                int caretLine = -1, caretCol = 0;
+                var a2 = new object[2];
+                try { if (dv != null && TryInvoke(dv, "GetCaretPos", a2, out _)) { caretLine = Convert.ToInt32(a2[0]); caretCol = Convert.ToInt32(a2[1]); } } catch { }
+                if (caretLine < 0 && SafeGet(syn, "CaretLine") is int cl) caretLine = cl;
+                if (caretLine < 0) caretLine = 0;
+                caretLine = Math.Min(caretLine, textLines.Length - 1);
+                int nl = text.Contains("\r\n") ? 2 : 1, caret = 0;
+                for (int i = 0; i < caretLine; i++) caret += textLines[i].Length + nl;
+                caret += Math.Min(caretCol, textLines[caretLine].Length);
+                Log($"Condition: caret line {caretLine + 1} column {caretCol + 1}");
                 var sel = SafeGet(syn, "SelectedText") as string;
                 var (cond, line) = ConditionAt(text, caret, sel);
                 if (cond == null) { SetStatus(T("TcAgent: no condition at the cursor - put it into an IF, ELSIF, WHILE or UNTIL (or a boolean assignment)", "TcAgent: Keine Bedingung am Cursor - setze ihn in ein IF, ELSIF, WHILE oder UNTIL (oder eine boolesche Zuweisung)")); return; }
