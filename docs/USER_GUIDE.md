@@ -697,6 +697,9 @@ their range, enums as steps with their names; **+ Variable** adds more, one belo
 - The variable is followed to its ADS path like in the Inline-Logic-View (inherited, reference, pointer, index, GVL); the
   instance is chosen in the popup. The values are read every 20 ms (`TcAgent.exe watch`), only read, on any target.
 
+<p align="center"><img src="img/guide/inline-scope-code.png" width="760" alt="Alt+click on a variable in the TwinCAT editor"><br><sub>Alt+click on <code>fDemoSine</code> in the editor ...</sub></p>
+<p align="center"><img src="img/guide/inline-scope.png" width="744" alt="Inline-Scope of a sine signal over 5 seconds"><br><sub>... opens the Inline-Scope: the value over the last 5 s with its value axis, below the current value, min and max.</sub></p>
+
 The agent has the same as `tc_condition`, the command line as `TcAgent.exe condition --text "IF …"`: the sub-conditions,
 when the condition is true, and rewrites that mean exactly the same - De Morgan, simplify, write out in full, `= TRUE`
 uniform - each proven over every combination.
