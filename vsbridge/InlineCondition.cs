@@ -118,10 +118,18 @@ namespace TcAgentBridge
             caret = Math.Max(0, Math.Min(caret, text.Length));
             foreach (Match m in Regex.Matches(text, @"(?is)\b(IF|ELSIF|WHILE|UNTIL)\b.*?(\bTHEN\b|\bDO\b|;)"))
                 if (m.Index <= caret && caret <= m.Index + m.Length + 1) return (m.Value, LineOf(m.Index));
-            // a boolean assignment on the line of the caret
-            int ls = text.LastIndexOf('\n', Math.Max(0, caret - 1)) + 1;
-            var stmt = Regex.Match(text.Substring(ls), @"(?s)^[^;]*?:=[^;]*;");
-            if (stmt.Success && Regex.IsMatch(stmt.Value, @"\b(AND|OR|XOR|AND_THEN|OR_ELSE)\b", RegexOptions.IgnoreCase)) return (stmt.Value.Trim(), LineOf(ls));
+            // a boolean assignment around the caret, also over several lines: from the ; before it to the ; after it
+            int from = caret > 0 ? text.LastIndexOf(';', caret - 1) + 1 : 0;
+            int to = text.IndexOf(';', caret);
+            if (to < 0) return (null, 0);
+            var stmt = text.Substring(from, to - from + 1);
+            // what stands before the statement on its lines: THEN, ELSE, DO, a CASE label, comments
+            var head = Regex.Match(stmt, @"(?is)^.*(\bTHEN\b|\bELSE\b|\bDO\b|\bREPEAT\b|\bOF\b|^\s*[\w.#]+\s*:(?!=))");
+            int cut = head.Success ? head.Length : 0;
+            stmt = stmt.Substring(cut);
+            stmt = Regex.Replace(stmt, @"^(\s*(//[^\n]*\n|\(\*.*?\*\)))+", "", RegexOptions.Singleline);
+            if (stmt.Contains(":=") && Regex.IsMatch(stmt, @"\b(AND|OR|XOR|NOT|AND_THEN|OR_ELSE)\b", RegexOptions.IgnoreCase))
+                return (stmt.Trim(), LineOf(Math.Max(from, text.IndexOf(stmt.Trim(), from, StringComparison.Ordinal))));
             return (null, 0);
         }
 
