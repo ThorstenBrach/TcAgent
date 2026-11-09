@@ -101,4 +101,44 @@ public class StLogicTests
         Assert.False(StLogic.Same(e.Root, wrong, 2));
         Assert.True(StLogic.Same(e.Root, StLogic.NotInward(LNode.Not(LNode.Not(e.Root))), 2));
     }
+
+    [Fact]
+    public void ASignStaysAtItsNumber()
+    {
+        Assert.Equal("fSine < -0.5", StLogic.Parse("IF fSine < -0.5 THEN").Atoms[0]);
+        Assert.Equal("nA - 1 > (-nB)", StLogic.Parse("nA - 1 > (- nB)").Atoms[0]);
+    }
+
+    [Fact]
+    public void ANegatedComparisonIsTurned()
+    {
+        Assert.Equal("nA <= 20", StLogic.Turn("nA > 20"));
+        Assert.Equal("fSine >= -0.5", StLogic.Turn("fSine < -0.5"));
+        Assert.Equal("eState <> E_State.Run", StLogic.Turn("eState = E_State.Run"));
+        Assert.Null(StLogic.Turn("bReady"));
+        Assert.Null(StLogic.Turn("NOT a = b"));
+        var r = Rewrites("IF bOn AND NOT (fSine < -0.5 AND nB > 30) THEN", out var o);
+        Assert.Contains("not-inward-turn: bOn AND (fSine >= -0.5 OR nB <= 30)", r);
+        Assert.Equal(8, o["results"]!.ToString().Length);
+        Assert.Equal('1', o["results"]!.ToString()[1]);         // bOn only: TRUE
+    }
+
+    [Fact]
+    public void ARewriteBecomesTheCodeOfTheSameStatement()
+    {
+        var cfg = new StFormatConfig();
+        var (code, ok) = StLogicLayout.Layout(StLogic.Parse("IF a AND NOT (b OR c) THEN"), "a AND NOT b AND NOT c", cfg);
+        Assert.StartsWith("IF ", code);
+        Assert.EndsWith("THEN", code);
+        Assert.Contains("NOT b", code);
+        Assert.True(ok);
+        (code, ok) = StLogicLayout.Layout(StLogic.Parse("bOut := NOT (bA OR nX > 5);"), "NOT bA AND nX <= 5", cfg);
+        Assert.Equal("bOut := NOT bA AND nX <= 5;", code);
+        Assert.True(ok);
+        (code, _) = StLogicLayout.Layout(StLogic.Parse("ELSIF a OR b THEN"), "b OR a", cfg);
+        Assert.StartsWith("ELSIF", code);
+        // a text that means something else is never passed as checked
+        (_, ok) = StLogicLayout.Layout(StLogic.Parse("IF a AND b THEN"), "a OR b", cfg);
+        Assert.False(ok);
+    }
 }

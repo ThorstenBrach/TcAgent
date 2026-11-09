@@ -1,7 +1,9 @@
-// TcAgent.exe condition: a condition as logic (StLogic.cs) - for the Conditions window of the IDE and for scripts. Files only.
+// TcAgent.exe condition: a condition as logic (StLogic.cs) - for the Inline-Logic-View, the condition window of the IDE and for scripts. Files only.
 //
 //   condition --stdin [--json]          the condition from stdin ("IF a AND NOT b THEN", "a AND b", "x := a OR b;")
 //   condition --text "<condition>"      the same from the command line
+//   ... --layout [--solution <dir>]     each rewrite also as "code": the statement head laid out by the formatter with the rules
+//                                       of the solution, checked again ("codeChecked"); the input as colored tokens
 //
 // SPDX-License-Identifier: MIT
 using System.Text.Json;
@@ -22,7 +24,7 @@ public static class CliCondition
                 else if (args[i].Equals("--stdin", StringComparison.OrdinalIgnoreCase))
                 {
                     Console.InputEncoding = new System.Text.UTF8Encoding(false);
-                    text = Console.In.ReadToEnd();
+                    text = Console.In.ReadToEnd().TrimStart('\uFEFF');
                 }
             if (string.IsNullOrWhiteSpace(text) && !args.Any(a => a.Equals("--instances", StringComparison.OrdinalIgnoreCase))) { Console.Error.WriteLine("Usage: TcAgent.exe condition --stdin | --text \"IF a AND NOT b THEN\" [--json]"); return Cli.Usage; }
             string O(string n) { var i = Array.FindIndex(args, a => a.Equals(n, StringComparison.OrdinalIgnoreCase)); return i >= 0 && i + 1 < args.Length ? args[i + 1] : null; }
@@ -71,6 +73,26 @@ public static class CliCondition
                     foreach (var a in atomList)
                         foreach (var x in a!["operands"]!.AsArray())
                             Console.WriteLine($"  {x!["text"],-40} {(x["constant"]!.GetValue<bool>() ? "constant: " + x["from"] : x["path"] != null ? x["path"] + "  (" + x["from"] + ")" : "not readable: " + x["reason"])}");
+            }
+            // --layout: each rewrite as the code that replaces the condition in the editor - laid out by the formatter with the
+            // rules of the solution (cond.* and the rest), checked once more against the condition; the input in colors
+            if (args.Any(a => a.Equals("--layout", StringComparison.OrdinalIgnoreCase)))
+            {
+                var dir = Opt("--solution");
+                if (dir != null && File.Exists(dir)) dir = Path.GetDirectoryName(Path.GetFullPath(dir));
+                StFormatConfig cfg;
+                try { cfg = Opt("--rules") is { } rf ? StFormatConfig.FromFile(rf) : StFormatConfig.Load(dir); } catch { cfg = new StFormatConfig(); }
+                var e = StLogic.Parse(text);
+                o["source"] = text;
+                o["sourceTokens"] = CliFormat.Colored(text);
+                o["hasComments"] = StLexer.Lex(text).Any(t => t.Comment);
+                foreach (var w in o["rewrites"]!.AsArray())
+                {
+                    var (code, ok) = StLogicLayout.Layout(e, w!["text"]!.ToString(), cfg);
+                    w.AsObject()["code"] = code;
+                    w.AsObject()["codeTokens"] = CliFormat.Colored(code);
+                    w.AsObject()["codeChecked"] = ok;
+                }
             }
             Console.OutputEncoding = new System.Text.UTF8Encoding(false);
             if (json) { Console.WriteLine(o.ToJsonString(new JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping })); return Cli.Ok; }

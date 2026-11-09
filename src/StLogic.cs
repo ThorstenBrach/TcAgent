@@ -178,16 +178,20 @@ public static class StLogic
     static string Text(List<StToken> t)
     {
         var sb = new StringBuilder();
+        bool unary = false;
         for (int i = 0; i < t.Count; i++)
         {
             var x = t[i];
             if (i > 0)
             {
                 var p = t[i - 1];
-                bool tight = p.Text is "(" or "[" or "." or "^" || x.Text is ")" or "]" or "." or "," or "^" || x.Text is "(" or "[" && p.Kind == StTok.Word && !StKeywords.IsWordOperator(p.Text) && p.Upper != "NOT";
+                bool tight = unary || p.Text is "(" or "[" or "." or "^" || x.Text is ")" or "]" or "." or "," or "^" || x.Text is "(" or "[" && p.Kind == StTok.Word && !StKeywords.IsWordOperator(p.Text) && p.Upper != "NOT";
                 if (!tight) sb.Append(' ');
             }
             sb.Append(x.Kind == StTok.Word && StKeywords.IsCaseFree(x.Text) ? x.Upper : x.Text);
+            // a sign in front of a number or name (x < -0.5, (-a)): no space after it
+            unary = x.Kind == StTok.Op && x.Text is "-" or "+" && (i == 0 || t[i - 1].Kind == StTok.Op && t[i - 1].Text is not (")" or "]")
+                     || t[i - 1].Text is "(" or "[" or "," || t[i - 1].Kind == StTok.Word && (StKeywords.IsWordOperator(t[i - 1].Text) || t[i - 1].Upper is "NOT" or "MOD"));
         }
         return sb.ToString().Replace(" ,", ",");
     }
@@ -348,7 +352,7 @@ public static class StLogic
 
     // ------------------------------------------------------------------ text
     /// <summary>ST text of a tree. boolCompare: "keep" (x, NOT x), "always" (x = TRUE, x = FALSE).</summary>
-    public static string ToText(LExpr e, LNode n, string boolCompare = "keep")
+    public static string ToText(LExpr e, LNode n, string boolCompare = "keep", bool turnCompare = false)
     {
         string W(LNode x, int parentPrec)
         {
@@ -359,6 +363,7 @@ public static class StLogic
                 case "const": return x.Value ? "TRUE" : "FALSE";
                 case "NOT":
                     if (boolCompare == "always" && x.Kids[0].Op == "atom" && IsBoolAtom(e, x.Kids[0].Atom)) return e.Atoms[x.Kids[0].Atom] + " = FALSE";
+                    if (turnCompare && x.Kids[0].Op == "atom" && Turn(e.Atoms[x.Kids[0].Atom]) is { } turned) return turned;
                     var k = x.Kids[0];
                     s = "NOT " + (k.Op is "atom" or "const" && !Binaryish(e, k) ? W(k, 4) : "(" + W(k, 0) + ")");
                     return s;
@@ -368,6 +373,24 @@ public static class StLogic
             }
         }
         return W(n, 0);
+    }
+
+    /// <summary>The negation of a comparison as a comparison: a &lt; b → a &gt;= b, a = b → a &lt;&gt; b. null when the atom is not exactly
+    /// one comparison (a BOOL, NOT a = b, two comparisons, a call around it).</summary>
+    public static string Turn(string atom)
+    {
+        var t = StLexer.Lex(atom ?? "").Where(x => !x.Trivia && !x.Comment).ToList();
+        if (t.Count == 0 || t[0].Kind == StTok.Word && t[0].Upper == "NOT") return null;
+        int at = -1;
+        for (int i = 0, d = 0; i < t.Count; i++)
+        {
+            if (t[i].Text is "(" or "[") d++; else if (t[i].Text is ")" or "]") d--;
+            else if (d == 0 && t[i].Kind == StTok.Op && t[i].Text is "=" or "<>" or "<" or ">" or "<=" or ">=") { if (at >= 0) return null; at = i; }
+        }
+        if (at <= 0 || at == t.Count - 1) return null;
+        var op = t[at].Text switch { "=" => "<>", "<>" => "=", "<" => ">=", ">=" => "<", ">" => "<=", _ => ">" };
+        t[at] = t[at] with { Text = op };
+        return Text(t);
     }
 
     static bool Binaryish(LExpr e, LNode atom) => atom.Op == "atom" && Binary(StLexer.Lex(e.Atoms[atom.Atom]).Where(t => !t.Trivia).ToList(), 0, StLexer.Lex(e.Atoms[atom.Atom]).Count(t => !t.Trivia));
@@ -523,17 +546,19 @@ public static class StLogic
         var rows = TrueRows(e.Root, n);
         o["trueRows"] = rows == null ? null : new JsonArray(rows.Select(r => (JsonNode)r).ToArray());
         o["combinations"] = n <= 62 ? (long)(1UL << n) : -1;
+        // the whole truth table for the window: one character per combination (bit i of the combination = sub-condition i)
+        if (n <= 10) o["results"] = new string(Enumerable.Range(0, 1 << n).Select(v => Eval(e.Root, (ulong)v) ? '1' : '0').ToArray());
         // rewrites: only those that change something; each one proven over all combinations
         var list = new JsonArray();
-        void Add(string id, string title, string titleDe, LNode r, string why = null, string boolCompare = "keep")
+        void Add(string id, string title, string titleDe, LNode r, string why = null, string boolCompare = "keep", bool turn = false, string whyDe = null)
         {
             if (r == null) return;
-            var txt = ToText(e, r, boolCompare);
+            var txt = ToText(e, r, boolCompare, turn);
             if (txt == e.Source || id is not ("bool-uniform" or "bool-remove") && txt == ToText(e, e.Root)) return;
             var same = Same(e.Root, r, n);
             if (same == false) return;          // never offered: it would change the meaning
             if (list.Any(x => x!["text"]!.ToString() == txt)) return;      // the same text as a rewrite already offered
-            list.Add(new JsonObject { ["id"] = id, ["title"] = title, ["titleDe"] = titleDe, ["text"] = txt, ["proven"] = same == true, ["combinations"] = o["combinations"]?.DeepClone(), ["note"] = why });
+            list.Add(new JsonObject { ["id"] = id, ["title"] = title, ["titleDe"] = titleDe, ["text"] = txt, ["proven"] = same == true, ["combinations"] = o["combinations"]?.DeepClone(), ["note"] = why, ["noteDe"] = whyDe ?? why, ["tree"] = Tree(r), ["turn"] = turn, ["boolCompare"] = boolCompare });
         }
         if (e.ShortCircuit)
             o["rewriteNote"] = "AND_THEN / OR_ELSE fix the order of evaluation - the condition is not rewritten.";
@@ -541,6 +566,10 @@ public static class StLogic
         {
             Add("not-inward", "NOT inward (De Morgan)", "NOT nach innen (De Morgan)", NotInward(e.Root));
             Add("not-outward", "NOT outward (De Morgan)", "NOT nach außen (De Morgan)", NotOutward(e.Root));
+            const string realNote = "NOT (a < b) becomes a >= b: exact for whole numbers, enums and BOOL; for REAL/LREAL only a value that is not a number (NaN) would compare differently.";
+            const string realNoteDe = "Aus NOT (a < b) wird a >= b: exakt für Ganzzahlen, Enums und BOOL; bei REAL/LREAL würde nur ein Wert, der keine Zahl ist (NaN), anders verglichen.";
+            Add("not-inward-turn", "NOT inward, comparisons turned", "NOT nach innen, Vergleiche umgedreht", NotInward(e.Root), realNote, "keep", true, realNoteDe);
+            Add("turn", "Turn negated comparisons", "Negierte Vergleiche umdrehen", Copy(e.Root), realNote, "keep", true, realNoteDe);
             if (e.Calls.Any(c => c)) o["simplifyNote"] = "the condition calls a function or method - simplifying could drop or repeat the call, so it is not offered";
             else
             {

@@ -49,6 +49,7 @@
     <Compile Include="..\..\src\Targets.cs" Link="src\Targets.cs" />
     <Compile Include="..\..\src\SettingsSchema.cs" Link="src\SettingsSchema.cs" />
     <Compile Include="..\..\src\StLogic.cs" Link="src\StLogic.cs" />
+    <Compile Include="..\..\src\StLogicLayout.cs" Link="src\StLogicLayout.cs" />
     <Compile Include="..\..\src\SymbolResolve.cs" Link="src\SymbolResolve.cs" />
   </ItemGroup>
   <ItemGroup>

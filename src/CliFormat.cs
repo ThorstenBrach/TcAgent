@@ -148,7 +148,7 @@ public static class CliFormat
 
     /// <summary>The text as [class, text] pairs for syntax colors in the preview of the IDE: keyword, type, literal, comment,
     /// pragma, string, number, newline, text. Text that cannot be read is one "text" piece.</summary>
-    static JsonArray Colored(string text)
+    internal static JsonArray Colored(string text)
     {
         List<StToken> t;
         try { t = StLexer.Lex(text ?? ""); }
