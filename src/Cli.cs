@@ -31,7 +31,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "about" or "shared" or "reset" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" or "advise" or "format" or "reload" or "settings" or "targets" or "condition" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "about" or "shared" or "reset" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" or "advise" or "format" or "reload" or "settings" or "targets" or "condition" or "watch" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -72,7 +72,8 @@ public static partial class Cli
         if (args[0].Equals("reload", StringComparison.OrdinalIgnoreCase))                                  // Reload.cs - running servers read their settings again
         { Console.WriteLine("Asked every running TcAgent server to read its settings again (" + Reload.Request() + ")."); return Ok; }
         if (args[0].Equals("settings", StringComparison.OrdinalIgnoreCase)) return CliSettings.Settings(args);
-        if (args[0].Equals("condition", StringComparison.OrdinalIgnoreCase)) return CliCondition.Run(args);      // StLogic.cs - a condition as logic, files only     // CliSettings.cs - the settings window, files only
+        if (args[0].Equals("condition", StringComparison.OrdinalIgnoreCase)) return CliCondition.Run(args);
+        if (args[0].Equals("watch", StringComparison.OrdinalIgnoreCase)) return VariableWatch.Run(args);           // VariableWatch.cs - the history of variables (Mini-Scope), reads only      // StLogic.cs - a condition as logic, files only     // CliSettings.cs - the settings window, files only
         if (args[0].Equals("targets", StringComparison.OrdinalIgnoreCase)) return CliSettings.TargetsCli(args);    // Targets.cs - released target systems, files only
         // the elevated part of tc_packages_change (Packages.cs), started by TcAgent itself through the UAC prompt
         if (args[0].Equals("tcpkg-elevated", StringComparison.Ordinal)) return ToolRegistry.RunElevatedTcpkg(args);

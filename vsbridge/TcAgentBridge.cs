@@ -325,9 +325,10 @@ namespace TcAgentBridge
                 StartStallMonitor();
                 try { ReadFormatHotkey(); } catch (Exception ex) { Log("Format hotkey: " + Inner(ex)); }
                 try { ReadConditionHotkey(); } catch (Exception ex) { Log("Condition hotkey: " + Inner(ex)); }
+                try { ReadScopeHotkey(); } catch (Exception ex) { Log("Scope hotkey: " + Inner(ex)); }
                 var spec = ChatSetting("askHotkey") as string ?? "Ctrl+Shift+Q";
                 bool askOff = spec.Trim().Length == 0 || spec.Equals("off", StringComparison.OrdinalIgnoreCase);
-                if (askOff) { Log("Hotkey disabled"); hotKey = 0; if (!fmtOn && !condOn) return; spec = "off"; }
+                if (askOff) { Log("Hotkey disabled"); hotKey = 0; if (!fmtOn && !condOn && !scopeOn) return; spec = "off"; }
                 System.Windows.Forms.Keys mods = 0, key = 0;
                 foreach (var part in spec.Split('+').Select(x => x.Trim()))
                 {
@@ -421,6 +422,16 @@ namespace TcAgentBridge
                         {
                             Log("Format hotkey pressed");
                             try { FormatFromEditor(); } catch (Exception ex) { Log("Format: " + Inner(ex)); }
+                        }));
+                    return (IntPtr)1;
+                }
+                if (code == 0 && down && IsScopeKey((int)wParam.ToInt64()))
+                {
+                    if (!repeat)
+                        ui.BeginInvoke(new Action(() =>
+                        {
+                            Log("Scope hotkey pressed");
+                            try { ShowScopeFromEditor(); } catch (Exception ex) { Log("Scope: " + Inner(ex)); }
                         }));
                     return (IntPtr)1;
                 }

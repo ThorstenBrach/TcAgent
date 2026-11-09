@@ -674,7 +674,22 @@ are found; the last one used is remembered). Each variable is followed to where 
 in a library), `THIS^`/`SUPER^`, a reference, a pointer (checked for 0 first), an array index (read first), a GVL.
 Interface members, properties without `{attribute 'monitoring' := 'call'}`, method locals, `VAR_TEMP` and calls are
 never read - the popup says why. It only reads, on any target. ⏸ freezes the values, 📌 keeps the popup open, Esc closes.
-Without a running PLC it shows the structure.
+Without a running PLC it shows the structure. A large condition gets scroll bars; a click on a gate folds its branch into
+one row (a click on the row opens it again), **⊟** folds every fulfilled branch at once. A click on a sub-condition opens its
+history in the Mini-Scope.
+
+### Mini-Scope: the history of a variable
+
+Put the cursor on a variable (or select one) and press **Ctrl+Alt+T** ("scopeHotkey" in `chat-backends.json`), or click a
+sub-condition in the condition popup. A small popup shows how the value changes: BOOL as a step, numbers as a line with
+their range, enums as steps with their names; **+ Variable** adds more, one below the other.
+
+- **Time axis:** 5 s, 30 s, 1 min, 5 min, 10 min, and the mouse wheel zooms in between (1 s to 10 min). ⏸ freezes it; then
+  dragging moves back through the last 10 minutes.
+- A **cursor** under the mouse shows the time and every value; below: current, min and max.
+- **Copy CSV** puts the samples of the visible time on the clipboard.
+- The variable is followed to its ADS path like in the condition popup (inherited, reference, pointer, index, GVL); the
+  instance is chosen in the popup. The values are read every 20 ms (`TcAgent.exe watch`), only read, on any target.
 
 The agent has the same as `tc_condition`, the command line as `TcAgent.exe condition --text "IF …"`: the sub-conditions,
 when the condition is true, and rewrites that mean exactly the same - De Morgan, simplify, write out in full, `= TRUE`

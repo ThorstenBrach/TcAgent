@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **Condition popup at the code (Ctrl+Alt+B)** - the condition under the cursor (IF, ELSIF, WHILE, UNTIL, a boolean
+  assignment, also in a CASE branch) as a logic diagram: lamps with names and declaration comments, gates with
+  right-angled lines, NOT as a dot; online everything fulfilled turns green and the top line says what is missing; scroll
+  bars, branches fold by a click (⊟ folds all fulfilled ones). Members of a library base and enum values as array index
+  are resolved.
+- **Mini-Scope (Ctrl+Alt+T)** - the history of variables in a popup: BOOL as steps, numbers as lines, enums with names;
+  time axis 5 s to 10 min with mouse-wheel zoom, frozen it moves through the last 10 minutes; cursor with values,
+  min/max, CSV; `TcAgent.exe watch` reads every 20 ms (only reads).
 - **Conditions as logic (`tc_condition`, `TcAgent.exe condition`)** - the sub-conditions of an IF, when it is true (prime
   implicants), rewrites that mean exactly the same (De Morgan inward/outward, simplify, write out in full, `= TRUE`
   uniform or removed), each proven over every combination; never a rewrite that changes the meaning, no simplifying with

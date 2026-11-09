@@ -243,8 +243,10 @@ namespace TcAgentBridge
             var big = Btn("⤢", T("The large window with truth table and rewrites - comes next", "Das große Fenster mit Wahrheitstabelle und Umformen - kommt als Nächstes"), () => { });
             big.IsEnabled = false;
             var close = Btn("✕", T("Close (Esc)", "Schließen (Esc)"), CloseNow);
+            var fold = Btn("⊟", T("Fold every fulfilled branch into one row - click again to open them all", "Alle erfüllten Zweige zu je einer Zeile zuklappen - noch mal klicken klappt alle auf"), null);
+            fold.Click += (s, e) => { collapseMet = !collapseMet; folded.Clear(); opened.Clear(); fold.Content = collapseMet ? "⊞" : "⊟"; Draw(); };
             var head = new DockPanel { Margin = new Thickness(10, 5, 6, 5) };
-            foreach (var b in new UIElement[] { close, pin, pause, big }) { DockPanel.SetDock(b, Dock.Right); head.Children.Add(b); }
+            foreach (var b in new UIElement[] { close, pin, pause, big, fold }) { DockPanel.SetDock(b, Dock.Right); head.Children.Add(b); }
             DockPanel.SetDock(instances, Dock.Right); head.Children.Add(instances);
             head.Children.Add(title);
             var headBorder = new Border { Child = head, BorderThickness = new Thickness(0, 0, 0, 1) };
@@ -257,7 +259,14 @@ namespace TcAgentBridge
             var panel = new StackPanel();
             panel.Children.Add(headBorder);
             panel.Children.Add(resultBar);
-            panel.Children.Add(new Border { Child = canvas, Margin = new Thickness(8, 8, 8, 2) });
+            // scroll bars when the diagram is larger than most of the screen
+            var area = System.Windows.Forms.Screen.FromPoint(System.Windows.Forms.Cursor.Position).WorkingArea;
+            panel.Children.Add(new ScrollViewer
+            {
+                Content = new Border { Child = canvas, Margin = new Thickness(8, 8, 8, 2) },
+                HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Auto,
+                MaxHeight = Math.Max(240, area.Height * 0.7), MaxWidth = Math.Max(480, area.Width * 0.8)
+            });
             panel.Children.Add(foot);
             var outer = new Border { Child = panel, BorderThickness = new Thickness(1) };
             outer.BorderBrush = Theme(EnvironmentColors.ToolWindowBorderColorKey, Grey);
@@ -265,6 +274,15 @@ namespace TcAgentBridge
             PreviewKeyDown += (s, e) => { if (e.Key == Key.Escape) { e.Handled = true; CloseNow(); } };
             Deactivated += (s, e) => { if (!pinned) CloseNow(); };
             Closed += (s, e) => StopWatch();
+        }
+
+        /// <summary>The variables of a sub-condition in the Mini-Scope (constants and what cannot be read stay out).</summary>
+        void OpenScope(int atom)
+        {
+            var ops = L(L(structure, "atoms").ElementAtOrDefault(atom), "operands").Where(o => B(o, "constant") != true && S(o, "path") != null).Select(o => S(o, "text")).ToList();
+            if (ops.Count == 0) { foot.Text = T("Nothing to show over time here (a constant or not readable).", "Hier gibt es keinen Verlauf (eine Konstante oder nicht lesbar)."); return; }
+            pinned = true;                       // the scope takes the focus: keep this popup
+            ScopePopup.Open(editor, exe, sln, ops, pou, method, instances.SelectedItem as string, netId, german);
         }
 
         void CloseNow()
@@ -389,21 +407,29 @@ namespace TcAgentBridge
         }
 
         // ------------------------------------------------------------------ drawing
-        sealed class G { public string Op; public int Atom = -1; public bool? Value; public readonly List<(G Kid, bool Not)> Kids = new List<(G, bool)>(); public double Y, X; public int H; }
+        sealed class G { public string Op, Path; public int Atom = -1; public bool? Value; public readonly List<(G Kid, bool Not)> Kids = new List<(G, bool)>(); public double Y, X; public int H; }
+
+        // folded branches: by their path in the tree ("0.2"); collapseMet folds every fulfilled branch unless it was opened by hand
+        readonly HashSet<string> folded = new HashSet<string>(), opened = new HashSet<string>();
+        bool collapseMet;
 
         static IEnumerable<Dictionary<string, object>> L(object o, string k) => o is Dictionary<string, object> d && d.TryGetValue(k, out var v) && v is ArrayList a ? a.OfType<Dictionary<string, object>>() : Enumerable.Empty<Dictionary<string, object>>();
         static string S(object o, string k) => o is Dictionary<string, object> d && d.TryGetValue(k, out var v) && v != null ? v.ToString() : null;
         static bool? B(object o, string k) => o is Dictionary<string, object> d && d.TryGetValue(k, out var v) && v is bool b ? b : (bool?)null;
 
         /// <summary>The tree with the NOTs moved onto the edges (a dot at the input), values from the online reading.</summary>
-        static (G Node, bool Not) Build(Dictionary<string, object> n)
+        static (G Node, bool Not) Build(Dictionary<string, object> n, string path = "0")
         {
-            if (S(n, "op") == "NOT") { var k = Build(L(n, "kids").First()); return (k.Node, !k.Not); }
-            var g = new G { Op = S(n, "op"), Value = B(n, "value") };
+            if (S(n, "op") == "NOT") { var k = Build(L(n, "kids").First(), path); return (k.Node, !k.Not); }
+            var g = new G { Op = S(n, "op"), Value = B(n, "value"), Path = path };
             if (g.Op == "atom" && int.TryParse(S(n, "atom"), out var a)) g.Atom = a;
-            foreach (var k in L(n, "kids")) g.Kids.Add(Build(k));
+            int i = 0;
+            foreach (var k in L(n, "kids")) g.Kids.Add(Build(k, path + "." + i++));
             return (g, false);
         }
+
+        static string Sym(G g) => g.Op == "AND" ? "&" : g.Op == "OR" ? "≥1" : g.Op == "XOR" ? "=1" : g.Op;
+        static int Count(G g) => g.Kids.Count == 0 ? 1 : g.Kids.Sum(k => Count(k.Kid));
 
         void Draw()
         {
@@ -411,6 +437,8 @@ namespace TcAgentBridge
             var src = live ?? structure;
             if (src == null || !(src.TryGetValue("tree", out var t) && t is Dictionary<string, object> tree)) return;
             var (root, rootNot) = Build(tree);
+            // a folded branch is drawn as one row (the root never)
+            bool IsLeaf(G g) => g.Kids.Count == 0 || g != root && (folded.Contains(g.Path) || collapseMet && g.Value == true && !opened.Contains(g.Path));
             var atomsS = L(structure, "atoms").ToList();
             var atomsL = live != null ? L(live, "atoms").ToList() : null;
             var opsL = live != null ? L(live, "operands").ToList() : null;
@@ -421,7 +449,7 @@ namespace TcAgentBridge
             // rows: the leaves in order
             const double rowH = 28, top = 14;
             var leaves = new List<(G G, bool Not)>();
-            void Leaves(G g) { if (g.Op == "atom" || g.Op == "const") leaves.Add((g, false)); else foreach (var k in g.Kids) Leaves(k.Kid); }
+            void Leaves(G g) { if (IsLeaf(g)) leaves.Add((g, false)); else foreach (var k in g.Kids) Leaves(k.Kid); }
             Leaves(root);
             double labelEnd = 0;
             var labels = new List<(string Name, string Note, bool? Value, bool Unreadable, string Tip)>();
@@ -429,6 +457,15 @@ namespace TcAgentBridge
             {
                 var g = leaves[i].G;
                 g.Y = top + i * rowH;
+                if (g.Kids.Count > 0)
+                {
+                    // a folded branch: its gate and how many sub-conditions it holds
+                    var nm = $"{Sym(g)}  ({Count(g)} {T("sub-conditions", "Teilbedingungen")})";
+                    var nt = T("folded - click to open", "zugeklappt - Klick klappt auf");
+                    labels.Add((nm, nt, g.Value, false, T("Click: open the branch", "Klick: Zweig aufklappen")));
+                    labelEnd = Math.Max(labelEnd, 30 + Width(nm, 12, true) + Width(": " + nt, 12, false));
+                    continue;
+                }
                 string name = g.Op == "const" ? (g.Value == true ? "TRUE" : "FALSE") : S(atomsS.ElementAtOrDefault(g.Atom), "text") ?? "?";
                 // the note: the comment of the declaration, or the values of a comparison, or why it cannot be read
                 var ops = L(atomsS.ElementAtOrDefault(g.Atom), "operands").ToList();
@@ -452,13 +489,13 @@ namespace TcAgentBridge
             }
             labelEnd = Math.Min(labelEnd, 420);
             // columns: by the height of the subtree
-            int Height(G g) => g.Kids.Count == 0 ? 0 : (g.H = 1 + g.Kids.Max(k => Height(k.Kid)));
+            int Height(G g) => IsLeaf(g) ? 0 : (g.H = 1 + g.Kids.Max(k => Height(k.Kid)));
             Height(root);
             const double colW = 74, gateW = 40;
             double gatesStart = labelEnd + 36;
             double Place(G g)
             {
-                if (g.Kids.Count == 0) return g.Y;
+                if (IsLeaf(g)) return g.Y;
                 var ys = g.Kids.Select(k => Place(k.Kid)).ToList();
                 g.X = gatesStart + (g.H - 1) * colW;
                 g.Y = (ys.Min() + ys.Max()) / 2;
@@ -497,12 +534,23 @@ namespace TcAgentBridge
                 tb.Inlines.Add(new System.Windows.Documents.Run(name) { FontWeight = FontWeights.SemiBold, Foreground = unreadable ? Grey : fore });
                 if (note != null) tb.Inlines.Add(new System.Windows.Documents.Run(": " + note) { Foreground = Grey });
                 Canvas.SetLeft(tb, 28); Canvas.SetTop(tb, y - 9); canvas.Children.Add(tb);
+                // a click: a folded branch opens; a sub-condition shows its history (Mini-Scope)
+                var leaf = leaves[i].G;
+                foreach (var el in new FrameworkElement[] { lamp, tb })
+                {
+                    el.Cursor = Cursors.Hand;
+                    el.MouseLeftButtonUp += (s, e) =>
+                    {
+                        if (leaf.Kids.Count > 0) { folded.Remove(leaf.Path); opened.Add(leaf.Path); Draw(); }
+                        else if (leaf.Atom >= 0) OpenScope(leaf.Atom);
+                    };
+                }
             }
             // the gates and lines (right-angled: horizontal into the gate at the height of the kid)
-            double OutX(G g) => g.Kids.Count == 0 ? Math.Min(28 + Width(labels[leaves.FindIndex(l => l.G == g)].Name, 12, true) + (labels[leaves.FindIndex(l => l.G == g)].Note != null ? Width(": " + labels[leaves.FindIndex(l => l.G == g)].Note, 12, false) : 0) + 6, labelEnd + 6) : g.X + gateW;
+            double OutX(G g) => IsLeaf(g) ? Math.Min(28 + Width(labels[leaves.FindIndex(l => l.G == g)].Name, 12, true) + (labels[leaves.FindIndex(l => l.G == g)].Note != null ? Width(": " + labels[leaves.FindIndex(l => l.G == g)].Note, 12, false) : 0) + 6, labelEnd + 6) : g.X + gateW;
             void Gate(G g)
             {
-                if (g.Kids.Count == 0) return;
+                if (IsLeaf(g)) return;
                 foreach (var k in g.Kids) Gate(k.Kid);
                 double gTop = g.Kids.Min(k => k.Kid.Y) - 13, gBot = g.Kids.Max(k => k.Kid.Y) + 13;
                 if (gBot - gTop < 34) { var c = (gTop + gBot) / 2; gTop = c - 17; gBot = c + 17; }
@@ -517,7 +565,13 @@ namespace TcAgentBridge
                 var box = new Rectangle { Width = gateW, Height = gBot - gTop, Stroke = g.Value == true ? Green : g.Value == false || !online ? fore : Grey, StrokeThickness = 1.6, Fill = g.Value == true ? GreenFill : Back };
                 if (g.Value == null && online) box.StrokeDashArray = new DoubleCollection { 4, 3 };
                 Canvas.SetLeft(box, g.X); Canvas.SetTop(box, gTop); canvas.Children.Add(box);
-                var sym = g.Op == "AND" ? "&" : g.Op == "OR" ? "≥1" : g.Op == "XOR" ? "=1" : g.Op;
+                if (g != root)
+                {
+                    box.Cursor = Cursors.Hand;
+                    box.ToolTip = T("Click: fold this branch into one row", "Klick: diesen Zweig zu einer Zeile zuklappen");
+                    box.MouseLeftButtonUp += (s, e) => { folded.Add(g.Path); opened.Remove(g.Path); Draw(); };
+                }
+                var sym = Sym(g);
                 Text(sym, g.X + (sym.Length == 1 ? 14 : 9), g.Y - 10, g.Value == true ? Green : fore, 15, true);
             }
             Gate(root);
