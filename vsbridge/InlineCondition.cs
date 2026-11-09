@@ -82,7 +82,12 @@ namespace TcAgentBridge
                 for (int i = 0; i < caretLine; i++) caret += textLines[i].Length + nl;
                 caret += Math.Min(caretCol, textLines[caretLine].Length);
                 Log($"Condition: caret line {caretLine + 1} column {caretCol + 1}");
-                var sel = SafeGet(syn, "SelectedText") as string;
+                // the selection: from the VS view (IVsTextView.GetSelectedText), otherwise from the editor control
+                string sel = null;
+                var a1 = new object[1];
+                try { if (dv != null && TryInvoke(dv, "GetSelectedText", a1, out _)) sel = a1[0] as string; } catch { }
+                if (string.IsNullOrWhiteSpace(sel)) sel = SafeGet(syn, "SelectedText") as string;
+                Log($"Condition: selection {(string.IsNullOrWhiteSpace(sel) ? "none" : sel.Length + " characters")}");
                 var (cond, line) = ConditionAt(text, caret, sel);
                 if (cond == null) { SetStatus(T("TcAgent: no condition at the cursor - put it into an IF, ELSIF, WHILE or UNTIL (or a boolean assignment)", "TcAgent: Keine Bedingung am Cursor - setze ihn in ein IF, ELSIF, WHILE oder UNTIL (oder eine boolesche Zuweisung)")); return; }
                 // POU and method: the caption of the editor ("FB_Station.Cycle", "FB_Station [Online]"), otherwise the file
@@ -108,7 +113,7 @@ namespace TcAgentBridge
         internal static (string Cond, int Line) ConditionAt(string text, int caret, string selected)
         {
             int LineOf(int idx) => text.Take(Math.Max(0, Math.Min(idx, text.Length))).Count(c => c == '\n');
-            if (!string.IsNullOrWhiteSpace(selected) && Regex.IsMatch(selected, @"\b(AND|OR|XOR|NOT)\b|\bIF\b", RegexOptions.IgnoreCase))
+            if (!string.IsNullOrWhiteSpace(selected) && selected.Trim().Length > 0)
                 return (selected, LineOf(Math.Max(0, text.IndexOf(selected, StringComparison.Ordinal))));
             caret = Math.Max(0, Math.Min(caret, text.Length));
             foreach (Match m in Regex.Matches(text, @"(?is)\b(IF|ELSIF|WHILE|UNTIL)\b.*?(\bTHEN\b|\bDO\b|;)"))
