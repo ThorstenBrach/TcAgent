@@ -184,6 +184,8 @@ namespace TcAgentBridge
                 Dispatcher.BeginInvoke(new Action(() =>
                 {
                     prompts = list;
+                    // the list came after the panel opened (the first time there was nothing yet): the height of "All" now
+                    if (PromptsOpen) promptList.Height = Math.Min(promptList.MaxHeight, prompts.Count * 22 + 44);
                     if (PromptsOpen || promptTokenStart >= 0) { if (!promptFilling) PromptTextChanged(); if (promptTokenStart < 0 && PromptsOpen) FillPrompts(""); }
                 }));
             });
