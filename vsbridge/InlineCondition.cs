@@ -415,11 +415,13 @@ namespace TcAgentBridge
                 return g.Y;
             }
             Place(root);
-            Brush Wire(bool? v) => v == true ? Green : v == false ? fore : Grey;
+            // offline (no values yet): solid lines in the text color, like a printed diagram; online an unknown value is grey and dashed
+            bool online = live != null;
+            Brush Wire(bool? v) => v == true ? Green : v == false || !online ? fore : Grey;
             void Line(double x1, double y1, double x2, double y2, bool? v)
             {
                 var l = new System.Windows.Shapes.Line { X1 = x1, Y1 = y1, X2 = x2, Y2 = y2, Stroke = Wire(v), StrokeThickness = 1.6 };
-                if (v == null) l.StrokeDashArray = new DoubleCollection { 4, 3 };
+                if (v == null && online) l.StrokeDashArray = new DoubleCollection { 4, 3 };
                 canvas.Children.Add(l);
             }
             void Dot(double x, double y, bool? v)
@@ -438,7 +440,8 @@ namespace TcAgentBridge
                 var (name, note, value, unreadable, tip) = labels[i];
                 double y = leaves[i].G.Y;
                 var lamp = new Ellipse { Width = 16, Height = 16, Fill = unreadable ? Brushes.Transparent : value == true ? LampOn : LampOff, Stroke = unreadable ? Grey : value == true ? Green : Grey, StrokeThickness = 1 };
-                if (unreadable || value == null) lamp.StrokeDashArray = new DoubleCollection { 2, 2 };
+                if (online && (unreadable || value == null)) lamp.StrokeDashArray = new DoubleCollection { 2, 2 };
+                if (!online) { lamp.Fill = LampOff; lamp.Stroke = Grey; }
                 Canvas.SetLeft(lamp, 4); Canvas.SetTop(lamp, y - 8); canvas.Children.Add(lamp);
                 var tb = new TextBlock { FontSize = 12, ToolTip = tip.Length > 0 ? tip : null, MaxWidth = 400, TextTrimming = TextTrimming.CharacterEllipsis };
                 tb.Inlines.Add(new System.Windows.Documents.Run(name) { FontWeight = FontWeights.SemiBold, Foreground = unreadable ? Grey : fore });
@@ -461,8 +464,8 @@ namespace TcAgentBridge
                     Line(x0, y, xIn, y, kid.Value);
                     if (not) Dot(g.X - 4, y, kid.Value);
                 }
-                var box = new Rectangle { Width = gateW, Height = gBot - gTop, Stroke = g.Value == true ? Green : g.Value == false ? fore : Grey, StrokeThickness = 1.6, Fill = g.Value == true ? GreenFill : Back };
-                if (g.Value == null) box.StrokeDashArray = new DoubleCollection { 4, 3 };
+                var box = new Rectangle { Width = gateW, Height = gBot - gTop, Stroke = g.Value == true ? Green : g.Value == false || !online ? fore : Grey, StrokeThickness = 1.6, Fill = g.Value == true ? GreenFill : Back };
+                if (g.Value == null && online) box.StrokeDashArray = new DoubleCollection { 4, 3 };
                 Canvas.SetLeft(box, g.X); Canvas.SetTop(box, gTop); canvas.Children.Add(box);
                 var sym = g.Op == "AND" ? "&" : g.Op == "OR" ? "≥1" : g.Op == "XOR" ? "=1" : g.Op;
                 Text(sym, g.X + (sym.Length == 1 ? 14 : 9), g.Y - 10, g.Value == true ? Green : fore, 15, true);
@@ -474,8 +477,8 @@ namespace TcAgentBridge
             double rx = (root.Kids.Count == 0 ? labelEnd : root.X + gateW) + 34;
             Line(OutX(root), root.Y, rx - (rootNot ? 8 : 0), root.Y, root.Value);
             if (rootNot) Dot(rx - 4, root.Y, root.Value);
-            var pill = new Border { CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1.6), Padding = new Thickness(14, 2, 14, 2), BorderBrush = res == true ? Green : res == false ? Red : Grey, Background = res == true ? GreenFill : res == false ? RedFill : Brushes.Transparent,
-                                    Child = new TextBlock { Text = res == true ? "TRUE" : res == false ? "FALSE" : "?", FontWeight = FontWeights.Bold, Foreground = res == true ? Green : res == false ? Red : Grey } };
+            var pill = new Border { CornerRadius = new CornerRadius(12), BorderThickness = new Thickness(1.6), Padding = new Thickness(14, 2, 14, 2), BorderBrush = res == true ? Green : res == false ? Red : online ? Grey : fore, Background = res == true ? GreenFill : res == false ? RedFill : Brushes.Transparent,
+                                    Child = new TextBlock { Text = res == true ? "TRUE" : res == false ? "FALSE" : "?", FontWeight = FontWeights.Bold, Foreground = res == true ? Green : res == false ? Red : online ? Grey : fore } };
             Canvas.SetLeft(pill, rx); Canvas.SetTop(pill, root.Y - 12); canvas.Children.Add(pill);
             canvas.Width = rx + 100;
             canvas.Height = top + leaves.Count * rowH;
