@@ -613,6 +613,14 @@ namespace TcAgentBridge
                 {
                     try { ShowSettings(); } catch (Exception ex) { Log("TcAgent settings: " + Inner(ex)); }
                 }, new System.ComponentModel.Design.CommandID(CommandSet, CmdSettings)));
+                mcs.AddCommand(new System.ComponentModel.Design.MenuCommand((s, e) =>
+                {
+                    try { ShowConditionFromEditor(); } catch (Exception ex) { Log("Condition: " + Inner(ex)); }
+                }, new System.ComponentModel.Design.CommandID(CommandSet, CmdCondition)));
+                mcs.AddCommand(new System.ComponentModel.Design.MenuCommand((s, e) =>
+                {
+                    try { ShowConditionWindowFromEditor(); } catch (Exception ex) { Log("Condition window: " + Inner(ex)); }
+                }, new System.ComponentModel.Design.CommandID(CommandSet, CmdConditionWindow)));
                 Log("Menu commands registered");
             }
             catch (Exception ex) { Log("Menu: " + Inner(ex)); }

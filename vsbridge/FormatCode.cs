@@ -122,7 +122,8 @@ namespace TcAgentBridge
             try
             {
                 syn.Focus();
-                System.Windows.Forms.Clipboard.SetText(text.Replace("\r\n", "\n").Replace("\n", "\r\n"));
+                // the clipboard can be held by another program for a moment: try again for a second
+                System.Windows.Forms.Clipboard.SetDataObject(text.Replace("\r\n", "\n").Replace("\n", "\r\n"), true, 10, 100);
                 var selectAll = AllMethods(syn.GetType()).FirstOrDefault(m => m.Name == "SelectAll" && m.GetParameters().Length == 0);
                 var paste = AllMethods(syn.GetType()).FirstOrDefault(m => m.Name == "Paste" && m.GetParameters().Length == 0);
                 if (selectAll != null && paste != null)

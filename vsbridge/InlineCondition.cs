@@ -60,51 +60,12 @@ namespace TcAgentBridge
             fmtGerman = UiGerman();
             try
             {
-                var dv = ActiveDocView(out var doc);
-                // the two editors of the object (declaration, implementation): the one with the focus, otherwise the implementation -
-                // the same way tc_editor_context reads them (the VS view reports another pane in online mode)
-                var cds = SafeGet(dv, "EditorView") ?? SafeGet(SafeGet(EnvProp("Engine"), "Frame"), "ActiveView");
-                System.Windows.Forms.Control Syn(string pane) =>
-                    SafeGet(cds, pane) is System.Windows.Forms.Control ctl
-                        ? (ctl.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0 ? ctl : Descendants(ctl).FirstOrDefault(c => c.GetType().Name.IndexOf("SynEd", StringComparison.Ordinal) >= 0))
-                        : null;
-                var impl = Syn("ImplementationEditorView");
-                var decl = Syn("InterfaceEditorView");
-                var syn = decl != null && (decl.Focused || decl.ContainsFocus) ? decl : impl
-                          ?? SafeCall(dv, "GetActiveSynEdControl", SafeGet(dv, "EditorView")) as System.Windows.Forms.Control;
-                var text = SafeGet(syn, "Text") as string;
-                if (string.IsNullOrEmpty(text)) { SetStatus(T("TcAgent: put the cursor into a condition (IF, ELSIF, WHILE, UNTIL) of an open POU first", "TcAgent: Setze den Cursor zuerst in eine Bedingung (IF, ELSIF, WHILE, UNTIL) einer offenen POU")); return; }
-                // the caret: the position in the text of this editor (CaretPosition), otherwise its line (CaretLine)
-                var textLines = text.Replace("\r\n", "\n").Split('\n');
-                int nl = text.Contains("\r\n") ? 2 : 1, caret = -1;
-                var cpos = SafeGet(syn, "CaretPosition");
-                if (cpos is int cpi && cpi >= 0 && cpi <= text.Length) caret = cpi;
-                else if (cpos is long cpl && cpl >= 0 && cpl <= text.Length) caret = (int)cpl;
-                if (caret < 0 && SafeGet(syn, "CaretLine") is int cl)
-                    for (int i = 0, k = 0; i < textLines.Length; k += textLines[i].Length + nl, i++) if (i == cl) { caret = k; break; }
-                if (caret < 0) caret = 0;
-                Log($"Condition: caret at {caret} of {text.Length} (line {text.Take(caret).Count(c => c == '\n') + 1}), {(syn == decl ? "declaration" : "implementation")}");
-                // the selection of this editor: only a condition counts (a word clicked in online mode is not one)
-                string sel = SafeGet(syn, "SelectedText") as string;
-                if (!string.IsNullOrWhiteSpace(sel) && !(sel.Contains("\n") || Regex.IsMatch(sel, @"\b(AND|OR|XOR|NOT|AND_THEN|OR_ELSE)\b|[<>=]", RegexOptions.IgnoreCase))) sel = null;
-                Log($"Condition: selection {(string.IsNullOrWhiteSpace(sel) ? "none" : sel.Length + " characters")}");
-                var (cond, line) = ConditionAt(text, caret, sel);
-                if (cond == null) { SetStatus(T("TcAgent: no condition at the cursor - put it into an IF, ELSIF, WHILE or UNTIL (or a boolean assignment)", "TcAgent: Keine Bedingung am Cursor - setze ihn in ein IF, ELSIF, WHILE oder UNTIL (oder eine boolesche Zuweisung)")); return; }
-                // POU and method: the caption of the editor ("FB_Station.Cycle", "FB_Station [Online]"), otherwise the file
-                string caption = null;
-                try
-                {
-                    var mon = (Microsoft.VisualStudio.Shell.Interop.IVsMonitorSelection)Microsoft.VisualStudio.Shell.Package.GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SVsShellMonitorSelection));
-                    if (mon.GetCurrentElementValue(2, out var fo) == 0 && fo is Microsoft.VisualStudio.Shell.Interop.IVsWindowFrame fr && fr.GetProperty((int)Microsoft.VisualStudio.Shell.Interop.__VSFPROPID.VSFPROPID_Caption, out var cap) == 0) caption = cap?.ToString();
-                }
-                catch { }
-                var name = Regex.Replace(caption ?? "", @"\s*\[.*?\]|\*", "").Trim();
-                if (name.Length == 0 && !string.IsNullOrEmpty(doc)) name = Path.GetFileNameWithoutExtension(doc.Split('|').Last().Trim());
-                string pou = name, method = null;
-                if (name.Contains(".")) { pou = name.Substring(0, name.IndexOf('.')); method = name.Substring(name.IndexOf('.') + 1); }
+                var site = ConditionSiteFromEditor(out var why);
+                if (site == null) { SetStatus(why); return; }
+                Log($"Condition: {site.Pou}{(site.Method != null ? "." + site.Method : "")} line {site.Line}, {site.Length} characters{(!site.Found ? " (selection not found again)" : "")}");
                 var exe = TcUnitControl.TcAgentExe();
                 if (exe == null) { FormatMessage(T("TcAgent.exe was not found - set it up in the TcAgent Chat first.", "TcAgent.exe wurde nicht gefunden - richte TcAgent zuerst im TcAgent Chat ein."), true); return; }
-                ConditionPopup.Open(this, syn, exe, TcUnitControl.SolutionPath(), cond, pou, method, line + 1, TargetNetId(), fmtGerman);
+                ConditionPopup.Open(this, site.Syn, exe, TcUnitControl.SolutionPath(), site.Original, site.Pou, site.Method, site.Line, TargetNetId(), fmtGerman, site);
             }
             catch (Exception ex) { Log("Condition: " + Inner(ex)); SetStatus("TcAgent: " + Inner(ex)); }
         }
@@ -112,16 +73,31 @@ namespace TcAgentBridge
         /// <summary>The condition around the caret: the selection, an IF/ELSIF/WHILE/UNTIL up to THEN/DO/;, or a boolean assignment.</summary>
         internal static (string Cond, int Line) ConditionAt(string text, int caret, string selected)
         {
+            var s = ConditionSpanAt(text, caret, selected);
+            return (s.Cond, s.Line);
+        }
+
+        /// <summary>The condition around the caret with its place in the text (start, length): what the condition window replaces.</summary>
+        internal static (string Cond, int Line, int Start, int Length) ConditionSpanAt(string text, int caret, string selected)
+        {
             int LineOf(int idx) => text.Take(Math.Max(0, Math.Min(idx, text.Length))).Count(c => c == '\n');
-            if (!string.IsNullOrWhiteSpace(selected) && selected.Trim().Length > 0)
-                return (selected, LineOf(Math.Max(0, text.IndexOf(selected, StringComparison.Ordinal))));
             caret = Math.Max(0, Math.Min(caret, text.Length));
+            if (!string.IsNullOrWhiteSpace(selected) && selected.Trim().Length > 0)
+            {
+                // the occurrence at the caret (the same text may stand more than once), without the blanks around it
+                int at = -1;
+                for (int i = text.IndexOf(selected, StringComparison.Ordinal); i >= 0; i = text.IndexOf(selected, i + 1, StringComparison.Ordinal))
+                    if (at < 0 || Math.Abs(i - caret) < Math.Abs(at - caret) || i <= caret && caret <= i + selected.Length) { at = i; if (i <= caret && caret <= i + selected.Length) break; }
+                if (at < 0) return (selected, 0, -1, 0);
+                var lead = selected.Length - selected.TrimStart().Length;
+                return (selected, LineOf(at + lead), at + lead, selected.Trim().Length);
+            }
             foreach (Match m in Regex.Matches(text, @"(?is)\b(IF|ELSIF|WHILE|UNTIL)\b.*?(\bTHEN\b|\bDO\b|;)"))
-                if (m.Index <= caret && caret <= m.Index + m.Length + 1) return (m.Value, LineOf(m.Index));
+                if (m.Index <= caret && caret <= m.Index + m.Length + 1) return (m.Value, LineOf(m.Index), m.Index, m.Length);
             // a boolean assignment around the caret, also over several lines: from the ; before it to the ; after it
             int from = caret > 0 ? text.LastIndexOf(';', caret - 1) + 1 : 0;
             int to = text.IndexOf(';', caret);
-            if (to < 0) return (null, 0);
+            if (to < 0) return (null, 0, -1, 0);
             var stmt = text.Substring(from, to - from + 1);
             // what stands before the statement on its lines: THEN, ELSE, DO, a CASE label, comments
             var head = Regex.Match(stmt, @"(?ism)\A.*(\bTHEN\b|\bELSE\b|\bDO\b|\bREPEAT\b|\bOF\b|^[ \t]*[\w.#]+(?:[ \t]*(?:,|\.\.)[ \t]*[\w.#]+)*[ \t]*:(?!=)[ \t]*\r?$)");
@@ -130,8 +106,11 @@ namespace TcAgentBridge
             // comments, pragmas ({warning ...}) and blank lines before the statement
             stmt = Regex.Replace(stmt, @"\A(\s*(//[^\n]*\n|\(\*.*?\*\)|\{[^}]*\}))+", "", RegexOptions.Singleline);
             if (stmt.Contains(":=") && Regex.IsMatch(stmt, @"\b(AND|OR|XOR|NOT|AND_THEN|OR_ELSE)\b", RegexOptions.IgnoreCase))
-                return (stmt.Trim(), LineOf(Math.Max(from, text.IndexOf(stmt.Trim(), from, StringComparison.Ordinal))));
-            return (null, 0);
+            {
+                int at = text.IndexOf(stmt.Trim(), from, StringComparison.Ordinal);
+                return (stmt.Trim(), LineOf(Math.Max(from, at)), at, at < 0 ? 0 : stmt.Trim().Length);
+            }
+            return (null, 0, -1, 0);
         }
 
         /// <summary>The target of the solution (ITcSysManager.GetTargetNetId), or null = this PC.</summary>
@@ -175,6 +154,7 @@ namespace TcAgentBridge
         readonly ComboBox instances = new ComboBox { MinWidth = 180, Margin = new Thickness(6, 0, 0, 0), FontSize = 11 };
         readonly TextBlock foot = new TextBlock { FontSize = 11, Opacity = 0.7, Margin = new Thickness(10, 2, 10, 6), TextWrapping = TextWrapping.Wrap };
         Dictionary<string, object> structure, live;
+        ConditionSite site;
         Process watch;
         bool pinned, paused, closing;
 
@@ -197,7 +177,7 @@ namespace TcAgentBridge
         static Brush Fore => Theme(EnvironmentColors.ToolWindowTextColorKey, shotDark ? Frozen(0xDC, 0xDC, 0xDC) : Brushes.Black);
         static bool Dark => Back is SolidColorBrush sb && (sb.Color.R + sb.Color.G + sb.Color.B) / 3 < 100;
 
-        internal static void Open(BridgePackage pkg, System.Windows.Forms.Control editor, string exe, string sln, string cond, string pou, string method, int line, string netId, bool isGerman)
+        internal static void Open(BridgePackage pkg, System.Windows.Forms.Control editor, string exe, string sln, string cond, string pou, string method, int line, string netId, bool isGerman, ConditionSite site = null)
         {
             german = isGerman;
             open?.CloseNow();
@@ -214,7 +194,7 @@ namespace TcAgentBridge
                 var m = System.Windows.Forms.Cursor.Position;
                 p = !er.IsEmpty && er.Contains(m) ? new POINT { X = m.X, Y = m.Y } : !er.IsEmpty ? new POINT { X = er.Left + 80, Y = er.Top + 60 } : new POINT { X = m.X, Y = m.Y };
             }
-            var w = new ConditionPopup(pkg, editor, exe, sln, cond, pou, method, line, netId);
+            var w = new ConditionPopup(pkg, editor, exe, sln, cond, pou, method, line, netId) { site = site };
             open = w;
             w.PlaceAt(p.X + 40, p.Y + (editor?.Font?.Height ?? 16) + 6);
             w.Show();
@@ -240,8 +220,7 @@ namespace TcAgentBridge
             var pin = Btn("📌", T("Keep open when you click elsewhere", "Offen lassen, wenn du woanders klickst"), null);
             pin.Click += (s, e) => { pinned = !pinned; pin.Opacity = pinned ? 1 : 0.55; };
             pin.Opacity = 0.55;
-            var big = Btn("⤢", T("The large window with truth table and rewrites - comes next", "Das große Fenster mit Wahrheitstabelle und Umformen - kommt als Nächstes"), () => { });
-            big.IsEnabled = false;
+            var big = Btn("⤢", T("The condition window: rewrite it (De Morgan, comparisons turned, simplified), truth table, sub-conditions", "Das Bedingungsfenster: umformen (De Morgan, Vergleiche umgedreht, vereinfacht), Wahrheitstabelle, Teilbedingungen"), OpenWindow);
             var close = Btn("✕", T("Close (Esc)", "Schließen (Esc)"), CloseNow);
             var fold = Btn("⊟", T("Fold every fulfilled branch into one row - click again to open them all", "Alle erfüllten Zweige zu je einer Zeile zuklappen - noch mal klicken klappt alle auf"), null);
             fold.Click += (s, e) => { collapseMet = !collapseMet; folded.Clear(); opened.Clear(); fold.Content = collapseMet ? "⊞" : "⊟"; Draw(); };
@@ -283,6 +262,18 @@ namespace TcAgentBridge
             if (ops.Count == 0) { foot.Text = T("Nothing to show over time here (a constant or not readable).", "Hier gibt es keinen Verlauf (eine Konstante oder nicht lesbar)."); return; }
             pinned = true;                       // the scope takes the focus: keep this popup
             ScopePopup.Open(editor, exe, sln, ops.Take(1).ToList(), pou, method, instances.SelectedItem as string, netId, german);
+        }
+
+        /// <summary>The condition window, with the instance of the popup and the values of now (when online).</summary>
+        void OpenWindow()
+        {
+            if (pkg == null) return;
+            var now = live != null ? L(live, "atoms").Select(a => B(a, "value")).ToList() : null;
+            var s = site ?? new ConditionSite { Syn = editor, Found = false, Text = cond, Start = 0, Length = cond.Length, Line = line, Pou = pou, Method = method };
+            var inst = instances.SelectedItem as string;
+            bool hasInstance = inst != null && instances.IsEnabled;
+            CloseNow();
+            pkg.ShowConditionWindow(s, exe, sln, hasInstance ? inst : null, now);
         }
 
         void CloseNow()

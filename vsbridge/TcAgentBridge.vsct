@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Menu commands of TcAgentBridge: View > Other Windows > TcAgent Chat / TcUnit Tests / TcAgent Knowledge, Tools > Format ST code (TcAgent).
+<!-- Menu commands of TcAgentBridge: View > Other Windows > TcAgent Chat / TcUnit Tests / TcAgent Knowledge, Tools > Format ST code (TcAgent), Condition at the cursor, Rewrite condition.
      Compiled to Menus.ctmenu (resource of TcAgentBridge.dll): by the VS SDK build (TcAgentBridge.csproj, build-vsix.ps1)
      and by VSCT.exe in install-xaeshell.ps1 / build.ps1. The handlers are added in BridgePackage.AddMenuCommands.
      SPDX-License-Identifier: MIT -->
@@ -44,6 +44,18 @@
           <ButtonText>TcAgent settings ...</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidTcAgentCmdSet" id="cmdidCondition" priority="0x0103" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_TOOLS_EXT_TOOLS" />
+        <Strings>
+          <ButtonText>Condition at the cursor (TcAgent)</ButtonText>
+        </Strings>
+      </Button>
+      <Button guid="guidTcAgentCmdSet" id="cmdidConditionWindow" priority="0x0104" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_TOOLS_EXT_TOOLS" />
+        <Strings>
+          <ButtonText>Rewrite condition (TcAgent) ...</ButtonText>
+        </Strings>
+      </Button>
     </Buttons>
   </Commands>
   <Symbols>
@@ -55,6 +67,8 @@
       <IDSymbol name="cmdidFormat" value="0x0103" />
       <IDSymbol name="cmdidFormatSettings" value="0x0104" />
       <IDSymbol name="cmdidSettings" value="0x0105" />
+      <IDSymbol name="cmdidCondition" value="0x0106" />
+      <IDSymbol name="cmdidConditionWindow" value="0x0107" />
     </GuidSymbol>
   </Symbols>
 </CommandTable>
