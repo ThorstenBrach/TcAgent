@@ -6,7 +6,7 @@ push – on your own PC first, later on a VM or a Beckhoff IPC used as build ser
 
 Other CI systems (Azure DevOps, Jenkins, GitLab) and all commands are described in [PIPELINE.md](PIPELINE.md).
 
-<p align="center"><img src="img/runner-flow.svg" width="900" alt="How a TwinCAT pipeline runs: you push to GitHub, the self-hosted runner on the build machine asks GitHub for jobs, checks out the commit, runs the TcAgent steps with a hidden Visual Studio and TwinCAT XAE, and sends exit codes, logs and files back to GitHub"></p>
+<p><img src="img/runner-flow.svg" width="900" alt="How a TwinCAT pipeline runs: you push to GitHub, the self-hosted runner on the build machine asks GitHub for jobs, checks out the commit, runs the TcAgent steps with a hidden Visual Studio and TwinCAT XAE, and sends exit codes, logs and files back to GitHub"></p>
 
 The picture shows the workflow template [github-actions-ci.yml](pipeline/github-actions-ci.yml) (steps in
 `.tcagent/pipeline.json`, run by `TcAgent.exe ci`); [github-actions.yml](pipeline/github-actions.yml) calls the same

@@ -16,7 +16,7 @@ There are three ways to use TcAgent:
 | **Any MCP client** | Claude Desktop, Claude Code, GitHub Copilot (agent mode in Visual Studio 17.14+ or the CLI), Gemini CLI, Codex CLI | The same tools from the client you already use. |
 | **Command line (CLI)** | `TcAgent.exe check`, `test`, `sil`, `hil` and others on a build server | CI pipelines without an AI: exit codes, JUnit XML, annotations. |
 
-<p align="center"><a href="img/tcagent-demo.mp4"><img src="img/tcagent-demo.gif" width="760" alt="Video: from the device manual to the HMI page with one prompt"></a><br><sub>Click for the video. It is a generated visualization of the workflow; in practice TcAgent works exactly like this.</sub></p>
+<p><a href="img/tcagent-demo.mp4"><img src="img/tcagent-demo.gif" width="760" alt="Video: from the device manual to the HMI page with one prompt"></a><br><sub>Click for the video. It is a generated visualization of the workflow; in practice TcAgent works exactly like this.</sub></p>
 
 Installation is covered in [INSTALLATION.md](INSTALLATION.md). This guide starts once TcAgent is installed and at
 least one AI client is signed in.
@@ -254,7 +254,7 @@ agent gets – coding rules, risk rules, skills, workflows, lessons, reference s
 knowledge without editing folders by hand. The levels and what belongs to them: [Your files](#configuration-reference)
 and [docs/KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md). Every list sorts by a click on a column header; a second click reverses it.
 
-<p align="center"><img src="img/knowledge-in-ide.png" width="1000" alt="The Knowledge window and the TcAgent Chat in the IDE"></p>
+<p><img src="img/knowledge-in-ide.png" width="1000" alt="The Knowledge window and the TcAgent Chat in the IDE"></p>
 
 *How the window works:* the tabs are on top – a badge on a tab counts what needs your attention there; on the right
 the platform of the project (a click opens the Platforms tab), **⟳** (F5) and **⋯** with **Levels …**, **Backup now …**,
@@ -270,7 +270,7 @@ status line shows on the right what the tab holds.
 
 ### Overview
 
-<p align="center"><img src="img/knowledge-overview.png" width="900" alt="The Overview tab: what the agent gets, what needs attention, the workflow runs"></p>
+<p><img src="img/knowledge-overview.png" width="900" alt="The Overview tab: what the agent gets, what needs attention, the workflow runs"></p>
 
 First **what the agent gets in this project** – one entry per kind (coding rule files, skills, workflows,
 reference sources …); a click shows them in the Files tab. Then **Needs attention** (items from a source changed
@@ -284,7 +284,7 @@ workflow for its runs over time.
 
 ### Files
 
-<p align="center"><img src="img/knowledge-tab-files.png" width="900" alt="The Files tab: every file of every level with its state and where it comes from"></p>
+<p><img src="img/knowledge-tab-files.png" width="900" alt="The Files tab: every file of every level with its state and where it comes from"></p>
 
 Coding rules, risk rules, skills, workflows, lessons and templates of every level with their state
 (✓ applies, ↷ replaced by a later level, ⊘ switched off, locked, forced, and for an item from a source ✎ changed
@@ -307,7 +307,7 @@ branch for a pull request; the column **Git** marks changed and new files.
 
 ### Sources
 
-<p align="center"><img src="img/knowledge-tab-sources.png" width="900" alt="The Sources tab: Git repositories and the items installed from them"></p>
+<p><img src="img/knowledge-tab-sources.png" width="900" alt="The Sources tab: Git repositories and the items installed from them"></p>
 
 The Git repositories skills, workflows and rules can be installed from (`tc_sources`): **Browse and install …**
 first, then **New …**, **Open** (the repository in the browser; double-click), **Open folder** (TcAgent's local copy),
@@ -350,7 +350,7 @@ The output of these actions appears in the box **Output** at the bottom (folded 
 
 ### Platforms
 
-<p align="center"><img src="img/knowledge-tab-platforms.png" width="900" alt="The Platforms tab: the platform of this project and all platforms"></p>
+<p><img src="img/knowledge-tab-platforms.png" width="900" alt="The Platforms tab: the platform of this project and all platforms"></p>
 
 On top the decision for this project – which platforms apply, chosen by hand or detected and why, the
 libraries of the project – with **Set for this project …** and **Detect automatically**. Below all platforms
@@ -369,7 +369,7 @@ window at once; **⋯ > Set up clients** in the chat passes them on to the AI cl
 
 ### Modules
 
-<p align="center"><img src="img/knowledge-tab-modules.png" width="900" alt="The Modules tab: the tool modules and plugins the agent sees"></p>
+<p><img src="img/knowledge-tab-modules.png" width="900" alt="The Modules tab: the tool modules and plugins the agent sees"></p>
 
 Which groups of tools the AI agent sees and which plugins it gets ([docs/PLUGINS.md](PLUGINS.md)). A check box per
 module switches it on or off – for **me** (your user level, the default) or for **this project**
@@ -386,7 +386,7 @@ the TcUnit Tests window stays and says so, with a link to switch it on.
 
 ### Reference
 
-<p align="center"><img src="img/knowledge-tab-reference.png" width="900" alt="The Reference tab: what the agent looks things up in, and a search like the agent"></p>
+<p><img src="img/knowledge-tab-reference.png" width="900" alt="The Reference tab: what the agent looks things up in, and a search like the agent"></p>
 
 Manuals, datasheets and library docs the agent searches (`tc_docs`) – Beckhoff InfoSys, the links, folders and network
 shares of the `knowledge.md` of every level and the document folders `knowledge\`, each with type, level, state
@@ -401,7 +401,7 @@ and open with a double-click (documents with their program, pages in the browser
 
 ### Feedback
 
-<p align="center"><img src="img/knowledge-tab-feedback.png" width="900" alt="The Feedback tab: tool problems the agent reported"></p>
+<p><img src="img/knowledge-tab-feedback.png" width="900" alt="The Feedback tab: tool problems the agent reported"></p>
 
 The reports of `tc_feedback` (**Show:** open, all, resolved …). For the selected reports the window builds the text of
 an issue and **anonymizes** it: names of this computer, user, solution and projects, your `privateTerms`
@@ -419,7 +419,7 @@ problems are reported privately (`SECURITY.md`).
 
 ### Workflow runs
 
-<p align="center"><img src="img/knowledge-tab-workflow-runs.png" width="900" alt="The Workflow runs tab: failed checks and corrections per run over time"></p>
+<p><img src="img/knowledge-tab-workflow-runs.png" width="900" alt="The Workflow runs tab: failed checks and corrections per run over time"></p>
 
 Failed checks and corrections per run with a moving average, every adopted improvement as a marker, and the
 improvements with their values before and after (helped / no effect / worse / reverted); **Export CSV**. With fewer
@@ -429,7 +429,7 @@ than two runs the chart says so instead of staying empty.
 
 ### Advisor
 
-<p align="center"><img src="img/knowledge-tab-advisor.png" width="900" alt="The Advisor tab: advice with state, rating, kind and confidence"></p>
+<p><img src="img/knowledge-tab-advisor.png" width="900" alt="The Advisor tab: advice with state, rating, kind and confidence"></p>
 
 The advice of the Advisor runs ([ADVISOR.md](ADVISOR.md)), newest first, with its finding, evidence, proposal and order.
 **Right**, **Partly**, **Wrong** and **n/a** rate it with one click (a "wrong" asks what is wrong); the heading shows the
@@ -441,7 +441,7 @@ window with `TcAgent.exe advise`; at the running plant with `/advise-live` or th
 
 ### Backup and restore
 
-<p align="center"><img src="img/knowledge-tab-backups.png" width="900" alt="The Backups tab: the automatic backups of every level"></p>
+<p><img src="img/knowledge-tab-backups.png" width="900" alt="The Backups tab: the automatic backups of every level"></p>
 
 The tab **Backups** (and **⋯ > Backup now … / Restore …**): the knowledge of every level – coding rules, risk rules, skills, workflows,
 lessons, templates, platforms, `knowledge.md`, `sources.json`, `skills.lock.json`, `disabled.json`, `config.json` – is
@@ -681,8 +681,8 @@ Without a running PLC it shows the structure. A large condition gets scroll bars
 one row (a click on the row opens it again), **⊟** folds every fulfilled branch at once. A click on a sub-condition opens its
 history in the Inline-Scope.
 
-<p align="center"><img src="img/guide/inline-logic-view.png" width="744" alt="Inline-Logic-View of a nested IF condition, online"><br><sub>The Inline-Logic-View of a nested IF online: fulfilled operands and lines green, a dashed gate cannot be read yet, the line on top says the result.</sub></p>
-<p align="center"><img src="img/guide/inline-logic-view-code.png" width="744" alt="The same IF in the TwinCAT online view"><br><sub>The same condition in the TwinCAT editor online - the popup shows which part decides.</sub></p>
+<p><img src="img/guide/inline-logic-view.png" width="744" alt="Inline-Logic-View of a nested IF condition, online"><br><sub>The Inline-Logic-View of a nested IF online: fulfilled operands and lines green, a dashed gate cannot be read yet, the line on top says the result.</sub></p>
+<p><img src="img/guide/inline-logic-view-code.png" width="744" alt="The same IF in the TwinCAT online view"><br><sub>The same condition in the TwinCAT editor online - the popup shows which part decides.</sub></p>
 
 ### Condition window: rewrite it, truth table
 
@@ -717,8 +717,8 @@ their range, enums as steps with their names; **+ Variable** adds more, one belo
 - The variable is followed to its ADS path like in the Inline-Logic-View (inherited, reference, pointer, index, GVL); the
   instance is chosen in the popup. The values are read every 20 ms (`TcAgent.exe watch`), only read, on any target.
 
-<p align="center"><img src="img/guide/inline-scope-code.png" width="744" alt="Alt+click on a variable in the TwinCAT editor"><br><sub>Alt+click on <code>fDemoSine</code> in the editor ...</sub></p>
-<p align="center"><img src="img/guide/inline-scope.png" width="744" alt="Inline-Scope of a sine signal over 5 seconds"><br><sub>... opens the Inline-Scope: the value over the last 5 s with its value axis, below the current value, min and max.</sub></p>
+<p><img src="img/guide/inline-scope-code.png" width="744" alt="Alt+click on a variable in the TwinCAT editor"><br><sub>Alt+click on <code>fDemoSine</code> in the editor ...</sub></p>
+<p><img src="img/guide/inline-scope.png" width="744" alt="Inline-Scope of a sine signal over 5 seconds"><br><sub>... opens the Inline-Scope: the value over the last 5 s with its value axis, below the current value, min and max.</sub></p>
 
 The agent has the same as `tc_condition`, the command line as `TcAgent.exe condition --text "IF …"`: the sub-conditions,
 when the condition is true, and rewrites that mean exactly the same - De Morgan, comparisons turned, simplify, write out
@@ -1134,15 +1134,15 @@ Default location `<solution>\doc\<PLC project>.html` (`file=...` for another). I
 Diagrams can be zoomed (buttons, Ctrl+mouse wheel, double click), moved and shown full screen. They use Mermaid, which
 needs internet access in the browser; the hierarchy tree works offline.
 
-<p align="center"><img src="img/guide/doc-overview.png" width="860" alt="Program documentation: overview with the explanation of the program and the task"><br><sub>The page of the test project: how the program works (written by the agent) and the tasks with cycle time and priority.</sub></p>
+<p><img src="img/guide/doc-overview.png" width="860" alt="Program documentation: overview with the explanation of the program and the task"><br><sub>The page of the test project: how the program works (written by the agent) and the tasks with cycle time and priority.</sub></p>
 
-<p align="center"><img src="img/guide/doc-callgraph.png" width="860" alt="Call graph of the test project"><br><sub>Call graph – task → MAIN → programs and function blocks; zoom with the buttons or Ctrl+mouse wheel.</sub></p>
+<p><img src="img/guide/doc-callgraph.png" width="860" alt="Call graph of the test project"><br><sub>Call graph – task → MAIN → programs and function blocks; zoom with the buttons or Ctrl+mouse wheel.</sub></p>
 
-<p align="center"><img src="img/guide/doc-inheritance.png" width="860" alt="Inheritance hierarchy as diagram and tree"><br><sub>Inheritance hierarchy – diagram and tree, library base classes included, with the short description of each FB.</sub></p>
+<p><img src="img/guide/doc-inheritance.png" width="860" alt="Inheritance hierarchy as diagram and tree"><br><sub>Inheritance hierarchy – diagram and tree, library base classes included, with the short description of each FB.</sub></p>
 
-<p align="center"><img src="img/guide/doc-chains.png" width="860" alt="SFC step chain FB_SfcTest drawn as diagram"><br><sub>Step chains – SFC and CASE state machines are drawn from the code; "Chain as text" shows the same chain in the tc_sfc format.</sub></p>
+<p><img src="img/guide/doc-chains.png" width="860" alt="SFC step chain FB_SfcTest drawn as diagram"><br><sub>Step chains – SFC and CASE state machines are drawn from the code; "Chain as text" shows the same chain in the tc_sfc format.</sub></p>
 
-<p align="center"><img src="img/guide/doc-reference.png" width="860" alt="Reference entry per object"><br><sub>Reference – one card per object: description, explanation, calls, libraries used, used by, code.</sub></p>
+<p><img src="img/guide/doc-reference.png" width="860" alt="Reference entry per object"><br><sub>Reference – one card per object: description, explanation, calls, libraries used, used by, code.</sub></p>
 
 ### Findings you may see
 
@@ -1201,7 +1201,7 @@ Rules only report what they can resolve; unknown identifiers (library constants,
 The findings are text based. The agent is told to verify each one in the code (`tc_plc_read`) before reporting or
 changing it. Counts and high risks also appear in the outline, and the full list in the **Risks** section of the HTML page.
 
-<p align="center"><img src="img/guide/doc-risks.png" width="860" alt="Risks section of the HTML page"><br><sub>The Risks section of the HTML page: severity, object (linked to its reference), line, rule and explanation.</sub></p>
+<p><img src="img/guide/doc-risks.png" width="860" alt="Risks section of the HTML page"><br><sub>The Risks section of the HTML page: severity, object (linked to its reference), line, rule and explanation.</sub></p>
 
 ### Your own risk rules: risk-rules.md
 
@@ -1235,7 +1235,7 @@ When you say *"check from now on that every MEMCPY uses SIZEOF"*, the agent:
 4. narrows the rule until the findings are right,
 5. saves it after your OK with `tc_risk_rules action=add` (dry run first; `scope=project` unless you mean "always").
 
-<p align="center"><img src="img/guide/risk-rule.gif" width="860" alt="Animation: a MEMCPY rule is tested on the project, checked and saved"><br><sub>A new rule in the test project: tested without saving, findings checked in the code, saved after your OK (tool output shortened).</sub></p>
+<p><img src="img/guide/risk-rule.gif" width="860" alt="Animation: a MEMCPY rule is tested on the project, checked and saved"><br><sub>A new rule in the test project: tested without saving, findings checked in the code, saved after your OK (tool output shortened).</sub></p>
 
 If a regex cannot decide it, the agent saves an agent check with `tc_risk_rules action=check text=...`. Built-in rules are
 tuned or switched off only on request: `tc_risk_rules action=builtin rule=long-code setting="limit=200"`.
@@ -1339,7 +1339,7 @@ reported with how it was matched (by name / by order). The agent runs `dryRun=tr
 source elements remain unmatched, nothing is linked for that pair and the pairs found so far are listed for an explicit
 `pairs` call; extra target entries are reported as left unlinked. `elementwise=false` links exactly the given items.
 
-<p align="center"><img src="img/guide/link-struct.gif" width="860" alt="Animation: GVL_Gpib.ComIn/ComOut linked to the EL6001 element by element"><br><sub>GVL_Gpib.ComIn/ComOut to the EL6001 in one step: dry run with the pairs, your OK, 46 single links, build (tool output shortened).</sub></p>
+<p><img src="img/guide/link-struct.gif" width="860" alt="Animation: GVL_Gpib.ComIn/ComOut linked to the EL6001 element by element"><br><sub>GVL_Gpib.ComIn/ComOut to the EL6001 in one step: dry run with the pairs, your OK, 46 single links, build (tool output shortened).</sub></p>
 
 `tc_unlink source=... [target=...]` removes links of a variable (all, or only to one counterpart).
 
@@ -2032,7 +2032,7 @@ without agreement.** The agent cannot widen the list - only you can.
 
 **In the IDE:** Tools > **TcAgent settings …** (or ⋯ > TcAgent settings … in the TcAgent Chat) > **Target systems**.
 
-<p align="center"><img src="img/settings/targets.png" width="820" alt="Target systems: this PC, a test rig taken over from the ADS routes and the user mode runtime, each released for writing"></p>
+<p><img src="img/settings/targets.png" width="820" alt="Target systems: this PC, a test rig taken over from the ADS routes and the user mode runtime, each released for writing"></p>
 
 | Column | Meaning |
 |---|---|
@@ -2119,7 +2119,7 @@ license keys in prompts or feedback reports.
 
 ## Configuration reference
 
-<p align="center"><img src="img/knowledge-files.svg" width="900" alt="Where TcAgent keeps its files on the six levels from built-in to project"></p>
+<p><img src="img/knowledge-files.svg" width="900" alt="Where TcAgent keeps its files on the six levels from built-in to project"></p>
 
 ### Environment variables
 
@@ -2165,13 +2165,13 @@ Tools > **TcAgent settings …** (also ⋯ in the TcAgent Chat and in the Knowle
 plain words, on the pages *General and mode*, *Target systems*, *Gates and confirmations*, *Knowledge and levels* and
 *Advanced* (plus a link to the Formatter settings). Search with Ctrl+F.
 
-<p align="center"><img src="img/settings/general.png" width="820" alt="TcAgent settings, page General and mode: each setting with value and origin, the details of the selected one"></p>
+<p><img src="img/settings/general.png" width="820" alt="TcAgent settings, page General and mode: each setting with value and origin, the details of the selected one"></p>
 
 <details><summary>The other pages</summary>
 
-<p align="center"><img src="img/settings/gates.png" width="820" alt="Page Gates and confirmations"></p>
-<p align="center"><img src="img/settings/knowledge.png" width="820" alt="Page Knowledge and levels: company, team and platform folders, additional rules and sources"></p>
-<p align="center"><img src="img/settings/advanced.png" width="820" alt="Page Advanced: plugins, skill copies, pinned solution, IDE assemblies, formatter debug folder"></p>
+<p><img src="img/settings/gates.png" width="820" alt="Page Gates and confirmations"></p>
+<p><img src="img/settings/knowledge.png" width="820" alt="Page Knowledge and levels: company, team and platform folders, additional rules and sources"></p>
+<p><img src="img/settings/advanced.png" width="820" alt="Page Advanced: plugins, skill copies, pinned solution, IDE assemblies, formatter debug folder"></p>
 
 </details>
 
