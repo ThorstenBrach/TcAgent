@@ -282,7 +282,7 @@ namespace TcAgentBridge
             var ops = L(L(structure, "atoms").ElementAtOrDefault(atom), "operands").Where(o => B(o, "constant") != true && S(o, "path") != null).Select(o => S(o, "text")).ToList();
             if (ops.Count == 0) { foot.Text = T("Nothing to show over time here (a constant or not readable).", "Hier gibt es keinen Verlauf (eine Konstante oder nicht lesbar)."); return; }
             pinned = true;                       // the scope takes the focus: keep this popup
-            ScopePopup.Open(editor, exe, sln, ops, pou, method, instances.SelectedItem as string, netId, german);
+            ScopePopup.Open(editor, exe, sln, ops.Take(1).ToList(), pou, method, instances.SelectedItem as string, netId, german);
         }
 
         void CloseNow()

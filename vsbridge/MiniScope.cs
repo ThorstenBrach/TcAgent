@@ -201,7 +201,10 @@ namespace TcAgentBridge
         bool paused, pinned, closing;
         double? cursorX;
         int interval = 20;
-        const double Left0 = 110, PlotW = 560, BandBool = 26, BandNum = 110, Gap = 10;
+        const double Left0 = 110, PlotW = 560, Gap = 10;
+        // one variable: tall, so small changes show; several: one below the other
+        double BandBool => names.Count == 1 ? 90 : 26;
+        double BandNum => names.Count == 1 ? 240 : 110;
 
         static SolidColorBrush Frozen(byte r, byte g, byte b) { var x = new SolidColorBrush(Color.FromRgb(r, g, b)); x.Freeze(); return x; }
         static readonly Brush[] Colors = { Frozen(0x3B, 0x6F, 0xD8), Frozen(0xC6, 0x28, 0x28), Frozen(0x3A, 0xA3, 0x35), Frozen(0xC2, 0x6A, 0x00), Frozen(0x8E, 0x44, 0xAD), Frozen(0x00, 0x96, 0x88) };
@@ -218,10 +221,10 @@ namespace TcAgentBridge
         internal static void Open(System.Windows.Forms.Control editor, string exe, string sln, List<string> names, string pou, string method, string instance, string netId, bool isGerman)
         {
             german = isGerman;
-            // a second variable into the open scope (from the condition popup or Ctrl+Alt+T again)
+            // another variable while a scope of the same POU is open: it shows that one now (more come with + Variable)
             if (open != null && open.IsVisible && open.pou == pou && (instance == null || instance == open.instance))
             {
-                foreach (var n in names) if (!open.names.Contains(n, StringComparer.OrdinalIgnoreCase)) open.names.Add(n);
+                open.names.Clear(); open.names.AddRange(names.Take(1));
                 open.Restart();
                 open.Activate();
                 return;
@@ -244,7 +247,7 @@ namespace TcAgentBridge
 
         ScopePopup(System.Windows.Forms.Control editor, string exe, string sln, List<string> names, string pou, string method, string instance, string netId)
         {
-            this.editor = editor; this.exe = exe; this.sln = sln; this.names = names.ToList(); this.pou = pou; this.method = method; this.instance = instance; this.netId = netId;
+            this.editor = editor; this.exe = exe; this.sln = sln; this.names = names.Take(1).ToList(); this.pou = pou; this.method = method; this.instance = instance; this.netId = netId;
             Icon = BridgePackage.AppIcon;
             WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize; ShowInTaskbar = false; SizeToContent = SizeToContent.WidthAndHeight;
             try { Owner = Application.Current?.MainWindow; } catch { }
@@ -282,7 +285,7 @@ namespace TcAgentBridge
             DockPanel.SetDock(add, Dock.Right); tools.Children.Add(add);
             tools.Children.Add(ranges);
 
-            chart.Width = Left0 + PlotW + 16;
+            chart.Width = Left0 + PlotW + 60;     // room for the values of the axis on the right
             chart.Background = Back;
             chart.MouseMove += (s, e) => { var x = e.GetPosition(chart).X; cursorX = x >= Left0 && x <= Left0 + PlotW ? x : (double?)null; if (dragFrom != null && paused) { offsetMs = Math.Max(0, Math.Min(MaxOffset(), dragOffset + (x - dragFrom.Value) / PlotW * spanMs)); } Draw(); };
             chart.MouseLeave += (s, e) => { cursorX = null; dragFrom = null; Draw(); };
@@ -461,7 +464,7 @@ namespace TcAgentBridge
                 var type = S(m, "type") ?? "";
                 bool isBool = type.Equals("BOOL", StringComparison.OrdinalIgnoreCase) || type.Equals("BIT", StringComparison.OrdinalIgnoreCase);
                 bool isText = visible.Any(s => s.V.ElementAtOrDefault(i) is string);
-                double h = isBool || isText || S(m, "error") != null ? BandBool : BandNum;
+                double h = S(m, "error") != null ? 26 : isBool || isText ? BandBool : BandNum;
                 Txt(names[i], 4, y + (h / 2) - 8, color, 11, true, Left0 - 10);
                 var frame = new Rectangle { Width = PlotW, Height = h, Stroke = GridBrush, StrokeThickness = 1 };
                 Canvas.SetLeft(frame, Left0); Canvas.SetTop(frame, y); chart.Children.Add(frame);
@@ -491,7 +494,13 @@ namespace TcAgentBridge
                     if (hi - lo < 1e-9) { lo -= 1; hi += 1; }
                     double pad = (hi - lo) * 0.08; lo -= pad; hi += pad;
                     double Y(double v) => y + h - 3 - (v - lo) / (hi - lo) * (h - 6);
-                    for (int g = 1; g < 4; g++) chart.Children.Add(new WLine { X1 = Left0, X2 = Left0 + PlotW, Y1 = y + g * h / 4, Y2 = y + g * h / 4, Stroke = GridBrush, StrokeThickness = 0.5 });
+                    int lines = h > 150 ? 8 : 4;
+                    for (int g = 1; g < lines; g++)
+                    {
+                        double gy = y + g * h / lines;
+                        chart.Children.Add(new WLine { X1 = Left0, X2 = Left0 + PlotW, Y1 = gy, Y2 = gy, Stroke = GridBrush, StrokeThickness = 0.5 });
+                        if (h > 150) Txt(Fmt(lo + (hi - lo) * (1 - (gy - y - 3) / (h - 6))), Left0 + PlotW + 2, gy - 7, Grey, 9);
+                    }
                     var poly = new Polyline { Stroke = color, StrokeThickness = 1.6 };
                     // many samples: one point per pixel column is enough (min and max kept)
                     foreach (var grp in nums.GroupBy(v => (int)X(v.T)))
