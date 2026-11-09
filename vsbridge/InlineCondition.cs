@@ -153,9 +153,24 @@ namespace TcAgentBridge
         Process watch;
         bool pinned, paused, closing;
 
-        static readonly SolidColorBrush Green = Frozen(0x3A, 0xA3, 0x35), GreenFill = Frozen(0xE5, 0xF4, 0xE4), Red = Frozen(0xC6, 0x28, 0x28), RedFill = Frozen(0xFB, 0xEB, 0xEB),
-                                        Grey = Frozen(0x9A, 0x9A, 0xA2), LampOn = Frozen(0x7C, 0xC3, 0x5B), LampOff = Frozen(0xE3, 0xE3, 0xE6);
+        static readonly SolidColorBrush Green = Frozen(0x3A, 0xA3, 0x35), Red = Frozen(0xC6, 0x28, 0x28), Grey = Frozen(0x9A, 0x9A, 0xA2), LampOn = Frozen(0x7C, 0xC3, 0x5B);
+        // fills that work on the light and the dark theme
+        static Brush GreenFill => Dark ? Frozen(0x1E, 0x3B, 0x1E) : Frozen(0xE5, 0xF4, 0xE4);
+        static Brush RedFill => Dark ? Frozen(0x40, 0x1E, 0x1E) : Frozen(0xFB, 0xEB, 0xEB);
+        static Brush LampOff => Dark ? Frozen(0x55, 0x55, 0x5A) : Frozen(0xE3, 0xE3, 0xE6);
         static SolidColorBrush Frozen(byte r, byte g, byte b) { var x = new SolidColorBrush(Color.FromRgb(r, g, b)); x.Freeze(); return x; }
+
+        /// <summary>A color of the VS theme as a brush (outside VS: the fallback).</summary>
+        static Brush Theme(Microsoft.VisualStudio.Shell.ThemeResourceKey key, Brush fallback)
+        {
+            try { var c = VSColorTheme.GetThemedColor(key); if (c.A > 0) { var b = new SolidColorBrush(Color.FromArgb(c.A, c.R, c.G, c.B)); b.Freeze(); return b; } } catch { }
+            return fallback;
+        }
+        // outside VS (screenshots of the docs): light, or dark with TCAGENT_SHOT_DARK=1
+        static readonly bool shotDark = Environment.GetEnvironmentVariable("TCAGENT_SHOT_DARK") == "1";
+        static Brush Back => Theme(EnvironmentColors.ToolWindowBackgroundColorKey, shotDark ? Frozen(0x25, 0x25, 0x26) : Brushes.White);
+        static Brush Fore => Theme(EnvironmentColors.ToolWindowTextColorKey, shotDark ? Frozen(0xDC, 0xDC, 0xDC) : Brushes.Black);
+        static bool Dark => Back is SolidColorBrush sb && (sb.Color.R + sb.Color.G + sb.Color.B) / 3 < 100;
 
         internal static void Open(BridgePackage pkg, System.Windows.Forms.Control editor, string exe, string sln, string cond, string pou, string method, int line, string netId, bool isGerman)
         {
@@ -179,8 +194,8 @@ namespace TcAgentBridge
             Icon = BridgePackage.AppIcon;
             WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize; ShowInTaskbar = false; SizeToContent = SizeToContent.WidthAndHeight;
             try { Owner = Application.Current?.MainWindow; } catch { }
-            SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
-            SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+            // the colors of the VS theme, taken directly: a popup window does not see the theme resources of the IDE
+            Background = Back; Foreground = Fore;
 
             // header: what it is, the instance, the buttons
             var title = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
@@ -200,8 +215,7 @@ namespace TcAgentBridge
             DockPanel.SetDock(instances, Dock.Right); head.Children.Add(instances);
             head.Children.Add(title);
             var headBorder = new Border { Child = head, BorderThickness = new Thickness(0, 0, 0, 1) };
-            headBorder.SetResourceReference(Border.BackgroundProperty, EnvironmentColors.ToolWindowTabSelectedTabBrushKey);
-            headBorder.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+            headBorder.Background = Theme(EnvironmentColors.ToolWindowTabSelectedTabColorKey, Back); headBorder.BorderBrush = Theme(EnvironmentColors.ToolWindowBorderColorKey, Grey);
             headBorder.MouseLeftButtonDown += (s, e) => { try { DragMove(); } catch { } };
             instances.SelectionChanged += (s, e) => { if (instances.SelectedItem is string i) { lastInstance[pou] = i; StartWatch(); } };
 
@@ -213,7 +227,7 @@ namespace TcAgentBridge
             panel.Children.Add(new Border { Child = canvas, Margin = new Thickness(8, 8, 8, 2) });
             panel.Children.Add(foot);
             var outer = new Border { Child = panel, BorderThickness = new Thickness(1) };
-            outer.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+            outer.BorderBrush = Theme(EnvironmentColors.ToolWindowBorderColorKey, Grey);
             Content = outer;
             PreviewKeyDown += (s, e) => { if (e.Key == Key.Escape) { e.Handled = true; CloseNow(); } };
             Deactivated += (s, e) => { if (!pinned) CloseNow(); };
@@ -350,7 +364,7 @@ namespace TcAgentBridge
             var atomsS = L(structure, "atoms").ToList();
             var atomsL = live != null ? L(live, "atoms").ToList() : null;
             var opsL = live != null ? L(live, "operands").ToList() : null;
-            var fore = TryFindResource(EnvironmentColors.ToolWindowTextBrushKey) as Brush ?? Brushes.Black;
+            var fore = Fore;
             var typeface = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Normal, FontStretches.Normal);
             double Width(string s, double size, bool bold) => new FormattedText(s, System.Globalization.CultureInfo.CurrentUICulture, FlowDirection.LeftToRight, bold ? new Typeface(typeface.FontFamily, FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal) : typeface, size, Brushes.Black, 1.0).WidthIncludingTrailingWhitespace;
 
@@ -410,7 +424,7 @@ namespace TcAgentBridge
             }
             void Dot(double x, double y, bool? v)
             {
-                var e = new Ellipse { Width = 8, Height = 8, Fill = v == false ? LampOn : (TryFindResource(EnvironmentColors.ToolWindowBackgroundBrushKey) as Brush ?? Brushes.White), Stroke = Wire(v == null ? null : !v), StrokeThickness = 1.4 };
+                var e = new Ellipse { Width = 8, Height = 8, Fill = v == false ? LampOn : Back, Stroke = Wire(v == null ? null : !v), StrokeThickness = 1.4 };
                 Canvas.SetLeft(e, x - 4); Canvas.SetTop(e, y - 4); canvas.Children.Add(e);
             }
             void Text(string s, double x, double y, Brush b, double size = 12, bool bold = false)
@@ -447,7 +461,7 @@ namespace TcAgentBridge
                     Line(x0, y, xIn, y, kid.Value);
                     if (not) Dot(g.X - 4, y, kid.Value);
                 }
-                var box = new Rectangle { Width = gateW, Height = gBot - gTop, Stroke = g.Value == true ? Green : g.Value == false ? fore : Grey, StrokeThickness = 1.6, Fill = g.Value == true ? GreenFill : (TryFindResource(EnvironmentColors.ToolWindowBackgroundBrushKey) as Brush ?? Brushes.White) };
+                var box = new Rectangle { Width = gateW, Height = gBot - gTop, Stroke = g.Value == true ? Green : g.Value == false ? fore : Grey, StrokeThickness = 1.6, Fill = g.Value == true ? GreenFill : Back };
                 if (g.Value == null) box.StrokeDashArray = new DoubleCollection { 4, 3 };
                 Canvas.SetLeft(box, g.X); Canvas.SetTop(box, gTop); canvas.Children.Add(box);
                 var sym = g.Op == "AND" ? "&" : g.Op == "OR" ? "≥1" : g.Op == "XOR" ? "=1" : g.Op;
@@ -474,7 +488,7 @@ namespace TcAgentBridge
             else
             {
                 resultBar.Background = res == true ? GreenFill : res == false ? RedFill : Brushes.Transparent;
-                result.Foreground = res == null ? fore : Brushes.Black;
+                result.Foreground = fore;
                 var missing = L(live, "missing").ToList();
                 var ways = live.TryGetValue("missing", out var mo) && mo is ArrayList ma ? ma.OfType<ArrayList>().Select(w => w.OfType<Dictionary<string, object>>().Select(x => (Atom: int.Parse(S(x, "atom")), Want: B(x, "want") == true)).ToList()).ToList() : new List<List<(int Atom, bool Want)>>();
                 string Atom(int i) => S(atomsS.ElementAtOrDefault(i), "text");
