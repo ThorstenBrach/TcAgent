@@ -65,6 +65,38 @@ public sealed partial class ToolRegistry
                 return s;
             }));
 
+        Add("tc_condition", "A condition as logic, without the IDE: its sub-conditions, when it is true (prime implicants, '-' = any), and " +
+                            "rewrites that mean exactly the same - De Morgan (NOT inward / outward), simplify, write out in full, = TRUE uniform " +
+                            "or removed - each proven over every combination of its sub-conditions. Use it to understand a long IF before changing " +
+                            "it, to propose a clearer form, or to build test cases from the true rows. Never offers a rewrite that changes the " +
+                            "meaning; a condition with a call is not simplified, one with AND_THEN / OR_ELSE not rewritten.",
+            Schema(Req(P("condition", "string", "The condition: \"IF a AND NOT (b OR c) THEN\", \"a AND b\" or \"x := a OR b;\"")),
+                   P("pou", "string", "Online: the POU the condition is in - each variable is resolved through the declarations (inherited, reference, pointer, interface, THIS^/SUPER^, method locals, GVLs) to its ADS path"),
+                   P("method", "string", "Online: the method of the POU the condition is in"),
+                   P("instance", "string", "Online: the instance path of the POU, e.g. MAIN.fbStation1 (a PROGRAM: its name); empty = list the instances"),
+                   P("online", "boolean", "Read the values once over ADS (read only, any target): the value of each sub-condition, the result and what is missing for TRUE"),
+                   P("netId", "string", "AmsNetId (empty = local)"), P("port", "integer", "ADS port (default 851)")),
+            a =>
+            {
+                var opts = new System.Text.Json.JsonSerializerOptions { WriteIndented = true, Encoder = System.Text.Encodings.Web.JavaScriptEncoder.UnsafeRelaxedJsonEscaping };
+                var o = StLogic.Analyze(Str(a, "condition"));
+                if (Str(a, "pou") is { Length: > 0 } pou)
+                {
+                    var idx = SymbolResolve.Index(SolutionDir());
+                    if (string.IsNullOrEmpty(Str(a, "instance"))) o["instances"] = new JsonArray(SymbolResolve.Instances(idx, pou).Select(x => (JsonNode)x).ToArray());
+                    else if (Bool(a, "online", false))
+                    {
+                        using var w = new ConditionWatch(Str(a, "condition"), idx, pou, Str(a, "method"), Str(a, "instance"), Str(a, "netId"), Int(a, "port", 851));
+                        o["online"] = w.Cycle();
+                    }
+                    else
+                        foreach (var at in o["atoms"]!.AsArray())
+                            at!.AsObject()["operands"] = new JsonArray(SymbolResolve.Operands(idx, pou, Str(a, "method"), Str(a, "instance"), at["text"]!.ToString())
+                                .Select(x => (JsonNode)new JsonObject { ["text"] = x.Text, ["path"] = x.Path, ["constant"] = x.Constant, ["from"] = x.From, ["reason"] = x.Reason }).ToArray());
+                }
+                return o.ToJsonString(opts);
+            });
+
         Add("tc_coding_rules", "Returns this project's coding guidelines (naming conventions, comments, structure ...). Call BEFORE first " +
                                "writing or creating code and align all changes with them.",
             Schema(), a =>

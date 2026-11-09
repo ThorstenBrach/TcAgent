@@ -48,6 +48,8 @@
     <Compile Include="..\..\src\Reset.cs" Link="src\Reset.cs" />
     <Compile Include="..\..\src\Targets.cs" Link="src\Targets.cs" />
     <Compile Include="..\..\src\SettingsSchema.cs" Link="src\SettingsSchema.cs" />
+    <Compile Include="..\..\src\StLogic.cs" Link="src\StLogic.cs" />
+    <Compile Include="..\..\src\SymbolResolve.cs" Link="src\SymbolResolve.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

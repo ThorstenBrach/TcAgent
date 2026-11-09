@@ -705,6 +705,25 @@ alone if the IDE is too slow for the cross-references.
 | `symbol` | string | yes | Name of the symbol (variable, FB, method, type) |
 | `max` | integer |  | Max. hits per source (default 300) |
 
+### `tc_condition`
+
+A condition as logic, without the IDE: its sub-conditions, when it is true (prime implicants, `-` = any) and rewrites that
+mean exactly the same - De Morgan (NOT inward / outward), simplify, write out in full, `= TRUE` uniform or removed - each
+proven over every combination of its sub-conditions (up to 20). A condition with a call is not simplified, one with
+`AND_THEN` / `OR_ELSE` not rewritten. Command line: `TcAgent.exe condition --text "IF a AND NOT (b OR c) THEN"`.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `condition` | string | yes | `IF a AND NOT (b OR c) THEN`, `a AND b` or `x := a OR b;` |
+| `pou` | string |  | Online: the POU the condition is in - each variable is resolved through the declarations to its ADS path: inherited (EXTENDS, also from a library base), `THIS^`/`SUPER^`, a reference, a pointer (checked for 0 first, then `p^`), an array index (read first), a GVL; not read: interface members, properties without `{attribute 'monitoring' := 'call'}`, method locals and `VAR_TEMP` (stack), calls |
+| `method` | string |  | Online: the method the condition is in |
+| `instance` | string |  | Online: the instance path (`MAIN.fbStation1`, a PROGRAM: its name); empty = the instances of the POU are listed |
+| `online` | boolean |  | Read once over ADS (read only, any target): each sub-condition's value, the result, what is missing for TRUE |
+| `netId`, `port` | string, integer |  | Target (default local, 851) |
+
+Command line: `TcAgent.exe condition --text "…" --solution <dir> --pou <POU> --instance <path> --online [--watch 250]`
+(one JSON line per reading until stdin closes), `--instances` lists where the POU is used.
+
 ### `tc_ide`
 
 Experimental: direct query of the VS extension TcAgentBridge in the IDE process. command: ping (is it running?), context (raw editor context), libs (libraries installed in the repository), probe (diagnostics: what is reachable in the IDE process; writes probe.txt).

@@ -46,7 +46,7 @@ public static class Modules
         ["core"] = "tc_instances tc_attach tc_open tc_status tc_version tc_tree tc_xml_get tc_xml_set tc_delete tc_plc_read tc_plc_write tc_plc_create " +
                    "tc_plc_search tc_plc_references tc_save tc_check tc_build tc_errors tc_dialogs tc_coding_rules tc_coding_rules_add tc_feedback tc_policy " +
                    "tc_ask_user tc_ide tc_editor_context",
-        ["plc-code"] = "tc_plaintext tc_refactor tc_editor_open tc_goto_definition tc_find_references tc_sfc tc_lib_signatures tc_export tc_import",
+        ["plc-code"] = "tc_plaintext tc_refactor tc_editor_open tc_goto_definition tc_find_references tc_sfc tc_lib_signatures tc_export tc_import tc_condition",
         ["test"] = "tc_test_run tc_test_results tc_test_skeleton tc_static_analysis",
         ["runtime"] = "tc_activate tc_plc_online tc_plc_state ads_read ads_write ads_symbols tc_backup tc_runtime_mode tc_runtime_startup tc_boot_project",
         ["io"] = "tc_io_add tc_io_scan tc_io_scan_add tc_io_vars tc_link tc_unlink tc_mapping_export tc_mapping_import",

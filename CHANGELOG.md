@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **Conditions as logic (`tc_condition`, `TcAgent.exe condition`)** - the sub-conditions of an IF, when it is true (prime
+  implicants), rewrites that mean exactly the same (De Morgan inward/outward, simplify, write out in full, `= TRUE`
+  uniform or removed), each proven over every combination; never a rewrite that changes the meaning, no simplifying with
+  calls, no rewriting with AND_THEN/OR_ELSE. Online: each variable resolved through the declarations to its ADS path
+  (inherited also from a library base, THIS^/SUPER^, reference, pointer checked for 0, array index read first, GVL; not
+  read and said why: interface members, properties without monitoring, method locals, VAR_TEMP, calls), the value of every
+  sub-condition, the result and what is missing for TRUE; the instances of a POU are found. The IDE window follows.
 - **Formatter: brackets, lines and columns for conditions** - 14 `cond.*` rules (one sub-condition per line, brackets
   around sub-conditions and groups, tight or spaced group brackets, NOT inside or in front, room for NOT, AND/OR at the end
   or the start, next lines under the bracket or indented, inner groups indented or flat, closing brackets, comparisons and
