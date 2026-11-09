@@ -586,6 +586,10 @@ namespace TcAgentBridge
                 {
                     try { ShowFormatSettings(); } catch (Exception ex) { Log("Formatter settings: " + Inner(ex)); }
                 }, new System.ComponentModel.Design.CommandID(CommandSet, CmdFormatSettings)));
+                mcs.AddCommand(new System.ComponentModel.Design.MenuCommand((s, e) =>
+                {
+                    try { ShowSettings(); } catch (Exception ex) { Log("TcAgent settings: " + Inner(ex)); }
+                }, new System.ComponentModel.Design.CommandID(CommandSet, CmdSettings)));
                 Log("Menu commands registered");
             }
             catch (Exception ex) { Log("Menu: " + Inner(ex)); }

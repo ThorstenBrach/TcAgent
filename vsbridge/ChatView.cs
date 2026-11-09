@@ -294,6 +294,8 @@ namespace TcAgentBridge
             language.Items.Add(new Separator());
             foreach (var c in InstalledLanguages()) Language(Title(c), c.Name);
             menu.Items.Add(language);
+            menu.Items.Add(Item("TcAgent settings …", () => { try { BridgePackage.Instance?.ShowSettings(); } catch { } },
+                                "Every setting of TcAgent and the target systems the agent may write to - saved settings take effect at once"));
             menu.Items.Add(Item("Shared folders …", ShowSharedFolders, "Folders the agent may read without asking"));
             menu.Items.Add(Item("Reload settings", ReloadSettings,
                                 "Every running TcAgent reads settings.json, the targets and the mode, modules.json and the plugins again - no restart of the agent, the CLI or the MCP server"));

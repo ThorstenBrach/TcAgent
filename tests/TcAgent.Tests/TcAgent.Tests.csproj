@@ -46,6 +46,8 @@
     <Compile Include="..\..\src\Updates.cs" Link="src\Updates.cs" />
     <Compile Include="..\..\src\SharedFolders.cs" Link="src\SharedFolders.cs" />
     <Compile Include="..\..\src\Reset.cs" Link="src\Reset.cs" />
+    <Compile Include="..\..\src\Targets.cs" Link="src\Targets.cs" />
+    <Compile Include="..\..\src\SettingsSchema.cs" Link="src\SettingsSchema.cs" />
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.11.1" />

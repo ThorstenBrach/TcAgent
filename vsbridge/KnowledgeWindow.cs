@@ -513,6 +513,8 @@ namespace TcAgentBridge
             var moreMenu = MenuOf(A("Levels …", "Company, team and platform folders or repositories (settings.json)", EditLevels),
                                   A("Formatter settings …", "The rules of the ST formatter (formatting.json of the levels) with a preview",
                                     () => { try { BridgePackage.Instance?.ShowFormatSettings(); } catch (Exception ex) { Error(ex.Message); } }),
+                                  A("TcAgent settings …", "Every setting of TcAgent and the target systems the agent may write to",
+                                    () => { try { BridgePackage.Instance?.ShowSettings(); } catch (Exception ex) { Error(ex.Message); } }),
                                   Sep,
                                   A(BackupLabel, "Back up the knowledge of the levels now (it is also backed up automatically before every change)", BackupNow),
                                   A(RestoreLabel, "Restore a level, a file or a skill from a backup", RestoreBackup),

@@ -7,6 +7,17 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **TcAgent settings window:** Tools > TcAgent settings ... (also ⋯ in the TcAgent Chat and the Knowledge window) - every
+  setting of TcAgent in plain words on pages (general and mode, target systems, gates and confirmations, knowledge and
+  levels, advanced), with its value, where it comes from (default, saved, set from outside) and the details; Save writes
+  settings.json and the running servers read it again at once; export and import. Built from one schema
+  (`TcAgent.exe settings [--set KEY=VALUE] [--export|--import]`); a test checks that every variable the code reads is in
+  it and in the User Guide (9 were missing there).
+- **Release target systems, also for a time:** Target systems in the settings window or `TcAgent.exe targets add <netId>
+  [--access read] [--until 1h|today|<date>]` - write (and read) or read only, for good or until a time; a release that ran
+  out stops at once. The user mode runtimes of this PC (their own AMS Net ID) are found and offered. Only a person
+  releases (no agent tool), every change goes to the audit log, a refused call says why. Reading stays free for every
+  target. `targets.json` applies to all projects on the PC, in addition to `TCAGENT_ALLOW_TARGETS`.
 - **Reload settings without a restart:** ⋯ > Reload settings in the TcAgent Chat (or `TcAgent.exe reload`) - every running TcAgent
   reads settings.json, targets and mode, modules.json and the plugins again, the agent gets the new tool list, the chat says what changed.
 - **ST formatter:** Ctrl+Alt+F (or Tools > Format ST code (TcAgent)) formats the PLC object in the editor - indentation,

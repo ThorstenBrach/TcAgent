@@ -38,6 +38,12 @@
           <ButtonText>Formatter settings (TcAgent) ...</ButtonText>
         </Strings>
       </Button>
+      <Button guid="guidTcAgentCmdSet" id="cmdidSettings" priority="0x0102" type="Button">
+        <Parent guid="guidSHLMainMenu" id="IDG_VS_TOOLS_EXT_TOOLS" />
+        <Strings>
+          <ButtonText>TcAgent settings ...</ButtonText>
+        </Strings>
+      </Button>
     </Buttons>
   </Commands>
   <Symbols>
@@ -48,6 +54,7 @@
       <IDSymbol name="cmdidKnowledge" value="0x0102" />
       <IDSymbol name="cmdidFormat" value="0x0103" />
       <IDSymbol name="cmdidFormatSettings" value="0x0104" />
+      <IDSymbol name="cmdidSettings" value="0x0105" />
     </GuidSymbol>
   </Symbols>
 </CommandTable>

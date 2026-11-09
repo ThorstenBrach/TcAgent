@@ -132,8 +132,23 @@ public sealed class Policy
     /// <summary>File the audit entries of this process go to (TCAGENT_AUDIT or %LOCALAPPDATA%\TcAgent\audit.jsonl).</summary>
     public string AuditPath => auditPath;
 
-    public string Describe() =>
-        $"Mode: {Mode} ({ModeText})\nAllowed target systems: {string.Join(", ", allowedTargets)}\nAudit log: {auditPath}";
+    /// <summary>Targets the agent may write to now: TCAGENT_ALLOW_TARGETS (and --allow) plus the releases of targets.json.</summary>
+    public List<string> AllowedForWriting()
+    {
+        var now = DateTime.Now;
+        return allowedTargets.Concat(Targets.Load().Where(t => t.WritableAt(now)).Select(t => t.NetId)).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+    }
+
+    public string Describe()
+    {
+        var now = DateTime.Now;
+        var released = Targets.Load();
+        return $"Mode: {Mode} ({ModeText})\nReading: every target system\n" +
+               $"Writing allowed by the configuration (TCAGENT_ALLOW_TARGETS): {string.Join(", ", allowedTargets)}\n" +
+               (released.Count == 0 ? "Released in the settings window: none\n"
+                   : "Released in the settings window:\n" + string.Join("\n", released.Select(t => "  " + Targets.Describe(t, now))) + "\n") +
+               $"Audit log: {auditPath}";
+    }
 
     string ModeText => Mode switch
     {
@@ -162,10 +177,17 @@ public sealed class Policy
         {
             var target = targetNetId();
             if (string.IsNullOrEmpty(target) || target.Equals("local", StringComparison.OrdinalIgnoreCase)) target = "127.0.0.1.1.1";
-            if (!allowedTargets.Contains(target))
+            // released in the settings window (targets.json): read on every call, so a release that ran out stops at once
+            if (!allowedTargets.Contains(target) && !Targets.WriteAllowed(target))
+            {
+                var released = Targets.Load().FirstOrDefault(t => t.NetId.Equals(target, StringComparison.OrdinalIgnoreCase));
+                var why = released == null ? "is not allowed"
+                        : released.Expired(DateTime.Now) ? $"was released until {released.Until:dd.MM. HH:mm} - that time is over"
+                        : "is released for reading only";
                 throw new UnauthorizedAccessException(
-                    $"{tool} blocked: target system {target} is not allowed. Allowed: {string.Join(", ", allowedTargets)}. " +
-                    "Allow it via TCAGENT_ALLOW_TARGETS in the MCP configuration.");
+                    $"{tool} blocked: target system {target} {why}. Allowed for writing: {string.Join(", ", AllowedForWriting())}. " +
+                    "Only the person can release a target: TcAgent settings > Target systems (or TCAGENT_ALLOW_TARGETS in the MCP configuration). Do not try to change this yourself - ask the person.");
+            }
         }
     }
 

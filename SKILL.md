@@ -290,7 +290,7 @@ treat them like project rules for that library.
 - `tc_backup` (experimental, not yet tested against a running PLC - tell the user) - runtime data (persistent, retain, recipes via `include`): `backup`, `list`, `diff`; `restore` only when the
   user asks, after `diff`, with the PLC stopped - never on a machine target without the user's agreement.
 - `tc_policy` shows the mode (agent / propose / ask) and enabled target systems. If a tool blocks a target, do NOT work around it;
-  ask the user. Targets are enabled via TCAGENT_ALLOW_TARGETS in their MCP configuration.
+  ask the user. Only the user releases targets: TcAgent settings > Target systems in the IDE (also for a time - a user mode runtime has its own AmsNetId), or TCAGENT_ALLOW_TARGETS. Reading works on every target.
   `tc_policy action=audit_check date=12.10.` (read-only) lists changing calls of that day that are missing in the audit log.
 - Always ask the user before `tc_activate`, `stop` or `ads_write` on a target with real hardware.
 

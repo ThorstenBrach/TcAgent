@@ -1,7 +1,7 @@
 # Tool reference
 
 All tools of the MCP server `tcagent`. Depending on the client they appear with a prefix (e.g. `mcp__tcagent__tc_build`).
-Write tools are recorded in the audit log; runtime tools only access target systems listed in `TCAGENT_ALLOW_TARGETS`.
+Write tools are recorded in the audit log; runtime tools only write to target systems the user released (TcAgent settings > Target systems, `targets.json`, or `TCAGENT_ALLOW_TARGETS`); reading works on every target.
 This file is generated from `src/ToolRegistry.cs`.
 
 Every tool belongs to a module (`src/Modules.cs`) that can be switched off – then the AI client does not get it, and a

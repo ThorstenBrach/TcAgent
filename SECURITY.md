@@ -6,7 +6,8 @@ activate configurations, start and stop the PLC, write variables. Use it accordi
 ## Ground rules
 
 * **Safe by default:** Without configuration, runtime actions are only allowed on this PC
-  (`TCAGENT_ALLOW_TARGETS=local`). Enable other target systems deliberately and one at a time.
+  (`TCAGENT_ALLOW_TARGETS=local`). Enable other target systems deliberately and one at a time - in Tools > TcAgent settings >
+  Target systems preferably for a limited time; only a person can release a target, the agent cannot.
 * **Do not enable machines that can endanger people or equipment** unless a human confirms every
   runtime action (keep per-tool-call confirmation enabled in the client).
 * **Confirm runtime actions:** by default (`TCAGENT_CONFIRM=runtime`) you are asked before every activation, PLC

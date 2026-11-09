@@ -1528,9 +1528,10 @@ and port 851; `netId` and `port` select others.
 
 ### Safeguards
 
-- **Allowed targets.** Activation, online commands, runtime mode and ADS writes only work on targets listed in
-  `TCAGENT_ALLOW_TARGETS` – by default `local`, this PC only. A blocked call tells you which targets are allowed; the
-  agent asks you instead of working around it.
+- **Released targets.** Activation, online commands, runtime mode and ADS writes only work on targets you released -
+  by default `local`, this PC only. Release further ones, for a time or for good, in Tools > TcAgent settings > Target
+  systems (see [Target systems](#target-systems-where-the-agent-may-write)). A blocked call tells the agent why; it asks
+  you instead of working around it.
 - **Confirmation.** With `TCAGENT_CONFIRM=runtime` (default) you confirm each of these actions: a Yes/No dialog in
   Visual Studio from the TcAgent Chat, the client's own question dialog elsewhere. A declined or unanswered confirmation
   counts as "no" and is final – the agent does not retry or work around it.
@@ -1951,11 +1952,51 @@ Read-only actions of otherwise changing tools – such as `tc_task action=list`,
 `tc_doc action=outline`, `tc_refactor action=analyze`, `tc_risk_rules action=test` – count as reading: no confirmation,
 allowed in `ask`/`propose`, not audited.
 
-### Allowed targets (TCAGENT_ALLOW_TARGETS)
+### Target systems: where the agent may write
 
-Comma-separated AmsNetIds for activation, PLC online commands, runtime mode and ADS writes. Default `local` = this PC
-only (`127.0.0.1.1.1` or its own AmsNetId). Enable other targets deliberately, one at a time. **Never allow targets with
-real machines without agreement.** The agent cannot widen the list – only you can, in the MCP configuration.
+The agent may **read** every target system. **Writing** - activation, PLC online commands, runtime mode, ADS writes,
+TcUnit runs on a target, restoring a backup - only to targets you released. **Never release targets with real machines
+without agreement.** The agent cannot widen the list - only you can.
+
+**In the IDE:** Tools > **TcAgent settings …** (or ⋯ > TcAgent settings … in the TcAgent Chat) > **Target systems**.
+
+| Column | Meaning |
+|---|---|
+| Status | ✓ released · ⏱ runs out (released for a time) · ○ read only · ⊘ expired (read only again) |
+| Name, AMS Net ID | Your name for the target, its AMS Net ID |
+| May | write (and read) or read only |
+| Until | for good, or the end of the release with the time left |
+| From | this window, the default (this PC) or 🔒 the MCP configuration (not changeable here) |
+
+- **+ New target …** asks for name, AMS Net ID (checked while you type), *read and write* or *read only*, and how long:
+  30 minutes, 1 hour, 4 hours, today, 7 days, until a date, or for good. **Extend ▾** gives the selected target more time,
+  **Delete …** removes it (the agent may then only read it). A change takes effect at once - no reload, no restart; a
+  release that ran out stops at once too.
+- **User mode runtime:** TwinCAT's user mode runtime has an AMS Net ID of its own, different from the runtime of this PC.
+  The window finds the user mode runtimes installed on this PC and offers to release them (info bar and a badge on the page).
+- The releases apply to every project on this PC and are kept in `%LOCALAPPDATA%\TcAgent\targets.json`. Every change is
+  written to the audit log.
+- A refused call tells the agent why ("not released", "released for reading only", "the release ran out") and to ask you.
+
+**Command line** (the same file):
+
+```bash
+TcAgent.exe targets
+```
+
+```bash
+TcAgent.exe targets add 5.80.123.4.1.1 --name "Test rig" --until 1h
+```
+
+```bash
+TcAgent.exe targets remove 5.80.123.4.1.1
+```
+
+`--access read` releases a target for reading only; `--until` takes `30m`, `1h`, `2d`, `today`, a date and time or `forever`.
+
+**For pipelines and MCP configurations:** `TCAGENT_ALLOW_TARGETS` - comma-separated AMS Net IDs the agent may always write
+to, default `local` = this PC only (`127.0.0.1.1.1` or its own AMS Net ID). It applies in addition to the list above; in a
+pipeline, `--allow` in the pipeline definition releases a target for that run.
 
 ### Confirmations (TCAGENT_CONFIRM)
 
@@ -2031,6 +2072,42 @@ client.
 | `TCAGENT_DOC_TEMPLATES` | – | Additional example manuals for `tc_userdoc` (`;`-separated files/folders) |
 | `TCAGENT_FEEDBACK` | TcAgent folder | Feedback store: a `.jsonl` file or a (shared) folder/UNC path |
 | `TCAGENT_JOB_WAIT` | `45` | Seconds `tc_refactor apply/result` waits for your decisions before returning progress |
+| `TCAGENT_ACTIVATE_GATE` | on | `0` lets `tc_activate` go on without the clean build it otherwise needs first |
+| `TCAGENT_SPEC_GATE` | on | `0` turns off the question before new code (FB, program, function, method) without a specification |
+| `TCAGENT_COMPANY` | – | Folder or Git repository of the company level of the knowledge |
+| `TCAGENT_PLATFORMS` | – | Further roots of platforms (an automation framework in a repository of its own), `;`-separated |
+| `TCAGENT_LESSONS` | – | Team file or folder for lessons (older; newer: the `lessons` folder of the team level) |
+| `TCAGENT_PLUGINS` | on | `0` loads no plugins (to find a problem) |
+| `TCAGENT_SKILL_MIRROR` | on | `0` stops copying the skills into the skill folders of the agent CLIs |
+| `TCAGENT_IDE_ASSEMBLIES` | – | Folders searched first for EnvDTE and the TwinCAT interop, `;`-separated |
+| `TCAGENT_FORMAT_DEBUG` | – | A folder: the formatter writes its first and second run there (to find a problem) |
+
+### The TcAgent settings window
+
+Tools > **TcAgent settings …** (also ⋯ in the TcAgent Chat and in the Knowledge window) shows every variable above in
+plain words, on the pages *General and mode*, *Target systems*, *Gates and confirmations*, *Knowledge and levels* and
+*Advanced* (plus a link to the Formatter settings). Search with Ctrl+F.
+
+- Each setting shows its value and where it comes from: *default*, *saved (user)* - `settings.json` - or **⚠ set from
+  outside** (a Windows environment variable or the MCP configuration of the chat). A value set from outside wins over the
+  window; the window says so.
+- The details below the list: what it does, the default, what applies now, the variable, whether a restart is needed.
+- **Save** writes `%LOCALAPPDATA%\TcAgent\settings.json` ("env") and the running TcAgent servers read it again at once
+  (as ⋯ > Reload settings). Turning off the confirmations or the build gate, or allowing targets by configuration,
+  asks once more. Every change is written to the audit log.
+- **Export … / Import …** on the pages *General* and *Knowledge*: the saved settings as one JSON file.
+
+The same from the command line:
+
+```bash
+TcAgent.exe settings
+```
+
+```bash
+TcAgent.exe settings --set TCAGENT_CONFIRM=all
+```
+
+`--set KEY=` (empty) goes back to the default; `--export <file>` and `--import <file>` move the settings to another PC.
 
 The TcAgent Chat sets `TCAGENT_CLIENT` and `TCAGENT_VS_PID` for the processes it starts, so TcAgent knows which IDE it
 belongs to. You do not set these yourself.
@@ -2123,7 +2200,7 @@ Packaged clients (for example Claude Desktop) may redirect `%LOCALAPPDATA%` to
 | `.tcscopex` shows a plain file icon / "Please upgrade your TwinCAT Measurement" | Scope integration and Scope files differ in version. `tcpkg upgrade TE1300.ScopeViewProfessional.XAE` with VS closed, then `devenv /updateconfiguration` (or ask the agent to use `tc_packages_change` – with your confirmation). |
 | `tc_scope record_start`: "not loaded in Visual Studio" | Open the `.tcscopex` once in the IDE; PLC in Run. |
 | `tc_hmi action=controls`: "Control package not found" | Build the HMI project once in the IDE. |
-| A runtime tool is "blocked: target system … is not allowed" | The target is not in `TCAGENT_ALLOW_TARGETS`. Add it deliberately in the MCP configuration, then restart the client. |
+| A runtime tool is "blocked: target system … is not allowed" | The target is not released for writing, or its release ran out. Release it deliberately in Tools > TcAgent settings > Target systems (takes effect at once) - a user mode runtime has an AMS Net ID of its own. |
 | A change is "blocked: TcAgent is running in mode 'propose'/'ask'" | Intended by your configuration. Change `TCAGENT_MODE` if you want the agent to make changes. |
 | First write rejected with "NOT executed: this project has coding guidelines…" | The rules gate. The agent reads the rules and repeats the call – nothing to do. |
 | Chat: attached PDFs/images are not read | The Claude backend needs `Read` in `--allowedTools`; TcAgent adds it automatically. Check a custom `chat-backends.json`. |
