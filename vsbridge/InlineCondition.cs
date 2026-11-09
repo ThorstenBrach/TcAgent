@@ -124,10 +124,11 @@ namespace TcAgentBridge
             if (to < 0) return (null, 0);
             var stmt = text.Substring(from, to - from + 1);
             // what stands before the statement on its lines: THEN, ELSE, DO, a CASE label, comments
-            var head = Regex.Match(stmt, @"(?is)^.*(\bTHEN\b|\bELSE\b|\bDO\b|\bREPEAT\b|\bOF\b|^\s*[\w.#]+\s*:(?!=))");
+            var head = Regex.Match(stmt, @"(?ism)\A.*(\bTHEN\b|\bELSE\b|\bDO\b|\bREPEAT\b|\bOF\b|^[ \t]*[\w.#]+(?:[ \t]*(?:,|\.\.)[ \t]*[\w.#]+)*[ \t]*:(?!=)[ \t]*\r?$)");
             int cut = head.Success ? head.Length : 0;
             stmt = stmt.Substring(cut);
-            stmt = Regex.Replace(stmt, @"^(\s*(//[^\n]*\n|\(\*.*?\*\)))+", "", RegexOptions.Singleline);
+            // comments, pragmas ({warning ...}) and blank lines before the statement
+            stmt = Regex.Replace(stmt, @"\A(\s*(//[^\n]*\n|\(\*.*?\*\)|\{[^}]*\}))+", "", RegexOptions.Singleline);
             if (stmt.Contains(":=") && Regex.IsMatch(stmt, @"\b(AND|OR|XOR|NOT|AND_THEN|OR_ELSE)\b", RegexOptions.IgnoreCase))
                 return (stmt.Trim(), LineOf(Math.Max(from, text.IndexOf(stmt.Trim(), from, StringComparison.Ordinal))));
             return (null, 0);
