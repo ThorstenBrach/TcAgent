@@ -12,7 +12,7 @@ namespace TcAgent;
 
 public sealed class VarDecl
 {
-    public string Name, Type, Section;     // Section: VAR, VAR_INPUT, VAR_OUTPUT, VAR_IN_OUT, VAR_TEMP, VAR_INST, VAR_STAT, VAR_GLOBAL
+    public string Name, Type, Section, Comment;     // Comment: the comment at the end of its line (or right above it); Section: VAR, VAR_INPUT, VAR_OUTPUT, VAR_IN_OUT, VAR_TEMP, VAR_INST, VAR_STAT, VAR_GLOBAL
 }
 
 public sealed class PouDecl
@@ -38,6 +38,7 @@ public sealed class ResolvedOperand
     public string From = "", FromDe = "";      // in words: "inherited from FB_Base", "through pointer pSensor"
     public string Reason, ReasonDe;            // why it cannot be read
     public bool Constant;                      // a value of a type (enum value, constant): not read, used as written
+    public string Comment;                     // the comment of its declaration
     public readonly List<string> PointerChecks = new();          // paths of pointers that must not be 0
     public readonly List<(string Var, string Path)> Indexes = new();   // array indexes read first: {0} in Path
 }
@@ -81,6 +82,17 @@ public static class SymbolResolve
     {
         var t = StLexer.Lex(text).Where(x => !x.Trivia && !x.Comment).ToList();
         var d = new PouDecl();
+        // the comment of each declaration: at the end of its line, otherwise the comment line right above it
+        var comments = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        string above = null;
+        foreach (var raw in text.Replace("\r\n", "\n").Split('\n'))
+        {
+            var line = raw.Trim();
+            var dm = Regex.Match(line, @"^(\w+)\s*(?:,\s*\w+\s*)*(?:AT\s+\S+\s*)?:[^;]*;\s*(?://+\s*(?<c>.*)|\(\*\s*(?<c>.*?)\s*\*\))?\s*$");
+            if (dm.Success) { var c = dm.Groups["c"].Success && dm.Groups["c"].Value.Trim().Length > 0 ? dm.Groups["c"].Value.Trim() : above; if (c != null) comments[dm.Groups[1].Value] = c; above = null; continue; }
+            var cl = Regex.Match(line, @"^(?://+\s*(.*)|\(\*\s*(.*?)\s*\*\))$");
+            above = cl.Success ? (cl.Groups[1].Success ? cl.Groups[1].Value : cl.Groups[2].Value).Trim() : null;
+        }
         if (Regex.IsMatch(text, @"\{attribute\s+'qualified_only'\s*\}", RegexOptions.IgnoreCase)) d.QualifiedOnly = true;
         int i = 0;
         while (i < t.Count && t[i].Kind == StTok.Pragma) i++;
@@ -137,7 +149,7 @@ public static class SymbolResolve
                 type.Add(x.Kind == StTok.Word && StKeywords.IsCaseFree(x.Text) ? x.Upper : x.Text);
             }
             var ty = string.Join(" ", type).Replace(" .", ".").Replace(". ", ".").Replace("[ ", "[").Replace(" ]", "]").Replace(" ..", "..").Replace(".. ", "..");
-            foreach (var n in names) d.Vars[n] = new VarDecl { Name = n, Type = ty, Section = section };
+            foreach (var n in names) d.Vars[n] = new VarDecl { Name = n, Type = ty, Section = section, Comment = comments.TryGetValue(n, out var cm) ? cm : null };
             while (end < t.Count && t[end].Text != ";") end++;
             k = end;
         }
@@ -259,7 +271,7 @@ public static class SymbolResolve
             var name = chain[3].Text;
             var v = Member(idx, first.Upper == "SUPER" ? Type(idx, pou.Extends) ?? pou : pou, name, out var where);
             if (v == null) return Property(idx, pou, name) is { } mon ? PropertyResult(o, instance + "." + name, mon, name) : No($"{name} is not declared in {pouName} or its base types", $"{name} ist in {pouName} und seinen Basistypen nicht deklariert");
-            path = instance + "." + name; typeName = v.Type;
+            path = instance + "." + name; typeName = v.Type; o.Comment = v.Comment;
             o.From = first.Upper == "SUPER" || where != pou ? $"inherited from {where.Name} ({first.Upper}^)" : "own variable (THIS^)";
             o.FromDe = first.Upper == "SUPER" || where != pou ? $"geerbt von {where.Name} ({first.Upper}^)" : "eigene Variable (THIS^)";
             k = 4;
@@ -279,7 +291,7 @@ public static class SymbolResolve
                 if (pou.Kind == "FUNCTION") return No("a variable of a function - lives on the stack only during the call", "eine Variable einer Funktion - liegt nur während des Aufrufs auf dem Stack");
                 if (v.Section == "VAR_TEMP") return No("VAR_TEMP - lives on the stack only during the cycle", "VAR_TEMP - liegt nur während des Zyklus auf dem Stack");
                 if (instance == null) return No("the instance is not known - choose it", "die Instanz ist nicht bekannt - bitte wählen");
-                path = instance + "." + name; typeName = v.Type;
+                path = instance + "." + name; typeName = v.Type; o.Comment = v.Comment;
                 o.From = where != pou ? $"inherited from {where.Name}" : v.Section == "VAR_INPUT" ? "VAR_INPUT" : v.Section == "VAR_OUTPUT" ? "VAR_OUTPUT" : v.Section == "VAR_IN_OUT" ? "VAR_IN_OUT (reference to the caller's variable)" : "own variable";
                 o.FromDe = where != pou ? $"geerbt von {where.Name}" : v.Section == "VAR_INPUT" ? "VAR_INPUT" : v.Section == "VAR_OUTPUT" ? "VAR_OUTPUT" : v.Section == "VAR_IN_OUT" ? "VAR_IN_OUT (Referenz auf die Variable des Aufrufers)" : "eigene Variable";
             }
@@ -368,6 +380,7 @@ public static class SymbolResolve
                     if (mv != null && mv.Section == "VAR_TEMP") return No($"{name} is VAR_TEMP of {t2.Name}", $"{name} ist VAR_TEMP von {t2.Name}");
                     if (mv != null && where2 != t2) Note(o, $"{name} inherited from {where2.Name}", $"{name} geerbt von {where2.Name}");
                     typeName = mv?.Type;
+                    if (mv?.Comment != null) o.Comment = mv.Comment;
                 }
                 else typeName = null;            // a library type (TON.Q ...): read as it is
                 path += "." + name;

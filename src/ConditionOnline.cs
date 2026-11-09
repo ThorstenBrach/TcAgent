@@ -31,6 +31,13 @@ public sealed class ConditionWatch : IDisposable
 
     public void Dispose() => client.Dispose();
 
+    /// <summary>The state of the PLC runtime ("Run", "Stop", "Config" ...) or "not reachable: ...".</summary>
+    string State()
+    {
+        try { return client.ReadState().AdsState.ToString(); }
+        catch (Exception ex) { return "not reachable: " + ex.Message; }
+    }
+
     object Read(string path, out string error)
     {
         error = null;
@@ -55,7 +62,7 @@ public sealed class ConditionWatch : IDisposable
         for (int a = 0; a < operands.Count; a++)
             foreach (var o in operands[a])
             {
-                var j = new JsonObject { ["atom"] = a, ["text"] = o.Text, ["from"] = o.From, ["fromDe"] = o.FromDe };
+                var j = new JsonObject { ["atom"] = a, ["text"] = o.Text, ["from"] = o.From, ["fromDe"] = o.FromDe, ["comment"] = o.Comment };
                 if (o.Constant) { j["constant"] = true; ops.Add(j); continue; }
                 if (o.Path == null) { values[o.Text] = StLogic.Unknown; j["error"] = o.Reason; j["errorDe"] = o.ReasonDe; ops.Add(j); continue; }
                 string path = o.Path, err = null;
@@ -95,7 +102,8 @@ public sealed class ConditionWatch : IDisposable
             ["tree"] = Tree(expr.Root),
             ["missing"] = result == true ? new JsonArray() : new JsonArray(StLogic.Missing(expr.Root, Atom)
                 .Select(w => (JsonNode)new JsonArray(w.Select(x => (JsonNode)new JsonObject { ["atom"] = x.Atom, ["want"] = x.Want }).ToArray())).ToArray()),
-            ["onlineProject"] = OnlineProject
+            ["onlineProject"] = OnlineProject,
+            ["state"] = State()
         };
     }
 }

@@ -52,6 +52,16 @@ public class SymbolResolveTests
     }
 
     [Fact]
+    public void CommentsOfDeclarationsComeAlong()
+    {
+        var d = SymbolResolve.ParseDecl("FUNCTION_BLOCK FB_X\nVAR\n  bError : BOOL; // collective fault\n  // door locked\n  bLocked : BOOL;\n  nCount : INT := 0; (* parts *)\n  bNone : BOOL;\nEND_VAR");
+        Assert.Equal("collective fault", d.Vars["bError"].Comment);
+        Assert.Equal("door locked", d.Vars["bLocked"].Comment);
+        Assert.Equal("parts", d.Vars["nCount"].Comment);
+        Assert.Null(d.Vars["bNone"].Comment);
+    }
+
+    [Fact]
     public void ThisAndSuper()
     {
         Assert.Equal("MAIN.fbStation1.bError", One("THIS^.bError").Path);

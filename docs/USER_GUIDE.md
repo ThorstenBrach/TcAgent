@@ -658,6 +658,28 @@ ones, and **Wish a rule or feature ...** opens a GitHub issue with the example. 
 [FORMATTER_EXAMPLES.md](FORMATTER_EXAMPLES.md). Rules, profiles and configuration:
 [FORMATTER.md](FORMATTER.md).
 
+## Conditions as a logic diagram
+
+Put the cursor into a condition - an IF, ELSIF, WHILE, UNTIL or a boolean assignment, or select one - and press
+**Ctrl+Alt+B** ("conditionHotkey" in `chat-backends.json`). A small popup at the code shows it as a logic diagram:
+
+- the sub-conditions as a list with a lamp, the name and the comment of the declaration (for a comparison its values),
+- gates `&`, `≥1`, `=1` with right-angled lines, NOT as a dot at the input,
+- online everything that is fulfilled turns **green** - the lines, the gates and the result; what is not fulfilled stays
+  in the text color, what cannot be read is grey and dashed. The line on top says the result and **what is missing** for
+  TRUE (the shortest ways first).
+
+The values are read over ADS every 500 ms from the instance chosen in the popup (the instances of the POU in the project
+are found; the last one used is remembered). Each variable is followed to where it really is: inherited (also from a base
+in a library), `THIS^`/`SUPER^`, a reference, a pointer (checked for 0 first), an array index (read first), a GVL.
+Interface members, properties without `{attribute 'monitoring' := 'call'}`, method locals, `VAR_TEMP` and calls are
+never read - the popup says why. It only reads, on any target. ⏸ freezes the values, 📌 keeps the popup open, Esc closes.
+Without a running PLC it shows the structure.
+
+The agent has the same as `tc_condition`, the command line as `TcAgent.exe condition --text "IF …"`: the sub-conditions,
+when the condition is true, and rewrites that mean exactly the same - De Morgan, simplify, write out in full, `= TRUE`
+uniform - each proven over every combination.
+
 ## Coding rules
 
 **Good for:** making every agent – whatever client – write code in your conventions (names, comments, structure,

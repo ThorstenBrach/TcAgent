@@ -62,7 +62,7 @@ public static class CliCondition
                     var ops = SymbolResolve.Operands(idx, pou, Opt("--method"), Opt("--instance"), a!["text"]!.ToString());
                     a.AsObject()["operands"] = new JsonArray(ops.Select(x => (JsonNode)new JsonObject
                     {
-                        ["text"] = x.Text, ["path"] = x.Path, ["constant"] = x.Constant, ["from"] = x.From, ["fromDe"] = x.FromDe, ["reason"] = x.Reason, ["reasonDe"] = x.ReasonDe,
+                        ["text"] = x.Text, ["path"] = x.Path, ["constant"] = x.Constant, ["comment"] = x.Comment, ["from"] = x.From, ["fromDe"] = x.FromDe, ["reason"] = x.Reason, ["reasonDe"] = x.ReasonDe,
                         ["pointerChecks"] = new JsonArray(x.PointerChecks.Select(p => (JsonNode)p).ToArray()),
                         ["indexes"] = new JsonArray(x.Indexes.Select(p => (JsonNode)new JsonObject { ["var"] = p.Var, ["path"] = p.Path }).ToArray())
                     }).ToArray());
