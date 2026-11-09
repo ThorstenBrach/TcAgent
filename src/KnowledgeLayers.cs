@@ -55,11 +55,12 @@ public static class KnowledgeLayers
     static string SettingsFile => Path.Combine(UserRoot, "settings.json");
 
     /// <summary>Sets the variables of settings.json "env" in this process where the environment does not set them already.</summary>
-    public static void ApplySettingsEnv()
+    public static void ApplySettingsEnv(string settingsFile = null)
     {
         try
         {
-            if (!File.Exists(SettingsFile) || JsonNode.Parse(File.ReadAllText(SettingsFile))?["env"] is not JsonObject env) return;
+            var sf = settingsFile ?? SettingsFile;
+            if (!File.Exists(sf) || JsonNode.Parse(File.ReadAllText(sf))?["env"] is not JsonObject env) return;
             foreach (var (k, v) in env)
                 if (v != null && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(k))) { Environment.SetEnvironmentVariable(k, v.ToString()); fromSettings.Add(k); }
         }
@@ -71,11 +72,12 @@ public static class KnowledgeLayers
 
     /// <summary>settings.json read again (Reload.cs): changed values take effect, removed ones go; what the environment set
     /// itself stays. Returns what changed ("TCAGENT_TEAM: D:\old → D:\new").</summary>
-    public static List<string> ReloadSettingsEnv()
+    public static List<string> ReloadSettingsEnv(string settingsFile = null)
     {
         var changes = new List<string>();
         JsonObject env = null;
-        try { if (File.Exists(SettingsFile)) env = JsonNode.Parse(File.ReadAllText(SettingsFile))?["env"] as JsonObject; }
+        var sf = settingsFile ?? SettingsFile;
+        try { if (File.Exists(sf)) env = JsonNode.Parse(File.ReadAllText(sf))?["env"] as JsonObject; }
         catch (Exception ex) { changes.Add("settings.json is invalid - kept the old values: " + ex.Message); return changes; }
         env ??= new JsonObject();
         foreach (var k in fromSettings.ToList())
