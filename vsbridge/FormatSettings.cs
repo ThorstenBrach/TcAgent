@@ -697,6 +697,65 @@ namespace TcAgentBridge
                                   rows.Where(x => current[x.Key] != x.Default).Select(x => x.Key + " = " + current[x.Key]).ToList());
             };
             undo.Click += (s, e) => { foreach (var k in loaded.Keys.ToList()) current[k] = loaded[k]; profile.SelectedIndex = 0; changed(); };
+
+            // ---- export and import: a formatting.json to pass on, or one to take over into the window
+            var export = new Button { Content = T("Export …", "Exportieren …"), Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(6, 0, 0, 0),
+                                      ToolTip = T("Saves the rules as they are set in this window as a formatting.json file - for a colleague, a team or another project",
+                                                  "Speichert die Regeln, wie sie in diesem Fenster eingestellt sind, als formatting.json - für Kollegen, ein Team oder ein anderes Projekt") };
+            var import = new Button { Content = T("Import …", "Importieren …"), Padding = new Thickness(10, 3, 10, 3), Margin = new Thickness(6, 0, 0, 0),
+                                      ToolTip = T("Takes the rules of a formatting.json into this window (locked rules stay); Save writes them into the chosen level",
+                                                  "Übernimmt die Regeln einer formatting.json in dieses Fenster (gesperrte Regeln bleiben); Speichern schreibt sie in die gewählte Ebene") };
+            if (wish.Parent is DockPanel wbar)
+            {
+                DockPanel.SetDock(export, Dock.Left); DockPanel.SetDock(import, Dock.Left);
+                wbar.Children.Insert(wbar.Children.IndexOf(wish) + 1, export);
+                wbar.Children.Insert(wbar.Children.IndexOf(export) + 1, import);
+            }
+            export.Click += (s, e) =>
+            {
+                var dlg = new Microsoft.Win32.SaveFileDialog { FileName = "formatting.json", Filter = "formatting.json|*.json", Title = T("Export the formatter rules", "Formatierer-Regeln exportieren") };
+                if (dlg.ShowDialog(w) != true) return;
+                try
+                {
+                    var all = rows.ToDictionary(x => x.Key, x => (object)(int.TryParse(current[x.Key], out var n) ? (object)n : current[x.Key] == "true" ? (object)true : current[x.Key] == "false" ? (object)false : current[x.Key]));
+                    var json = new JavaScriptSerializer().Serialize(new Dictionary<string, object> { ["rules"] = all });
+                    // one rule per line, readable and easy to compare
+                    json = json.Replace("{\"rules\":{", "{\n  \"rules\": {\n    ").Replace(",\"", ",\n    \"").Replace("}}", "\n  }\n}\n");
+                    File.WriteAllText(dlg.FileName, json, new UTF8Encoding(false));
+                    statusLeft.Text = "✓ " + T("Exported: ", "Exportiert: ") + dlg.FileName;
+                }
+                catch (Exception ex) { FormatMessage(T("The rules were not exported:", "Die Regeln wurden nicht exportiert:") + "\n\n" + ex.Message, true); }
+            };
+            import.Click += (s, e) =>
+            {
+                var dlg = new Microsoft.Win32.OpenFileDialog { Filter = "formatting.json|*.json|*.*|*.*", Title = T("Import formatter rules", "Formatierer-Regeln importieren") };
+                if (dlg.ShowDialog(w) != true) return;
+                try
+                {
+                    var doc = FmtJson(File.ReadAllText(dlg.FileName));
+                    int taken = 0, kept = 0;
+                    var unknown = new List<string>();
+                    // a profile first, then the single rules - as on a knowledge level
+                    if (FmtStr(doc, "profile") is string prof && profiles?.TryGetValue(prof, out var pobj) == true && pobj is Dictionary<string, object> pv)
+                        foreach (var rr in rows) if (pv.TryGetValue(rr.Key, out var v) && v != null) { if (rr.Locked != null) kept++; else { current[rr.Key] = v.ToString(); taken++; } }
+                    if (doc.TryGetValue("rules", out var ro) && ro is Dictionary<string, object> rules2)
+                        foreach (var kv in rules2)
+                        {
+                            var rr = rows.FirstOrDefault(x => x.Key.Equals(kv.Key, StringComparison.OrdinalIgnoreCase));
+                            if (rr == null) { unknown.Add(kv.Key); continue; }
+                            if (rr.Locked != null) { kept++; continue; }
+                            var v = kv.Value is bool bv ? (bv ? "true" : "false") : kv.Value?.ToString() ?? "";
+                            if (v == "unset") v = rr.Default;
+                            current[rr.Key] = v; taken++;
+                        }
+                    profile.SelectedIndex = 0;
+                    changed();
+                    statusLeft.Text = "✓ " + T($"{taken} rule(s) taken over", $"{taken} Regel(n) übernommen") + (kept > 0 ? T($", {kept} locked ones kept", $", {kept} gesperrte behalten") : "")
+                                      + T(" – Save writes them into the chosen level", " – Speichern schreibt sie in die gewählte Ebene");
+                    if (unknown.Count > 0) FormatMessage(T("Unknown rules in the file, not taken over:", "Unbekannte Regeln in der Datei, nicht übernommen:") + "\n\n" + string.Join("\n", unknown), true);
+                }
+                catch (Exception ex) { FormatMessage(T("The file could not be read:", "Die Datei konnte nicht gelesen werden:") + "\n\n" + ex.Message, true); }
+            };
             save.Click += async (s, e) =>
             {
                 var diff = current.Where(k => k.Value != loaded[k.Key]).ToDictionary(k => k.Key, k => (object)k.Value);

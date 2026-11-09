@@ -5,6 +5,7 @@
 //       formats the text from stdin (UTF-8) and writes it to stdout; --json: {ok, changed, text, error, notes, part}
 //   TcAgent.exe format --file <file.st> [--write] [--check] ...   a plain-text file: print it, write it back, or only check it
 //   TcAgent.exe format --show-rules [--solution <sln>] [--json]   the effective rules and the level each one comes from
+//   TcAgent.exe format --export <file.json> [--solution <sln>]    the effective rules as one formatting.json (to pass on, import)
 //   TcAgent.exe format --examples --markdown | --json             an example for every rule (docs/FORMATTER_EXAMPLES.md, the window)
 //   TcAgent.exe format --save <changes.json> --level user|project|team|company [--solution <sln>]   writes rules into the
 //       formatting.json of that level (backup first); a rule set to "unset" is removed there - the settings window of the IDE
@@ -21,7 +22,7 @@ public static class CliFormat
 {
     public static int Run(string[] args)
     {
-        string solution = null, rules = null, file = null, part = null, save = null, level = null;
+        string solution = null, rules = null, file = null, part = null, save = null, level = null, export = null;
         bool stdin = false, json = false, write = false, check = false, show = false, tokens = false;
         try
         {
@@ -41,6 +42,7 @@ public static class CliFormat
                     case "--check": check = true; break;
                     case "--show-rules": show = true; break;
                     case "--save": save = V(); break;
+                    case "--export": export = V(); break;
                     case "--level": level = V(); break;
                     case "--examples":
                         Console.OutputEncoding = new UTF8Encoding(false);
@@ -60,7 +62,7 @@ public static class CliFormat
                     default: throw new ArgumentException("unknown option " + args[i]);
                 }
             }
-            if (!stdin && file == null && !show && save == null) throw new ArgumentException("--stdin, --file, --show-rules or --save is required");
+            if (!stdin && file == null && !show && save == null && export == null) throw new ArgumentException("--stdin, --file, --show-rules, --export or --save is required");
         }
         catch (ArgumentException ex)
         {
@@ -76,6 +78,19 @@ public static class CliFormat
         // the comments of the enum values of the project, for comment.case-labels
         if (dir != null && cfg["comment.case-labels"].Equals("enum", StringComparison.OrdinalIgnoreCase)) cfg.EnumComments = StEnums.Read(dir);
 
+        if (export != null)
+        {
+            // the effective rules of the solution as one formatting.json - to pass on or to import elsewhere
+            var all = new JsonObject();
+            foreach (var r in StFormatConfig.Rules)
+            {
+                var v = cfg[r.Key];
+                all[r.Key] = int.TryParse(v, out var n) ? JsonValue.Create(n) : v is "true" or "false" ? JsonValue.Create(v == "true") : JsonValue.Create(v);
+            }
+            File.WriteAllText(export, new JsonObject { ["rules"] = all }.ToJsonString(new System.Text.Json.JsonSerializerOptions { WriteIndented = true }) + "\n", new UTF8Encoding(false));
+            Console.WriteLine($"{StFormatConfig.Rules.Length} rules exported to {export}");
+            return Cli.Ok;
+        }
         if (save != null)
         {
             try { Console.WriteLine(Save(save, level ?? "project", dir)); return Cli.Ok; }

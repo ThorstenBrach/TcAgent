@@ -27,6 +27,8 @@ shows the selected rule: the code as written and the result for every value, wit
 
 The window speaks German when the TcAgent Chat answers in German (or, without a set answer language, Windows is German), English otherwise; values are shown in plain words ("keep as written" for `preserve`, "UPPER CASE" for `upper` …), `formatting.json` keeps the short keys.
 
+**Export …** saves the rules as they are set in the window as a `formatting.json` (all rules, one per line) - for a colleague, a team or another project; **Import …** takes such a file into the window (locked rules stay, unknown ones are named) and **Save** writes it into the chosen level. On the command line: `TcAgent.exe format --export <file.json> --solution <sln>`.
+
 **Wish a rule or feature ...** opens a new issue on GitHub with the example of the preview: what the code looks like, what the
 formatter makes of it today, and a place for what you would like instead. Check it in the browser, remove names of customers
 or plants, and send it yourself.
