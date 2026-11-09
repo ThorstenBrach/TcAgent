@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+## [0.54.0] – 2026-11-09
+
+The built-in knowledge in this version is TcAgent_Knowledge 1.1.0 (unchanged).
+
 ### Added
 - **Inline-Logic-View (Ctrl+Alt+B)** - the condition under the cursor (IF, ELSIF, WHILE, UNTIL, a boolean
   assignment, also in a CASE branch) as a logic diagram: lamps with names and declaration comments, gates with
@@ -75,6 +79,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **An example for every formatter rule:** the code as written and the result for each value, made by the formatter itself
   (`TcAgent.exe format --examples`) - in [docs/FORMATTER_EXAMPLES.md](docs/FORMATTER_EXAMPLES.md) (a test keeps it current)
   and in the details of a rule in the settings window.
+
+### Fixed
+- **Selected rows in the dark theme** (TcUnit Tests, Knowledge window, settings windows) were hard to read; they now take the
+  colors of the VS theme.
+- **The prompt list** (/ in the chat) opened too low the first time; it has its full height at once.
 
 ## [0.53.0] – 2026-11-08
 
@@ -997,7 +1006,10 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.51.0...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.54.0...HEAD
+[0.54.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.53.0...v0.54.0
+[0.53.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.52.0...v0.53.0
+[0.52.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.51.0...v0.52.0
 [0.51.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.50.0...v0.51.0
 [0.50.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.48.2...v0.50.0
 [0.48.2]: https://github.com/ThorstenBrach/TcAgent/compare/v0.48.1...v0.48.2
