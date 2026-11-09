@@ -1,4 +1,4 @@
-<p align="center"><img src="docs/img/icon.png" width="96" alt="TcAgent"></p>
+<p><img src="docs/img/icon.png" width="96" alt="TcAgent"></p>
 
 <h1 align="center">TcAgent – TwinCAT 3 for AI coding agents</h1>
 
@@ -27,7 +27,7 @@ read and write PLC code, check and build, navigate, look up library APIs, config
 TcAgent does not stop at generating code. The agent works through the whole job in your IDE, and TcAgent holds it to your rules:
 a workflow only goes on when its checkpoint is proven, and nothing reaches a PLC without a clean build, an allowed target and your confirmation.
 
-<p align="center"><img src="docs/img/workflow-steps.svg" width="900" alt="The whole job in seven steps: understand, plan, implement, build, test, review, deploy. TcAgent enforces checkpoints at plan, build and deploy, and lessons, rules and skills stay for the next job."></p>
+<p><img src="docs/img/workflow-steps.svg" width="900" alt="The whole job in seven steps: understand, plan, implement, build, test, review, deploy. TcAgent enforces checkpoints at plan, build and deploy, and lessons, rules and skills stay for the next job."></p>
 
 | Step | What the agent does | With |
 |---|---|---|
@@ -48,7 +48,7 @@ The job does not end when the code is on the PLC. The **Advisor** stays with the
 advises, it never changes the project or the PLC. Each finding comes with evidence and a ready order; you rate it, and
 **Act on it** hands the order to an agent that works through the steps above.
 
-<p align="center"><img src="docs/img/advisor-phases.svg" width="900" alt="The Advisor goes with the plant from development to operation: Advisor Shadow at night in the pipeline, Advisor Live at commissioning and in operation. It reads and advises, it changes nothing."></p>
+<p><img src="docs/img/advisor-phases.svg" width="900" alt="The Advisor goes with the plant from development to operation: Advisor Shadow at night in the pipeline, Advisor Live at commissioning and in operation. It reads and advises, it changes nothing."></p>
 
 | Phase | The Advisor | Started by |
 |---|---|---|
@@ -179,7 +179,7 @@ switched off in **⋯ > About TcAgent**, or for everybody on the company level: 
 
 ## How it works
 
-<p align="center"><img src="docs/img/architecture.svg" width="900" alt="Architecture: AI clients talk MCP to TcAgent; TcAgent drives Visual Studio via COM, the TcAgentBridge extension via a named pipe and the runtime via ADS"></p>
+<p><img src="docs/img/architecture.svg" width="900" alt="Architecture: AI clients talk MCP to TcAgent; TcAgent drives Visual Studio via COM, the TcAgentBridge extension via a named pipe and the runtime via ADS"></p>
 
 * **TcAgent** (`src/`) – MCP server (.NET 8). Drives the IDE through the TwinCAT Automation Interface and the runtime through ADS.
 * **TcAgentBridge** (`vsbridge/`) – Visual Studio extension inside the IDE process. Provides what is not reachable from
@@ -214,7 +214,7 @@ Everything TcAgent learns about your project and your way of working lives in pl
 (built-in, company, you, team, platform, project), so the company standard, your personal style, your team, the automation
 framework and the project's conventions (in Git) work together:
 
-<p align="center"><img src="docs/img/knowledge-files.svg" width="900" alt="Where TcAgent keeps coding rules, risk rules, skills, workflows, prompts, lessons learned, reference sources and manual templates on six levels from built-in to project, and the files that are not layered"></p>
+<p><img src="docs/img/knowledge-files.svg" width="900" alt="Where TcAgent keeps coding rules, risk rules, skills, workflows, prompts, lessons learned, reference sources and manual templates on six levels from built-in to project, and the files that are not layered"></p>
 
 ## Knowledge window
 
@@ -225,7 +225,7 @@ up in, the agent's feedback reports, the workflow history – and backups of the
 every change. New, add existing, rename, move to another level, switch off, delete, Git, install from a source, merge a
 newer version, propose a change upstream: all from the window, with the same menus in every tab.
 
-<p align="center"><img src="docs/img/knowledge/files.png" width="900" alt="The knowledge window, tab Files: every knowledge file of every level with its status; a skill from a Git source shows that it was changed locally"></p>
+<p><img src="docs/img/knowledge/files.png" width="900" alt="The knowledge window, tab Files: every knowledge file of every level with its status; a skill from a Git source shows that it was changed locally"></p>
 
 Every tab with screenshots: [User guide – The knowledge window](docs/USER_GUIDE.md#the-knowledge-window).
 

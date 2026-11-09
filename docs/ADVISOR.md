@@ -4,7 +4,7 @@ The Advisor is an agent that looks, advises and hands over a ready order – it 
 advice, rates it, and sends the order to an agent when it should be acted on. That agent then works as usual, with
 workflows, checkpoints and confirmations.
 
-<p align="center"><img src="img/advisor-phases.svg" width="900" alt="The Advisor goes with the plant from development to operation: Advisor Shadow at night in the pipeline, Advisor Live at commissioning and in operation. It reads and advises, it changes nothing."></p>
+<p><img src="img/advisor-phases.svg" width="900" alt="The Advisor goes with the plant from development to operation: Advisor Shadow at night in the pipeline, Advisor Live at commissioning and in operation. It reads and advises, it changes nothing."></p>
 
 | | Advisor Shadow | Advisor Live |
 |---|---|---|
@@ -47,7 +47,7 @@ Advice that stays unrated for 14 days no longer counts as open.
 
 ## Where you see it
 
-<p align="center"><img src="img/knowledge-tab-advisor.png" width="900" alt="The Advisor tab of the Knowledge window: advice with state, rating, kind and confidence"></p>
+<p><img src="img/knowledge-tab-advisor.png" width="900" alt="The Advisor tab of the Knowledge window: advice with state, rating, kind and confidence"></p>
 
 - **Knowledge window, tab Advisor:** the advice with its evidence, order and diff; one click to rate it; **Act on it …**
   opens the TcAgent Chat with the order in the input – you read it, change it and send it. The advice is then marked
