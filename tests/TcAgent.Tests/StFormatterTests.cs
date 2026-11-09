@@ -322,26 +322,23 @@ bLamp := (bEnable AND NOT bPhaseOff);";
     {
         var dir = Path.Combine(Path.GetTempPath(), "tcagent-reload-" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
-        var old = KnowledgeLayers.UserRootOverride;
         try
         {
-            KnowledgeLayers.UserRootOverride = dir;
             Environment.SetEnvironmentVariable("TCAGENT_TEST_FROM_ENV", "env");
             File.WriteAllText(Path.Combine(dir, "settings.json"), "{\"env\":{\"TCAGENT_TEST_RELOAD\":\"a\",\"TCAGENT_TEST_FROM_ENV\":\"file\"}}");
-            KnowledgeLayers.ApplySettingsEnv();
+            KnowledgeLayers.ApplySettingsEnv(Path.Combine(dir, "settings.json"));
             Assert.Equal("a", Environment.GetEnvironmentVariable("TCAGENT_TEST_RELOAD"));
             File.WriteAllText(Path.Combine(dir, "settings.json"), "{\"env\":{\"TCAGENT_TEST_RELOAD\":\"b\",\"TCAGENT_TEST_FROM_ENV\":\"file2\"}}");
-            var changes = KnowledgeLayers.ReloadSettingsEnv();
+            var changes = KnowledgeLayers.ReloadSettingsEnv(Path.Combine(dir, "settings.json"));
             Assert.Equal("b", Environment.GetEnvironmentVariable("TCAGENT_TEST_RELOAD"));
             Assert.Equal("env", Environment.GetEnvironmentVariable("TCAGENT_TEST_FROM_ENV"));    // the environment wins
             Assert.Contains(changes, c => c.StartsWith("TCAGENT_TEST_RELOAD"));
             File.WriteAllText(Path.Combine(dir, "settings.json"), "{\"env\":{}}");
-            KnowledgeLayers.ReloadSettingsEnv();
+            KnowledgeLayers.ReloadSettingsEnv(Path.Combine(dir, "settings.json"));
             Assert.Null(Environment.GetEnvironmentVariable("TCAGENT_TEST_RELOAD"));
         }
         finally
         {
-            KnowledgeLayers.UserRootOverride = old;
             Environment.SetEnvironmentVariable("TCAGENT_TEST_RELOAD", null);
             Environment.SetEnvironmentVariable("TCAGENT_TEST_FROM_ENV", null);
             Directory.Delete(dir, true);
