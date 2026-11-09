@@ -1,4 +1,4 @@
-// Read the settings again without a restart: the button "Reload settings" of the TcAgent Chat (or TcAgent.exe reload) writes
+// Read the settings again without a restart: the button "Reload" of the TcAgent settings window (or TcAgent.exe reload; saving there does it too) writes
 // %LOCALAPPDATA%\TcAgent\reload.signal; every running TcAgent MCP server on this PC sees it within two seconds and reads
 // settings.json ("env"), the policy (targets, mode), modules.json and the plugins again, mirrors the skills and tells its client
 // when its tool list changed (notifications/tools/list_changed). Each server writes what it did to reload.<pid>.json, which

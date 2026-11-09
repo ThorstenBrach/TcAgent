@@ -2051,7 +2051,7 @@ license keys in prompts or feedback reports.
 
 Set these in the `env` section of the client's MCP configuration (or via the parameters of `setup-clients.ps1`).
 
-**Changed a setting? No restart needed:** **⋯ > Reload settings** in the TcAgent Chat (or `TcAgent.exe reload`) makes every
+**Changed a setting? No restart needed:** **⟳ Reload** (F5) in the TcAgent settings window (or `TcAgent.exe reload`) makes every
 running TcAgent on this PC read `settings.json` ("env"), the allowed targets and the mode, `modules.json` and the plugins
 again within two seconds; the agent gets the new tool list at once, and the chat says what changed. A variable that the
 client's own MCP configuration sets still wins over `settings.json` - changing that configuration needs a restart of the
@@ -2096,7 +2096,7 @@ plain words, on the pages *General and mode*, *Target systems*, *Gates and confi
   window; the window says so.
 - The details below the list: what it does, the default, what applies now, the variable, whether a restart is needed.
 - **Save** writes `%LOCALAPPDATA%\TcAgent\settings.json` ("env") and the running TcAgent servers read it again at once
-  (as ⋯ > Reload settings). Turning off the confirmations or the build gate, or allowing targets by configuration,
+  (as **⟳ Reload**, which is for files changed outside the window). Turning off the confirmations or the build gate, or allowing targets by configuration,
   asks once more. Every change is written to the audit log.
 - **Export … / Import …** on the pages *General* and *Knowledge*: the saved settings as one JSON file.
 

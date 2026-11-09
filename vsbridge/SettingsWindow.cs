@@ -104,7 +104,11 @@ namespace TcAgentBridge
             var save = SetButton(T("Save", "Speichern"), T("Writes the changed settings into settings.json; the running servers read them again", "Schreibt die geänderten Einstellungen in settings.json; die laufenden Server lesen sie neu"), true);
             var close = SetButton(T("Close", "Schließen"), null); close.IsCancel = true; close.Margin = new Thickness(0);
             save.IsEnabled = undo.IsEnabled = false;
+            var reload = SetButton(T("⟳ Reload", "⟳ Neu laden"), T("Every running TcAgent reads settings.json, the target systems, the mode, modules.json and the plugins again, and the chat its backends - for files changed outside this window, no restart (F5)",
+                                                                     "Alle laufenden TcAgent-Server lesen settings.json, Zielsysteme, Modus, modules.json und Plugins neu, der Chat seine Backends - für Dateien, die außerhalb dieses Fensters geändert wurden, ohne Neustart (F5)"));
+            reload.Margin = new Thickness(0, 0, 12, 0);
             var bar = new DockPanel { Margin = new Thickness(12, 8, 12, 8), LastChildFill = true };
+            DockPanel.SetDock(reload, Dock.Left); bar.Children.Add(reload);
             foreach (var x in new UIElement[] { close, save, undo }) { DockPanel.SetDock(x, Dock.Right); bar.Children.Add(x); }
             bar.Children.Add(note);
             var barLine = new Border { BorderThickness = new Thickness(0, 1, 0, 0), Child = bar };
@@ -767,6 +771,27 @@ namespace TcAgentBridge
             search.TextChanged += (s, e) => Show();
             search.KeyDown += (s, e) => { if (e.Key == Key.Escape && search.Text.Length > 0) { search.Text = ""; e.Handled = true; } };
 
+            reload.Click += async (s, e) =>
+            {
+                if (busy) return;
+                if (rows.Any(r => r.Changed) && MessageBox.Show(w, T("Reload discards the changes that are not saved. Go on?", "Neu laden verwirft die nicht gespeicherten Änderungen. Weiter?"), T("TcAgent settings", "TcAgent-Einstellungen"),
+                                                                 MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+                busy = true; reload.IsEnabled = false; progress.Visibility = Visibility.Visible;
+                statusLeft.Text = T("Reading the settings again …", "Lese die Einstellungen neu …");
+                try
+                {
+                    ChatControl.Instance?.ReloadChatSettings();
+                    var lines = await ChatControl.ReloadServers();
+                    await Load();
+                    statusLeft.Text = lines.Count == 0
+                        ? T("Read again. No TcAgent server is running - the next question starts one with these settings.", "Neu geladen. Kein TcAgent-Server läuft gerade - die nächste Frage startet einen mit diesen Einstellungen.")
+                        : T("Read again - ", "Neu geladen - ") + string.Join(" · ", lines);
+                    statusLeft.ToolTip = string.Join("\n", lines);
+                }
+                catch (Exception ex) { MessageBox.Show(w, Inner(ex), T("TcAgent settings", "TcAgent-Einstellungen"), MessageBoxButton.OK, MessageBoxImage.Error); }
+                finally { busy = false; reload.IsEnabled = true; progress.Visibility = Visibility.Collapsed; Changed(); }
+            };
+            w.PreviewKeyDown += (s, e) => { if (e.Key == Key.F5) { reload.RaiseEvent(new RoutedEventArgs(Button.ClickEvent)); e.Handled = true; } };
             undo.Click += (s, e) => { foreach (var r in rows) r.Value = r.Original; Show(); Changed(); statusLeft.Text = T("Changes discarded", "Änderungen verworfen"); };
             save.Click += async (s, e) =>
             {
