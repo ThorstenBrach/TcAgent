@@ -15,6 +15,8 @@ The key can be changed or switched off: `"formatHotkey": "Ctrl+Alt+F"` (or `"off
 
 ## Settings with a preview
 
+<p align="center"><img src="img/formatter-settings.png" width="900" alt="Formatter settings: the rules grouped with value and level, the details of a rule and its example with the rules set in the window"></p>
+
 **Tools > Formatter settings (TcAgent) ...** (also **⋯ > Formatter settings …** in the TcAgent Chat and in the Knowledge window) lists every rule in plain words, grouped (a click on a heading folds the group), with its value and the level it comes
 from; **Search** (Ctrl+F) finds a rule by name, key or description, **Start from profile** puts the values of a profile into
 the window. The details of the selected rule say what it does, its values, the default and what applies now. Change a rule and

@@ -149,6 +149,12 @@ work without the extension. The extension runs **inside** the IDE process and ad
 
   <img src="img/chat/about.png" width="420" alt="About TcAgent: author, license, versions, components and the switches of the daily checks">
 
+- **The ⋯ menu** of the chat: what to send, the answer language, **TcAgent settings …** (every setting and the target
+  systems, see [The TcAgent settings window](#the-tcagent-settings-window)), shared folders, a new chat, the other windows,
+  setup and help.
+
+  <img src="img/chat/menu.png" width="200" alt="The ⋯ menu of the TcAgent Chat">
+
 - **Edit a prompt** – right-click it in the list. Your own prompt opens as it is. A built-in, company or team prompt stays unchanged:
   **Edit my copy** puts a copy into your folder (`%LOCALAPPDATA%\TcAgent\prompts\`), which replaces it for you.
 - **Reset TcAgent** – Knowledge window, **⋯ > Reset TcAgent**: back to a fresh installation, when levels, platforms, sources or plugins should be
@@ -1960,6 +1966,8 @@ without agreement.** The agent cannot widen the list - only you can.
 
 **In the IDE:** Tools > **TcAgent settings …** (or ⋯ > TcAgent settings … in the TcAgent Chat) > **Target systems**.
 
+<p align="center"><img src="img/settings/targets.png" width="820" alt="Target systems: this PC, a test rig taken over from the ADS routes and the user mode runtime, each released for writing"></p>
+
 | Column | Meaning |
 |---|---|
 | Status | ✓ released · ⏱ runs out (released for a time) · ○ read only · ⊘ expired (read only again) |
@@ -2090,6 +2098,16 @@ client.
 Tools > **TcAgent settings …** (also ⋯ in the TcAgent Chat and in the Knowledge window) shows every variable above in
 plain words, on the pages *General and mode*, *Target systems*, *Gates and confirmations*, *Knowledge and levels* and
 *Advanced* (plus a link to the Formatter settings). Search with Ctrl+F.
+
+<p align="center"><img src="img/settings/general.png" width="820" alt="TcAgent settings, page General and mode: each setting with value and origin, the details of the selected one"></p>
+
+<details><summary>The other pages</summary>
+
+<p align="center"><img src="img/settings/gates.png" width="820" alt="Page Gates and confirmations"></p>
+<p align="center"><img src="img/settings/knowledge.png" width="820" alt="Page Knowledge and levels: company, team and platform folders, additional rules and sources"></p>
+<p align="center"><img src="img/settings/advanced.png" width="820" alt="Page Advanced: plugins, skill copies, pinned solution, IDE assemblies, formatter debug folder"></p>
+
+</details>
 
 - Each setting shows its value and where it comes from: *default*, *saved (user)* - `settings.json` - or **⚠ set from
   outside** (a Windows environment variable or the MCP configuration of the chat). A value set from outside wins over the
