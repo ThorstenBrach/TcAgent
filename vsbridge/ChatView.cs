@@ -295,6 +295,8 @@ namespace TcAgentBridge
             foreach (var c in InstalledLanguages()) Language(Title(c), c.Name);
             menu.Items.Add(language);
             menu.Items.Add(Item("Shared folders …", ShowSharedFolders, "Folders the agent may read without asking"));
+            menu.Items.Add(Item("Reload settings", ReloadSettings,
+                                "Every running TcAgent reads settings.json, the targets and the mode, modules.json and the plugins again - no restart of the agent, the CLI or the MCP server"));
             menu.Items.Add(Item("New chat", () => clear.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), clear.ToolTip as string));
             menu.Items.Add(Item("Copy conversation", CopyConversation, "The questions and answers of this chat as text"));
             menu.Items.Add(new Separator());

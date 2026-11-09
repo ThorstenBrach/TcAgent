@@ -7,6 +7,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **Reload settings without a restart:** ⋯ > Reload settings in the TcAgent Chat (or `TcAgent.exe reload`) - every running TcAgent
+  reads settings.json, targets and mode, modules.json and the plugins again, the agent gets the new tool list, the chat says what changed.
 - **ST formatter:** Ctrl+Alt+F (or Tools > Format ST code (TcAgent)) formats the PLC object in the editor - indentation,
   case of keywords, spacing, aligned declarations, blank lines, long calls with one parameter per line, and brackets around
   AND groups inside OR so the order is visible. Declaration and implementation, also unsaved; Ctrl+Z takes it back.

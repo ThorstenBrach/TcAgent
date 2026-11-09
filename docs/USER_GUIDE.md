@@ -2007,6 +2007,12 @@ license keys in prompts or feedback reports.
 
 Set these in the `env` section of the client's MCP configuration (or via the parameters of `setup-clients.ps1`).
 
+**Changed a setting? No restart needed:** **⋯ > Reload settings** in the TcAgent Chat (or `TcAgent.exe reload`) makes every
+running TcAgent on this PC read `settings.json` ("env"), the allowed targets and the mode, `modules.json` and the plugins
+again within two seconds; the agent gets the new tool list at once, and the chat says what changed. A variable that the
+client's own MCP configuration sets still wins over `settings.json` - changing that configuration needs a restart of the
+client.
+
 | Variable | Default | Meaning |
 |---|---|---|
 | `TCAGENT_ALLOW_TARGETS` | `local` | AmsNetIds allowed for activation, online commands, runtime mode, ADS writes (comma-separated) |

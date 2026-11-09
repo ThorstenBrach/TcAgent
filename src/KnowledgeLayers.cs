@@ -61,9 +61,40 @@ public static class KnowledgeLayers
         {
             if (!File.Exists(SettingsFile) || JsonNode.Parse(File.ReadAllText(SettingsFile))?["env"] is not JsonObject env) return;
             foreach (var (k, v) in env)
-                if (v != null && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(k))) Environment.SetEnvironmentVariable(k, v.ToString());
+                if (v != null && string.IsNullOrEmpty(Environment.GetEnvironmentVariable(k))) { Environment.SetEnvironmentVariable(k, v.ToString()); fromSettings.Add(k); }
         }
         catch { }
+    }
+
+    /// <summary>The variables this process took from settings.json (the others come from the environment and stay).</summary>
+    static readonly HashSet<string> fromSettings = new(StringComparer.OrdinalIgnoreCase);
+
+    /// <summary>settings.json read again (Reload.cs): changed values take effect, removed ones go; what the environment set
+    /// itself stays. Returns what changed ("TCAGENT_TEAM: D:\old → D:\new").</summary>
+    public static List<string> ReloadSettingsEnv()
+    {
+        var changes = new List<string>();
+        JsonObject env = null;
+        try { if (File.Exists(SettingsFile)) env = JsonNode.Parse(File.ReadAllText(SettingsFile))?["env"] as JsonObject; }
+        catch (Exception ex) { changes.Add("settings.json is invalid - kept the old values: " + ex.Message); return changes; }
+        env ??= new JsonObject();
+        foreach (var k in fromSettings.ToList())
+            if (!env.ContainsKey(k))
+            {
+                changes.Add($"{k}: removed");
+                Environment.SetEnvironmentVariable(k, null);
+                fromSettings.Remove(k);
+            }
+        foreach (var (k, v) in env)
+        {
+            if (v == null) continue;
+            var now = Environment.GetEnvironmentVariable(k);
+            if (!string.IsNullOrEmpty(now) && !fromSettings.Contains(k)) continue;     // the environment wins
+            if (now != v.ToString()) changes.Add($"{k}: {(string.IsNullOrEmpty(now) ? "(not set)" : now)} → {v}");
+            Environment.SetEnvironmentVariable(k, v.ToString());
+            fromSettings.Add(k);
+        }
+        return changes;
     }
 
     /// <summary>A setting of settings.json "env" (empty value removes it); also applied to this process. Returns the file.</summary>

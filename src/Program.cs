@@ -40,9 +40,27 @@ public static class Program
         var sta = new StaWorker();
         var tools = new ToolRegistry(new TwinCatSession(sta)) { UseModules = true };   // modules.json and plugins (Modules.cs, Plugins.cs)
 
+        // "Reload settings" (Reload.cs): checked every two seconds while idle and before every request
+        var gate = new object();
+        Reload.Start();
+        void ReloadIfAsked()
+        {
+            if (!Reload.Pending()) return;
+            try { Reload.Report(tools.ReloadSettings()); } catch (Exception ex) { Log.Error("Reload: " + ex.Message); Reload.Report(new List<string> { "failed: " + ex.Message }); }
+        }
+        using var reloadTimer = new System.Threading.Timer(_ =>
+        {
+            if (!System.Threading.Monitor.TryEnter(gate)) return;      // a request is running: it checks itself before the next one
+            try { ReloadIfAsked(); } finally { System.Threading.Monitor.Exit(gate); }
+        }, null, 2000, 2000);
+
         string line;
         while ((line = Mcp.Next()) != null)
         {
+            System.Threading.Monitor.Enter(gate);     // a reload never runs during a request
+            try
+            {
+            ReloadIfAsked();
             line = line.TrimStart((char)0xFEFF);          // a client that writes a byte order mark first (e.g. .NET Framework stdin)
             if (string.IsNullOrWhiteSpace(line)) continue;
             JsonObject req;
@@ -96,6 +114,8 @@ public static class Program
             var resp = new JsonObject { ["jsonrpc"] = "2.0", ["id"] = id };
             if (error != null) resp["error"] = error; else resp["result"] = result;
             Mcp.Send(resp);
+            }
+            finally { System.Threading.Monitor.Exit(gate); }
         }
         sta.Dispose();
         return 0;

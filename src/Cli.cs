@@ -31,7 +31,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "about" or "shared" or "reset" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" or "advise" or "format" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "about" or "shared" or "reset" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" or "advise" or "format" or "reload" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -69,6 +69,8 @@ public static partial class Cli
         if (args[0].Equals("prompts", StringComparison.OrdinalIgnoreCase)) return Prompts.RunCli(args);   // Prompts.cs - files only, the list for the chat
         if (args[0].Equals("advise", StringComparison.OrdinalIgnoreCase)) return CliAdvisor.Run(args);    // CliAdvisor.cs - Advisor Shadow, its record
         if (args[0].Equals("format", StringComparison.OrdinalIgnoreCase)) return CliFormat.Run(args);     // CliFormat.cs - the ST formatter, files only
+        if (args[0].Equals("reload", StringComparison.OrdinalIgnoreCase))                                  // Reload.cs - running servers read their settings again
+        { Console.WriteLine("Asked every running TcAgent server to read its settings again (" + Reload.Request() + ")."); return Ok; }
         // the elevated part of tc_packages_change (Packages.cs), started by TcAgent itself through the UAC prompt
         if (args[0].Equals("tcpkg-elevated", StringComparison.Ordinal)) return ToolRegistry.RunElevatedTcpkg(args);
         Options o;
@@ -983,6 +985,8 @@ public static partial class Cli
   TcAgent.exe advise [run] --solution <sln> [--trigger nightly|commit|pipeline] [--since ""24 hours ago""] [--results <dir>] [--minutes 15]
       Advisor Shadow: the AI client of the chat (Claude Code for now) reads the project without a window and records advice
       with an order in .tcagent\advisor - it changes nothing (TCAGENT_MODE=ask). --dry-run prints the prompt only.
+  TcAgent.exe reload
+      Every running TcAgent server on this PC reads settings.json, targets and mode, modules.json and plugins again.
   TcAgent.exe advise list|stats|rate --solution <sln> [--open] [--json] [--id AD-... --rating right|partly|wrong|n/a]
       The advice of the project, the hit rate per kind of task, a rating.
       rate, acted, done and delete take several ids at once: --id AD-1,AD-2.
