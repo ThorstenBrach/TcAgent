@@ -708,7 +708,8 @@ alone if the IDE is too slow for the cross-references.
 ### `tc_condition`
 
 A condition as logic, without the IDE: its sub-conditions, when it is true (prime implicants, `-` = any) and rewrites that
-mean exactly the same - De Morgan (NOT inward / outward), simplify, write out in full, `= TRUE` uniform or removed - each
+mean exactly the same - De Morgan (NOT inward / outward), negated comparisons turned (`NOT (a < b)` → `a >= b`), simplify,
+write out in full, `= TRUE` uniform or removed - each
 proven over every combination of its sub-conditions (up to 20). A condition with a call is not simplified, one with
 `AND_THEN` / `OR_ELSE` not rewritten. Command line: `TcAgent.exe condition --text "IF a AND NOT (b OR c) THEN"`.
 

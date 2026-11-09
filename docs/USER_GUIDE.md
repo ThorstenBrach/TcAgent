@@ -684,6 +684,26 @@ history in the Inline-Scope.
 <p align="center"><img src="img/guide/inline-logic-view.png" width="744" alt="Inline-Logic-View of a nested IF condition, online"><br><sub>The Inline-Logic-View of a nested IF online: fulfilled operands and lines green, a dashed gate cannot be read yet, the line on top says the result.</sub></p>
 <p align="center"><img src="img/guide/inline-logic-view-code.png" width="744" alt="The same IF in the TwinCAT online view"><br><sub>The same condition in the TwinCAT editor online - the popup shows which part decides.</sub></p>
 
+### Condition window: rewrite it, truth table
+
+**⤢** in the Inline-Logic-View (or **Tools > Rewrite condition (TcAgent) ...** with the cursor in a condition) opens the
+condition window with three tabs:
+
+- **Rewrite** - the rewrites that mean exactly the same: NOT inward (De Morgan), NOT inward with the comparisons turned
+  (`NOT (a < b)` → `a >= b`), NOT outward, simplify, write out in full, `= TRUE` / `= FALSE` uniform or removed. Before and
+  after stand side by side in the look of the editor, laid out with the formatter rules of the project. Every rewrite is
+  **proven**: all combinations of the sub-conditions give the same result, and the code for the editor is read again and
+  checked. **Apply** replaces the condition in the editor in one step - **Ctrl+Z** takes it back. Comments inside the
+  condition are not in the rewrite (the window warns). A condition with a call is never simplified, one with `AND_THEN` /
+  `OR_ELSE` never rewritten; turning a comparison is exact for whole numbers, enums and BOOL - for REAL only a value that is
+  not a number (NaN) would compare differently, the window says so. In online mode the editor is read only: log out first.
+- **Truth table** - when the condition is TRUE, one row per group (`–` = any value), or every combination (up to 10
+  sub-conditions). Opened from the Inline-Logic-View online, the combination of now is marked. **Copy table** puts it on
+  the clipboard with tabs, for Excel or a test plan.
+- **Sub-conditions** - each one with its value now and where its variables come from.
+
+<p align="center"><img src="img/guide/condition-window.png" width="744" alt="Condition window, tab Rewrite"><br><sub>NOT inward with the comparisons turned: before and after, proven over all 1024 combinations, Apply writes it into the editor.</sub></p>
+<p align="center"><img src="img/guide/condition-window-table.png" width="744" alt="Condition window, tab Truth table"><br><sub>When it is TRUE: one row per group, the combination of now marked.</sub></p>
 ### Inline-Scope: the history of a variable
 
 **Alt+click** any variable in the code ("scopeClick" in `chat-backends.json`: Alt, Ctrl+Alt or off), put the cursor on one and press **Ctrl+Alt+T** ("scopeHotkey"), or click a
@@ -701,8 +721,8 @@ their range, enums as steps with their names; **+ Variable** adds more, one belo
 <p align="center"><img src="img/guide/inline-scope.png" width="744" alt="Inline-Scope of a sine signal over 5 seconds"><br><sub>... opens the Inline-Scope: the value over the last 5 s with its value axis, below the current value, min and max.</sub></p>
 
 The agent has the same as `tc_condition`, the command line as `TcAgent.exe condition --text "IF …"`: the sub-conditions,
-when the condition is true, and rewrites that mean exactly the same - De Morgan, simplify, write out in full, `= TRUE`
-uniform - each proven over every combination.
+when the condition is true, and rewrites that mean exactly the same - De Morgan, comparisons turned, simplify, write out
+in full, `= TRUE` uniform - each proven over every combination; `--layout` gives each rewrite as the code for the editor.
 
 ## Coding rules
 

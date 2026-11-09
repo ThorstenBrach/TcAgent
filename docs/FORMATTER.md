@@ -182,8 +182,9 @@ comparisons and comments. The defaults leave conditions as written; the profile 
   the line.
 - Tested on 66,618 sections of real projects with several combinations of the rules: everything formatted is stable on a
   second run, nothing changes its meaning.
-- Planned, not yet in the formatter: De Morgan (`NOT ( a OR b )` → `NOT a AND NOT b`) and making `= TRUE` uniform - these
-  change the expression and come with the *Conditions* feature (logic diagram, truth table, rewrites with a proof).
+- Not in the formatter: De Morgan (`NOT ( a OR b )` → `NOT a AND NOT b`), turning negated comparisons and making `= TRUE`
+  uniform change the expression - they are in the condition window (**Tools > Rewrite condition (TcAgent) ...** or ⤢ in the
+  Inline-Logic-View), each proven and laid out with these rules: [USER_GUIDE.md](USER_GUIDE.md#condition-window-rewrite-it-truth-table).
 
 ## formatting.json on the knowledge levels
 

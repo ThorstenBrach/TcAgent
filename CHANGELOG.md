@@ -6,6 +6,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+### Added
+- **Condition window: rewrite it, truth table** - ⤢ in the Inline-Logic-View or Tools > Rewrite condition (TcAgent) ...
+  Tab *Rewrite*: NOT inward (De Morgan), NOT inward with the comparisons turned (`NOT (a < b)` → `a >= b`), NOT outward,
+  simplify, write out in full, `= TRUE` uniform or removed - before and after in the look of the editor, laid out with the
+  formatter rules of the project, each proven over every combination and the code read again and checked; **Apply**
+  replaces the condition in the editor in one step (Ctrl+Z takes it back). Tab *Truth table*: when it is TRUE or every
+  combination (up to 10 sub-conditions), the combination of now marked, copy as a table. Tab *Sub-conditions*: value now
+  and where the variables come from. [docs/USER_GUIDE.md](docs/USER_GUIDE.md#condition-window-rewrite-it-truth-table)
+- **Tools menu:** Condition at the cursor (TcAgent) opens the Inline-Logic-View, Rewrite condition (TcAgent) ... the window.
+- `TcAgent.exe condition --layout`: each rewrite as the code that replaces the condition (`code`, checked again in
+  `codeChecked`), the whole truth table in `results`; `tc_condition` offers turned comparisons.
+
+### Fixed
+- A sign in a condition stays at its number (`fSine < -0.5`, was `< - 0.5`).
+- Format ST code: the clipboard is tried again for a second when another program holds it.
+
 ## [0.54.0] – 2026-11-09
 
 The built-in knowledge in this version is TcAgent_Knowledge 1.1.0 (unchanged).
