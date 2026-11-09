@@ -41,6 +41,16 @@ public static class StFormatter
             var after = StLexer.Lex(once);
             var a = StLexer.Significant(before, parens);
             var b = StLexer.Significant(after, parens);
+            // comment.decl-position moved comments: the code without comments is the same, and the same comments are there
+            if (inserted.Remove(MovedComments))
+            {
+                bool C(string x) => x.StartsWith("C:") || x.StartsWith("B:");
+                var ca = a.Where(C).OrderBy(x => x, StringComparer.Ordinal).ToList();
+                var cb = b.Where(C).OrderBy(x => x, StringComparer.Ordinal).ToList();
+                if (!ca.SequenceEqual(cb)) { r.Error = "safety net: moving the comments of declarations would lose or change one - nothing changed. Please report it (tc_feedback)."; return r; }
+                a = a.Where(x => !C(x)).ToList();
+                b = b.Where(x => !C(x)).ToList();
+            }
             // comments the formatter wrote itself (comment.case-labels) are the only allowed addition
             if (inserted.Count > 0)
             {
@@ -124,6 +134,7 @@ public static class StFormatter
         CaseWords(lines, cfg);
         if (part == StPart.Implementation) lines = Restructure(lines, cfg);
         Structure(lines, cfg, part);
+        if (part == StPart.Declaration && MoveDeclComments(lines, cfg)) inserted.Add(MovedComments);
         foreach (var l in lines) if (!l.Frozen && !l.Blank) Spacing(l, cfg, part);
         Indentation(lines, cfg);
         ExpandTabs(lines, cfg);
@@ -772,6 +783,47 @@ public static class StFormatter
             r.Add(Segment(target, start, target.P.Count, firstSeg, true));
         }
         return r;
+    }
+
+    // ------------------------------------------------------------------ comments of declarations: above or behind
+    const string MovedComments = "\u0001moved-comments";
+
+    /// <summary>comment.decl-position: above - a comment at the end of a declaration line goes on its own line above it;
+    /// behind - the one comment line right above a declaration goes to the end of its line. Only single-line comments, only
+    /// when the place is free (no comment there yet), never in a switched-off section. True when something moved.</summary>
+    static bool MoveDeclComments(List<Line> lines, StFormatConfig cfg)
+    {
+        string mode = cfg["comment.decl-position"].ToLowerInvariant();
+        if (mode is not ("above" or "behind")) return false;
+        bool moved = false;
+        bool Decl(Line l) => l != null && !l.Frozen && !l.Blank && !l.CommentOnly && !l.Cont && l.InBlock && DeclParts(l) is { } d && d.Semi > 0;
+        bool OneLine(StToken t) => t.Kind == StTok.LineComment || t.Kind == StTok.BlockComment && !t.Text.Contains('\n');
+        for (int i = 0; i < lines.Count; i++)
+        {
+            var l = lines[i];
+            if (!Decl(l)) continue;
+            var trailing = l.P.Count > 0 && l.P[^1].T.Comment && OneLine(l.P[^1].T) ? l.P[^1] : null;
+            var above = i > 0 ? lines[i - 1] : null;
+            bool commentAbove = above != null && !above.Frozen && above.CommentOnly && above.P.Count == 1 && above.P[0].T.Comment;
+            if (mode == "above" && trailing != null && !commentAbove)
+            {
+                l.P.RemoveAt(l.P.Count - 1);
+                var c = new Line { CommentOnly = true, Newline = l.Newline ?? DefaultNewline, Original = "", DepthHere = l.Depth, Depth = l.Depth };
+                c.P.Add(new Piece { T = trailing.T, Gap = "" });
+                lines.Insert(i, c);
+                i++;
+                moved = true;
+            }
+            else if (mode == "behind" && trailing == null && commentAbove && OneLine(above.P[0].T)
+                     && !(i > 1 && lines[i - 2].CommentOnly && !lines[i - 2].Blank))   // several comment lines stay above
+            {
+                l.P.Add(new Piece { T = above.P[0].T, Gap = " " });
+                lines.RemoveAt(i - 1);
+                i--;
+                moved = true;
+            }
+        }
+        return moved;
     }
 
     // ------------------------------------------------------------------ CASE branches: comments above the labels, blank lines

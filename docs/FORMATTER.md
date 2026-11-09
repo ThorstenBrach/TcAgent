@@ -79,6 +79,7 @@ Nothing is a fixed rule. The defaults (profile `twincat`) - **an example with be
 | `space.parens` | `preserve` | none, one, preserve - spaces inside `( )` and `[ ]` |
 | `space.keyword-paren` | `one` | `IF (`, `AND (`; or preserve |
 | `space.call-paren` | `none` | `F(x)`; or preserve |
+| `comment.decl-position` | `preserve` | `above`: the comment at the end of a declaration goes on its own line above it; `behind`: the one comment line right above a declaration goes to the end of its line (several comment lines stay above) |
 | `comment.case-labels` | `off` | `enum`: a comment above each CASE label that has none - the comment of the enum value from the DUTs of the project (end-of-line comment, `///` or `(* *)` above the value), otherwise the name of the value; numbers get none |
 | `comment.eol-spaces` | `preserve` | spaces before a comment at the end of a code line |
 | `layout.blocks` | `preserve` | `expand`: one statement per line, the bodies of IF, CASE, FOR, WHILE and REPEAT on their own lines |

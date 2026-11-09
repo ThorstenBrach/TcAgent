@@ -40,6 +40,7 @@ public static class StFormatExamples
         I("space.parens", "nX := ( nA + nB ) * (nC);", new[] { "none", "one", "preserve" }),
         I("space.keyword-paren", "bX := NOT(bA) AND(bB);", new[] { "one", "preserve" }),
         I("space.call-paren", "F_Sum (nA, nB);", new[] { "none", "preserve" }),
+        D("comment.decl-position", "VAR_INPUT\n  /// start the cycle\n  bStart : BOOL;\n  nParts : INT; // parts so far\nEND_VAR", new[] { "preserve", "above", "behind" }),
         I("comment.case-labels", CaseCode, new[] { "off", "enum" }),
         I("comment.eol-spaces", "nA := 1;// first\nnLonger := 22;    // second", new[] { "preserve", "1", "2" }),
         I("layout.blocks", "IF bStart THEN nCount := 0; bBusy := TRUE; END_IF", new[] { "expand", "preserve" }),
