@@ -52,6 +52,20 @@ public class SymbolResolveTests
     }
 
     [Fact]
+    public void EnumIndexAndMembersOfALibraryBase()
+    {
+        var idx = Project();
+        SymbolResolve.AddFile(idx, "<TcPlcObject><DUT Name=\"E_Band\"><Declaration><![CDATA[TYPE E_Band :\n(\n  OK := 1,\n  NOK,\n  REWORK := 16#10\n);\nEND_TYPE]]></Declaration></DUT></TcPlcObject>");
+        SymbolResolve.AddFile(idx, Pou("FB_Handling", "FUNCTION_BLOCK FB_Handling EXTENDS LibUnitBase\nVAR\n  bOwn : BOOL;\nEND_VAR"));
+        SymbolResolve.AddFile(idx, "<TcPlcObject><GVL Name=\"GVL_Line\"><Declaration><![CDATA[VAR_GLOBAL\n  aBands : ARRAY[1..20] OF FB_Handling;\n  fbHandling : FB_Handling;\nEND_VAR]]></Declaration></GVL></TcPlcObject>");
+        var o = Assert.Single(SymbolResolve.Operands(idx, "FB_Station", null, "MAIN.fbStation1", "aBands[E_Band.NOK].IsEmpty"));
+        Assert.Equal("GVL_Line.aBands[2].IsEmpty", o.Path);
+        Assert.Contains("LibUnitBase", o.From);
+        Assert.Equal("GVL_Line.aBands[16].bOwn", SymbolResolve.Operands(idx, "FB_Station", null, "MAIN.fbStation1", "aBands[E_Band.REWORK].bOwn")[0].Path);
+        Assert.Equal("GVL_Line.fbHandling.IsEmpty", SymbolResolve.Operands(idx, "FB_Station", null, "MAIN.fbStation1", "fbHandling.IsEmpty")[0].Path);
+    }
+
+    [Fact]
     public void CommentsOfDeclarationsComeAlong()
     {
         var d = SymbolResolve.ParseDecl("FUNCTION_BLOCK FB_X\nVAR\n  bError : BOOL; // collective fault\n  // door locked\n  bLocked : BOOL;\n  nCount : INT := 0; (* parts *)\n  bNone : BOOL;\nEND_VAR");

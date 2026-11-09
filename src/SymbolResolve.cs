@@ -22,6 +22,7 @@ public sealed class PouDecl
     public readonly Dictionary<string, VarDecl> Vars = new(StringComparer.OrdinalIgnoreCase);
     public readonly Dictionary<string, PouDecl> Methods = new(StringComparer.OrdinalIgnoreCase);
     public readonly Dictionary<string, bool> Properties = new(StringComparer.OrdinalIgnoreCase);   // name → readable online (monitoring attribute)
+    public readonly Dictionary<string, long> EnumValues = new(StringComparer.OrdinalIgnoreCase);    // an enum: value name → number
     public bool QualifiedOnly;
 }
 
@@ -120,6 +121,26 @@ public static class SymbolResolve
                 d.Kind = t.Skip(i).Any(x => x.Upper is "STRUCT" or "UNION") ? "STRUCT" : "ENUM";
                 int ext = t.FindIndex(i, x => x.Upper == "EXTENDS");
                 if (ext > 0 && ext + 1 < t.Count) d.Extends = Dotted(t, ext + 1);
+                if (d.Kind == "ENUM")
+                {
+                    // ( Name [:= number], ... ) - without a number: the one before plus 1
+                    int open = t.FindIndex(i, x => x.Text == "(");
+                    long next = 0;
+                    for (int q = open + 1; open > 0 && q < t.Count && t[q].Text != ")"; q++)
+                    {
+                        if (t[q].Kind != StTok.Word) continue;
+                        var nm = t[q].Text;
+                        if (q + 2 < t.Count && t[q + 1].Text == ":=")
+                        {
+                            bool neg = t[q + 2].Text == "-";
+                            var num = t[q + (neg ? 3 : 2)].Text.Replace("_", "");
+                            long v = num.Contains("#") ? Convert.ToInt64(num.Substring(num.IndexOf('#') + 1), num.StartsWith("16") ? 16 : num.StartsWith("8") ? 8 : num.StartsWith("2") ? 2 : 10) : long.TryParse(num, out var pv) ? pv : next;
+                            next = neg ? -v : v;
+                        }
+                        d.EnumValues[nm] = next++;
+                        while (q + 1 < t.Count && t[q + 1].Text is not ("," or ")")) q++;
+                    }
+                }
                 break;
             }
             if (w.Upper.StartsWith("VAR")) break;
@@ -173,6 +194,18 @@ public static class SymbolResolve
         for (var p = pou; p != null; p = Type(idx, p.Extends))
             if (p.Vars.TryGetValue(name, out var v)) { where = p; return v; }
         where = null;
+        return null;
+    }
+
+    /// <summary>An array index that is an enum value of the project (E_Idx.Value, or a value unique among the enums): its number.</summary>
+    static long? EnumIndex(ProjectIndex idx, List<StToken> toks)
+    {
+        if (toks.Count == 3 && toks[1].Text == "." && Type(idx, toks[0].Text) is { Kind: "ENUM" } en && en.EnumValues.TryGetValue(toks[2].Text, out var v)) return v;
+        if (toks.Count == 1 && toks[0].Kind == StTok.Word)
+        {
+            var hits = idx.Types.Values.Where(x => x.Kind == "ENUM" && x.EnumValues.ContainsKey(toks[0].Text)).Select(x => x.EnumValues[toks[0].Text]).Distinct().ToList();
+            if (hits.Count == 1) return hits[0];
+        }
         return null;
     }
 
@@ -347,9 +380,12 @@ public static class SymbolResolve
                 var idxText = Join(idxToks);
                 if (idxToks.All(z => z.Kind == StTok.Number || z.Text == ","))
                     path += "[" + idxText + "]";
+                else if (idxToks.Count == 3 && EnumIndex(idx, idxToks) is { } ev)
+                    path += "[" + ev + "]";            // an enum value of the project: its number
                 else if (idxToks.Count == 1 && idxToks[0].Kind == StTok.Word)
                 {
                     var iv = Resolve(idx, pouName, method, instance, idxToks, false);
+                    if (iv?.Path == null && EnumIndex(idx, idxToks) is { } ev1) { path += "[" + ev1 + "]"; var m1 = Regex.Match(inner, @"^ARRAY\s*\[.*?\]\s*OF\s+(.+)$", RegexOptions.IgnoreCase); typeName = m1.Success ? m1.Groups[1].Value.Trim() : null; k = close + 1; continue; }
                     if (iv?.Path == null) return No($"the index {idxText} cannot be read", $"der Index {idxText} kann nicht gelesen werden");
                     o.Indexes.Add((idxText, iv.Path));
                     path += "[{" + (o.Indexes.Count - 1) + "}]";
@@ -374,6 +410,12 @@ public static class SymbolResolve
                     if (mv == null && Property(idx, t2, name) is { } mon)
                     {
                         if (!mon) return No($"property {name} of {t2.Name} - readable online only with {{attribute 'monitoring' := 'call'}}", $"Property {name} von {t2.Name} - online nur lesbar mit {{attribute 'monitoring' := 'call'}}");
+                        path += "." + name; typeName = null; k += 2; continue;
+                    }
+                    if (mv == null && LibraryBase(idx, t2) is { } lib2)
+                    {
+                        // a member of a library base of the FB: read it, the read tells
+                        Note(o, $"{name} inherited from {lib2} (a library - not checked)", $"{name} geerbt von {lib2} (Bibliothek - nicht geprüft)");
                         path += "." + name; typeName = null; k += 2; continue;
                     }
                     if (mv == null && t2.Kind is "FUNCTION_BLOCK" or "STRUCT") return No($"{name} is not declared in {t2.Name}", $"{name} ist in {t2.Name} nicht deklariert");

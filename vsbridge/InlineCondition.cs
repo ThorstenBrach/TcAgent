@@ -531,6 +531,8 @@ namespace TcAgentBridge
                                     Child = new TextBlock { Text = res == true ? "TRUE" : res == false ? "FALSE" : "?", FontWeight = FontWeights.Bold, Foreground = res == true ? Green : res == false ? Red : online ? Grey : fore } };
             Canvas.SetLeft(pill, rx); Canvas.SetTop(pill, root.Y - 12); canvas.Children.Add(pill);
             canvas.Width = rx + 100;
+            result.MaxWidth = Math.Max(420, canvas.Width);       // the line on top wraps instead of widening the popup
+            foot.MaxWidth = result.MaxWidth;
             canvas.Height = top + leaves.Count * rowH;
             // the line on top: the result and what is missing
             if (live == null)
@@ -545,8 +547,8 @@ namespace TcAgentBridge
                 var missing = L(live, "missing").ToList();
                 var ways = live.TryGetValue("missing", out var mo) && mo is ArrayList ma ? ma.OfType<ArrayList>().Select(w => w.OfType<Dictionary<string, object>>().Select(x => (Atom: int.Parse(S(x, "atom")), Want: B(x, "want") == true)).ToList()).ToList() : new List<List<(int Atom, bool Want)>>();
                 string Atom(int i) => S(atomsS.ElementAtOrDefault(i), "text");
-                string Way(List<(int Atom, bool Want)> w) => string.Join(T(" and ", " und "), w.Select(x => Atom(x.Atom) + (x.Want ? "" : " = FALSE")));
-                result.Text = res == true ? "✓ TRUE" : res == false ? "✗ FALSE – " + T("missing: ", "es fehlt: ") + string.Join(T(" or ", " oder "), ways.Take(3).Select(Way))
+                string Way(List<(int Atom, bool Want)> w) => string.Join(T(" and ", " und "), w.Take(4).Select(x => Atom(x.Atom) + (x.Want ? "" : " = FALSE"))) + (w.Count > 4 ? T($" and {w.Count - 4} more", $" und {w.Count - 4} weitere") : "");
+                result.Text = res == true ? "✓ TRUE" : res == false ? "✗ FALSE – " + T("missing: ", "es fehlt: ") + string.Join(T(" or ", " oder "), ways.Take(2).Select(Way)) + (ways.Count > 2 ? T(" or …", " oder …") : "")
                             : "? " + T("unknown - a sub-condition cannot be read", "unbekannt - eine Teilbedingung ist nicht lesbar");
                 foot.Text = T("online", "online") + (string.IsNullOrEmpty(netId) ? "" : " · " + netId) + " · " + S(live, "time") + (paused ? T(" · frozen", " · eingefroren") : "")
                           + (S(live, "onlineProject") is string op ? " · " + op : "") + T(" · read only", " · nur lesen");
