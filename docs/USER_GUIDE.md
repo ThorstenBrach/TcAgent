@@ -702,8 +702,8 @@ condition window with three tabs:
   the clipboard with tabs, for Excel or a test plan.
 - **Sub-conditions** - each one with its value now and where its variables come from.
 
-<p align="center"><img src="img/guide/condition-window.png" width="744" alt="Condition window, tab Rewrite"><br><sub>NOT inward with the comparisons turned: before and after, proven over all 1024 combinations, Apply writes it into the editor.</sub></p>
-<p align="center"><img src="img/guide/condition-window-table.png" width="744" alt="Condition window, tab Truth table"><br><sub>When it is TRUE: one row per group, the combination of now marked.</sub></p>
+<p><img src="img/guide/condition-window.png" width="744" alt="Condition window, tab Rewrite"><br><sub>NOT inward with the comparisons turned: before and after, proven over all 1024 combinations, Apply writes it into the editor.</sub></p>
+<p><img src="img/guide/condition-window-table.png" width="744" alt="Condition window, tab Truth table"><br><sub>When it is TRUE: one row per group, the combination of now marked.</sub></p>
 ### Inline-Scope: the history of a variable
 
 **Alt+click** any variable in the code ("scopeClick" in `chat-backends.json`: Alt, Ctrl+Alt or off), put the cursor on one and press **Ctrl+Alt+T** ("scopeHotkey"), or click a
