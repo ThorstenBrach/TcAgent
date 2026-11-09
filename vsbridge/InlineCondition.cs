@@ -223,7 +223,7 @@ namespace TcAgentBridge
 
         ConditionPopup(BridgePackage pkg, System.Windows.Forms.Control editor, string exe, string sln, string cond, string pou, string method, int line, string netId)
         {
-            this.pkg = pkg; this.editor = editor; this.exe = exe; this.sln = sln; this.cond = cond; this.pou = pou; this.method = method; this.line = line; this.netId = netId;
+            this.pkg = pkg; this.editor = editor; this.exe = exe; this.sln = sln; this.cond = WithoutComments(cond); this.pou = pou; this.method = method; this.line = line; this.netId = netId;
             Icon = BridgePackage.AppIcon;
             WindowStyle = WindowStyle.None; ResizeMode = ResizeMode.NoResize; ShowInTaskbar = false; SizeToContent = SizeToContent.WidthAndHeight;
             try { Owner = Application.Current?.MainWindow; } catch { }
@@ -276,6 +276,23 @@ namespace TcAgentBridge
             try { Close(); } catch { }
             var ed = editor;
             Dispatcher.BeginInvoke(new Action(() => { try { if (ed != null && !ed.IsDisposed) ed.Focus(); } catch { } }), System.Windows.Threading.DispatcherPriority.Input);
+        }
+
+        /// <summary>The condition goes to TcAgent.exe on one command line: a // comment would swallow the rest, so comments go
+        /// (outside of strings), pragmas too.</summary>
+        static string WithoutComments(string s)
+        {
+            var sb = new StringBuilder();
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+                if (c == '\'' || c == '"') { int j = s.IndexOf(c, i + 1); if (j < 0) j = s.Length - 1; sb.Append(s, i, j - i + 1); i = j; continue; }
+                if (c == '/' && i + 1 < s.Length && s[i + 1] == '/') { while (i < s.Length && s[i] != '\n') i++; sb.Append('\n'); continue; }
+                if (c == '(' && i + 1 < s.Length && s[i + 1] == '*') { int j = s.IndexOf("*)", i + 2, StringComparison.Ordinal); i = j < 0 ? s.Length : j + 1; sb.Append(' '); continue; }
+                if (c == '{') { int j = s.IndexOf('}', i + 1); i = j < 0 ? s.Length : j; sb.Append(' '); continue; }
+                sb.Append(c);
+            }
+            return sb.ToString();
         }
 
         static string Q(string s) => "\"" + (s ?? "").Replace("\r", " ").Replace("\n", " ").Replace("\"", "\\\"") + "\"";
