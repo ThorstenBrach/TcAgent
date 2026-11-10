@@ -69,12 +69,26 @@ namespace TcAgentBridge
                 var sln = TcUnitControl.SolutionPath();
                 int changed = 0;
                 var offNotes = new List<string>();
+                string atCaret = null;
                 foreach (var (syn, part) in halves)
                 {
                     if (SafeGet(syn, "ReadOnly") is bool ro && ro) { said.Add(part + T(": read only (online?) - not formatted", ": schreibgeschützt (online?) - nicht formatiert")); continue; }
                     var text = SafeGet(syn, "Text") as string;
                     if (string.IsNullOrEmpty(text)) continue;
+                    // the caret line before formatting (the text moves afterwards): in the part with the focus, or the only part
+                    int caretLine = (halves.Count == 1 || syn.Focused || syn.ContainsFocus) && SafeGet(syn, "CaretLine") is int cl ? cl + 1 : 0;
                     var res = RunFormatter(exe, sln, part, text);
+                    // the caret stands in a section switched off in the code: say by which marker, else "already formatted" misleads
+                    if (caretLine > 0 && res.TryGetValue("off", out var offs) && offs is System.Collections.IEnumerable offList)
+                        foreach (var o in offList.OfType<Dictionary<string, object>>())
+                        {
+                            int from = o.TryGetValue("from", out var fv) && fv is int fi ? fi : 0, to = o.TryGetValue("to", out var tv) && tv is int ti ? ti : 0;
+                            if (from <= 0 || caretLine < from || to > 0 && caretLine > to) continue;
+                            var marker = o.TryGetValue("marker", out var mv) ? mv as string : "";
+                            atCaret = to == 0 ? T($"the formatter is switched off here: {marker} in line {from}, without 'on' up to the end", $"der Formatierer ist hier ausgeschaltet: {marker} in Zeile {from}, ohne 'on' bis zum Ende")
+                                              : T($"the formatter is switched off here: {marker} in line {from} (up to line {to})", $"der Formatierer ist hier ausgeschaltet: {marker} in Zeile {from} (bis Zeile {to})");
+                            break;
+                        }
                     // a "format off" without "on" after it: from there to the end nothing is formatted - say so, else "already formatted" misleads
                     if (res.TryGetValue("offToEnd", out var ote) && ote is int offLine && offLine > 0)
                         offNotes.Add(T($"{part}: switched off from line {offLine} to the end ('off' without 'on')", $"{(part == "declaration" ? "Deklaration" : "Implementierung")}: ab Zeile {offLine} bis zum Ende ausgeschaltet ('off' ohne 'on')"));
@@ -86,7 +100,8 @@ namespace TcAgentBridge
                 }
                 var msg = changed > 0 ? T($"TcAgent: formatted ({changed} part{(changed == 1 ? "" : "s")}) - Ctrl+Z takes it back", $"TcAgent: formatiert ({changed} Teil{(changed == 1 ? "" : "e")}) - Strg+Z nimmt es zurück")
                                       : T("TcAgent: already formatted", "TcAgent: bereits formatiert");
-                if (offNotes.Count > 0) msg += " - " + string.Join("; ", offNotes);
+                if (atCaret != null) msg = (changed > 0 ? T($"TcAgent: formatted ({changed} part{(changed == 1 ? "" : "s")}), but ", $"TcAgent: formatiert ({changed} Teil{(changed == 1 ? "" : "e")}), aber ") : "TcAgent: ") + atCaret;
+                else if (offNotes.Count > 0) msg += " - " + string.Join("; ", offNotes);
                 if (said.Count > 0) FormatMessage(T("Format ST code", "ST-Code formatieren") + "\n\n" + string.Join("\n", said), true);
                 SetStatus(msg);
                 Log(msg + (said.Count > 0 ? " | " + string.Join(" | ", said) : ""));

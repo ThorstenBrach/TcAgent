@@ -22,8 +22,18 @@ public sealed class StFormatResult
     public string Error;
     public readonly List<string> Notes = new();
     public StPart Part;
+    /// <summary>The sections switched off in the code (// tcagent-format: off ... on, next-line, file, the pragma form).</summary>
+    public readonly List<StOffSection> Off = new();
     /// <summary>The line (1-based) of a "format off" that is never switched on again: from there to the end nothing is formatted. 0: none.</summary>
-    public int OffToEnd;
+    public int OffToEnd => Off.FirstOrDefault(o => o.Kind == "off" && o.To == 0)?.From ?? 0;
+}
+
+/// <summary>Lines switched off in the code: From..To (1-based, To = 0: up to the end), the marker as written.</summary>
+public sealed class StOffSection
+{
+    public int From, To;
+    public string Marker, Kind;
+    public bool Contains(int line) => line >= From && (To == 0 || line <= To);
 }
 
 public static class StFormatter
@@ -38,7 +48,7 @@ public static class StFormatter
             if (part == StPart.Auto) part = Detect(before);
             r.Part = part;
             var inserted = new List<string>();
-            Freeze(before, out _, out r.OffToEnd);
+            Freeze(before, out _, r.Off);
             if (r.OffToEnd > 0) r.Notes.Add($"switched off from line {r.OffToEnd} to the end: there is no 'on' after the 'off'");
             var once = Core(before, cfg, part, r.Notes, out bool parens, inserted);
             // safety net 1: the meaning-carrying tokens are the same (brackets: checked on the trees in StExpr)
@@ -126,7 +136,7 @@ public static class StFormatter
     {
         parens = false;
         var toks = new List<StToken>(tokens);
-        var frozenTok = Freeze(toks, out bool wholeFile, out _);
+        var frozenTok = Freeze(toks, out bool wholeFile);
         if (wholeFile) { notes.Add("switched off for the whole text (tcagent-format: file)"); return StLexer.Join(tokens); }
         if (part == StPart.Implementation && cfg.Flag("paren.precedence"))
         {
@@ -184,11 +194,13 @@ public static class StFormatter
         return null;
     }
 
-    /// <summary>Per token: does it lie in a section that is switched off? (The marker lines themselves stay as they are.)</summary>
-    static bool[] Freeze(List<StToken> t, out bool wholeFile, out int offToEnd)
+    /// <summary>Per token: does it lie in a section that is switched off? (The marker lines themselves stay as they are.)
+    /// sections: the switched-off lines (1-based, To = 0: up to the end) with the marker that switched them off.</summary>
+    static bool[] Freeze(List<StToken> t, out bool wholeFile, List<StOffSection> sections = null)
     {
-        wholeFile = false; offToEnd = 0;
-        int line = 1, offLine = 0;
+        wholeFile = false;
+        int line = 1;
+        StOffSection open = null, nextSec = null;
         var f = new bool[t.Count];
         bool off = false, next = false;
         int lineStart = 0;
@@ -196,21 +208,21 @@ public static class StFormatter
         {
             if (i < t.Count && t[i].Kind != StTok.Newline) continue;
             // a line from lineStart to i (exclusive)
-            string m = null;
+            string m = null, mText = null;
             bool code = false;
-            for (int k = lineStart; k < i; k++) { m = Marker(t[k]) ?? m; if (!t[k].Trivia) code = true; }
-            if (m == "file") { wholeFile = true; return f; }
+            for (int k = lineStart; k < i; k++) { if (Marker(t[k]) is { } mk) { m = mk; mText = t[k].Text.Trim(); } if (!t[k].Trivia) code = true; }
+            if (m == "file") { wholeFile = true; sections?.Add(new StOffSection { From = line, To = 0, Marker = mText, Kind = "file" }); return f; }
             bool freezeLine = off || next || m != null;
-            if (m == "off" && !off) { off = true; offLine = line; }
-            if (m == "on") off = false;
-            if (next && code && m == null) next = false;
-            if (m == "next") next = true;
+            if (m == "off" && !off) { off = true; open = new StOffSection { From = line, Marker = mText, Kind = "off" }; sections?.Add(open); }
+            if (m == "on" && off) { off = false; open.To = line; open = null; }
+            if (next && code && m == null) { next = false; if (nextSec != null) nextSec.To = line; nextSec = null; }
+            if (m == "next" && !off) { next = true; nextSec = new StOffSection { From = line, Marker = mText, Kind = "next-line" }; sections?.Add(nextSec); }
             if (freezeLine) for (int k = lineStart; k < i; k++) f[k] = true;
             for (int k = lineStart; k < i; k++) line += t[k].Text.Count(c => c == '\n');   // a comment over several lines
             lineStart = i + 1;
             line++;
         }
-        if (off) offToEnd = offLine;
+        if (nextSec != null) nextSec.To = 0;
         return f;
     }
 

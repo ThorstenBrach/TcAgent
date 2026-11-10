@@ -102,6 +102,14 @@ public class StFormatterTests
         Assert.Equal(4, r.OffToEnd);
         Assert.Contains(r.Notes, n => n.Contains("line 4"));
         Assert.EndsWith("y:=2;\nIF a THEN\nz:=3;\nEND_IF", N(r.Text));
+        var sec = Assert.Single(r.Off);
+        Assert.Equal((4, 0, "{attribute 'tcagent.format' := 'off'}"), (sec.From, sec.To, sec.Marker));
+        Assert.True(sec.Contains(7));
+        // off ... on and next-line: the lines from the marker up to the on / the next line of code
+        var r2 = F("// tcagent-format: off\nx:=1;\n// tcagent-format: on\ny:=2;\n// tcagent-format: next-line\n\nz:=3;\nw:=4;", StPart.Implementation);
+        Assert.Equal(new[] { (1, 3, "off"), (5, 7, "next-line") }, r2.Off.Select(o => (o.From, o.To, o.Kind)).ToArray());
+        Assert.Equal(0, r2.OffToEnd);
+        Assert.False(r2.Off.Any(o => o.Contains(8)));
     }
 
     [Fact]

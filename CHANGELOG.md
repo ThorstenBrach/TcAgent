@@ -22,8 +22,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - A sign in a condition stays at its number (`fSine < -0.5`, was `< - 0.5`).
 - Condition window: a long nested condition is laid out over several lines with its inner groups further in, also when
   `cond.lines` is `preserve` (the rewrite had stayed one line of about 200 characters).
-- Format ST code: an `off` without `on` after it no longer looks like "already formatted" - the status bar says from which
-  line formatting is switched off (`format --json`: `offToEnd`).
+- Format ST code: when the cursor stands in a section switched off in the code, the status bar says so with the marker
+  and its line, instead of "already formatted"; an `off` without `on` is named too (`format --json`: `off`, `offToEnd`).
 - Format ST code: the clipboard is tried again for a second when another program holds it.
 
 ## [0.54.0] – 2026-11-09

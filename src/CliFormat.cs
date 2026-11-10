@@ -126,6 +126,7 @@ public static class CliFormat
             {
                 ["ok"] = res.Error == null, ["changed"] = res.Changed, ["text"] = res.Text, ["error"] = res.Error, ["part"] = res.Part.ToString().ToLowerInvariant(),
                 ["notes"] = new JsonArray(res.Notes.Concat(cfg.Notes).Select(n => (JsonNode)n).ToArray()), ["rulesFromFiles"] = cfg.FromFiles, ["offToEnd"] = res.OffToEnd,
+                ["off"] = new JsonArray(res.Off.Select(o => (JsonNode)new JsonObject { ["from"] = o.From, ["to"] = o.To, ["kind"] = o.Kind, ["marker"] = o.Marker }).ToArray()),
                 ["tokens"] = tokens ? Colored(res.Text) : null, ["inputTokens"] = tokens ? Colored(text) : null
             }.ToJsonString());
             return res.Error != null ? Cli.Infra : check && res.Changed ? Cli.Failed : Cli.Ok;
