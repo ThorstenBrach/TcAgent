@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Reflection;
 using System.Text;
 using System.Web.Script.Serialization;
 using Microsoft.VisualStudio.Shell.Interop;
@@ -139,6 +140,11 @@ namespace TcAgentBridge
             string clip = null;
             bool hadText = false;
             try { hadText = System.Windows.Forms.Clipboard.ContainsText(); if (hadText) clip = System.Windows.Forms.Clipboard.GetText(); } catch { }
+            // select all + paste are two entries in the editor's undo list (remove, insert): one compound action makes Ctrl+Z take it back at once
+            var undo = UndoManager(syn);
+            bool compound = false;
+            try { if (undo != null) { undo.GetType().GetMethod("BeginCompoundAction", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(undo, null); compound = true; } }
+            catch (Exception ex) { Log("Format: BeginCompoundAction: " + Inner(ex)); }
             try
             {
                 syn.Focus();
@@ -160,8 +166,23 @@ namespace TcAgentBridge
             }
             finally
             {
+                if (compound)
+                    try { undo.GetType().GetMethod("EndCompoundAction", BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance)?.Invoke(undo, null); }
+                    catch (Exception ex) { Log("Format: EndCompoundAction: " + Inner(ex)); }
                 try { if (hadText && clip != null) System.Windows.Forms.Clipboard.SetText(clip); else System.Windows.Forms.Clipboard.Clear(); } catch { }
             }
+        }
+
+        /// <summary>The undo list of the PLC editor (SynEdControl._buffer._undoMgr, in every TwinCAT build so far) - null when not found.</summary>
+        static object UndoManager(object syn)
+        {
+            object Field(object o, string name)
+            {
+                for (var t = o?.GetType(); t != null; t = t.BaseType)
+                    if (t.GetField(name, BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.Instance) is FieldInfo f) return f.GetValue(o);
+                return null;
+            }
+            try { return Field(Field(syn, "_buffer"), "_undoMgr"); } catch { return null; }
         }
 
         void SetStatus(string text)
