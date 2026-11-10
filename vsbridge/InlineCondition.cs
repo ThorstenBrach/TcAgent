@@ -214,7 +214,7 @@ namespace TcAgentBridge
             var title = new TextBlock { VerticalAlignment = VerticalAlignment.Center };
             title.Inlines.Add(new System.Windows.Documents.Run(Regex.Match(cond.TrimStart(), @"^\w+").Value.ToUpperInvariant()) { FontWeight = FontWeights.Bold, FontFamily = new FontFamily("Consolas") });
             title.Inlines.Add(new System.Windows.Documents.Run($"  {pou}{(method != null ? "." + method : "")} · {T("line", "Zeile")} {line}") { Foreground = Brushes.Gray });
-            Button Btn(string s, string tip, Action a) { var b = new Button { Content = s, ToolTip = tip, Padding = new Thickness(6, 0, 6, 0), Margin = new Thickness(2, 0, 0, 0), Background = Brushes.Transparent, BorderThickness = new Thickness(0) }; b.Click += (x, e) => a(); return b; }
+            Button Btn(string s, string tip, Action a) { var b = new Button { Content = s, ToolTip = tip, Padding = new Thickness(6, 0, 6, 0), Margin = new Thickness(2, 0, 0, 0), Background = Brushes.Transparent, BorderThickness = new Thickness(0) }; if (a != null) b.Click += (x, e) => a(); return b; }   // pin, pause and fold bring their own Click (a null here would end Visual Studio)
             var pause = Btn("⏸", T("Freeze the values", "Werte einfrieren"), null);
             pause.Click += (s, e) => { paused = !paused; pause.Content = paused ? "▶" : "⏸"; if (!paused && live != null) Draw(); };
             var pin = Btn("📌", T("Keep open when you click elsewhere", "Offen lassen, wenn du woanders klickst"), null);

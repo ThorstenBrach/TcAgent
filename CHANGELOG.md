@@ -19,6 +19,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `codeChecked`), the whole truth table in `results`; `tc_condition` offers turned comparisons.
 
 ### Fixed
+- Inline-Logic-View: 📌 (pin), ⏸ (freeze) and ⊟ (fold) no longer end Visual Studio - a click ran an empty action.
 - A sign in a condition stays at its number (`fSine < -0.5`, was `< - 0.5`).
 - Condition window: a long nested condition is laid out over several lines with its inner groups further in, also when
   `cond.lines` is `preserve` (the rewrite had stayed one line of about 200 characters).
