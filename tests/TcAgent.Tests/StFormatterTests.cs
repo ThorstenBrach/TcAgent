@@ -90,6 +90,18 @@ public class StFormatterTests
         Assert.Equal("{attribute 'tcagent.format' := 'off'}\nx:=1;\n{attribute 'tcagent.format' := 'on'}\ny := 2;", N(F(pragma, StPart.Implementation).Text));
         var whole = "// tcagent-format: file\nx:=1;";
         Assert.Equal(whole, F(whole, StPart.Implementation).Text);
+        Assert.Equal(0, F(pragma, StPart.Implementation).OffToEnd);
+    }
+
+    [Fact]
+    public void AnOffWithoutOnIsReportedWithItsLine()
+    {
+        // the rest of the part stays as it is - the editor must not just say "already formatted"
+        var src = "x:=1;\n(* two\nlines *)\n{attribute 'tcagent.format' := 'off'}\ny:=2;\nIF a THEN\nz:=3;\nEND_IF";
+        var r = F(src, StPart.Implementation);
+        Assert.Equal(4, r.OffToEnd);
+        Assert.Contains(r.Notes, n => n.Contains("line 4"));
+        Assert.EndsWith("y:=2;\nIF a THEN\nz:=3;\nEND_IF", N(r.Text));
     }
 
     [Fact]

@@ -22,6 +22,8 @@ public sealed class StFormatResult
     public string Error;
     public readonly List<string> Notes = new();
     public StPart Part;
+    /// <summary>The line (1-based) of a "format off" that is never switched on again: from there to the end nothing is formatted. 0: none.</summary>
+    public int OffToEnd;
 }
 
 public static class StFormatter
@@ -36,6 +38,8 @@ public static class StFormatter
             if (part == StPart.Auto) part = Detect(before);
             r.Part = part;
             var inserted = new List<string>();
+            Freeze(before, out _, out r.OffToEnd);
+            if (r.OffToEnd > 0) r.Notes.Add($"switched off from line {r.OffToEnd} to the end: there is no 'on' after the 'off'");
             var once = Core(before, cfg, part, r.Notes, out bool parens, inserted);
             // safety net 1: the meaning-carrying tokens are the same (brackets: checked on the trees in StExpr)
             var after = StLexer.Lex(once);
@@ -122,7 +126,7 @@ public static class StFormatter
     {
         parens = false;
         var toks = new List<StToken>(tokens);
-        var frozenTok = Freeze(toks, out bool wholeFile);
+        var frozenTok = Freeze(toks, out bool wholeFile, out _);
         if (wholeFile) { notes.Add("switched off for the whole text (tcagent-format: file)"); return StLexer.Join(tokens); }
         if (part == StPart.Implementation && cfg.Flag("paren.precedence"))
         {
@@ -181,9 +185,10 @@ public static class StFormatter
     }
 
     /// <summary>Per token: does it lie in a section that is switched off? (The marker lines themselves stay as they are.)</summary>
-    static bool[] Freeze(List<StToken> t, out bool wholeFile)
+    static bool[] Freeze(List<StToken> t, out bool wholeFile, out int offToEnd)
     {
-        wholeFile = false;
+        wholeFile = false; offToEnd = 0;
+        int line = 1, offLine = 0;
         var f = new bool[t.Count];
         bool off = false, next = false;
         int lineStart = 0;
@@ -196,13 +201,16 @@ public static class StFormatter
             for (int k = lineStart; k < i; k++) { m = Marker(t[k]) ?? m; if (!t[k].Trivia) code = true; }
             if (m == "file") { wholeFile = true; return f; }
             bool freezeLine = off || next || m != null;
-            if (m == "off") off = true;
+            if (m == "off" && !off) { off = true; offLine = line; }
             if (m == "on") off = false;
             if (next && code && m == null) next = false;
             if (m == "next") next = true;
             if (freezeLine) for (int k = lineStart; k < i; k++) f[k] = true;
+            for (int k = lineStart; k < i; k++) line += t[k].Text.Count(c => c == '\n');   // a comment over several lines
             lineStart = i + 1;
+            line++;
         }
+        if (off) offToEnd = offLine;
         return f;
     }
 

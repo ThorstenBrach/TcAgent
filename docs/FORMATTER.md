@@ -59,6 +59,8 @@ aTable : ARRAY[0..2] OF INT := [  1,  20, 300,
 
 `// tcagent-format: next-line` keeps the next line, `// tcagent-format: file` the whole part. The pragma form works in the
 declaration and the implementation without a compiler warning: `{attribute 'tcagent.format' := 'off'}` ... `'on'`.
+An `off` without an `on` after it switches formatting off up to the end of the part: the status bar of the editor then
+says from which line (`format --json`: `offToEnd`).
 The markers of other formatters are understood as well (`STweep.Disable`/`Enable`, `fmt: off`/`on`, `stformat:off`/`on`,
 `tctidier-ignore`).
 

@@ -68,12 +68,16 @@ namespace TcAgentBridge
                 if (exe == null) { FormatMessage(T("Format ST code: TcAgent.exe was not found - set it up in the TcAgent Chat first.", "ST-Code formatieren: TcAgent.exe wurde nicht gefunden - richte TcAgent zuerst im TcAgent Chat ein."), true); return; }
                 var sln = TcUnitControl.SolutionPath();
                 int changed = 0;
+                var offNotes = new List<string>();
                 foreach (var (syn, part) in halves)
                 {
                     if (SafeGet(syn, "ReadOnly") is bool ro && ro) { said.Add(part + T(": read only (online?) - not formatted", ": schreibgeschützt (online?) - nicht formatiert")); continue; }
                     var text = SafeGet(syn, "Text") as string;
                     if (string.IsNullOrEmpty(text)) continue;
                     var res = RunFormatter(exe, sln, part, text);
+                    // a "format off" without "on" after it: from there to the end nothing is formatted - say so, else "already formatted" misleads
+                    if (res.TryGetValue("offToEnd", out var ote) && ote is int offLine && offLine > 0)
+                        offNotes.Add(T($"{part}: switched off from line {offLine} to the end ('off' without 'on')", $"{(part == "declaration" ? "Deklaration" : "Implementierung")}: ab Zeile {offLine} bis zum Ende ausgeschaltet ('off' ohne 'on')"));
                     if (res.TryGetValue("error", out var err) && err is string e && e.Length > 0) { said.Add(part + ": " + e); continue; }
                     if (!(res.TryGetValue("changed", out var ch) && ch is bool c && c)) continue;
                     var formatted = res["text"] as string ?? text;
@@ -82,6 +86,7 @@ namespace TcAgentBridge
                 }
                 var msg = changed > 0 ? T($"TcAgent: formatted ({changed} part{(changed == 1 ? "" : "s")}) - Ctrl+Z takes it back", $"TcAgent: formatiert ({changed} Teil{(changed == 1 ? "" : "e")}) - Strg+Z nimmt es zurück")
                                       : T("TcAgent: already formatted", "TcAgent: bereits formatiert");
+                if (offNotes.Count > 0) msg += " - " + string.Join("; ", offNotes);
                 if (said.Count > 0) FormatMessage(T("Format ST code", "ST-Code formatieren") + "\n\n" + string.Join("\n", said), true);
                 SetStatus(msg);
                 Log(msg + (said.Count > 0 ? " | " + string.Join(" | ", said) : ""));
