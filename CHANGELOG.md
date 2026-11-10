@@ -20,6 +20,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ### Fixed
 - A sign in a condition stays at its number (`fSine < -0.5`, was `< - 0.5`).
+- Condition window: a long nested condition is laid out over several lines with its inner groups further in, also when
+  `cond.lines` is `preserve` (the rewrite had stayed one line of about 200 characters).
 - Format ST code: the clipboard is tried again for a second when another program holds it.
 
 ## [0.54.0] – 2026-11-09

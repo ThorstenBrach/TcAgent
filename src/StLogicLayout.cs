@@ -29,6 +29,15 @@ public static class StLogicLayout
             _ => $"{kw} {expr};\n"
         };
         string code = flat;
+        // cond.lines = preserve keeps the lines as written - but a rewrite is written on one line, so a long nested condition
+        // would stay one line of 200 characters: lay it out as when-long instead (one sub-condition per line, inner groups further in)
+        if (cfg.Preserve("cond.lines"))
+        {
+            var c = new StFormatConfig { EnumComments = cfg.EnumComments };
+            foreach (var kv in cfg.Values) c.Values[kv.Key] = kv.Value;
+            c.Values["cond.lines"] = "when-long";
+            cfg = c;
+        }
         if (snippet != null)
             try
             {

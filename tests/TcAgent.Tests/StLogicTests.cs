@@ -141,4 +141,22 @@ public class StLogicTests
         (_, ok) = StLogicLayout.Layout(StLogic.Parse("IF a AND b THEN"), "a OR b", cfg);
         Assert.False(ok);
     }
+
+    [Fact]
+    public void ALongNestedRewriteIsLaidOutOverLinesAlsoWhenTheLinesArePreserved()
+    {
+        // cond.lines = preserve (the default): the rewrite is written on one line, so "as written" would leave 200 characters in one line
+        var cfg = new StFormatConfig();
+        const string src = "IF (bEnable AND ((nFast > 20 AND nFast < 70) OR (nSlow MOD 10 = 0 AND NOT bManual)) AND NOT (fSine < -0.5 AND nSlow > 30))\n"
+                         + "  OR (bManual AND bOverride AND (fSine > 0.0 OR nFast >= 90)) THEN";
+        var e = StLogic.Parse(src);
+        var (code, ok) = StLogicLayout.Layout(e, StLogic.ToText(e, StLogic.NotInward(e.Root)), cfg);
+        Assert.True(ok);
+        var lines = code.Split('\n');
+        Assert.True(lines.Length > 6, code);
+        Assert.All(lines, l => Assert.True(l.Length <= 100, code));
+        // a short one stays on one line
+        (code, _) = StLogicLayout.Layout(StLogic.Parse("IF a AND NOT (b OR c) THEN"), "a AND NOT b AND NOT c", cfg);
+        Assert.DoesNotContain("\n", code.Replace("\nTHEN", " THEN"));
+    }
 }
