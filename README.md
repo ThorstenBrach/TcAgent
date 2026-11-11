@@ -67,6 +67,7 @@ Details: [docs/ADVISOR.md](docs/ADVISOR.md).
 | **Plain-text ST** | The whole PLC code as `.st` files (one per POU with its methods/properties/actions) for reviews, Git diffs and bulk edits – and back into the project, Ids kept, nothing deleted; also as CI gate | `tc_plaintext` |
 | **SFC step chains** | Read and write sequential function charts as text – steps, actions, transitions, alternative and parallel branches, jumps; renumber steps, step comments, SFC flags | `tc_sfc` |
 | **Lessons learned** | The agent remembers hard-won solutions – what the problem was, why, and how it was solved – and recalls them by itself when the same error comes up again (project, personal or team file) | `tc_lessons` |
+| **Chat history** | The TcAgent Chat keeps its conversations per solution on your PC: open the project again and ask where you stopped – the agent gets a summary with the open tasks of its plan and reads more when needed | `tc_chat_history` |
 | **Program documentation** | Explains the project: call hierarchy, call graph, inheritance hierarchy, class diagram, step chains (SFC and CASE), a short description for every FB, method and function (from comments or derived from the code), findings – one HTML page with zoomable diagrams, explanations kept as project memory; task overview with cycle times and a static risk analysis | `tc_doc` |
 | **User manual** | Manual of FBs, functions and their structs/enums – in the style of your own example documents (Markdown, AsciiDoc or HTML), missing comments explained from the code | `tc_userdoc` |
 | **Formatting** | Ctrl+Alt+F formats the open object the same way every time - indentation, keyword case, aligned declarations, long calls, brackets that show the order of AND/OR, long conditions one operand per line with aligned brackets; every rule configurable per company, team or project, a safety net keeps the meaning, Ctrl+Z takes it back | `TcAgent.exe format` – [docs/FORMATTER.md](docs/FORMATTER.md) |
@@ -101,7 +102,7 @@ Details: [docs/ADVISOR.md](docs/ADVISOR.md).
 | **Reference** | Beckhoff InfoSys, your URLs, document folders and network shares – read-only | `tc_docs`, `tc_docs_add` |
 | **Modules & plugins** | Switch groups of tools on or off per user, project, team or company (a shorter tool list for the agent; the command line keeps everything); your own tools as plugins – any program that speaks MCP, with the same policy, confirmation and audit, project plugins only after your approval; tab **Modules** in the Knowledge window | `TcAgent.exe modules`, `TcAgent.exe plugins` – [docs/PLUGINS.md](docs/PLUGINS.md) |
 
-All 99 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
+All 100 tools with parameters: [docs/TOOLS.md](docs/TOOLS.md).
 
 What you can do, explained step by step with example prompts: [docs/USER_GUIDE.md](docs/USER_GUIDE.md).
 

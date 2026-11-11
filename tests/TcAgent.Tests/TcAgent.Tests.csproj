@@ -32,6 +32,7 @@
     <Compile Include="..\..\src\Skills.cs" Link="src\Skills.cs" />
     <Compile Include="..\..\src\Workflows.cs" Link="src\Workflows.cs" />
     <Compile Include="..\..\src\RunLogs.cs" Link="src\RunLogs.cs" />
+    <Compile Include="..\..\src\ChatHistory.cs" Link="src\ChatHistory.cs" />
     <Compile Include="..\..\src\Improver.cs" Link="src\Improver.cs" />
     <Compile Include="..\..\src\Sources.cs" Link="src\Sources.cs" />
     <Compile Include="..\..\src\SourcesMerge.cs" Link="src\SourcesMerge.cs" />

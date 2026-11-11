@@ -112,11 +112,12 @@ work without the extension. The extension runs **inside** the IDE process and ad
   The input shows "Ask … about this solution", above it a chip with the editor context that goes with the question
   (📄 MAIN · line 12 – **×** sends the next question without it) and the attachments; below it the keys: Enter sends,
   Shift+Enter makes a new line, ↑/↓ brings back earlier prompts (kept across sessions), Esc stops the answer while the
-  agent works (otherwise back to the editor). **New chat** clears the history, **Stop** cancels the running answer (with Claude Code
+  agent works (otherwise back to the editor). **New chat** starts a new conversation (the old one stays saved, see
+  *Chat history* below), **Stop** cancels the running answer (with Claude Code
   and the ACP backends the conversation goes on with the next question). The
   status line shows the state of the backend, while working "◐ Claude Code is working · 3 tool calls · 12 s · tc_check",
   afterwards "✓ Done in 14 s · 6 tool calls". The **⋯** menu is grouped: *Chat* (send editor context, check after changes, **Answer language**,
-  New chat, Copy conversation), *Windows* (TcUnit Tests, Knowledge), *Setup and help* (Set up clients, Copy diagnostics,
+  New chat, Copy conversation, Delete chat history of this solution), *Windows* (TcUnit Tests, Knowledge), *Setup and help* (Set up clients, Copy diagnostics,
   Open user guide, Check for updates, About TcAgent) and the version. The result of **Set up clients** is one line at the top ("TcAgent x is set up for n
   clients – restart the open ones") with **Details** (the files written, user folders as %LOCALAPPDATA% / %USERPROFILE%).
 - **Answer language** – **⋯ > Answer language**: the language of Windows (the default), the language of the question, or one
@@ -124,6 +125,17 @@ work without the extension. The extension runs **inside** the IDE process and ad
   identifiers stay as they are.
 
   <img src="img/chat/answer-language.png" width="400" alt="The menu of the chat with the answer languages">
+
+- **Chat history** – the chat keeps every conversation per solution on this PC, never in the project or in Git:
+  `%LOCALAPPDATA%\TcAgent\chats\<solution>-<hash>\`, one file per conversation with the questions, the answers, one line per
+  tool call (name, ✓/✗, first line of the result), the task list of the agent and a stop. Attachments are kept by name
+  only. When you open the solution again, the chat shows the last conversation (its last 10 questions) and a line such as
+  "Last conversation in this project: 11.11. 17:42, 6 questions, 2 open tasks". Within 8 hours the next question simply
+  continues it; after that, or after **New chat**, a new conversation begins. Either way the first question to the agent
+  gets a short summary of the last conversation (questions, last answer, open tasks, whether it was stopped), so you can
+  ask *"Where did we stop?"* or *"Finish the open tasks"*. The agent reads more with `tc_chat_history` (read, list,
+  search) – with every AI client. Kept: 90 days and the last 50 conversations per solution. **⋯ > Delete chat history of
+  this solution** removes them; `"saveHistory": false` in `chat-backends.json` switches the history off.
 
 - **Shared folders** – **Attach … > Share a folder**, drop a folder on the input, or **⋯ > Shared folders**: the agent reads the folder
   without asking; changing a file there still asks you. A question decides, also for attached files: **only this chat**, or
@@ -2340,7 +2352,7 @@ It only connects to MCP servers by URL. TcAgent deliberately stays local (stdio)
 
 ## Tool index
 
-All 99 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
+All 100 tools and the section of this guide that covers them. Parameters: [TOOLS.md](TOOLS.md).
 
 | Tool | Section |
 |---|---|
@@ -2368,6 +2380,7 @@ All 99 tools and the section of this guide that covers them. Parameters: [TOOLS.
 | `tc_new_solution`, `tc_plc_project_add`, `tc_export`, `tc_import`, `tc_library`, `tc_library_save`, `tc_sbom`, `tc_library_lock`, `tc_twincat_version`, `tc_platform`, `tc_variant`, `tc_archive`, `tc_static_analysis`, `tc_packages`, `tc_packages_change` | [Projects, files, libraries and packages](#projects-files-libraries-and-packages) |
 | `tc_route_search`, `tc_route_add`, `tc_tccom` | [Network: routes and TcCOM](#network-routes-and-tccom) |
 | `tc_docs`, `tc_docs_add`, `tc_lessons` | [Knowledge: documentation and lessons learned](#knowledge-documentation-and-lessons-learned) |
+| `tc_chat_history` | [What the VS extension (TcAgentBridge) adds](#what-the-vs-extension-tcagentbridge-adds) (Chat history) |
 | `tc_dialogs` | [IDE dialogs](#ide-dialogs) |
 | `tc_feedback`, `tc_policy` | [Feedback and audit](#feedback-and-audit) |
 | `tc_knowledge`, `tc_skills`, `tc_workflow`, `tc_improve`, `tc_sources`, `tc_advisor` | [Coding rules](#coding-rules) (levels, platform, skills) |

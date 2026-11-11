@@ -7,6 +7,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **Chat history per solution** - the TcAgent Chat keeps every conversation on this PC
+  (`%LOCALAPPDATA%\TcAgent\chats\<solution>-<hash>\`, never in Git): questions, answers, one line per tool call, the
+  agent's task list (Claude Code TodoWrite, ACP plan) and a stop. Opening the solution again shows the last conversation;
+  within 8 hours the next question continues it. The first question to the agent gets a short summary - questions, last
+  answer, open tasks - and the new tool `tc_chat_history` (read, list, search) reads more, with every AI client. Kept 90
+  days / 50 per solution; **⋯ > Delete chat history of this solution**; `"saveHistory": false` in `chat-backends.json`
+  switches it off. The chat now also follows a solution change of the IDE (new session in the new folder).
+  [docs/USER_GUIDE.md](docs/USER_GUIDE.md#what-the-vs-extension-tcagentbridge-adds)
 - **Knowledge > Sources: several installed items at once** - tick items with the same state (the others grey out,
   "Tick all like this", "Untick all", Space); My changes, Update and merge, What's new upstream, Revert, Keep as own
   version, Uninstall and Copy path work on all ticked items with one question - Update and merge shows every preview

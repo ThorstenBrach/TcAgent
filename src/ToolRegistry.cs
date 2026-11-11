@@ -240,6 +240,7 @@ public sealed partial class ToolRegistry
         RegisterSfc();
         RegisterDoc();
         RegisterLessons();
+        RegisterChatHistory();
         RegisterUserDoc();
         RegisterRefactor();
         RegisterSafety();

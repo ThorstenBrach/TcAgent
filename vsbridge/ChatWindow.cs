@@ -280,6 +280,7 @@ namespace TcAgentBridge
             clear.Click += (s, e) =>
             {
                 history.Clear(); msgs.Children.Clear(); cur = null; lock (toolCalls) toolCalls.Clear(); contextOff = false;
+                ForgetConversation();       // the saved conversation stays; the next question starts a new one (ChatRecord.cs)
                 KillSession(); ClearSessionFolders(); UpdateVersionLabel(); ShowEmptyState(); UpdateContextChip(); status.Text = "New conversation."; WarmUp();
             };
             // Pre-start the Claude session as soon as the window becomes visible or the backend changes
@@ -296,6 +297,9 @@ namespace TcAgentBridge
             turnClock.Tick += (s, e) => ShowWorking();
             ShowEmptyState();
             UpdatePlaceholder();
+            // the conversation of this solution, kept from the last session (ChatRecord.cs)
+            WatchSolution();
+            LoadProjectConversation();
         }
 
         // ------------------------------------------------------------------ Settings
@@ -397,6 +401,7 @@ namespace TcAgentBridge
                     if (js.TryGetValue("sendContext", out var sc) && sc is bool b0) contextBox.IsChecked = b0;
                     answerLanguage = js.TryGetValue("answerLanguage", out var al) ? al as string : null;
                     if (js.TryGetValue("buildAfterChange", out var ba) && ba is bool b1) buildBox.IsChecked = b1;
+                    if (js.TryGetValue("saveHistory", out var sh) && sh is bool b2) saveHistory = b2;
                     if (js.TryGetValue("backends", out var bo) && bo is Dictionary<string, object> bs)
                         foreach (var kv in bs)
                             if (kv.Value is Dictionary<string, object> v)
@@ -750,6 +755,8 @@ namespace TcAgentBridge
             contextOff = false;
             var att = external == null ? TakeAttachments() : new List<Attachment>();
             AddUserBubble(text, ctx, att, external != null);
+            RecordQuestion(text, ctx, att);
+            var answered = history.Count;
             if (external == null) { RememberPrompt(text); input.Clear(); }
             var docs = AttachmentPrompt(att);
             if (docs != null) ctx = (ctx != null ? ctx + "\n\n" : "") + docs;
@@ -774,6 +781,8 @@ namespace TcAgentBridge
             finally
             {
                 turnClock.Stop();
+                if (history.Count > answered) RecordAnswer(history[history.Count - 1].Value, (DateTime.Now - turnStart).TotalSeconds);
+                else if (stoppedByUser) Record("stopped");
                 FlushAgent(); cur = null; busy = false; send.IsEnabled = true; stop.IsEnabled = false;
                 var st = backendState.TryGetValue(be.Key, out var bs) ? bs.State : null;
                 if (!failed && st == "working") SetState(be, sess != null && sess.Be == be || !IsPersistent(be) ? "ready" : "idle", null);
@@ -910,6 +919,7 @@ namespace TcAgentBridge
                     {
                         var name = (c.TryGetValue("name", out var nm) ? nm as string : "?") ?? "?";
                         var input = c.TryGetValue("input", out var inp) ? inp as Dictionary<string, object> : null;
+                        if (name == "TodoWrite" && input != null && input.TryGetValue("todos", out var todos)) RecordPlan(todos);   // the agent's task list
                         if (show.Length > 0 && show[show.Length - 1] != '\n') show.Append('\n');
                         show.Append(ToolStart(c.TryGetValue("id", out var tid) ? tid as string : null, name, input, t));
                     }
@@ -951,6 +961,7 @@ namespace TcAgentBridge
 
         void Stop()
         {
+            stoppedByUser = busy;
             if (starting != null)
             {
                 KillSession();          // the question is dropped; the next one starts a new session
@@ -1037,6 +1048,8 @@ namespace TcAgentBridge
                                        "an error after an allowed call is a real error of the tool, not a missing permission.");
             if (SharedNote() is string folders) sb.AppendLine(folders);
             if (ctx != null) sb.AppendLine("\n[User's editor context]\n" + ctx);
+            // the project was opened again: what was discussed last time (ChatRecord.cs) - once per opened conversation
+            if (TakeHandover() is string last) sb.AppendLine("\n[Last conversation in this project]\n" + last);
             if (history.Count > 0)
             {
                 var h = new StringBuilder();

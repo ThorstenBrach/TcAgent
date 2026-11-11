@@ -24,6 +24,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="*.cs" />
+    <Compile Include="..\src\ChatHistory.cs" Link="ChatHistory.cs" />
     <!-- the VS SDK requires this file name; build-vsix.ps1 copies it from extension.vsixmanifest (the single source) -->
     <None Include="source.extension.vsixmanifest"><SubType>Designer</SubType></None>
     <Content Include="TcAgentBridge.pkgdef" IncludeInVSIX="true" />

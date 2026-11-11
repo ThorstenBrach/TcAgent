@@ -299,6 +299,8 @@ namespace TcAgentBridge
             menu.Items.Add(Item("Shared folders …", ShowSharedFolders, "Folders the agent may read without asking"));
             menu.Items.Add(Item("New chat", () => clear.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), clear.ToolTip as string));
             menu.Items.Add(Item("Copy conversation", CopyConversation, "The questions and answers of this chat as text"));
+            menu.Items.Add(Item("Delete chat history of this solution …", DeleteProjectHistory,
+                                "The conversations of this solution are kept on this PC (%LOCALAPPDATA%\\TcAgent\\chats) - the agent reads them with tc_chat_history"));
             menu.Items.Add(new Separator());
             menu.Items.Add(Group("Windows"));
             menu.Items.Add(Item("TcUnit Tests", () => tests.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), tests.ToolTip as string));
@@ -543,6 +545,7 @@ namespace TcAgentBridge
             var first = (result ?? "").Replace("\r", "").Split('\n').Select(l => l.Trim()).FirstOrDefault(l => l.Length > 0 && l != "{" && l != "[") ?? "";
             call.Short = Short(first, 90);
             call.Full = Tail((result ?? "").Trim(), 3000);
+            RecordTool(call.Name, ok, call.Short);
             ToolChanged();
         }
 
