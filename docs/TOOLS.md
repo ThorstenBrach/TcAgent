@@ -573,6 +573,22 @@ JUMP Init
 
 ## Editor context and navigation (TcAgentBridge)
 
+### `tc_chat_history`
+
+The saved conversations of the TcAgent Chat for the open solution (`%LOCALAPPDATA%\TcAgent\chats\<solution>-<hash>\`, one
+`.jsonl` file per conversation, kept 90 days / 50 per solution): what was asked and answered, the tool calls in one line, the
+agent's task list at the end and whether the last question was stopped. For *"What did we discuss last time?"* and
+*"Finish the open tasks"* – the chat already hands a short summary of the last conversation to the first question after the
+solution was opened again. Read only.
+
+| Parameter | Type | Required | Description |
+|---|---|---|---|
+| `action` | string |  | read (default), list or search |
+| `id` | string |  | read: a conversation from list (e.g. `20261111-174203-a1b2`) or `latest` |
+| `full` | boolean |  | read: whole answers instead of shortened ones |
+| `query` | string |  | search: words that must all appear |
+| `max` | integer |  | list/search: max. entries (default 20 / 10) |
+
 ### `tc_lessons`
 
 Lessons learned across sessions: solutions to hard problems while coding or configuring TwinCAT. Each lesson records **what** the problem was (`symptom`: exact error text/code, behaviour), **why** (`cause`: explanation/background) and **how** it was solved (`solution`: concrete steps, values, code), optionally what did not work (`avoid`). Stored as Markdown, editable by hand: `<solution>\.tcagent\lessons.md` (project, versioned with Git), `%LOCALAPPDATA%\TcAgent\lessons.md` (personal), `TCAGENT_LESSONS` (team file). When a tool fails or `tc_check`/`tc_build` reports errors, matching lessons are appended to the result automatically (`TCAGENT_LESSONS_RECALL=0` turns this off); when a call succeeds after repeated failures the agent is reminded to save a lesson. `add`/`remove` count as project changes (audited, blocked in `ask` mode); `search`/`list` are read-only.

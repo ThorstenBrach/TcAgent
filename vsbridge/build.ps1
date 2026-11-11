@@ -58,7 +58,8 @@ if ($vsct) {
 } else { Write-Host "VSCT.exe not found (NuGet package Microsoft.VSSDK.BuildTools - run build-vsix.ps1 once) - no menu entries" -ForegroundColor Yellow }
 for ($i = 1; $i -le 25; $i++) {
     $args_ = @('/nologo', '/target:library', '/optimize+', '/langversion:latest', '/nowarn:1701,1702,CS1998', "/out:$out\TcAgentBridge.dll") + $menuRes +
-             ($refs | ForEach-Object { "/r:$_" }) + (Get-ChildItem "$here\*.cs" | ForEach-Object { $_.FullName })
+             ($refs | ForEach-Object { "/r:$_" }) + (Get-ChildItem "$here\*.cs" | ForEach-Object { $_.FullName }) +
+         "$here\..\src\ChatHistory.cs"     # shared with the TcAgent server (also linked in TcAgentBridge.csproj)
     $output = & $csc @args_ 2>&1 | Out-String
     if ($LASTEXITCODE -eq 0) { Write-Host $output; break }
     $missing = [regex]::Matches($output, 'CS0012[^\r\n]*?["''„“]([A-Za-z0-9_.]+), Version=') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique

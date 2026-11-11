@@ -174,7 +174,7 @@ the enable bools, a complete InitialOutputs test and one test per public method;
 expected behaviour and add the instance to the test program.
 
 **Other knowledge sources** - not coding rules, keep them apart:
-`tc_lessons` (solutions to hard TwinCAT problems), `tc_docs` (manuals, read only), `tc_doc` (program documentation /
+`tc_lessons` (solutions to hard TwinCAT problems), `tc_chat_history` (earlier TcAgent Chat conversations of this project and the open tasks then), `tc_docs` (manuals, read only), `tc_doc` (program documentation /
 project memory), `tc_risk_rules` (what the risk analysis checks - see Program documentation). Skills of the user (e.g. a library-specific coding-rules skill) are additional rules from the user -
 treat them like project rules for that library.
 

@@ -180,6 +180,9 @@ namespace TcAgentBridge
                     }
                     break;
                 }
+                case "plan":            // the agent's task list: {"entries":[{"content":..,"priority":..,"status":..}]} (ChatRecord.cs)
+                    if (u.TryGetValue("entries", out var entries)) RecordPlan(entries);
+                    break;
                 case "usage_update":
                     if (u.TryGetValue("used", out var used) && u.TryGetValue("size", out var size))
                         s.Acp.Usage = $"context {Convert.ToInt64(used) / 1000}k of {Convert.ToInt64(size) / 1000}k";
