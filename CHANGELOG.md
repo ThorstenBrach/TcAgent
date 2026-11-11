@@ -24,6 +24,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `codeChecked`), the whole truth table in `results`; `tc_condition` offers turned comparisons.
 
 ### Fixed
+- Knowledge > Sources: a commit in a source shows as an update of the installed items it touches. The content of the
+  item in Git decides (`git diff` between the installed and the source commit), not a version number in its header; a
+  source in a folder on this computer is read again whenever the state is shown, so the commit shows at once (was: only
+  after **Check for updates**, whose result the list did not even show until a refresh). **Browse and install …** marks
+  them **↑ update available** (or **✎** when you changed the item too), offers them ticked with "Only updates", and
+  **Update …** brings them to the new commit where they are installed. `sources pull` takes `--level`.
 - Chat: Stop no longer ends the Claude Code session - it interrupts the running answer only, an open question
   card counts as not answered, and the next question goes on with the whole conversation (was: a new session without
   the history). Only if Claude Code has not stopped after 8 s is the session ended as before.

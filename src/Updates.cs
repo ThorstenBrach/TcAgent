@@ -253,6 +253,7 @@ public static class Updates
                 try { Sources.Fetch(s); }
                 catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or IOException or System.ComponentModel.Win32Exception) { errors.Add(s.Name + ": " + ex.Message); }
         }
+        else if (sw.LockedBy == null || sw.On) Sources.RefreshLocal(solutionDir);     // a folder on this computer: no network, every time
         var items = new JsonArray();
         foreach (var (label, root) in roots)
             foreach (var (k, state, e) in Sources.Status(root))

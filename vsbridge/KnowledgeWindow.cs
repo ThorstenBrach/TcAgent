@@ -1,4 +1,4 @@
-// TcAgent Knowledge - tool window in Visual Studio/TwinCAT XAE Shell: everything the agent gets and where it comes from,
+﻿// TcAgent Knowledge - tool window in Visual Studio/TwinCAT XAE Shell: everything the agent gets and where it comes from,
 // and how the engineering workflows develop (docs/KNOWLEDGE_LAYERS.md, "Knowledge manager").
 //
 //   Overview       what the agent gets in this project (each count leads to the Files tab), what needs attention, KPI tiles
@@ -840,7 +840,7 @@ namespace TcAgentBridge
             // the actions on all installed items next to their heading
             var global = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 6, 2) };
             var check = Text("Check for updates", "Fetch the sources and list what is newer there");
-            check.Click += (s, e) => RunAsync("sources pull --dry-run", true, what: "Checking the sources");
+            check.Click += (s, e) => RunAsync("sources pull --dry-run", true, reload: true, what: "Checking the sources");     // reload: the list shows what the fetch found
             var all = Text("Update all …", "Update every installed item that is newer in its source (not the ones changed locally)");
             all.Click += (s, e) => UpdateAll();
             global.Children.Add(check); global.Children.Add(all);
@@ -1865,6 +1865,7 @@ namespace TcAgentBridge
             catch { Report(false, output, "Browse"); return; }
             status.Text = $"{items.Count} item(s) offered.";
             InstallDialog(items, name);
+            Load();     // the search fetched the sources: the installed list shows what is newer there now
         }
 
         static List<string> Strings(Dictionary<string, object> d, string k) => ((d != null && d.TryGetValue(k, out var v) ? v as IEnumerable : null) ?? new object[0]).Cast<object>().Select(x => x.ToString()).ToList();
@@ -1879,19 +1880,33 @@ namespace TcAgentBridge
             string InstalledAt(Dictionary<string, object> i) =>
                 string.Join(", ", installed.Where(x => (S(x, "key") ?? "").Split('/').Last() == S(i, "name") && ((S(x, "key") ?? "").StartsWith(S(i, "kind") + "/") || !(S(x, "key") ?? "").Contains("/")))
                                             .Select(x => S(x, "level")).Distinct());
+            // installed from this source: the commit it was installed at against the commit just fetched - the content of the
+            // item decides (sources search compares it with git), not a version number in its header
+            List<Dictionary<string, object>> Here(Dictionary<string, object> i) => Arr(i.TryGetValue("installed", out var io) ? io : null).ToList();
+            List<Dictionary<string, object>> UpdatesOf(Dictionary<string, object> i) => Here(i).Where(x => B(x, "newer") && !B(x, "changedLocally") && !B(x, "missing")).ToList();
+            List<Dictionary<string, object>> ConflictsOf(Dictionary<string, object> i) => Here(i).Where(x => B(x, "newer") && B(x, "changedLocally")).ToList();
+            string LevelsOf(IEnumerable<Dictionary<string, object>> l) => string.Join(", ", l.Select(x => S(x, "level")).Distinct());
             var lines = items.Select(i =>
             {
-                var at = InstalledAt(i);
+                var at = Here(i).Count > 0 ? LevelsOf(Here(i)) : InstalledAt(i);
                 var cls = S(i, "licenseClass");
                 var refused = cls is "source-available" or "none";
+                var upd = UpdatesOf(i); var con = ConflictsOf(i);
+                var state = refused ? "⊘ not installable"
+                          : upd.Count > 0 ? "↑ update available (" + LevelsOf(upd) + ")"
+                          : con.Count > 0 ? "✎ newer in source, changed by you (" + LevelsOf(con) + ")"
+                          : at.Length > 0 ? "✓ installed (" + at + ")" : "○ not installed";
+                var tip = upd.Concat(con).Select(x => $"{S(x, "level")}: installed @{Short(S(x, "commit"))}, source @{Short(S(i, "commit"))}" +
+                                                      (B(x, "changedLocally") ? " - changed by you: Sources > Update and merge …" : "")).ToList();
                 return new Line
                 {
-                    D = i, C1 = S(i, "name"), C2 = KindName(S(i, "kind")), C3 = S(i, "source"),
-                    C4 = refused ? "⊘ not installable" : at.Length > 0 ? "✓ installed (" + at + ")" : "○ not installed",
+                    D = i, C1 = S(i, "name"), C2 = KindName(S(i, "kind")), C3 = S(i, "source"), C4 = state,
                     C5 = S(i, "license") + (cls == "accepted" ? "" : " (" + cls + ")"), C6 = Strings(i, "scripts").Count > 0 ? "⚠ yes" : "", C7 = S(i, "description"),
-                    Mark = refused ? Orange : at.Length > 0 ? Green : Gray, Tip = S(i, "refusal") ?? S(i, "path")
+                    Mark = refused || upd.Count > 0 || con.Count > 0 ? Orange : at.Length > 0 ? Green : Gray,
+                    Tip = S(i, "refusal") ?? (tip.Count > 0 ? string.Join("\n", tip) : S(i, "path"))
                 };
             }).ToList();
+            var updatable = lines.Count(l => l.C4.StartsWith("↑"));
             var list = NewList();
             Columns(list, ("", 30, "?" + nameof(Line.On)), ("Name", 190, nameof(Line.C1)), ("Kind", 90, nameof(Line.C2)), ("Source", 120, nameof(Line.C3)), ("State", 150, "!" + nameof(Line.C4)),
                     ("License", 110, nameof(Line.C5)), ("Scripts", 60, nameof(Line.C6)), ("Description", 360, nameof(Line.C7)));
@@ -1899,21 +1914,27 @@ namespace TcAgentBridge
             var kinds = new[] { "All kinds" }.Concat(lines.Select(l => l.C2).Distinct()).ToArray();
             var kind = new ComboBox { ItemsSource = kinds, SelectedIndex = 0, MinWidth = 110, Margin = new Thickness(0, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
             var notYet = new CheckBox { Content = "Only not installed", VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(4, 0, 0, 0) };
+            var onlyUpd = new CheckBox { Content = $"Only updates ({updatable})", IsChecked = updatable > 0, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 0, 0),
+                                         ToolTip = "Installed items the source changed since they were installed (compared by their content in Git)" };
             void Filter()
             {
                 var q = query.Text.Trim().ToLowerInvariant();
                 list.ItemsSource = lines.Where(l => (kind.SelectedIndex <= 0 || l.C2 == (string)kind.SelectedItem) && (notYet.IsChecked != true || l.C4.StartsWith("○")) &&
+                                                    (onlyUpd.IsChecked != true || l.C4.StartsWith("↑") || l.C4.StartsWith("✎")) &&
                                                     (q.Length == 0 || $"{l.C1} {l.C2} {l.C3} {l.C5} {l.C7}".ToLowerInvariant().Contains(q))).ToList();
             }
             query.TextChanged += (s, e) => Filter();
             kind.SelectionChanged += (s, e) => Filter();
-            notYet.Click += (s, e) => Filter();
+            notYet.Click += (s, e) => { if (notYet.IsChecked == true) onlyUpd.IsChecked = false; Filter(); };
+            onlyUpd.Click += (s, e) => { if (onlyUpd.IsChecked == true) notYet.IsChecked = false; Filter(); };
+            // an update is offered ticked: Install updates them at once
+            foreach (var l in lines.Where(l => l.C4.StartsWith("↑"))) l.On = true;
             Filter();
             // tick: the shown items, none (the ticks stay when the filter changes)
             var tickAll = Text("Select all", "Tick every item the filter shows");
             var tickNone = Text("Select none", "Remove every tick");
             var top = new WrapPanel { Margin = new Thickness(0, 0, 0, 6) };
-            foreach (var e in new UIElement[] { SearchBox(query, "Search name, license, description", 280), kind, notYet, TcUnitControl.Separator(), tickAll, tickNone }) top.Children.Add(e);
+            foreach (var e in new UIElement[] { SearchBox(query, "Search name, license, description", 280), kind, notYet, onlyUpd, TcUnitControl.Separator(), tickAll, tickNone }) top.Children.Add(e);
             // the details of the selected item
             var info = new TextBox { IsReadOnly = true, TextWrapping = TextWrapping.Wrap, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Height = 130, Padding = new Thickness(4),
                                      FontFamily = new FontFamily("Consolas"), FontSize = 12, Margin = new Thickness(0, 6, 0, 0) };
@@ -1928,8 +1949,9 @@ namespace TcAgentBridge
             {
                 var c = Chosen();
                 var ok = c.Where(i => !(S(i, "licenseClass") is "source-available" or "none")).ToList();
+                var upd = ok.Count(i => UpdatesOf(i).Count > 0);
                 install.IsEnabled = ok.Count > 0;
-                install.Content = ok.Count > 1 ? $"Install {ok.Count} …" : "Install …";
+                install.Content = upd > 0 && upd == ok.Count ? (upd > 1 ? $"Update {upd} …" : "Update …") : upd > 0 ? $"Install / update {ok.Count} …" : ok.Count > 1 ? $"Install {ok.Count} …" : "Install …";
                 say.Text = c.Count == 0 ? "Tick the items to install (Space ticks the selected line)." : $"{c.Count} ticked" + (c.Count > ok.Count ? $", {c.Count - ok.Count} of them not installable" : "") + ".";
             }
             list.AddHandler(ToggleButton.ClickEvent, new RoutedEventHandler((s, e) => Ticked()));
@@ -1958,27 +1980,42 @@ namespace TcAgentBridge
                 if (chosen.Count == 0) return;
                 var to = (string)level.SelectedItem;
                 var pr = to.Contains("pull request");
+                // an item with an update is updated where it is installed (the level box is for new installs)
+                var updates = chosen.Where(i => UpdatesOf(i).Count > 0).ToList();
                 var text = string.Join("\n\n", chosen.Select(i =>
                 {
                     var files = Strings(i, "files"); var scripts = Strings(i, "scripts");
-                    return $"{KindName(S(i, "kind"))} \"{S(i, "name")}\" from {S(i, "source")} @{Short(S(i, "commit"))}\n" +
+                    var u = UpdatesOf(i);
+                    return (u.Count > 0 ? $"Update {KindName(S(i, "kind"))} \"{S(i, "name")}\" on {LevelsOf(u)}: @{Short(S(u[0], "commit"))} -> @{Short(S(i, "commit"))}\n"
+                                        : $"{KindName(S(i, "kind"))} \"{S(i, "name")}\" from {S(i, "source")} @{Short(S(i, "commit"))}\n") +
                            $"  License: {S(i, "license")}{(S(i, "licenseClass") == "accepted" ? "" : $" - {S(i, "licenseClass")}: check it before you accept it")}\n" +
                            $"  Files ({files.Count}): {string.Join(", ", files.Take(20))}{(files.Count > 20 ? " …" : "")}" +
                            (scripts.Count > 0 ? $"\n  Contains scripts: {string.Join(", ", scripts)} - TcAgent never runs them; read them before you use the item." : "");
                 })) + (skipped.Count > 0 ? "\n\nNot installed (license): " + string.Join(", ", skipped.Select(i => S(i, "name"))) : "");
                 var risky = chosen.Any(i => Strings(i, "scripts").Count > 0 || S(i, "licenseClass") != "accepted");
-                if (!Confirm("Install", $"Install {(chosen.Count == 1 ? "this item" : chosen.Count + " items")} to the {to.Split(' ')[0]} level?" +
-                                        (pr ? " (a commit on a new branch of its repository - you push it and open the pull request)" : ""), text, "Install", risky)) return;
+                var news = chosen.Count - updates.Count;
+                var question = updates.Count == chosen.Count ? $"Update {(chosen.Count == 1 ? "this item" : chosen.Count + " items")} from the source?"
+                             : $"Install {(news == 1 ? "this item" : news + " items")} to the {to.Split(' ')[0]} level" + (updates.Count > 0 ? $" and update {updates.Count} installed one(s)?" : "?");
+                if (!Confirm(updates.Count == chosen.Count ? "Update" : "Install", question +
+                                        (pr && news > 0 ? " (a commit on a new branch of its repository - you push it and open the pull request)" : ""), text,
+                                        updates.Count == chosen.Count ? "Update" : "Install", risky)) return;
                 install.IsEnabled = false;
                 var results = new List<string>(); bool all = true;
                 foreach (var i in chosen)
                 {
-                    say.Text = $"Installing {S(i, "name")} …";
-                    var (ok, output) = await Cli($"sources install --name {Quote(S(i, "source"))} --item {Quote(S(i, "name"))} --kind {S(i, "kind")} --level {Quote(to.Split(' ')[0])}" +
-                                                 (S(i, "licenseClass") == "accepted" ? "" : " --accept-license"));
-                    all &= ok;
-                    results.Add((ok ? "✓ " : "✗ ") + S(i, "name") + ": " + output.Trim().Split('\n')[0]);
-                    if (!ok) MessageBox.Show(w, output, "Not installed: " + S(i, "name"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    var u = UpdatesOf(i);
+                    var lic = S(i, "licenseClass") == "accepted" ? "" : " --accept-license";
+                    var calls = u.Count > 0
+                        ? u.Select(x => S(x, "level")).Distinct().Select(lv => $"sources pull --item {Quote(S(i, "kind") + "/" + S(i, "name"))} --level {Quote(lv)}" + lic).ToList()
+                        : new List<string> { $"sources install --name {Quote(S(i, "source"))} --item {Quote(S(i, "name"))} --kind {S(i, "kind")} --level {Quote(to.Split(' ')[0])}" + lic };
+                    foreach (var call in calls)
+                    {
+                        say.Text = (u.Count > 0 ? "Updating " : "Installing ") + S(i, "name") + " …";
+                        var (ok, output) = await Cli(call);
+                        all &= ok;
+                        results.Add((ok ? "✓ " : "✗ ") + S(i, "name") + ": " + output.Trim().Split('\n')[0].Trim());
+                        if (!ok) MessageBox.Show(w, output, (u.Count > 0 ? "Not updated: " : "Not installed: ") + S(i, "name"), MessageBoxButton.OK, MessageBoxImage.Warning);
+                    }
                 }
                 say.Text = string.Join(" · ", results.Select(x => x.Split(':')[0]));
                 install.IsEnabled = true;
