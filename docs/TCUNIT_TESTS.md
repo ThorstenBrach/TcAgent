@@ -253,6 +253,20 @@ The `///` comments in the code are the descriptions of the window and of the rep
   The first line (up to an empty `///` line or the first section) is the description; a sentence wrapped over several
   lines stays one description. Any keywords can be used; `reportGroupBy` ([section 7](#7-configuration)) groups the
   report by one of them (e.g. `Blocks`).
+- **Tables:** lines that start and end with `|` become a table – the first line is the head, a Markdown separator line
+  (`|---|---|`) may follow and is left out, columns of numbers are right-aligned. Any other line ends the table:
+
+  ```
+  /// H1 -> N12: via H2, approach and enter the nest N12.
+  /// Path:
+  /// | Step | Start      | Target     | Move mode       |
+  /// |    1 | H1         | H2         | JOINTS_BLENDED  |
+  /// |    2 | H2         | N12 Offset | PTP_BLENDED     |
+  /// |    3 | N12 Offset | N12        | LINEAR_ABSOLUTE |
+  ```
+
+  The report and the details of the window show it with aligned columns; a line with `|` in the middle of the text
+  stays text.
 - **Tests called from the suite body** (4.3, 4.4) take the comment of the method they call. A `///` comment directly
   above the call adds to it, e.g. the block of this one test:
 
@@ -327,13 +341,15 @@ it in the browser – one self-contained file to archive or send:
 - Cards: tests run, passed, failed, skipped / not run, pass rate and – separately – the tests switched off for this
   run (hidden in the list unless "show switched off" is ticked).
 - Every suite instance with its purpose; every test with result, description and duration. Opened: the test case
-  text of [section 5](#5-describing-tests), the failure text (`EXP` / `ACT` / `MSG`; failed tests are open from the
+  text of [section 5](#5-describing-tests) (`|` lines as a table), the failure text (`EXP` / `ACT` / `MSG`; failed tests are open from the
   start), code position, enable bool.
 - With `reportGroupBy` a second view, e.g. by the function block under test: a test about several blocks is listed
   under each of them; switch between **Blocks** and **Suite** at the top.
 - Search, "only failed", expand / collapse all; a summary table per suite (and per group); light and dark theme.
 
-Good descriptions in the code make a good report – no separate report tool is needed. Every run keeps its results in
+Good descriptions in the code make a good report – no separate report tool is needed. The texts are read from the
+files when the report is made; a run and the 📄 button save what is open in the IDE first, so a changed comment is in
+the report without a new download. Every run keeps its results in
 `%LOCALAPPDATA%\TcAgent\tcunit\<solution>-<hash>\` (`last.xml` JUnit, `last.json` the run), outside the repository.
 For a report tool of your own set `report` in the configuration; `tcunit report --builtin` still makes TcAgent's own.
 The command comes with the solution (a cloned repository, say), so it runs only after you approved it once for this

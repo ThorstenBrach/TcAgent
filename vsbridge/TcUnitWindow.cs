@@ -1082,6 +1082,79 @@ namespace TcAgentBridge
             return t;
         }
 
+        /// <summary>The cells of a "| a | b |" line (same rule as TcUnitDoc.TableCells of the HTML report), or null.</summary>
+        static List<string> TableCells(string line)
+        {
+            var l = (line ?? "").Trim();
+            if (l.Length < 2 || l[0] != '|' || l[l.Length - 1] != '|') return null;
+            return l.Substring(1, l.Length - 2).Split('|').Select(c => c.Trim()).ToList();
+        }
+
+        static readonly System.Text.RegularExpressions.Regex TableSeparator = new System.Text.RegularExpressions.Regex(@"^:?-{1,}:?$");
+
+        /// <summary>The /// text of a test or suite: plain lines as text, "| a | b |" lines as a grid with columns - the first
+        /// line is the head, a |---| separator is left out, number columns are right-aligned (like the HTML report).</summary>
+        UIElement Doc(string text)
+        {
+            var panel = new StackPanel { Margin = new Thickness(0, 4, 0, 0), Opacity = 0.85 };
+            var plain = new List<string>();
+            var rows = new List<List<string>>();
+            void FlushText()
+            {
+                var s = string.Join("\n", plain).Trim('\n');
+                if (s.Length > 0) panel.Children.Add(Words(s));
+                plain.Clear();
+            }
+            void FlushTable()
+            {
+                if (rows.Count == 0) return;
+                int cols = rows.Max(x => x.Count);
+                var g = new Grid { Margin = new Thickness(0, 3, 0, 5), HorizontalAlignment = HorizontalAlignment.Left };
+                for (int c = 0; c < cols; c++) g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                for (int c = 0; c < cols; c++)
+                {
+                    var body = rows.Skip(1).Where(x => c < x.Count && x[c].Length > 0).ToList();
+                    bool right = body.Count > 0 && body.All(x => double.TryParse(x[c], System.Globalization.NumberStyles.Float, System.Globalization.CultureInfo.InvariantCulture, out _));
+                    for (int r = 0; r < rows.Count; r++)
+                    {
+                        if (c == 0) g.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+                        var w = Words(c < rows[r].Count ? rows[r][c] : "", bold: r == 0);
+                        w.TextWrapping = TextWrapping.NoWrap;
+                        w.TextAlignment = right ? TextAlignment.Right : TextAlignment.Left;
+                        if (r == 0) w.Opacity = 0.8;
+                        var cell = new Border { BorderThickness = new Thickness(c == 0 ? 1 : 0, r == 0 ? 1 : 0, 1, 1), Padding = new Thickness(8, 1, 8, 1), Child = w };
+                        cell.SetResourceReference(Border.BorderBrushProperty, EnvironmentColors.ToolWindowBorderBrushKey);
+                        Grid.SetRow(cell, r); Grid.SetColumn(cell, c);
+                        g.Children.Add(cell);
+                    }
+                }
+                // a wide table scrolls sideways instead of being cut off; the mouse wheel still scrolls the details
+                var sv = new ScrollViewer { Content = g, HorizontalScrollBarVisibility = ScrollBarVisibility.Auto, VerticalScrollBarVisibility = ScrollBarVisibility.Disabled };
+                sv.PreviewMouseWheel += (s, e) =>
+                {
+                    e.Handled = true;
+                    panel.RaiseEvent(new System.Windows.Input.MouseWheelEventArgs(e.MouseDevice, e.Timestamp, e.Delta) { RoutedEvent = UIElement.MouseWheelEvent, Source = s });
+                };
+                panel.Children.Add(sv);
+                rows.Clear();
+            }
+            foreach (var raw in (text ?? "").Replace("\r", "").Split('\n'))
+            {
+                var cells = TableCells(raw);
+                if (cells != null)
+                {
+                    FlushText();
+                    if (!(rows.Count > 0 && cells.All(x => TableSeparator.IsMatch(x)))) rows.Add(cells);
+                    continue;
+                }
+                FlushTable();
+                plain.Add(raw);
+            }
+            FlushText();
+            FlushTable();
+            return panel;
+        }
+
         // label / value lines; a value may hold links
         Grid Facts(params (string Label, object Value)[] lines)
         {
@@ -1145,7 +1218,7 @@ namespace TcAgentBridge
                 detailBox.Children.Add(head);
                 if (t.Description != null) detailBox.Children.Add(Words(t.Description));
                 var doc = t.Details ?? (r.Suite?.Details != null && t.File == null ? r.Suite.Details : null);
-                if (doc != null) { var dt = Words(doc); dt.Opacity = 0.85; dt.Margin = new Thickness(0, 4, 0, 0); detailBox.Children.Add(dt); }
+                if (doc != null) detailBox.Children.Add(Doc(doc));
                 if (!string.IsNullOrEmpty(t.Message))
                 {
                     var (exp, act, msg) = Failure(t.Message);
@@ -1172,7 +1245,7 @@ namespace TcAgentBridge
                 head.Inlines.Add(new System.Windows.Documents.Run("   " + text) { FontSize = 12, FontWeight = FontWeights.Normal, Foreground = brush, FontFamily = Symbols });
                 detailBox.Children.Add(head);
                 if (s.Description != null) detailBox.Children.Add(Words(s.Description));
-                if (s.Details != null) { var dt = Words(s.Details); dt.Opacity = 0.85; dt.Margin = new Thickness(0, 4, 0, 0); detailBox.Children.Add(dt); }
+                if (s.Details != null) detailBox.Children.Add(Doc(s.Details));
                 detailBox.Children.Add(Facts(
                     ("Type", s.Type),
                     ("Code", s.File != null ? (object)Links((Path.GetFileName(s.File) + ":" + s.Line, OpenSelected)) : null),
@@ -1402,6 +1475,13 @@ namespace TcAgentBridge
             if (exe == null || string.IsNullOrEmpty(sln)) { status.Text = exe == null ? "TcAgent.exe not found." : "No solution open."; return; }
             report.IsEnabled = false;
             status.Text = "Creating the test report ...";
+            // the report reads the /// texts from the files: save what is open, so a changed comment is in it
+            try
+            {
+                var dte = Package.GetGlobalService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
+                if (dte != null) foreach (EnvDTE.Document d in dte.Documents) try { if (!d.Saved) d.Save(); } catch { }
+            }
+            catch { }
             System.Threading.Tasks.Task.Run(() =>
             {
                 string html = null, msg = null;

@@ -112,6 +112,9 @@ public sealed class TcUnitRun
         if (string.IsNullOrEmpty(sln) || !File.Exists(sln)) return Done("error", Cli.Usage, "Solution not found: " + sln);
         var cfg = TcUnitConfig.Load(Path.GetDirectoryName(sln));
         foreach (var e in cfg.Errors) Step($"{cfg.File}: {e}");
+        // the tests, texts and lines are read from the files: what is open in the IDE is saved first (also comments only -
+        // otherwise the run and the report afterwards would show the old texts and line numbers)
+        if (tc != null) SaveOpenFiles();
         var disc = TcUnitDiscovery.Discover(sln);
         var project = ChooseProject(disc, o.Plc ?? cfg.PlcProject, out var why);
         if (project == null) return Done("error", Cli.Usage, why);
@@ -157,7 +160,6 @@ public sealed class TcUnitRun
         try
         {
             // ---- is the code in the runtime the current one?
-            if (tc != null) { Step("Saving all files ..."); try { tc.Sta.Run(() => { tc.RequireDte().ExecuteCommand("File.SaveAll"); return 0; }); } catch (Exception ex) { Step("Save all failed: " + Msg(ex)); } }
             var hash = SourceHash(project);
             var key = target + "|" + project.PlcProj.ToLowerInvariant();
             var (upToDate, reason) = RuntimeUpToDate(target, project, key, hash);
@@ -586,6 +588,24 @@ public sealed class TcUnitRun
     static readonly string StateFile = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent", "tcunit-state.json");
 
     /// <summary>Hash of the .plcproj and all its code files - what a build of the project depends on.</summary>
+    /// <summary>Saves what is open in the IDE: File.SaveAll, and every document that is still unsaved one by one (SaveAll is not
+    /// available in every state of the IDE).</summary>
+    void SaveOpenFiles()
+    {
+        Step("Saving all files ...");
+        try
+        {
+            tc.Sta.Run(() =>
+            {
+                var dte = tc.RequireDte();
+                try { dte.ExecuteCommand("File.SaveAll"); } catch { }
+                foreach (EnvDTE.Document d in dte.Documents)
+                    try { if (!d.Saved) d.Save(); } catch { }
+                return 0;
+            });
+        }
+        catch (Exception ex) { Step("Save all failed: " + Msg(ex)); }
+    }
     static string SourceHash(TcUnitDiscovery.Project p)
     {
         using var sha = SHA256.Create();

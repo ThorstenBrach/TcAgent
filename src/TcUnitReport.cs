@@ -6,7 +6,8 @@
 // The report is made from them:
 //   - TcAgent's own report (default): works for every project - suites and tests with the /// descriptions of the code
 //     (TcUnitDiscovery), status, duration, failure text (EXP/ACT/MSG), code position and enable bool, summary per suite,
-//     run information (target, TcAgent, git commit); search, "only failed", tests switched off for this run hidden
+//     run information (target, TcAgent, git commit); search, "only failed", tests switched off for this run hidden;
+//     the /// texts are laid out by TcUnitDoc (headings, lists, "| a | b |" tables) and read from the files when the report is made
 //   - with "report" in .tcagent\tcunit.json: that command line instead, run in the solution folder, e.g. a report of a
 //     test case catalog; placeholders {junit} (JUnit file), {html} (report file to write), {solution}, {solutionDir}.
 //     Runs only after the user approved it once for this solution and command text (window question or --approve <id>)
@@ -158,47 +159,6 @@ public static class TcUnitReport
         return list;
     }
 
-    static readonly System.Text.RegularExpressions.Regex Heading = new(@"^([A-Za-z][\w /()-]{0,30}):\s*(.*)$"), Numbered = new(@"^\d+[.)]\s+(.*)$"), Bullet = new(@"^[-*]\s+(.*)$");
-
-    /// <summary>The details of a /// text as HTML: "Keyword:" lines as headings, "1." and "-" lines as lists, links clickable.</summary>
-    static string DocHtml(string details)
-    {
-        var sb = new StringBuilder();
-        string list = null;
-        void Close() { if (list != null) { sb.Append("</").Append(list).Append('>'); list = null; } }
-        void Open(string kind) { if (list == kind) return; Close(); sb.Append('<').Append(kind).Append('>'); list = kind; }
-        // links: only absolute http(s) URLs, found in the raw text and encoded for the attribute and the text separately
-        static string Text(string s)
-        {
-            var sb = new StringBuilder();
-            int at = 0;
-            foreach (System.Text.RegularExpressions.Match m in System.Text.RegularExpressions.Regex.Matches(s ?? "", @"https?://[^\s<>""']+"))
-            {
-                sb.Append(E(s[at..m.Index]));
-                var href = Guards.SafeHref(m.Value);
-                sb.Append(href != null ? "<a href=\"" + E(href) + "\" rel=\"noopener noreferrer\">" + E(m.Value) + "</a>" : E(m.Value));
-                at = m.Index + m.Length;
-            }
-            return sb.Append(E((s ?? "")[at..])).ToString();
-        }
-        foreach (var raw in details.Split('\n'))
-        {
-            var l = raw.Trim();
-            if (l.Length == 0) { Close(); continue; }
-            System.Text.RegularExpressions.Match m;
-            if ((m = Numbered.Match(l)).Success) { Open("ol"); sb.Append("<li>").Append(Text(m.Groups[1].Value)).Append("</li>"); continue; }
-            if ((m = Bullet.Match(l)).Success) { Open("ul"); sb.Append("<li>").Append(Text(m.Groups[1].Value)).Append("</li>"); continue; }
-            Close();
-            if ((m = Heading.Match(l)).Success && !l.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-            {
-                sb.Append("<h4>").Append(E(m.Groups[1].Value)).Append("</h4>");
-                if (m.Groups[2].Value.Length > 0) sb.Append("<div>").Append(Text(m.Groups[2].Value)).Append("</div>");
-            }
-            else sb.Append("<div>").Append(Text(l)).Append("</div>");
-        }
-        Close();
-        return sb.ToString();
-    }
 
     static string Git(string dir, string args)
     {
@@ -275,6 +235,8 @@ public static class TcUnitReport
           .Append("table.sum td,table.sum th{padding:7px 14px;border-bottom:1px solid var(--line);text-align:right}table.sum th:first-child,table.sum td:first-child{text-align:left}")
           .Append(".sdoc{padding:4px 18px 10px 18px;border-bottom:1px solid var(--line)}.body ol,.body ul,.sdoc ol,.sdoc ul{margin:4px 0;padding-left:20px}.sdoc h4{margin:8px 0 4px;font-size:13px}")
           .Append(".bar button.on{background:var(--accent);color:#fff;border-color:var(--accent)}")
+          .Append("table.steps{border-collapse:collapse;margin:4px 0 8px;font-size:13px;background:var(--card)}table.steps th,table.steps td{border:1px solid var(--line);padding:3px 10px;text-align:left;vertical-align:top}")
+          .Append("table.steps th{color:var(--muted);font-weight:600}table.steps .n{text-align:right;font-variant-numeric:tabular-nums}")
           .Append(".hdr{display:grid;grid-template-columns:110px minmax(180px,1.2fr) 2fr 90px;gap:10px;padding:0 14px 4px;color:var(--muted);font-size:12px}.hidden{display:none!important}code{font-size:12.5px}")
           .Append("</style></head><body><header><h1>").Append(E(title)).Append(" &ndash; TcUnit test report</h1><div class='muted'>")
           .Append(E(when.ToString("yyyy-MM-dd HH:mm", CultureInfo.InvariantCulture)))
@@ -324,7 +286,7 @@ public static class TcUnitReport
             if (gs > 0) o.Append("<span class='pill skipped'>&#8856; ").Append(gs).Append("</span>");
             o.Append("<span class='muted' style='font-size:12px'>").Append(Sec(gt)).Append("</span></summary>");
             // what the suite checks (/// details of the suite FB, e.g. the test case of a generated suite)
-            if (details != null) o.Append("<div class='sdoc'>").Append(DocHtml(details)).Append("</div>");
+            if (details != null) o.Append("<div class='sdoc'>").Append(TcUnitDoc.Html(details)).Append("</div>");
             foreach (var i in list)
             {
                 var look = Look(i);
@@ -336,8 +298,8 @@ public static class TcUnitReport
                  .Append("<summary><span class='st ").Append(look).Append("'>").Append(Label(look)).Append("</span><span class='tn'>").Append(E(i.Name)).Append("</span><span class='td'>")
                  .Append(E(t?.Description)).Append("</span><span class='num'>").Append(look is "passed" or "failed" ? Sec(i.Duration) : "").Append("</span></summary><div class='body'>");
                 if (t?.Description != null) o.Append("<div><b>").Append(E(t.Description)).Append("</b></div>");
-                if (t?.Details != null) o.Append(DocHtml(t.Details));
-                else if (t == null && inst?.Suite.Details != null) o.Append("<div class='muted'>Test case of the suite:</div>").Append(DocHtml(inst.Suite.Details));
+                if (t?.Details != null) o.Append(TcUnitDoc.Html(t.Details));
+                else if (t == null && inst?.Suite.Details != null) o.Append("<div class='muted'>Test case of the suite:</div>").Append(TcUnitDoc.Html(inst.Suite.Details));
                 if (!string.IsNullOrEmpty(i.Message))
                     o.Append("<h4>Failure</h4><pre>").Append(E(string.Join("\n", i.Message.Split('\n').Distinct()).Replace(", ACT:", "\nACT:").Replace(", MSG:", "\nMSG:"))).Append("</pre>");
                 o.Append("<h4>Details</h4><div class='kv'><span>Suite</span><span>").Append(E(i.Instance)).Append(inst != null ? " : " + E(inst.Suite.Type) : "").Append("</span>");

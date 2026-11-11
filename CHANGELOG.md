@@ -7,6 +7,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **TcUnit report and window: tables in the test texts** - `///` lines that start and end with `|` are shown as a table
+  (first line the head, a `|---|` separator line is left out, number columns right-aligned) in the HTML report, light and
+  dark, and in the details of the TcUnit Tests window, e.g. the step table of a path test.
 - **Chat history per solution** - for every backend of the TcAgent Chat (Claude Code, GitHub Copilot, Gemini, Codex):
   the chat keeps every conversation on this PC (`%LOCALAPPDATA%\TcAgent\chats\<solution>-<hash>\`, never in Git):
   questions, answers, one line per tool call, a stop, and the agent's task list where the backend reports one (Claude
@@ -37,6 +40,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `codeChecked`), the whole truth table in `results`; `tc_condition` offers turned comparisons.
 
 ### Fixed
+- **TcUnit report showed old test texts** after a run without download when only `///` comments had changed: a run now
+  saves what is open in the IDE before it reads the tests (texts and line numbers are current), and the report button
+  of the window saves before it makes the report.
 - **TcUnit tests of a PLC project kept in its own .xti file** are found again (TcUnit Tests window, `tc_test_run`,
   `tcunit list`): the `PrjFilePath` of the .xti is relative to the .xti, not to the .tsproj (the .tsproj folder is still
   tried for older projects). A PLC project whose .plcproj is not found is now named with the path tried instead of being
