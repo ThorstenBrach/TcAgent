@@ -170,7 +170,8 @@ elseif (-not $Uninstall) {
     for ($i = 1; $i -le 25; $i++) {
         $a = @('/nologo', '/target:library', '/platform:anycpu', '/optimize+', '/langversion:latest', '/define:XAESHELL',
                '/nowarn:1701,1702,CS1998,CS0618', "/out:$out\TcAgentBridge.dll") + $menuRes + ($refs | ForEach-Object { "/r:$_" }) +
-             (Get-ChildItem "$here\*.cs" | ForEach-Object { $_.FullName })
+             (Get-ChildItem "$here\*.cs" | ForEach-Object { $_.FullName }) +
+             "$here\..\src\ChatHistory.cs"     # shared with the TcAgent server (also in build.ps1 and TcAgentBridge.csproj)
         $output = & $csc @a 2>&1 | Out-String
         if ($LASTEXITCODE -eq 0) { $built = $true; break }
         $missing = [regex]::Matches($output, 'CS0012[^\r\n]*?["''„“]([A-Za-z0-9_.]+), Version=') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique

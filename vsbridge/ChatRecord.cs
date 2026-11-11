@@ -10,6 +10,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
+using Task = System.Threading.Tasks.Task;   // the VS 15 shell (XAE Shell) also has Microsoft.VisualStudio.Shell.Task
 using System.Windows;
 using Microsoft.VisualStudio;
 using Microsoft.VisualStudio.Shell;
