@@ -426,7 +426,7 @@ namespace TcAgentBridge
             public Process P; public Backend Be; public Stream In;
             public readonly StringBuilder Answer = new StringBuilder(), Err = new StringBuilder();
             public TaskCompletionSource<string> Turn; public Stopwatch TurnSw; public string Summary;
-            public bool Exited, Greeted; public readonly Stopwatch Up = Stopwatch.StartNew();
+            public bool Exited, Greeted, Interrupted; public readonly Stopwatch Up = Stopwatch.StartNew();
             public AcpState Acp;                // ACP backends (ChatAcp.cs)
             public string Server;               // TcAgent version registered when the session started
         }
@@ -789,7 +789,7 @@ namespace TcAgentBridge
             var warm = sess != null && !sess.Exited && sess.Be == be;
             if (!warm) status.Text = $"{be.Name} is starting ...";
             var s = await EnsureSession(be);
-            s.Answer.Clear(); s.Summary = null;
+            s.Answer.Clear(); s.Summary = null; s.Interrupted = false;
             s.TurnSw = Stopwatch.StartNew();
             s.Turn = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
             var prompt = BuildPrompt(text, ctx, followUp: s.Greeted, askTool: true);
@@ -820,6 +820,7 @@ namespace TcAgentBridge
                 if (sess == s) sess = null;
                 return;
             }
+            if (s.Interrupted) { FlushAgent(); SystemLine("⊘ Stopped by you - the conversation goes on with the next question."); }
             doneText = Done(s.TurnSw.Elapsed.TotalSeconds) + (s.Summary != null ? " · " + s.Summary : "");
             if (answer.Length > 0) history.Add(new KeyValuePair<string, string>(text, answer.Trim()));
         }
@@ -961,6 +962,11 @@ namespace TcAgentBridge
                 AcpCancel(sess);        // the agent ends the turn; the session stays open
                 return;
             }
+            if (sess != null && sess.Turn != null && sess.Be.Format == "claude-stream")
+            {
+                ClaudeInterrupt(sess);  // Claude Code ends the turn; the session and its history stay
+                return;
+            }
             if (sess != null && sess.Turn != null)
             {
                 KillSession();          // abort the running answer; the next question starts a new session
@@ -971,6 +977,35 @@ namespace TcAgentBridge
             if (p == null) return;
             try { Process.Start(new ProcessStartInfo("taskkill", $"/T /F /PID {p.Id}") { CreateNoWindow = true, UseShellExecute = false }); } catch { }
             SystemLine("⊘ Stopped by you.");
+        }
+
+        // Stop in a running Claude Code session: {"type":"control_request","request":{"subtype":"interrupt"}} on stdin.
+        // Claude Code ends the turn with a result (subtype error_during_execution) and waits for the next question with the
+        // whole conversation. Open cards are answered "not answered" first, so a waiting tool call returns. If the turn has
+        // not ended after a few seconds, the session is ended as before.
+        void ClaudeInterrupt(Session s)
+        {
+            s.Interrupted = true;
+            var turn = s.Turn;
+            var json = new JavaScriptSerializer().Serialize(new Dictionary<string, object>
+            {
+                ["type"] = "control_request", ["request_id"] = "stop-" + Guid.NewGuid().ToString("N"),
+                ["request"] = new Dictionary<string, object> { ["subtype"] = "interrupt" }
+            }) + "\n";
+            try
+            {
+                var bytes = new UTF8Encoding(false).GetBytes(json);
+                lock (writeLock) { s.In.Write(bytes, 0, bytes.Length); s.In.Flush(); }
+            }
+            catch { KillSession(); SystemLine("⊘ Stopped by you - the next question starts a new session."); return; }
+            CancelOpenCards();
+            status.Text = "Stopping ...";
+            _ = Task.Delay(8000).ContinueWith(_ => Dispatcher.BeginInvoke(new Action(() =>
+            {
+                if (sess != s || s.Turn != turn || turn == null || turn.Task.IsCompleted) return;
+                KillSession();
+                SystemLine("⊘ Stopped by you - the agent did not stop in time, the next question starts a new session.");
+            })));
         }
 
         string BuildPrompt(string text, string ctx, bool followUp, bool askTool = false)

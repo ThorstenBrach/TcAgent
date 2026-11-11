@@ -112,7 +112,8 @@ work without the extension. The extension runs **inside** the IDE process and ad
   The input shows "Ask … about this solution", above it a chip with the editor context that goes with the question
   (📄 MAIN · line 12 – **×** sends the next question without it) and the attachments; below it the keys: Enter sends,
   Shift+Enter makes a new line, ↑/↓ brings back earlier prompts (kept across sessions), Esc stops the answer while the
-  agent works (otherwise back to the editor). **New chat** clears the history, **Stop** cancels the running answer. The
+  agent works (otherwise back to the editor). **New chat** clears the history, **Stop** cancels the running answer (with Claude Code
+  and the ACP backends the conversation goes on with the next question). The
   status line shows the state of the backend, while working "◐ Claude Code is working · 3 tool calls · 12 s · tc_check",
   afterwards "✓ Done in 14 s · 6 tool calls". The **⋯** menu is grouped: *Chat* (send editor context, check after changes, **Answer language**,
   New chat, Copy conversation), *Windows* (TcUnit Tests, Knowledge), *Setup and help* (Set up clients, Copy diagnostics,

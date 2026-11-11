@@ -19,6 +19,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `codeChecked`), the whole truth table in `results`; `tc_condition` offers turned comparisons.
 
 ### Fixed
+- Chat: Stop no longer ends the Claude Code session - it interrupts the running answer only, an open question
+  card counts as not answered, and the next question goes on with the whole conversation (was: a new session without
+  the history). Only if Claude Code has not stopped after 8 s is the session ended as before.
 - Format ST code and Apply in the condition window: one Ctrl+Z takes it back (was two - select all and paste were two
   undo steps, now one compound action of the editor).
 - Inline-Logic-View: 📌 (pin), ⏸ (freeze) and ⊟ (fold) no longer end Visual Studio - a click ran an empty action.
