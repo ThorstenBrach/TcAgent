@@ -336,4 +336,51 @@ public sealed class TcUnitDiscoveryTests : IDisposable
         Assert.Contains("TEST('it''s // no comment');", r);
         Assert.DoesNotContain("x", r.Split('\n')[0]);
     }
-}
+
+    /// <summary>The PLC project as an independent file: the .tsproj names only the .xti, PrjFilePath is in the .xti.</summary>
+    void UseXti(string prjFilePath)
+    {
+        File.WriteAllText(Path.Combine(dir, "Demo.tsproj"), """
+            <?xml version="1.0"?>
+            <TcSmProject><Project><Plc><Project File="TestPlc.xti"/></Plc></Project></TcSmProject>
+            """);
+        Directory.CreateDirectory(Path.Combine(dir, "_Config", "PLC"));
+        File.WriteAllText(Path.Combine(dir, "_Config", "PLC", "TestPlc.xti"), $"""
+            <?xml version="1.0"?>
+            <TcSmItem><Project Name="TestPlc" PrjFilePath="{prjFilePath}" AmsPort="851"/></TcSmItem>
+            """);
+    }
+
+    [Fact]
+    public void FindsProjectOfAnXtiWithPathRelativeToTheXti()
+    {
+        UseXti(@"..\..\Tests\Tests.plcproj");
+        var r = TcUnitDiscovery.Discover(Sln);
+        var p = Assert.Single(r.Projects);
+        Assert.Equal("TestPlc", p.Name);
+        Assert.Equal(851, p.AmsPort);
+        Assert.Contains(p.Suites, s => s.Type == "FB_Motor_Test");
+        Assert.Contains(p.Instances, i => i.Path == "MAIN.fbMotor");
+        Assert.Empty(r.Notes);
+    }
+
+    [Fact]
+    public void FindsProjectOfAnXtiWithPathRelativeToTheTsproj()
+    {
+        UseXti(@"Tests\Tests.plcproj");     // older projects: relative to the .tsproj
+        var p = Assert.Single(TcUnitDiscovery.Discover(Sln).Projects);
+        Assert.Equal("TestPlc", p.Name);
+        Assert.Contains(p.Suites, s => s.Type == "FB_Motor_Test");
+    }
+
+    [Fact]
+    public void MissingPlcprojIsReportedNotSkippedSilently()
+    {
+        UseXti(@"..\..\Missing\Missing.plcproj");
+        var r = TcUnitDiscovery.Discover(Sln);
+        Assert.Empty(r.Projects);
+        var n = Assert.Single(r.Notes);
+        Assert.Contains("TestPlc", n);
+        Assert.Contains(Path.Combine(dir, "Missing", "Missing.plcproj"), n);
+        Assert.Equal(n, TcUnitDiscovery.ToJson(r)["notes"]![0]!.ToString());
+    }}

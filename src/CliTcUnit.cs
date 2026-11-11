@@ -50,7 +50,7 @@ public static partial class Cli
         if (o.Plc.Count > 0)
         {
             var keep = d.Projects.Where(p => p.Name.Equals(o.Plc[0], StringComparison.OrdinalIgnoreCase)).ToList();
-            if (keep.Count == 0) { Console.Error.WriteLine($"Error: PLC project '{o.Plc[0]}' not found - the solution has: {string.Join(", ", d.Projects.Select(p => p.Name))}"); return Usage; }
+            if (keep.Count == 0) { Console.Error.WriteLine($"Error: PLC project '{o.Plc[0]}' not found - the solution has: {string.Join(", ", d.Projects.Select(p => p.Name))}" + (d.Notes.Count > 0 ? " - " + string.Join("; ", d.Notes) : "")); return Usage; }
             json["projects"] = new JsonArray(keep.Select(p => (JsonNode)TcUnitDiscovery.ToJson(p)).ToArray());
         }
         var cfg = TcUnitConfig.Load(Path.GetDirectoryName(Path.GetFullPath(o.Solution)));

@@ -625,7 +625,9 @@ public sealed partial class ToolRegistry
                 }
                 foreach (var n in p.Notes) sb.AppendLine("  note: " + n);
             }
-            return sb.Length > 0 ? sb.ToString() : "No TcUnit test suites (FUNCTION_BLOCK ... EXTENDS TcUnit.FB_TestSuite) in the solution.";
+            foreach (var n in d.Notes) sb.AppendLine("note: " + n);
+            return sb.Length > 0 && d.Projects.Any(p => p.Suites.Count > 0) ? sb.ToString()
+                 : "No TcUnit test suites (FUNCTION_BLOCK ... EXTENDS TcUnit.FB_TestSuite) in the solution." + (sb.Length > 0 ? "\n" + sb : "");
         }
 
         var o = new TcUnitRun.Options { Solution = sln, Plc = Str(a, "plc"), Target = Str(a, "target"), Download = Bool(a, "download", false) };

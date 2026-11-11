@@ -384,6 +384,7 @@ results\tcunit.xml`.
 | A test has a greyed-out checkbox | No `bRun_<Test>` bool: it runs with its whole suite ([4.1](#41-the-rules)). |
 | A suite always runs | No `bRunSuite` bool in the suite (or its base suite). |
 | Tests appear only after the first run | Their names are not literals (`TEST(sName)`); give each test a literal name ([4.4](#44-one-method-several-tests-parameters)). |
+| The window stays empty, "PLC project … file … not found" | The PLC project points to a `.plcproj` that is not there (in the `.tsproj` or its own `.xti` in `_Config\PLC`, path relative to that file) – check the path, or open and save the project once in TwinCAT. |
 | A suite instance is missing | Instances are found in `PROGRAM`s and GVLs (also `ARRAY[..] OF`), not inside other function blocks. |
 | "Writing … failed" at the start | The runtime runs an older program than the code – run once with download (`--download`) or build and activate. |
 | Progress only "n of N finished" | `TcUnit.RUN()` runs all suites at the same time; `TcUnit.RUN_IN_SEQUENCE()` gives the test names. |

@@ -685,7 +685,14 @@ namespace TcAgentBridge
             var tickedSuites = new HashSet<string>(suites.Where(s => s.Ticked == true).Select(s => s.Path), StringComparer.OrdinalIgnoreCase);
             var collapsed = new HashSet<string>(suites.Where(s => !s.Expanded).Select(s => s.Path), StringComparer.OrdinalIgnoreCase);
             Clear();
-            if (pj == null) { project = null; status.Text = "No TcUnit test suites in this solution (FUNCTION_BLOCK ... EXTENDS TcUnit.FB_TestSuite with an instance in a PROGRAM or GVL)."; return; }
+            if (pj == null)
+            {
+                project = null;
+                var notes = L(root, "notes").Select(n => n?.ToString()).Where(n => !string.IsNullOrEmpty(n)).ToList();
+                status.Text = "No TcUnit test suites in this solution (FUNCTION_BLOCK ... EXTENDS TcUnit.FB_TestSuite with an instance in a PROGRAM or GVL)." +
+                              (notes.Count > 0 ? " " + string.Join("; ", notes) : "");
+                return;
+            }
             project = S(pj, "name"); treePath = S(pj, "treePath"); runMode = S(pj, "runMode");
             projectBox.SelectedItem = project;
             var types = L(pj, "suites").ToDictionary(s => S(s, "type"), s => s, StringComparer.OrdinalIgnoreCase);

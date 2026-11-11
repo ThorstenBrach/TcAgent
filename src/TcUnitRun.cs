@@ -569,13 +569,15 @@ public sealed class TcUnitRun
             var w = wanted.Trim();
             var p = d.Projects.FirstOrDefault(x => x.Name.Equals(w, StringComparison.OrdinalIgnoreCase) || x.TreePath.Equals(w, StringComparison.OrdinalIgnoreCase)
                                                    || ("TIPC^" + x.Name).Equals(w, StringComparison.OrdinalIgnoreCase));
-            if (p == null) why = $"PLC project '{w}' not found - the solution has: {string.Join(", ", d.Projects.Select(x => x.Name))}";
+            if (p == null) why = $"PLC project '{w}' not found - the solution has: {string.Join(", ", d.Projects.Select(x => x.Name))}" +
+                                 (d.Notes.Count > 0 ? " - " + string.Join("; ", d.Notes) : "");
             return p;
         }
         var withTests = d.Projects.Where(x => x.Instances.Count > 0).ToList();
         if (withTests.Count == 1) return withTests[0];
         why = withTests.Count == 0
-            ? "No PLC project with TcUnit test suite instances (FB EXTENDS TcUnit.FB_TestSuite, instance in a PROGRAM or GVL)."
+            ? "No PLC project with TcUnit test suite instances (FB EXTENDS TcUnit.FB_TestSuite, instance in a PROGRAM or GVL)." +
+              (d.Notes.Count > 0 ? " " + string.Join("; ", d.Notes) : "")
             : $"Several PLC projects with tests ({string.Join(", ", withTests.Select(x => x.Name))}) - choose one with --plc or \"plcProject\" in .tcagent\\tcunit.json.";
         return null;
     }

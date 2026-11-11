@@ -28,6 +28,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `codeChecked`), the whole truth table in `results`; `tc_condition` offers turned comparisons.
 
 ### Fixed
+- **TcUnit tests of a PLC project kept in its own .xti file** are found again (TcUnit Tests window, `tc_test_run`,
+  `tcunit list`): the `PrjFilePath` of the .xti is relative to the .xti, not to the .tsproj (the .tsproj folder is still
+  tried for older projects). A PLC project whose .plcproj is not found is now named with the path tried instead of being
+  left out silently.
 - Knowledge > Sources: a commit in a source shows as an update of the installed items it touches. The content of the
   item in Git decides (`git diff` between the installed and the source commit), not a version number in its header; a
   source in a folder on this computer is read again whenever the state is shown, so the commit shows at once (was: only

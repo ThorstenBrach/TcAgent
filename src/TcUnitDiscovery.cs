@@ -58,6 +58,8 @@ public static class TcUnitDiscovery
     {
         public string Solution;
         public readonly List<Project> Projects = new();
+        /// <summary>PLC projects named in a .tsproj/.xti whose .plcproj was not found (instead of skipping them silently).</summary>
+        public readonly List<string> Notes = new();
     }
 
     // ------------------------------------------------------------------ solution -> PLC projects
@@ -75,13 +77,16 @@ public static class TcUnitDiscovery
         if (tsprojs.Count == 0) tsprojs = Directory.GetFiles(dir, "*.tsproj", SearchOption.AllDirectories).ToList();
         var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var ts in tsprojs)
-            foreach (var (name, plcproj, port) in PlcProjects(ts))
+            foreach (var (name, plcproj, port) in PlcProjects(ts, r.Notes))
                 if (seen.Add(plcproj)) r.Projects.Add(ReadProject(name, plcproj, port));
         return r;
     }
 
-    /// <summary>PLC projects of a .tsproj: &lt;Plc&gt;&lt;Project Name=.. PrjFilePath=..&gt;, also in separate .xti files (File=..).</summary>
-    static IEnumerable<(string Name, string PlcProj, int Port)> PlcProjects(string tsproj)
+    /// <summary>PLC projects of a .tsproj: &lt;Plc&gt;&lt;Project Name=.. PrjFilePath=..&gt;, also in separate .xti files (File=..).
+    /// PrjFilePath is relative to the file it is written in: the .tsproj, or the .xti (e.g. _Config\PLC\X.xti with
+    /// ..\..\X\X.plcproj); for an .xti the folder of the .tsproj is tried as well (older projects). A project whose
+    /// .plcproj is not found is reported in notes.</summary>
+    static IEnumerable<(string Name, string PlcProj, int Port)> PlcProjects(string tsproj, List<string> notes)
     {
         var tsDir = Path.GetDirectoryName(tsproj)!;
         XDocument doc;
@@ -91,6 +96,7 @@ public static class TcUnitDiscovery
             var name = (string)p.Attribute("Name");
             var prj = (string)p.Attribute("PrjFilePath");
             var port = (int?)p.Attribute("AmsPort") ?? 851;
+            var bases = new List<string> { tsDir };      // folders PrjFilePath may be relative to, the first one first
             if (prj == null && (string)p.Attribute("File") is string xti)
             {
                 // independent project file: <tsproj dir>\_Config\PLC\<name>.xti
@@ -99,13 +105,22 @@ public static class TcUnitDiscovery
                     try
                     {
                         var xp = XDocument.Load(xf).Descendants().FirstOrDefault(e => e.Name.LocalName == "Project" && e.Attribute("PrjFilePath") != null);
-                        if (xp != null) { prj = (string)xp.Attribute("PrjFilePath"); name ??= (string)xp.Attribute("Name"); port = (int?)xp.Attribute("AmsPort") ?? port; }
+                        if (xp != null)
+                        {
+                            prj = (string)xp.Attribute("PrjFilePath"); name ??= (string)xp.Attribute("Name"); port = (int?)xp.Attribute("AmsPort") ?? port;
+                            bases.Insert(0, Path.GetDirectoryName(xf)!);    // relative to the .xti
+                        }
                     }
                     catch { }
+                else notes.Add($"PLC project {name ?? xti}: {xti} not found below {tsDir}");
             }
             if (prj == null) continue;
-            var full = Path.GetFullPath(Path.Combine(tsDir, prj.Replace('\\', Path.DirectorySeparatorChar)));
-            if (File.Exists(full) && full.EndsWith(".plcproj", StringComparison.OrdinalIgnoreCase))
+            var rel = prj.Replace('\\', Path.DirectorySeparatorChar);
+            var tried = bases.Select(b => Path.GetFullPath(Path.Combine(b, rel))).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var full = tried.FirstOrDefault(File.Exists);
+            if (full == null) notes.Add($"PLC project {name ?? Path.GetFileNameWithoutExtension(rel)}: file {tried[0]} not found" +
+                                        (tried.Count > 1 ? $" (nor {string.Join(", ", tried.Skip(1))})" : ""));
+            else if (full.EndsWith(".plcproj", StringComparison.OrdinalIgnoreCase))
                 yield return (name ?? Path.GetFileNameWithoutExtension(full), full, port);
         }
     }
@@ -552,7 +567,8 @@ public static class TcUnitDiscovery
     public static JsonObject ToJson(Result r) => new()
     {
         ["solution"] = r.Solution,
-        ["projects"] = new JsonArray(r.Projects.Select(p => (JsonNode)ToJson(p)).ToArray())
+        ["projects"] = new JsonArray(r.Projects.Select(p => (JsonNode)ToJson(p)).ToArray()),
+        ["notes"] = new JsonArray(r.Notes.Select(n => (JsonNode)n).ToArray())
     };
 
     public static JsonObject ToJson(Project p)
