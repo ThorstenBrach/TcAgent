@@ -1005,6 +1005,11 @@ public static partial class Cli
       run, one run after the other, until stdin closes or says ""cancel"". Reads only over ADS (PLC state, progress,
       enable bools); the target must be allowed like for ads_read. The TcUnit Tests window starts it.
 
+  TcAgent.exe tcunit ensure --solution <sln>|--attach [pid] [--plc <name>]
+      Installs the TcUnit shipped with TcAgent (thirdparty\TcUnit, MIT license) into the TwinCAT library repository,
+      but only if TcUnit is missing there or older; a newer installed TcUnit stays. Reports whether the PLC project
+      references TcUnit (nothing is saved - add it with tc_library action=ensure_tcunit or in the project). Starts the IDE.
+
   TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>] [--builtin] [--approve <id>]
       HTML report of the last tcunit run (or of the JUnit file given): the command of ""report"" in .tcagent\tcunit.json
       (placeholders {junit} {html} {solution} {solutionDir}, run in the solution folder) or TcAgent's own report.

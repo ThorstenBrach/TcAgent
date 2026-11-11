@@ -344,6 +344,10 @@ projects.
 ## Preparing the PLC project for TcUnit
 
 * Reference the [TcUnit](https://tcunit.org) library and call `TcUnit.RUN();` cyclically in a program of a task.
+* TcAgent ships TcUnit (MIT license, `thirdparty\TcUnit` next to `TcAgent.exe`). `TcAgent.exe tcunit ensure --solution <sln>`
+  installs it on the build machine only if TcUnit is missing or older there; a newer installed TcUnit stays. Put it in
+  `.tcagent/pipeline.json` before `test`/`sil` (`{ "run": "tcunit", "args": ["ensure"] }`) or run it once when setting up the machine. It saves nothing:
+  the reference belongs in the project (in the IDE or chat: `tc_library action=ensure_tcunit` adds it).
 * Test suites are function blocks that `EXTENDS TcUnit.FB_TestSuite`; instantiate them in that program.
 * Keep `LogExtendedResults` at `TRUE` (TcUnit default) – then the JUnit file has one entry per test instead of only the summary.
 * Recommended: a separate PLC project or solution for the tests, so the production PLC never contains test code.

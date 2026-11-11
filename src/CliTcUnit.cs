@@ -7,6 +7,9 @@
 //                                                                    HTML report of the last run (TcUnitReport.cs)
 //   TcAgent.exe tcunit watch --solution <sln> [--plc <name>] [--target ...]
 //                                                                    follows runs started elsewhere, read only (TcUnit window)
+//   TcAgent.exe tcunit ensure --solution <sln>|--attach [pid] [--plc <name>]
+//                                                                    installs the shipped TcUnit if it is missing or older
+//                                                                    (TcUnitInstall.cs), reports the reference, saves nothing
 // tcunit run stops when a line "cancel" arrives on stdin (or Ctrl+C): the PLC is reset, open tests stay "notrun".
 //
 // SPDX-License-Identifier: MIT
@@ -19,7 +22,8 @@ public static partial class Cli
 {
     static void ValidateTcUnit(Options o)
     {
-        if (o.Sub is not ("list" or "run" or "report" or "watch")) throw new Exception("tcunit needs list, run, report or watch, e.g. TcAgent.exe tcunit list --solution <sln>");
+        if (o.Sub is not ("list" or "run" or "report" or "watch" or "ensure")) throw new Exception("tcunit needs list, run, report, watch or ensure, e.g. TcAgent.exe tcunit list --solution <sln>");
+        if (o.Sub == "ensure" && (o.Tests.Count > 0 || o.Download || o.Junit != null || o.Target != null)) throw new Exception("tcunit ensure only installs TcUnit - --tests, --download, --junit and --target are options of tcunit run");
         if (o.Sub is "list" or "report" or "watch" && o.Solution == null) throw new Exception($"tcunit {o.Sub} needs --solution <path to .sln>");
         if (o.Sub == "watch" && (o.Tests.Count > 0 || o.Download || o.Junit != null)) throw new Exception("tcunit watch only follows runs - --tests, --download and --junit are options of tcunit run");
         if (o.Sub == "report" && (o.Tests.Count > 0 || o.Download)) throw new Exception("--tests and --download are options of tcunit run");
@@ -104,6 +108,7 @@ public static partial class Cli
 
     static int TcUnitCli(Options o, TwinCatSession tc)
     {
+        if (o.Sub == "ensure") return TcUnitEnsureCli(o, tc);
         var cancel = false;
         Console.CancelKeyPress += (_, e) => { e.Cancel = true; cancel = true; };
         // the window sends "cancel" on stdin; a pipeline without stdin just ends the reader
@@ -130,5 +135,20 @@ public static partial class Cli
         var rc = run.Run(ro);
         Say(run.Summary ?? "");
         return rc;
+    }
+
+    /// <summary>tcunit ensure: the shipped TcUnit into the library repository if it is missing or older. The repository
+    /// is changed for good; the project is not (the IDE closes without saving), so a missing reference is only reported.</summary>
+    static int TcUnitEnsureCli(Options o, TwinCatSession tc)
+    {
+        var text = tc.Sta.Run(() =>
+        {
+            var plcs = SelectedPlcs(o, tc);
+            if (plcs.Count == 0) throw new Exception("no PLC project found");
+            if (plcs.Count > 1) throw new Exception("Several PLC projects - choose one with --plc.");
+            return TcUnitInstall.Ensure(plcs[0], addReference: false, ToolRegistry.DescribeLib);
+        }, 300_000);
+        Say(text);
+        return Ok;
     }
 }

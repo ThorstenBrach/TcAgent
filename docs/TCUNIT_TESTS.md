@@ -364,6 +364,10 @@ started. The window pauses it during its own runs.
   `result`, `progress`, `done`); a line `cancel` on stdin (or Ctrl+C) stops the run. `--download` builds and activates
   even if the code did not change. Exit code 0 = all passed, 1 = failed tests or build errors, 2 = refused target or
   unknown test names, 3 = infrastructure problem or timeout.
+- `TcAgent.exe tcunit ensure --solution <sln> | --attach [pid] [--plc <name>]` – installs the TcUnit shipped with TcAgent
+  (MIT license, `thirdparty\TcUnit`) into the library repository only if TcUnit is missing or older, and says whether the
+  PLC project references it. In the chat: *"Make TcUnit ready for this project"* (`tc_library action=ensure_tcunit`, also
+  adds the reference).
 - `TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>] [--builtin] [--approve <id>]` – the report of
   [section 8](#8-test-report). No IDE needed.
 - In the chat: *"Run only the tests of FB_Motor_Test"*, *"Which tests failed and why?"* (tool `tc_test_run`,

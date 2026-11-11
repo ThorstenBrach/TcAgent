@@ -371,7 +371,7 @@ treat them like project rules for that library.
   existing project (writes through the IDE when it is open there - then `tc_save`, `tc_check`). Keep the implementation
   indented by two blanks; graphical bodies (`// @implementation SFC ...`) are not touched; it never deletes, renames or moves objects.
   For single changes `tc_plc_write` stays the normal way.
-- Libraries: `tc_library` (references, placeholders, repositories, install), `tc_library_save` (save a PLC project as library).
+- Libraries: `tc_library` (references, placeholders, repositories, install; `action=ensure_tcunit` makes TcUnit ready - installs the shipped one only if missing or older and adds the reference), `tc_library_save` (save a PLC project as library).
 - `tc_static_analysis` (TE1200) shows errors/warnings, optionally as SARIF. `tc_mapping_export`/`tc_mapping_import` for I/O mappings,
   `tc_archive` for a .tszip (the TwinCAT project, not HMI/Scope projects), `tc_twincat_version` and `tc_platform` for the build environment, `tc_variant` for project variants.
 - Network: `tc_route_search` (ADS broadcast), `tc_route_add` (runtime action - confirmation), `tc_tccom` (TcCOM module instances).

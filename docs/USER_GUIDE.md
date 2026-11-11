@@ -1665,6 +1665,7 @@ and port 851; `netId` and `port` select others.
 | `repositories`, `add_repository`, `remove_repository` | Library repositories (`path`, `index`) |
 | `install`, `uninstall` | Install a `.library`/`.compiled-library` file into a repository (`overwrite`) or remove it |
 | `scan` | All installed libraries (`filter`) |
+| `ensure_tcunit` | TcUnit ready for tests: installs the TcUnit shipped with TcAgent only if TcUnit is missing or older (a newer one stays), then adds the reference to the PLC project if it has none (`reference=false` only installs) |
 
 `tc_library_save file=MyLib.library [install=true]` saves a PLC project as library and optionally installs it into the
 default repository – for example as a pipeline artifact.

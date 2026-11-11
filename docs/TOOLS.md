@@ -870,18 +870,19 @@ PLC code as plain-text ST files and back (format: [PLAINTEXT.md](PLAINTEXT.md)).
 
 ### `tc_library`
 
-Library management of a PLC project: list (references), add, add_placeholder, remove, resolve (name alone: shows the effective version of a placeholder; with `library`: sets it), freeze (placeholder versions), repositories, add_repository, remove_repository, install, uninstall, scan (all installed libraries).
+Library management of a PLC project: list (references), add, add_placeholder, remove, resolve (name alone: shows the effective version of a placeholder; with `library`: sets it), freeze (placeholder versions), repositories, add_repository, remove_repository, install, uninstall, scan (all installed libraries), ensure_tcunit (installs the TcUnit shipped with TcAgent only if TcUnit is missing or older, then adds the reference if the project has none).
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
-| `action` | string | yes | list, add, add_placeholder, remove, resolve, freeze, repositories, add_repository, remove_repository, install, uninstall, scan |
+| `action` | string | yes | list, add, add_placeholder, remove, resolve, freeze, repositories, add_repository, remove_repository, install, uninstall, scan, ensure_tcunit |
 | `plcProjectPath` | string |  | PLC project (empty = the only one) |
 | `name` | string |  | Library or placeholder name, e.g. Tc2_Standard; also 'Tc2_Math, * (Beckhoff Automation GmbH)' |
 | `version` | string |  | Version, '*' = newest (default) |
 | `company` | string |  | Distributor, e.g. Beckhoff Automation GmbH |
 | `library` | string |  | resolve / add_placeholder: library name the placeholder points to |
 | `repository` | string |  | Repository name (install/uninstall/add_repository/remove_repository) |
-| `path` | string |  | install: .library/.compiled-library file; add_repository: root folder |
+| `path` | string |  | install: .library/.compiled-library file; add_repository: root folder; ensure_tcunit: other TcUnit.library than the shipped one |
+| `reference` | boolean |  | ensure_tcunit: add the TcUnit reference if missing (default true) |
 | `index` | integer |  | add_repository: position (default 0) |
 | `overwrite` | boolean |  | install: overwrite an installed version (default false) |
 | `filter` | string |  | scan: only libraries containing this text |

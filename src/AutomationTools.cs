@@ -59,15 +59,17 @@ public sealed partial class ToolRegistry
 
         // ---------------------------------------------------------- libraries
         Add("tc_library", "Library management of a PLC project: list (references), add, add_placeholder, remove, resolve (name alone: shows the effective version of a placeholder; with library: sets it), " +
-                          "freeze (placeholder versions), repositories, add_repository, remove_repository, install, uninstall, scan (all installed libraries).",
-            Schema(Req(P("action", "string", "list, add, add_placeholder, remove, resolve, freeze, repositories, add_repository, remove_repository, install, uninstall, scan")),
+                          "freeze (placeholder versions), repositories, add_repository, remove_repository, install, uninstall, scan (all installed libraries), " +
+                          "ensure_tcunit (installs the TcUnit shipped with TcAgent only if TcUnit is missing or older, then adds the reference if the project has none).",
+            Schema(Req(P("action", "string", "list, add, add_placeholder, remove, resolve, freeze, repositories, add_repository, remove_repository, install, uninstall, scan, ensure_tcunit")),
                    P("plcProjectPath", "string", "PLC project (empty = the only one)"),
                    P("name", "string", "Library or placeholder name, e.g. Tc2_Standard; also 'Tc2_Math, * (Beckhoff Automation GmbH)'"),
                    P("version", "string", "Version, '*' = newest (default)"),
                    P("company", "string", "Distributor, e.g. Beckhoff Automation GmbH"),
                    P("library", "string", "resolve / add_placeholder: library name the placeholder points to"),
                    P("repository", "string", "Repository name (install/uninstall/add_repository/remove_repository)"),
-                   P("path", "string", "install: .library/.compiled-library file; add_repository: root folder"),
+                   P("path", "string", "install: .library/.compiled-library file; add_repository: root folder; ensure_tcunit: other TcUnit.library than the shipped one"),
+                   P("reference", "boolean", "ensure_tcunit: add the TcUnit reference if missing (default true)"),
                    P("index", "integer", "add_repository: position (default 0)"),
                    P("overwrite", "boolean", "install: overwrite an installed version (default false)"),
                    P("filter", "string", "scan: only libraries containing this text")),

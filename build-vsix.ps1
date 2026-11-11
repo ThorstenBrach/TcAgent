@@ -41,6 +41,9 @@ Copy-Item "$here\agents\TCAGENT_GUIDE.md" "$stage\tcagent\agents\"
 # built-in knowledge (skills ...) next to TcAgent.exe - the single-file publish does not take content folders along
 if (-not (Test-Path "$stage\tcagent\knowledge")) { Copy-Item "$here\knowledge" "$stage\tcagent\knowledge" -Recurse }
 Remove-Item "$stage\tcagent\knowledge\.git" -Force -ErrorAction SilentlyContinue     # the link of the submodule, not content
+# shipped PLC libraries (TcUnit with its MIT license) next to TcAgent.exe - tc_library action=ensure_tcunit / tcunit ensure
+if (-not (Test-Path "$stage\tcagent\thirdparty")) { Copy-Item "$here\thirdparty" "$stage\tcagent\thirdparty" -Recurse }
+if (-not (Test-Path "$stage\tcagent\thirdparty\TcUnit\LICENSE")) { throw "thirdparty\TcUnit\LICENSE missing - TcUnit may only be shipped with its license" }
 
 # 3) Visual Studio extension + VSIX, built with the Visual Studio SDK build tools (Visual Studio's MSBuild)
 $vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"

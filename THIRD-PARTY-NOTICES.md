@@ -11,6 +11,7 @@ the following third-party components. Their license texts follow below.
 | PdfPig (`UglyToad.PdfPig.*`) | reading PDF documents for `tc_docs` | Apache License 2.0 |
 | Adobe Glyph List, Zapf Dingbats Glyph List (embedded in PdfPig) | mapping PDF glyph names to characters | BSD-3-Clause – Adobe Systems Incorporated |
 | Adobe Core 14 AFM files (embedded in PdfPig) | metrics of the 14 standard PDF fonts | Adobe AFM license (below) |
+| TcUnit (`thirdparty\TcUnit\<version>\TcUnit.library`, unchanged) | PLC unit test framework, installed into the TwinCAT library repository only when missing or older (`tc_library action=ensure_tcunit`, `tcunit ensure`) | MIT – Jakob Sagatowski and contributors |
 
 **Not included in the package:**
 
@@ -349,3 +350,32 @@ are not distributed without this file; that all modifications to this file or an
 noted in the modified file(s); and that this paragraph is not modified. Adobe Systems has no responsibility or
 obligation to support the use of the AFM files.
 ```
+
+---
+
+## TcUnit
+
+Source: https://github.com/tcunit/TcUnit - the license is also shipped next to the library (`thirdparty\TcUnit\LICENSE`).
+
+MIT License
+
+Copyright (c) 2018 Jakob Sagatowski and contributors
+(https://github.com/tcunit/TcUnit/graphs/contributors)
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.

@@ -1243,7 +1243,7 @@ public sealed partial class ToolRegistry
         return o.Length > 0 ? o.ToString() : "no library references found";
     }
 
-    static string DescribeLib(object r)
+    internal static string DescribeLib(object r)
     {
         dynamic d = r;
         static string T(Func<object> f) { try { return f()?.ToString() ?? ""; } catch { return null; } }

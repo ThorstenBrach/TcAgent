@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **TcUnit shipped with TcAgent** - TcUnit 1.3.2 (MIT license, `thirdparty\TcUnit` with its license next to
+  `TcAgent.exe`, listed in THIRD-PARTY-NOTICES.md). `tc_library action=ensure_tcunit` installs it into the TwinCAT library
+  repository only if TcUnit is missing or older there (a newer one stays) and adds the reference to the PLC project if it
+  has none; `TcAgent.exe tcunit ensure --solution <sln>` does the install for pipelines and reports the reference.
+  `doctor` now also finds TcUnit in the library folder of TwinCAT 4026 (`PlcEngineering\Managed Libraries`).
 - **Condition window: rewrite it, truth table** - ⤢ in the Inline-Logic-View or Tools > Rewrite condition (TcAgent) ...
   Tab *Rewrite*: NOT inward (De Morgan), NOT inward with the comparisons turned (`NOT (a < b)` → `a >= b`), NOT outward,
   simplify, write out in full, `= TRUE` uniform or removed - before and after in the look of the editor, laid out with the

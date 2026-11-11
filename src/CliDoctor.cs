@@ -85,7 +85,8 @@ public static partial class Cli
 
         // ---- TcUnit (library repository of this TwinCAT installation)
         var libRoots = new[] { tcDir == null ? null : Path.Combine(tcDir, "Components", "Plc", "Managed Libraries"),
-                               ProgramData(@"Beckhoff\TwinCAT\3.1\Components\Plc\Managed Libraries"),      // TwinCAT 4026
+                               ProgramData(@"Beckhoff\TwinCAT\3.1\Components\Plc\Managed Libraries"),
+                               ProgramData(@"Beckhoff\TwinCAT\PlcEngineering\Managed Libraries"),          // TwinCAT 4026
                                ProgramData(@"Beckhoff\TwinCAT\3.1\Repository"),
                                @"C:\Program Files (x86)\Beckhoff\TwinCAT\3.1\Components\Plc\Managed Libraries",
                                @"C:\TwinCAT\3.1\Components\Plc\Managed Libraries" }.Where(d => d != null && Directory.Exists(d)).Distinct().ToList();
@@ -94,7 +95,7 @@ public static partial class Cli
         // solution (--solution, below). Without it a miss is only a hint, not a warning (it was a false alarm on 4026).
         if (tcunit == null) Add(o.Solution != null ? Level.Warn : Level.Info, "TcUnit", "TcUnit not found in the usual library folders",
                                 o.Solution != null
-                                    ? "Needed for test/sil: install TcUnit (TwinCAT Package Manager or tcunit.org) into the library repository."
+                                    ? "Needed for test/sil: TcAgent.exe tcunit ensure --solution <sln> installs the TcUnit shipped with TcAgent."
                                     : "Needed for test/sil only. doctor --solution <sln> checks it reliably through TwinCAT.");
         else Add(Level.Ok, "TcUnit", tcunit);
 
