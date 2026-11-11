@@ -111,10 +111,11 @@ public sealed partial class ToolRegistry
     string SourcesStatus(string dir)
     {
         var sb = new StringBuilder();
+        Sources.RefreshLocal(dir);
         foreach (var (label, root) in InstallRoots(dir))
             foreach (var (key, state, e) in Sources.Status(root))
                 sb.AppendLine($"- {key} ({label}) from {e.Source} @{e.Commit[..Math.Min(8, e.Commit.Length)]}, {e.License}: {state}");
-        return sb.Length == 0 ? "No items installed from sources." : "Installed from sources (newer upstream as of the last search/pull):\n" + sb;
+        return sb.Length == 0 ? "No items installed from sources." : "Installed from sources (newer upstream: local sources now, the others as of the last search/pull):\n" + sb;
     }
 
     Sources.Source SourceByName(string dir, string name) =>
@@ -194,7 +195,7 @@ public sealed partial class ToolRegistry
                 if (!fetched.TryGetValue(src.Name, out var up))
                     try { fetched[src.Name] = up = Sources.Fetch(src); }
                     catch (Exception ex) { skipped.Add($"{key}: source {src.Name} not reachable - {ex.Message}"); continue; }
-                if (up == e.Commit || Sources.Git(Sources.CacheOf(src.Name), $"log --format=%h {e.Commit}..{up} -- \"{e.Path}\"").Length == 0) continue;
+                if (!Sources.ChangedUpstream(src.Name, e, up)) continue;
                 var installed = Sources.InstalledPath(root, key, e);
                 if ((File.Exists(installed) || Directory.Exists(installed)) && Sources.Checksum(installed) != e.Sha256 && !Bool(a, "force", false))
                 { skipped.Add($"{key} ({label}): changed locally - not updated (diff first; force=true overwrites)"); continue; }

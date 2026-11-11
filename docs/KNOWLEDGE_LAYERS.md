@@ -288,6 +288,12 @@ license), `diff`.
 
 - **Lock file** `.tcagent\skills.lock.json`: source, commit and checksum per skill – the team and the pipeline get
   exactly the same skills; updates only by `pull`.
+- **Newer in the source:** decided by the content in Git, not by a version number in the header – an installed item is
+  newer upstream when `git diff <installed commit> <source commit> -- <item path>` is not empty: every commit that touches
+  one of its files counts, a commit that only touches other items does not, a change undone again is no change. A source
+  that is a folder on this computer (`D:\...` or `file://`) is fetched whenever the state is shown (Knowledge window,
+  `sources status`, `tc_sources action=status`) – a commit there shows at once; Git URLs and shares keep the state of
+  their last fetch (daily check, **Check for updates**, browse, pull).
 - **Adapt without changing the original:** an overlay skill with `tcagent-extends: <source>/<skill>` adds only the
   TwinCAT parts; or a fork with origin and license in its header – `pull` reports changes of the original and offers a
   comparison.

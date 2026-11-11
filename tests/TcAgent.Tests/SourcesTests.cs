@@ -136,6 +136,39 @@ public sealed class SourcesTests : IDisposable
     }
 
     [Fact]
+    public void A_commit_in_a_local_source_shows_without_a_fetch_and_only_for_the_items_it_changes()
+    {
+        var root = KnowledgeLayers.UserRoot;
+        Sources.AddSource(root, "collection", Repo, null);
+        var s = Assert.Single(Sources.All(Sln), x => x.Name == "collection");
+        var commit = Sources.Fetch(s);
+        var repo = Sources.Checkout(s.Name, s.Url, commit);
+        Sources.Install(root, repo, Sources.Scan(repo).Single(i => i.Name == "code-review"), s, commit);
+        Sources.Install(root, repo, Sources.Scan(repo).Single(i => i.Kind == "lessons"), s, commit);
+
+        // a commit in the source folder - no version number changed, nobody pressed "Check for updates"
+        File.AppendAllText(Path.Combine(Repo, @"skills\code-review\scripts\lint.py"), "\nprint('y')\n");
+        Commit(Repo, "second");
+        Sources.RefreshLocal(Sln);
+        var st = Sources.Status(root).ToDictionary(x => x.Key, x => x.State);
+        Assert.Equal("ok, newer upstream", st["skills/code-review"]);       // a file below the skill counts
+        Assert.Equal("ok", st["lessons/2026-01-02-axis-not-ready"]);       // the commit did not touch it
+
+        // the change undone again: the content is the same as installed - no update
+        Git(Repo, "revert --no-edit HEAD");
+        Sources.RefreshLocal(Sln);
+        Assert.Equal("ok", Sources.Status(root).Single(x => x.Key == "skills/code-review").State);
+    }
+
+    [Theory]
+    [InlineData(@"D:\Plugins\collection", true)]
+    [InlineData("file:///D:/Plugins/collection", true)]
+    [InlineData(@"\\server\share\collection", false)]
+    [InlineData("https://example.com/collection.git", false)]
+    [InlineData("git@example.com:team/collection.git", false)]
+    public void Local_sources_are_folders_on_this_computer(string url, bool local) => Assert.Equal(local, Sources.IsLocal(url));
+
+    [Fact]
     public void OverlayShowsTheBaseSkillFirst()
     {
         Write(@"user\skills\code-review\SKILL.md", "---\nname: code-review\ndescription: General review.\n---\nGeneral steps.\n");

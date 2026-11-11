@@ -1,7 +1,10 @@
 // TcAgent command line: sources (part of Cli, see Cli.cs; the logic is in Sources.cs). Files and git only, no IDE.
 //
 //   TcAgent.exe sources status [--solution <sln>]             what was installed from sources: ok, changed locally,
-//                                                             missing, newer upstream (as of the last fetch)
+//                                                             missing, newer upstream (a source folder on this computer
+//                                                             is fetched first, a Git URL as of its last fetch)
+//   TcAgent.exe sources pull [--item <kind/name>] [--level <label>] [--dry-run]   update items the source changed (by
+//                                                             content, git diff); locally changed ones are skipped
 //   TcAgent.exe sources sync   [--solution <sln>] [--dry-run] restore every item of skills.lock.json exactly at its
 //                                                             commit - the pipeline gets the same skills as the team;
 //                                                             --dry-run only checks (exit 1 if something differs)
@@ -26,6 +29,7 @@ public static partial class Cli
             try { return SourcesEdit(o, dir); }
             catch (Exception ex) when (ex is ArgumentException or InvalidOperationException or TimeoutException) { Console.Error.WriteLine(ex.Message); return Failed; }
         var roots = Sources.InstallRoots(dir);
+        if (o.Sub == "status") Sources.RefreshLocal(dir);
         int differs = 0;
         foreach (var (label, root) in roots)
             foreach (var (key, state, e) in Sources.Status(root))
@@ -152,8 +156,23 @@ public static partial class Cli
                     foreach (var i in Sources.Scan(repo).Where(i => string.IsNullOrWhiteSpace(o.Query) || (i.Name + " " + i.Description).Contains(o.Query, StringComparison.OrdinalIgnoreCase)))
                     {
                         var files = Sources.FilesOf(repo, i);
+                        // where it is installed from this source, and whether the source changed it since (content of the item, not a version field)
+                        var at = new System.Text.Json.Nodes.JsonArray();
+                        foreach (var (label, root) in roots)
+                            foreach (var (key, e) in Sources.LoadLock(root).Where(x => x.Value.Source.Equals(s.Name, StringComparison.OrdinalIgnoreCase) && x.Value.Path == i.RelPath))
+                            {
+                                var p = Sources.InstalledPath(root, key, e);
+                                bool mine = (File.Exists(p) || Directory.Exists(p)) && Sources.Checksum(p) != e.Sha256;
+                                bool? theirs; try { theirs = Sources.ChangedUpstream(s.Name, e, commit); } catch { theirs = null; }
+                                at.Add(new System.Text.Json.Nodes.JsonObject
+                                {
+                                    ["level"] = label, ["key"] = key, ["commit"] = e.Commit, ["changedLocally"] = mine, ["newer"] = theirs,
+                                    ["missing"] = !File.Exists(p) && !Directory.Exists(p)
+                                });
+                            }
                         items.Add(new System.Text.Json.Nodes.JsonObject
                         {
+                            ["installed"] = at,
                             ["source"] = s.Name, ["commit"] = commit, ["name"] = i.Name, ["kind"] = i.Kind, ["path"] = i.RelPath, ["description"] = i.Description,
                             ["license"] = i.License, ["licenseClass"] = i.LicenseClass, ["refusal"] = Sources.LicenseRefusal(i, false) ?? Sources.RequirementRefusal(i, dir),
                             ["files"] = new System.Text.Json.Nodes.JsonArray(files.Select(f => (System.Text.Json.Nodes.JsonNode)f).ToArray()),
@@ -194,13 +213,15 @@ public static partial class Cli
             case "pull":
             {
                 int n = 0;
+                var fetched = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);     // each source once
                 foreach (var (label, root) in roots)
                     foreach (var (key, e) in Sources.LoadLock(root))
                     {
                         if (o.Item != null && !Sources.IsItem(key, o.Item)) continue;
+                        if (o.Level != null && !label.Equals(o.Level.Trim().ToLowerInvariant() is "personal" ? "user" : o.Level.Trim(), StringComparison.OrdinalIgnoreCase)) continue;
                         var src = Sources.All(dir).FirstOrDefault(x => x.Name == e.Source) ?? new Sources.Source { Name = e.Source, Url = e.Url };
-                        var up = Sources.Fetch(src);
-                        if (up == e.Commit || Sources.Git(Sources.CacheOf(src.Name), $"log --format=%h {e.Commit}..{up} -- \"{e.Path}\"").Length == 0) continue;
+                        if (!fetched.TryGetValue(src.Name, out var up)) fetched[src.Name] = up = Sources.Fetch(src);
+                        if (!Sources.ChangedUpstream(src.Name, e, up)) continue;
                         var installed = Sources.InstalledPath(root, key, e);
                         if ((File.Exists(installed) || Directory.Exists(installed)) && Sources.Checksum(installed) != e.Sha256) { Console.WriteLine($"  {key} ({label}): changed locally - not updated"); continue; }
                         var repo = Sources.Checkout(src.Name, src.Url, up);

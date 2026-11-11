@@ -184,7 +184,9 @@ public static partial class Cli
                                             ["ambiguous"] = new JsonArray(pi.Ambiguous.Select(x => (JsonNode)x).ToArray()) }
         };
 
-        // items installed from sources: changed locally / newer in the source (as of the last fetch) - shown with the file
+        // items installed from sources: changed locally / newer in the source (local sources fetched now, the others as of
+        // their last fetch) - shown with the file
+        Sources.RefreshLocal(dir);
         var sourceState = new List<(string Path, string State, string Level)>();
         foreach (var (label, root) in Sources.InstallRoots(dir))
             try { foreach (var (key, state, le) in Sources.Status(root)) sourceState.Add((Path.GetFullPath(Sources.InstalledPath(root, key, le)), state, label)); } catch { }

@@ -315,8 +315,11 @@ first, then **New …**, **Open** (the repository in the browser; double-click),
 **Edit …**, **Delete …** (asks whether the items installed from the source go as well: unchanged ones are uninstalled with
 a copy in the backups, ones you changed stay as your own version; items you already keep as your own version are not touched),
 **Copy URL**. **Browse and install …** lists everything a source offers – search, filter by
-kind, "Only not installed", the state (✓ installed and where, ○ not installed, ✗ not installable), license, scripts and
-the details of the selected line (description, license, files, scripts); tick the items to install – several at once,
+kind, "Only not installed", "Only updates", the state (✓ installed and where, ↑ update available – the source changed the
+item since you installed it, ✎ newer in the source but changed by you – use **Update and merge …** below, ○ not installed,
+✗ not installable), license, scripts and the details of the selected line (description, license, files, scripts; for an
+update the installed and the new commit). Updates are found by the content of the item in Git, not by a version number in
+its header, and they come ticked: **Update …** brings them to the new commit where they are installed. Tick the items to install – several at once,
 the ticks stay when you change the filter (Space or a double-click ticks the selected line, **Select all**,
 **Select none**).
 Before installing you confirm the license, the files and any scripts – source-available and unlicensed items are
@@ -324,7 +327,8 @@ refused, others only after you accept the license. Installing offers every level
 shared level kept in Git gets a commit on a new branch for a pull request instead of a direct change. Below the items
 installed from sources with their state – **✓ as installed**, **✎ changed locally**, **↑ newer in the source**, **⇅ both
 changed**, **✗ missing**; it is checked when the window opens, on refresh and when you save a file of a level in the
-editor. Next to the heading **Check for updates** and **Update all …** (the plan first, scrollable); for the selected
+editor – a source in a folder on this computer is read again each time, so a commit there shows at once; a Git URL as of
+its last fetch (daily, **Check for updates**, **Browse and install …**). Next to the heading **Check for updates** and **Update all …** (the plan first, scrollable); for the selected
 item **Open**, **Open folder**, **My changes**, **Update and merge …**, **More ▾**, **Uninstall …**,
 **Copy path**:
 - **My changes** – the compare window of Visual Studio, installed version left, yours right;

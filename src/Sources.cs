@@ -163,6 +163,33 @@ public static class Sources
     /// <summary>The newest commit seen at the last fetch (no network), null if never fetched.</summary>
     public static string KnownUpstream(string name) => File.Exists(UpstreamFile(name)) ? File.ReadAllText(UpstreamFile(name)).Trim() : null;
 
+    /// <summary>A folder on this computer or a file:// URL: fetching it needs no network and no sign-in (a share \\server\... does).</summary>
+    public static bool IsLocal(string url)
+    {
+        var u = (url ?? "").Trim();
+        if (u.StartsWith("file://", StringComparison.OrdinalIgnoreCase)) return !u.StartsWith("file:////", StringComparison.Ordinal);
+        return u.Length > 2 && char.IsLetter(u[0]) && u[1] == ':' && (u[2] == '\\' || u[2] == '/');
+    }
+
+    /// <summary>Fetches every local source (IsLocal) that items were installed from, so their state is the one of the source
+    /// now - a commit in a plugin repository next door shows up at once, not only after "Check for updates". Remote sources
+    /// keep the state of their last fetch (the daily check, browse, pull). A source that cannot be read keeps its last state.</summary>
+    public static void RefreshLocal(string solutionDir)
+    {
+        var used = InstallRoots(solutionDir).SelectMany(r => LoadLock(r.Root).Values.Select(e => e.Source)).ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var s in All(solutionDir).Where(s => used.Contains(s.Name) && IsLocal(s.Url)))
+            try { Fetch(s); }
+            catch (Exception ex) when (ex is InvalidOperationException or TimeoutException or IOException or UnauthorizedAccessException or System.ComponentModel.Win32Exception)
+            { Log.Error($"sources: {s.Name} not refreshed - {ex.Message}"); }
+    }
+
+    /// <summary>Is the item in the source different at commit up from the commit it was installed at? The content decides
+    /// (git diff of the item's path), not a version number in its front matter: every commit that touches the item counts,
+    /// a commit that only touches other items does not, and a change undone again is no change.</summary>
+    public static bool ChangedUpstream(string sourceName, LockEntry e, string up) =>
+        up != null && !up.Equals(e.Commit, StringComparison.OrdinalIgnoreCase) &&
+        Git(CacheOf(sourceName), $"diff --name-only {e.Commit} {up} -- \"{e.Path}\"").Length > 0;
+
     /// <summary>Checks the cache out at a commit (fetches it by URL if missing) and returns the folder.</summary>
     public static string Checkout(string name, string url, string commit)
     {
@@ -385,7 +412,8 @@ public static class Sources
     public static string InstalledPath(string root, string key, LockEntry e) =>
         FolderKinds.ContainsKey(KindDir(key)) ? Path.Combine(root, KindDir(key), key.Split('/')[1]) : Path.Combine(root, KindDir(key), Path.GetFileName(e.Path));
 
-    /// <summary>Status of the installed items of a level: ok, changed locally, missing, newer upstream (as of the last fetch).</summary>
+    /// <summary>Status of the installed items of a level: ok, changed locally, missing, newer upstream (as of the last fetch -
+    /// RefreshLocal brings local sources up to date first).</summary>
     public static List<(string Key, string State, LockEntry E)> Status(string root)
     {
         var list = new List<(string, string, LockEntry)>();
@@ -395,7 +423,7 @@ public static class Sources
             string state = !Directory.Exists(p) && !File.Exists(p) ? "missing" : Checksum(p) != e.Sha256 ? "changed locally" : "ok";
             var up = KnownUpstream(e.Source);
             if (up != null && up != e.Commit)
-                try { if (Git(CacheOf(e.Source), $"log --format=%h {e.Commit}..{up} -- \"{e.Path}\"").Length > 0) state += ", newer upstream"; }
+                try { if (ChangedUpstream(e.Source, e, up)) state += ", newer upstream"; }
                 catch { state += ", upstream unknown"; }
             list.Add((key, state, e));
         }
