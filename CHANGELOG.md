@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **Knowledge > Sources: several installed items at once** - tick items with the same state (the others grey out,
+  "Tick all like this", "Untick all", Space); My changes, Update and merge, What's new upstream, Revert, Keep as own
+  version, Uninstall and Copy path work on all ticked items with one question - Update and merge shows every preview
+  first and opens the conflicts in the merge window. Nothing ticked: the selected line as before.
 - **TcUnit shipped with TcAgent** - TcUnit 1.3.2 (MIT license, `thirdparty\TcUnit` with its license next to
   `TcAgent.exe`, listed in THIRD-PARTY-NOTICES.md). `tc_library action=ensure_tcunit` installs it into the TwinCAT library
   repository only if TcUnit is missing or older there (a newer one stays) and adds the reference to the PLC project if it

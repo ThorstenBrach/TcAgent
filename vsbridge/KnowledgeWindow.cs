@@ -560,7 +560,7 @@ namespace TcAgentBridge
             Columns(entries, ("Name", 200, nameof(Line.C1)), ("Kind", 100, nameof(Line.C2)), ("Level", 120, nameof(Line.C3)),
                     ("State", 190, "!" + nameof(Line.C4)), ("Source / license", 320, nameof(Line.C6)), ("Git", 60, nameof(Line.C7)), ("Why", 260, nameof(Line.C5)));
             Columns(sourceList, ("Source", 180, nameof(Line.C1)), ("Level", 80, nameof(Line.C2)), ("Repository", 420, nameof(Line.C3)), ("Branch / tag", 100, nameof(Line.C4)));
-            Columns(installedList, ("Item", 230, nameof(Line.C1)), ("Level", 80, nameof(Line.C2)), ("State", 190, "!" + nameof(Line.C3)),
+            Columns(installedList, ("", 30, "?" + nameof(Line.On)), ("Item", 230, nameof(Line.C1)), ("Level", 80, nameof(Line.C2)), ("State", 190, "!" + nameof(Line.C3)),
                     ("Source @ version", 200, nameof(Line.C4)), ("License", 100, nameof(Line.C5)), ("Installed", 100, nameof(Line.C6)));
             Columns(changes, ("Change", 150, nameof(Line.C1)), ("Date", 90, nameof(Line.C2)), ("What", 360, nameof(Line.C3)),
                     ("Before", 110, nameof(Line.C4)), ("After (runs)", 130, nameof(Line.C5)), ("Result", 110, "!" + nameof(Line.C6)));
@@ -818,24 +818,30 @@ namespace TcAgentBridge
                 A("Copy URL", "Copy the URL of the repository", () => CopyPath(Src("url")), SSel) };
             var tools1 = Bar(srcActs);
             bool ISel() => installedList.SelectedItem is Line;
+            bool IAny() => InstTargets().Count > 0;                         // ticked items or the selected line
+            bool IOne() => InstTargets().Count == 1;                        // actions that ask for one item (a commit message)
             string Inst(string k) => S((installedList.SelectedItem as Line)?.D, k);
-            void On(Action<string, string> act) { var (n, lv) = Installed(); if (n != null) act(n, lv); }
+            void On(Action<string, string> act) { var t = InstTargets(); if (t.Count == 1) act(S(t[0].D, "key"), S(t[0].D, "level")); else Hint("Tick or select one installed item."); }
+            const string Many = " - on every ticked item (tick several with the same state), else on the selected one";
             var instActs = new[] {
                 A("Open", "Open the installed file in the editor (or double-click)", () => OpenInEditor(Inst("path")), ISel, "Enter"),
                 A("Open folder", "Show the installed item in the Explorer", () => ShowInExplorer(Inst("path")), ISel),
                 Sep,
-                A(SrcCompare, "Your version and the installed one in the compare window of Visual Studio", () => On((n, lv) => CompareSource(n, lv, sourceDetail)), ISel),
-                A(SrcMerge, "Merge the newer version of the source into your item (three-way; conflicts in the merge window)", () => On((n, lv) => MergeSource(n, lv, sourceDetail)), ISel),
-                DropDown("More", "Rarer actions on the installed item", ISel,
-                     A(SrcChanges, "What changed in the source since the install", DiffInstalled),
+                A(SrcCompare, "Your version and the installed one in the compare window of Visual Studio" + Many, () => CompareSources(InstTargets()), IAny),
+                A(SrcMerge, "Merge the newer version of the source into your item (three-way; conflicts in the merge window)" + Many, () => MergeSources(InstTargets()), IAny),
+                DropDown("More", "Rarer actions on the installed items", IAny,
+                     A(SrcChanges, "What changed in the source since the install" + Many, () => DiffInstalledMany(InstTargets())),
                      Sep,
-                     A(SrcRevert, "Back to the installed version (yours goes to the backups)", () => On(RevertSource)),
-                     A(SrcDetach, "No longer tied to the source - no updates, the origin stays in the header", () => On(DetachSource)),
-                     A(SrcPropose, "Your changes as a branch for the source - push it and open the pull request", () => On((n, lv) => ProposeSource(n, lv, sourceDetail)))),
+                     A(SrcRevert, "Back to the installed version (yours goes to the backups)" + Many, () => RevertSources(InstTargets())),
+                     A(SrcDetach, "No longer tied to the source - no updates, the origin stays in the header" + Many, () => DetachSources(InstTargets())),
+                     A(SrcPropose, "Your changes as a branch for the source - push it and open the pull request (one item at a time)", () => On((n, lv) => ProposeSource(n, lv, sourceDetail)), IOne)),
                 Sep,
-                A(SrcUninstall, "Remove the item from its level (a copy goes to the backups; the source stays)", () => On((n, lv) => UninstallSource(n, lv, Inst("state"))), ISel, "Del"),
+                A(SrcUninstall, "Remove the item from its level (a copy goes to the backups; the source stays)" + Many, () => UninstallSources(InstTargets()), IAny, "Del"),
                 Sep,
-                A("Copy path", "Copy the path of the installed item", () => CopyPath(Inst("path")), ISel) };
+                A("Tick all like this", "Tick every installed item with the state of the selected one", TickLikeSelected, ISel),
+                A("Untick all", "Remove every tick", UntickAll, () => instTicked.Count > 0),
+                Sep,
+                A("Copy path", "Copy the paths of the ticked items, else of the selected one", () => CopyPath(string.Join(Environment.NewLine, InstTargets().Select(l => S(l.D, "path")))), IAny) };
             var tools2 = Bar(instActs);
             // the actions on all installed items next to their heading
             var global = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 6, 2) };
@@ -856,9 +862,16 @@ namespace TcAgentBridge
             installedList.ContextMenu = MenuOf(instActs);
             installedList.PreviewKeyDown += (s, e) =>
             {
-                if (e.Key == Key.Delete) { On((n, lv) => UninstallSource(n, lv, Inst("state"))); e.Handled = true; }
+                if (e.Key == Key.Delete) { UninstallSources(InstTargets()); e.Handled = true; }
                 else if (e.Key == Key.Enter) { OpenInEditor(Inst("path")); e.Handled = true; }
+                else if (e.Key == Key.Space && installedList.SelectedItem is Line l)
+                {
+                    if (l.Can) { l.On = !l.On; InstTicksChanged(); installedList.SelectedItem = l; }
+                    else Hint($"Only items with the same state are ticked together (ticked: {TickedState()}).");
+                    e.Handled = true;
+                }
             };
+            installedList.AddHandler(ToggleButton.ClickEvent, new RoutedEventHandler((s, e) => InstTicksChanged()));
             return sourcesPage = Rows((sourcesHeading, AutoH, 0), (tools1, AutoH, 0), (srcList, AutoH, 0), (head2, AutoH, 0), (tools2, AutoH, 0),
                                       (instList, Star(1), 80), (Output(sourceDetail), AutoH, 0));
         }
@@ -1766,9 +1779,163 @@ namespace TcAgentBridge
                 return new Line
                 {
                     D = i, C1 = S(i, "key"), C2 = S(i, "level"), C3 = stateText ?? (st == "ok" ? "✓ as installed" : st), C4 = S(i, "source") + " @" + Short(S(i, "commit")),
-                    C5 = S(i, "license"), C6 = S(i, "installed"), Mark = stateBrush ?? (st == "ok" ? Green : Orange), Tip = st + " · " + S(i, "url")
+                    C5 = S(i, "license"), C6 = S(i, "installed"), Mark = stateBrush ?? (st == "ok" ? Green : Orange), Tip = st + " · " + S(i, "url"),
+                    On = instTicked.Contains(TickKey(i))     // the ticks stay when the list is read again
                 };
             }).ToList();
+            InstTicksChanged(false);
+        }
+
+        // ------------------------------------------------------------------ several installed items at once
+        // Items are ticked (check boxes, UI_GUIDELINES: never Ctrl/Shift) and only items with the same state together: an
+        // action then means the same for all of them. The actions of the list work on the ticked items, or on the selected
+        // line when nothing is ticked.
+        readonly HashSet<string> instTicked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        static string TickKey(Dictionary<string, object> d) => S(d, "key") + "|" + S(d, "level");
+        IEnumerable<Line> InstLines() => (installedList.ItemsSource as IEnumerable<Line>) ?? Enumerable.Empty<Line>();
+
+        /// <summary>The state the ticked items share (null: nothing ticked).</summary>
+        string TickedState() => InstLines().Where(l => l.On).Select(l => l.C3).FirstOrDefault();
+
+        void InstTicksChanged(bool refresh = true)
+        {
+            // a tick that does not fit the state of the others is taken back (Space, "Tick all like this" of an older list)
+            var first = InstLines().FirstOrDefault(l => l.On && instTicked.Contains(TickKey(l.D))) ?? InstLines().FirstOrDefault(l => l.On);
+            foreach (var l in InstLines()) if (l.On && first != null && l.C3 != first.C3) l.On = false;
+            instTicked.Clear();
+            foreach (var l in InstLines().Where(l => l.On)) instTicked.Add(TickKey(l.D));
+            var state = TickedState();
+            foreach (var l in InstLines())
+            {
+                l.Can = state == null || l.C3 == state;
+                if (!l.Can) l.Tip = $"Only items with the same state are ticked together (ticked: {state}) · " + (S(l.D, "state") ?? "");
+                else if (l.Tip != null && l.Tip.StartsWith("Only items with the same state")) l.Tip = l.Tip.Substring(l.Tip.IndexOf(" · ", StringComparison.Ordinal) + 3) + " · " + S(l.D, "url");
+            }
+            // after the click: the check box that was clicked must not be regenerated inside its own event
+            if (refresh) Dispatcher.BeginInvoke(new Action(() => installedList.Items.Refresh()));
+            var n = instTicked.Count;
+            if (n > 0) status.Text = $"{n} item(s) ticked ({state}) - the actions work on all of them.";
+            UpdateGates();
+        }
+
+        /// <summary>What an action of the list works on: the ticked items, otherwise the selected line.</summary>
+        List<Line> InstTargets()
+        {
+            var t = InstLines().Where(l => l.On).ToList();
+            if (t.Count == 0 && installedList.SelectedItem is Line sel) t.Add(sel);
+            return t;
+        }
+
+        void TickLikeSelected()
+        {
+            if (!(installedList.SelectedItem is Line sel)) { Hint("Select an installed item first."); return; }
+            foreach (var l in InstLines()) l.On = l.C3 == sel.C3;
+            InstTicksChanged();
+        }
+
+        void UntickAll() { foreach (var l in InstLines()) l.On = false; InstTicksChanged(); }
+
+        static string ItemList(IEnumerable<Line> t) => string.Join("\n", t.Select(l => $"  {S(l.D, "key")} ({S(l.D, "level")})"));
+
+        // revert, keep as own version, uninstall: one question for all, then one call per item
+        async void SourceBatch(List<Line> t, string title, string question, string sub, MessageBoxImage icon)
+        {
+            if (t.Count == 0) { Hint("Tick or select installed items first."); return; }
+            if (MessageBox.Show($"{question}\n\n{ItemList(t.Take(25))}{(t.Count > 25 ? $"\n  … and {t.Count - 25} more" : "")}", "TcAgent Knowledge", MessageBoxButton.YesNo, icon, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            var results = new List<string>(); bool all = true;
+            foreach (var l in t)
+            {
+                var (ok, o) = await Cli($"sources {sub} --item {Quote(S(l.D, "key"))} --level {Quote(S(l.D, "level"))}", $"{title}: {S(l.D, "key")}");
+                all &= ok;
+                results.Add((ok ? "✓ " : "✗ ") + S(l.D, "key") + ": " + o.Trim().Split('\n')[0].Trim());
+            }
+            Out(sourceDetail, string.Join("\n", results));
+            Report(all, string.Join("\n", results), title);
+            if (all) instTicked.Clear();
+            Load();
+        }
+
+        void RevertSources(List<Line> t)
+        {
+            if (t.Count == 1) { RevertSource(S(t[0].D, "key"), S(t[0].D, "level")); return; }
+            SourceBatch(t, "Revert", $"Revert these {t.Count} items to their installed version?\n\nYour changes are copied to %LOCALAPPDATA%\\TcAgent\\backups\\sources first.", "revert", MessageBoxImage.Warning);
+        }
+
+        void DetachSources(List<Line> t)
+        {
+            if (t.Count == 1) { DetachSource(S(t[0].D, "key"), S(t[0].D, "level")); return; }
+            SourceBatch(t, "Keep as own version", $"Keep these {t.Count} items as your own versions?\n\nThey are no longer updated from their source; where they came from stays in their header.", "detach", MessageBoxImage.Question);
+        }
+
+        void UninstallSources(List<Line> t)
+        {
+            if (t.Count == 1) { UninstallSource(S(t[0].D, "key"), S(t[0].D, "level"), S(t[0].D, "state")); return; }
+            var changed = t.Any(l => (S(l.D, "state") ?? "").Contains("changed locally"));
+            SourceBatch(t, "Uninstall", $"Uninstall these {t.Count} items?\n\nTheir files are removed and they leave skills.lock.json; a copy goes to %LOCALAPPDATA%\\TcAgent\\backups\\sources. The sources stay." +
+                                        (changed ? "\n\nYou changed them - your changes are only in that copy afterwards." : ""), "uninstall", changed ? MessageBoxImage.Warning : MessageBoxImage.Question);
+        }
+
+        void CompareSources(List<Line> t)
+        {
+            if (t.Count == 0) { Hint("Tick or select installed items first."); return; }
+            foreach (var l in t.Take(8)) CompareSource(S(l.D, "key"), S(l.D, "level"), sourceDetail);
+            if (t.Count > 8) status.Text = $"The compare windows of the first 8 of {t.Count} items are open.";
+        }
+
+        async void DiffInstalledMany(List<Line> t)
+        {
+            if (t.Count == 0) { Hint("Tick or select installed items first."); return; }
+            var parts = new List<string>();
+            foreach (var l in t)
+            {
+                var (ok, o) = await Cli($"sources diff --item {Quote(S(l.D, "key"))} --level {Quote(S(l.D, "level"))}", "Reading the source of " + S(l.D, "key"));
+                parts.Add(o.Trim());
+            }
+            Out(sourceDetail, string.Join("\n\n" + new string('-', 60) + "\n\n", parts));
+            status.Text = "Done - see the output.";
+        }
+
+        // update and merge several: the previews first, one question, then the merges (conflicts open in the merge window)
+        async void MergeSources(List<Line> t)
+        {
+            if (t.Count == 0) { Hint("Tick or select installed items first."); return; }
+            if (t.Count == 1) { MergeSource(S(t[0].D, "key"), S(t[0].D, "level"), sourceDetail); return; }
+            var previews = new List<string>(); var plan = new List<Line>();
+            foreach (var l in t)
+            {
+                var (pok, p) = await Cli($"sources merge --dry-run --item {Quote(S(l.D, "key"))} --level {Quote(S(l.D, "level"))}", "Fetching the source of " + S(l.D, "key"));
+                if (p.Contains("has no newer version")) { previews.Add(p.Trim()); continue; }
+                if (!pok && !p.Contains("Conflicts")) { previews.Add($"{S(l.D, "key")}: not possible - {p.Trim()}"); continue; }
+                previews.Add(p.Trim()); plan.Add(l);
+            }
+            var text = string.Join("\n\n", previews);
+            Out(sourceDetail, text);
+            if (plan.Count == 0) { Info("None of them has a newer version in its source that can be merged - see the output."); return; }
+            var conflicts = previews.Any(x => x.Contains("Conflicts"));
+            if (!Confirm("Update and merge", $"Merge the new version of the source into {plan.Count} item(s)? Your versions are backed up first." +
+                                             (conflicts ? " Conflicts open in the merge window of Visual Studio (or are marked with <<<<<<< in the file)." : ""),
+                         text, "Merge", conflicts)) return;
+            var results = new List<string>(); bool all = true;
+            foreach (var l in plan)
+            {
+                var (ok, o) = await Cli($"sources merge --json --item {Quote(S(l.D, "key"))} --level {Quote(S(l.D, "level"))}", "Merging " + S(l.D, "key"));
+                var lines = o.Split('\n').ToList();
+                var cf = lines.FirstOrDefault(x => x.StartsWith("CONFLICT-FILES "));
+                all &= ok || o.Contains("Conflicts");
+                results.Add(string.Join("\n", lines.Where(x => !x.StartsWith("CONFLICT-FILES "))).Trim());
+                if (cf != null)
+                    try
+                    {
+                        foreach (var c in Arr(new JavaScriptSerializer().DeserializeObject(cf.Substring("CONFLICT-FILES ".Length))))
+                            OpenMergeTool(S(c, "theirs"), S(c, "yours"), S(c, "base"), S(c, "result"), S(c, "rel"));
+                    }
+                    catch (Exception ex) { Error("Merge window: " + ex.Message); }
+            }
+            Out(sourceDetail, string.Join("\n\n", results));
+            if (!all) Report(false, string.Join("\n\n", results), "Merge");
+            else status.Text = $"{plan.Count} item(s) merged - see the output.";
+            instTicked.Clear();
+            Load();
         }
 
         static string Short(string commit) => (commit ?? "").Substring(0, Math.Min(8, (commit ?? "").Length));
