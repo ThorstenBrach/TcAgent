@@ -7,9 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
-- **Chat history per solution** - the TcAgent Chat keeps every conversation on this PC
-  (`%LOCALAPPDATA%\TcAgent\chats\<solution>-<hash>\`, never in Git): questions, answers, one line per tool call, the
-  agent's task list (Claude Code TodoWrite, ACP plan) and a stop. Opening the solution again shows the last conversation;
+- **Chat history per solution** - for every backend of the TcAgent Chat (Claude Code, GitHub Copilot, Gemini, Codex):
+  the chat keeps every conversation on this PC (`%LOCALAPPDATA%\TcAgent\chats\<solution>-<hash>\`, never in Git):
+  questions, answers, one line per tool call, a stop, and the agent's task list where the backend reports one (Claude
+  Code, ACP backends such as Copilot). Opening the solution again shows the last conversation;
   within 8 hours the next question continues it. The first question to the agent gets a short summary - questions, last
   answer, open tasks - and the new tool `tc_chat_history` (read, list, search) reads more, with every AI client. Kept 90
   days / 50 per solution; **⋯ > Delete chat history of this solution**; `"saveHistory": false` in `chat-backends.json`
