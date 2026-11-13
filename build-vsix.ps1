@@ -58,7 +58,10 @@ Copy-Item "$stage\tcagent" "$here\vsbridge\tcagent" -Recurse
 # a "Platform" variable of the console (set by some PCs or developer prompts, e.g. x64) moves MSBuild's output to
 # bin\x64\Release - so the package is taken from wherever this build wrote it, and an older one is never shipped
 $buildStart = Get-Date
-& $msbuild "$here\vsbridge\TcAgentBridge.csproj" /restore /t:Rebuild /p:Configuration=Release /v:minimal /nologo 2>&1 | Tee-Object -FilePath "$here\build-vsix.log" -Append
+# every build gets its time in the informational version: a test build of the same version is a different TcAgentBridge.dll,
+# so the TcAgent Chat offers it (TCAGENT_UPDATE_FOLDER, src/LocalBuilds.cs)
+$buildStamp = (Get-Date).ToUniversalTime().ToString('yyyyMMddHHmmss')
+& $msbuild "$here\vsbridge\TcAgentBridge.csproj" /restore /t:Rebuild /p:Configuration=Release "/p:SourceRevisionId=build$buildStamp" /v:minimal /nologo 2>&1 | Tee-Object -FilePath "$here\build-vsix.log" -Append
 if ($LASTEXITCODE -ne 0) { throw "VSIX build failed - see build-vsix.log" }
 $built = Get-ChildItem "$here\vsbridge\bin" -Recurse -Filter 'TcAgent.vsix' | Where-Object { $_.LastWriteTime -ge $buildStart } |
          Sort-Object LastWriteTime -Descending | Select-Object -First 1
