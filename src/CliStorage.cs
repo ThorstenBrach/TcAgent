@@ -31,6 +31,7 @@ public static partial class Cli
                 else if (a == "--force") force = true;
                 else if (a == "--area") area = i + 1 < args.Length ? args[++i].ToLowerInvariant() : throw new ArgumentException("--area needs a value");
                 else if (a == "--name") name = i + 1 < args.Length ? args[++i] : throw new ArgumentException("--name needs a value");
+                else if (a is "--solution" or "-s") i++;          // the Knowledge window passes the solution to every command; storage is per PC
                 else if (a.StartsWith('-')) throw new ArgumentException("unknown option " + a);
                 else words.Add(a.ToLowerInvariant());
             }

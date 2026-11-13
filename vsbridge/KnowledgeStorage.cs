@@ -62,7 +62,7 @@ namespace TcAgentBridge
         async void LoadStorage()
         {
             var (ok, output) = await Cli("storage --json", "Reading the storage");
-            if (!ok) { status.Text = "Storage: " + output.Trim(); return; }
+            if (!ok) { Report(false, output, "Storage"); return; }
             try { storageData = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(output); }
             catch { status.Text = "Storage: this TcAgent.exe cannot list its files yet - update it."; return; }
             Heading(storageHeading, $"What TcAgent keeps on this PC ({Mb(storageData["total"])})", UserPath(S(storageData, "root")));
