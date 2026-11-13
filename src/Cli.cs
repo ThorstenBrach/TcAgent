@@ -966,6 +966,9 @@ public static partial class Cli
   TcAgent.exe update [check] [--force] [--json]
   TcAgent.exe update sources [--force] [--solution <sln>] [--json]
   TcAgent.exe update builtin [check|apply <version>|skip <version>|back] [--force] [--json]
+  TcAgent.exe update local [--folder <dir>] [--kind vsix|xaeshell-vs15|xaeshell-vs17] [--bridge <TcAgentBridge.dll>] [--json]
+      A test build in TCAGENT_UPDATE_FOLDER (or --folder): newer, or the same version built again (its TcAgentBridge.dll
+      differs from --bridge). update local skip <sha> ends the notice for that build. download --kind xaeshell: the ZIP.
   TcAgent.exe update download | skip <version> | set check|sources|knowledge|builtin on|off
       New versions of TcAgent (GitHub releases, at most once a day unless --force) and of the repo sources in use. download
       fetches the .vsix and checks it against SHA256SUMS.txt. The TcAgent Chat uses these; updates.json on the company or team

@@ -12,7 +12,7 @@ public static partial class Cli
     {
         Console.OutputEncoding = new System.Text.UTF8Encoding(false);
         bool json = false, force = false;
-        string current = Program.ServerVersion, sln = null;
+        string current = Program.ServerVersion, sln = null, kind = "vsix", bridge = null, folder = null;
         var words = new List<string>();
         try
         {
@@ -23,6 +23,9 @@ public static partial class Cli
                 else if (a == "--force") force = true;
                 else if (a == "--current") current = i + 1 < args.Length ? args[++i] : throw new ArgumentException("--current needs a value");
                 else if (a is "--solution" or "-s") sln = i + 1 < args.Length ? args[++i] : throw new ArgumentException("--solution needs a value");
+                else if (a == "--kind") kind = i + 1 < args.Length ? args[++i].ToLowerInvariant() : throw new ArgumentException("--kind needs a value");
+                else if (a == "--bridge") bridge = i + 1 < args.Length ? args[++i] : throw new ArgumentException("--bridge needs a value");
+                else if (a == "--folder") folder = i + 1 < args.Length ? args[++i] : throw new ArgumentException("--folder needs a value");
                 else if (a.StartsWith('-')) throw new ArgumentException("unknown option " + a);
                 else words.Add(a.ToLowerInvariant());
             }
@@ -66,9 +69,19 @@ public static partial class Cli
                     }
                     return Ok;
                 }
+                case "local":
+                {
+                    // a test build in the update folder (LocalBuilds.cs): newer, or the same version built again
+                    if (words.ElementAtOrDefault(1) == "skip") { LocalBuilds.Skip(words.ElementAtOrDefault(2) ?? throw new ArgumentException("update local skip <sha>")); return Ok; }
+                    var r = LocalBuilds.Check(folder, kind, bridge, current);
+                    Console.WriteLine(json ? r.ToJsonString() : r["error"] != null ? r["error"]!.ToString()
+                                      : r["available"]?.GetValue<bool>() == true ? $"Test build {r["version"]} ({r["built"]}): {r["file"]}" + (r["rebuilt"]?.GetValue<bool>() == true ? " - same version, another build" : "")
+                                      : "No newer test build in " + r["folder"]);
+                    return Ok;
+                }
                 case "download":
                 {
-                    var file = Updates.Download(current);
+                    var file = Updates.Download(current, kind);
                     Console.WriteLine(json ? new JsonObject { ["file"] = file }.ToJsonString() : file);
                     return Ok;
                 }
@@ -90,7 +103,7 @@ public static partial class Cli
                     Updates.SaveState(st);
                     return Ok;
                 }
-                default: throw new ArgumentException("update [check|sources|builtin [check|apply <v>|skip <v>|back]|download|skip <version>|set check|sources|knowledge|builtin on|off]");
+                default: throw new ArgumentException("update [check|sources|builtin [check|apply <v>|skip <v>|back]|local [--folder F] [--kind K] [--bridge DLL]|local skip <sha>|download [--kind xaeshell]|skip <version>|set check|sources|knowledge|builtin on|off]");
             }
         }
         catch (ArgumentException ex) { Console.Error.WriteLine(ex.Message); return Usage; }

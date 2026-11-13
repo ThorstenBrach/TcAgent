@@ -69,6 +69,7 @@ namespace TcAgentBridge
                 var items = src != null && src.TryGetValue("items", out var o) ? (o as IEnumerable)?.OfType<object>().Count() ?? 0 : 0;
                 if (items > 0) ShowSourcesNotice(items);
                 ShowBuiltin(await Ask("update builtin --json"));
+                await CheckLocalBuild(false);       // a test build in TCAGENT_UPDATE_FOLDER (ChatInstall.cs)
             }
             catch (Exception ex) { BridgePackage.Instance?.LogLine("Update check: " + ex.Message); }
         }
@@ -187,9 +188,10 @@ namespace TcAgentBridge
             if (r == null) { Message("TcAgent update", "Could not check for updates: this TcAgent.exe has no update command."); return; }
             r["notify"] = B(r, "available");         // asked for it: a skipped version counts again
             ShowUpdate(r);
+            await CheckLocalBuild(true);
             if (S(r, "error") is string e) Message("TcAgent update", "Could not check for updates:\n" + e);
             else if (B(r, "available")) ShowWhatsNew();
-            else Message("TcAgent update", $"TcAgent {BridgePackage.BridgeVersion} is up to date.");
+            else Message("TcAgent update", $"TcAgent {BridgePackage.BridgeVersion} is up to date." + (localStrip != null ? " A test build is offered above the conversation." : ""));
         }
 
         // above the dialog that is open (About), otherwise above the IDE
@@ -282,35 +284,30 @@ namespace TcAgentBridge
             later.Click += (s, e) => w.Close();
             var bar = new DockPanel { Margin = new Thickness(12, 4, 12, 10), LastChildFill = false };
             string file = null;
-            if (InXaeShell)
+            // Visual Studio: the .vsix; the XAE Shell: the package ZIP (install-xaeshell.ps1) - both installed after the IDE has
+            // closed and started again (ChatInstall.cs)
+            var install = CardButton("Download", true);
+            hint.Text = InXaeShell ? "Installing closes the XAE Shell, asks for administrator rights and starts it again. Save your work first."
+                                   : "Installing closes Visual Studio and starts it again. Save your work first.";
+            install.Click += async (s, e) =>
             {
-                // from the browser the ZIP keeps its download mark, and the documented way (unblock, extract, install) stays the user's
-                hint.Text = "The XAE Shell installs from the ZIP: download it on GitHub, unblock it, extract it and run install-xaeshell.ps1 (docs/INSTALLATION.md).";
-            }
-            else
-            {
-                var install = CardButton("Download", true);
-                hint.Text = "Installing needs Visual Studio closed. Save your work first.";
-                install.Click += async (s, e) =>
+                if (file != null)
                 {
-                    if (file != null)
-                    {
-                        Open(file, t => state.Text = t);       // the VSIX installer of Visual Studio: it asks and waits for the IDE to close
-                        w.Close();
-                        return;
-                    }
-                    install.IsEnabled = false; state.ClearValue(TextBlock.ForegroundProperty);
-                    state.Text = "Downloading …";
-                    var res = await Ask("update download --json --current " + BridgePackage.BridgeVersion);
-                    install.IsEnabled = true;
-                    file = S(res, "file");
-                    if (file == null) { state.Foreground = ErrorBrush; state.Text = S(res, "error") ?? "The download failed. Open the release on GitHub instead."; return; }
-                    state.Foreground = OkBrush;
-                    state.Text = $"✓ {System.IO.Path.GetFileName(file)} downloaded, checksum matches SHA256SUMS.txt";
-                    install.Content = "Install …";
-                };
-                DockPanel.SetDock(install, Dock.Left); bar.Children.Add(install);
-            }
+                    w.Close();
+                    InstallPackage(file, "TcAgent " + S(latest, "version"));
+                    return;
+                }
+                install.IsEnabled = false; state.ClearValue(TextBlock.ForegroundProperty);
+                state.Text = "Downloading …";
+                var res = await Ask($"update download --json --kind {(InXaeShell ? "xaeshell" : "vsix")} --current " + BridgePackage.BridgeVersion);
+                install.IsEnabled = true;
+                file = S(res, "file");
+                if (file == null) { state.Foreground = ErrorBrush; state.Text = S(res, "error") ?? "The download failed. Open the release on GitHub instead."; return; }
+                state.Foreground = OkBrush;
+                state.Text = $"✓ {System.IO.Path.GetFileName(file)} downloaded, checksum matches SHA256SUMS.txt";
+                install.Content = "Install …";
+            };
+            DockPanel.SetDock(install, Dock.Left); bar.Children.Add(install);
             DockPanel.SetDock(github, Dock.Left); bar.Children.Add(github);
             DockPanel.SetDock(later, Dock.Right); bar.Children.Add(later);
             DockPanel.SetDock(skip, Dock.Right); bar.Children.Add(skip);

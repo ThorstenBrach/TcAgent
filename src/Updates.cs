@@ -200,13 +200,15 @@ public static class Updates
         return Convert.ToHexString(SHA256.HashData(s)).ToLowerInvariant();
     }
 
-    /// <summary>Downloads the .vsix of the newest release into the update folder and checks it. The address is built from the
-    /// repository and the tag, not taken from the answer. Returns the file; nothing stays behind when the checksum differs.</summary>
-    public static string Download(string current)
+    /// <summary>Downloads the .vsix (Visual Studio 2022) or the XAE Shell package .zip (xaeshell) of the newest release into the
+    /// update folder and checks it. The address is built from the repository and the tag, not taken from the answer. Returns
+    /// the file; nothing stays behind when the checksum differs.</summary>
+    public static string Download(string current, string kind = "vsix")
     {
         var r = Newer(LoadState()["releases"], current).FirstOrDefault() ?? throw new Exception("No newer version is known - check for updates first.");
         if (!Regex.IsMatch(r.Tag, @"^v?\d+(\.\d+){1,3}$")) throw new Exception("Unexpected release tag: " + r.Tag);
-        var name = $"TcAgent-{r.Tag.TrimStart('v', 'V')}.vsix";
+        var shell = (kind ?? "").StartsWith("xaeshell", StringComparison.OrdinalIgnoreCase);
+        var name = shell ? $"TcAgent-XaeShell-{r.Tag.TrimStart('v', 'V')}.zip" : $"TcAgent-{r.Tag.TrimStart('v', 'V')}.vsix";
         var baseUrl = DownloadRoot + r.Tag + "/";
         var want = ExpectedHash(Http.GetStringAsync(baseUrl + "SHA256SUMS.txt").GetAwaiter().GetResult(), name)
                    ?? throw new Exception($"{name} is not listed in SHA256SUMS.txt of {r.Tag} - not downloaded.");
@@ -228,7 +230,7 @@ public static class Updates
             throw new Exception($"The checksum of {name} does not match SHA256SUMS.txt - the file was removed, nothing is installed.");
         }
         File.Move(part, target, true);
-        foreach (var old in Directory.GetFiles(DownloadDir, "TcAgent-*.vsix"))
+        foreach (var old in Directory.GetFiles(DownloadDir, shell ? "TcAgent-XaeShell-*.zip" : "TcAgent-*.vsix"))
             if (!old.Equals(target, StringComparison.OrdinalIgnoreCase)) try { File.Delete(old); } catch (IOException) { }
         return target;
     }

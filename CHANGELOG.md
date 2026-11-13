@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **Install updates from the chat, also in the XAE Shell** - **Install …** closes the IDE (it asks to save), installs the
+  package (VSIX installer, or the XAE Shell ZIP with `install-xaeshell.ps1`) and starts the IDE again with the same solution;
+  the XAE Shell now downloads its ZIP from the release itself (`update download --kind xaeshell`, checked against
+  SHA256SUMS.txt). **Test builds:** `TCAGENT_UPDATE_FOLDER` names a folder with built packages; one there is offered when it
+  is newer or the same version built again (another `TcAgentBridge.dll`), with **Skip this build** (`update local`).
 - **Chat history, stage 2** - **⋯ > Earlier conversations …** lists the saved conversations of the solution (read, continue,
   delete); a continued conversation goes on in the agent's own session when the backend is the same and the session is still
   there (Claude Code `--resume`, ACP `session/load`), otherwise with the summary as before. The history now also keeps your

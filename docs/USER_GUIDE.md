@@ -152,10 +152,17 @@ work without the extension. The extension runs **inside** the IDE process and ad
   <img src="img/chat/share-question.png" width="400" alt="The question when sharing: only this chat, or kept in the knowledge">
 
 - **New versions** – once a day, after the IDE has loaded, a line above the conversation says when a newer TcAgent is out, and ⋯ gets a
-  blue dot. **What's new …** shows the release notes down to your version: **Download** fetches the `.vsix` and checks it against
-  `SHA256SUMS.txt`, **Install …** then opens the VSIX installer (Visual Studio must be closed, so save first), **Skip this version**
-  ends the notice until the next one. In the XAE Shell, **Open on GitHub** leads to the ZIP; install it as in
-  [INSTALLATION.md](INSTALLATION.md). A second line says when installed items have newer versions in their sources and leads
+  blue dot. **What's new …** shows the release notes down to your version: **Download** fetches the package and checks it against
+  `SHA256SUMS.txt` (the `.vsix` in Visual Studio, `TcAgent-XaeShell-<version>.zip` in the XAE Shell), **Install …** then asks
+  once and does the rest: the IDE closes (it asks to save open changes), the package is installed (VSIX installer; in the XAE
+  Shell `install-xaeshell.ps1`, which asks for administrator rights and shows its result) and the IDE starts again with the same
+  solution. Yes, a restart is needed - the extension is loaded by the running IDE; restart the AI clients you use as well, so
+  they start the new `TcAgent.exe`. The log: `%LOCALAPPDATA%\TcAgent\updates\install-update.log`. **Skip this version** ends the
+  notice until the next one.
+- **Test builds** – with `TCAGENT_UPDATE_FOLDER` set to a folder with built packages (e.g. `bin\` of the TcAgent source after
+  `build-vsix.ps1`, or a share of your team) the chat also offers a package there when it is newer or the **same version built
+  again** (its `TcAgentBridge.dll` differs from the one that runs): "Test build 0.55.0 of 13.11. 18:50 - the same version built
+  again" with **Install …** (as above) and **Skip this build**. **⋯ > Check for updates** looks there too. A second line says when installed items have newer versions in their sources and leads
   to the tab Sources; updating them stays your decision there. The source `tcagent-knowledge` is predefined there: it offers newer
   skills, prompts and rules between two versions of TcAgent (needs Git). An item you install from it replaces the built-in one of
   the same name for you and then follows the source. **⋯ > About TcAgent** switches the source off.
@@ -2176,6 +2183,7 @@ client.
 | `TCAGENT_RULES` | – | Additional coding rules (files/folders, `;`-separated), e.g. company rules |
 | `TCAGENT_RULES_GATE` | on | `0` disables the one-time rejection of the first write before the rules were read |
 | `TCAGENT_RISK_RULES` | – | Additional risk rules (files/folders, `;`-separated) |
+| `TCAGENT_UPDATE_FOLDER` | – | Folder with test builds (`TcAgent-<version>.vsix`, `TcAgent-XaeShell-<version>.zip`): offered when newer or the same version built again |
 | `TCAGENT_BUILTIN` | – | `package`: always the built-in knowledge of the package, never a newer version taken over (pipelines do this anyway) |
 | `TCAGENT_KNOWLEDGE` | – | Additional knowledge sources (URLs/folders, `;`-separated) |
 | `TCAGENT_SEARCH` | – | Search service for `tc_docs`: `searxng:<url>` or `google:<API key>:<search engine ID>` |

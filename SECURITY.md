@@ -30,9 +30,11 @@ activate configurations, start and stop the PLC, write variables. Use it accordi
   "builtinUpdates": false }`.
 * **Predefined source:** the tab Sources offers the repository TcAgent_Knowledge. Nothing is read from it until somebody browses it, and an
   item is only taken over on a click, pinned to a commit. Skills and rules are instructions to the agent: check what you install.
-* **Updates are never installed silently.** A download starts on a click; the `.vsix` must match `SHA256SUMS.txt` of the release and
-  **Install** opens the VSIX installer. The checksum shows a damaged download. It lies in the same release, so it does not
-  protect against a taken-over repository: the packages are not signed.
+* **Updates are never installed silently.** A download starts on a click; the `.vsix` (or the XAE Shell `.zip`) must match
+  `SHA256SUMS.txt` of the release, and **Install** asks before it closes the IDE, installs (VSIX installer / `install-xaeshell.ps1`
+  with an administrator prompt) and starts the IDE again. The checksum shows a damaged download. It lies in the same release, so
+  it does not protect against a taken-over repository: the packages are not signed. Test builds from `TCAGENT_UPDATE_FOLDER` are
+  not checked at all - set it only to a folder you trust (your own build output, a share of your team).
 * **Shared folders:** in the TcAgent Chat the user can let the agent read folders outside the solution without asking; what it reads goes
   to the AI provider. Changing a file there still asks. Drives, the user profile, `AppData`, key folders such as `.ssh` and
   system folders are refused. The list is `%LOCALAPPDATA%\TcAgent\shared-folders.json`.
