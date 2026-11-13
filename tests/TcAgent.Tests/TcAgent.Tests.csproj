@@ -49,6 +49,7 @@
     <Compile Include="..\..\src\Updates.cs" Link="src\Updates.cs" />
     <Compile Include="..\..\src\BuiltInKnowledge.cs" Link="src\BuiltInKnowledge.cs" />
     <Compile Include="..\..\src\LocalBuilds.cs" Link="src\LocalBuilds.cs" />
+    <Compile Include="..\..\src\Storage.cs" Link="src\Storage.cs" />
     <Compile Include="..\..\src\SharedFolders.cs" Link="src\SharedFolders.cs" />
     <Compile Include="..\..\src\Reset.cs" Link="src\Reset.cs" />
     <Compile Include="..\..\src\Targets.cs" Link="src\Targets.cs" />

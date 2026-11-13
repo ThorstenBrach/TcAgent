@@ -72,6 +72,25 @@ namespace TcAgentBridge
                 {
                     try { Installer.OnStartup(Log, Notify); } catch (Exception ex) { Log("Installer: " + ex.Message); }
                 });
+                // once a day: the safe areas of %LOCALAPPDATA%\TcAgent are cleaned up in the background (src/Storage.cs), one line in the log
+                System.Threading.Tasks.Task.Run(async () =>
+                {
+                    try
+                    {
+                        await System.Threading.Tasks.Task.Delay(60000);
+                        var exe = TcUnitControl.TcAgentExe();
+                        if (exe == null) return;
+                        var psi = new System.Diagnostics.ProcessStartInfo(exe, "storage auto") { UseShellExecute = false, CreateNoWindow = true, RedirectStandardOutput = true, RedirectStandardError = true, RedirectStandardInput = true };
+                        using (var p = System.Diagnostics.Process.Start(psi))
+                        {
+                            p.StandardInput.Close();
+                            var o = p.StandardOutput.ReadToEnd();
+                            p.WaitForExit(60000);
+                            if (o.StartsWith("Cleaned up")) Log("Storage: " + o.Trim());
+                        }
+                    }
+                    catch (Exception ex) { Log("Storage: " + ex.Message); }
+                });
                 // Show chat window on startup (can be disabled: "showOnStartup": false in chat-backends.json)
                 if (ShowChatOnStartup() && ui != null)
                     ui.BeginInvoke(new Action(() =>

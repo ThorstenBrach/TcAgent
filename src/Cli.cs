@@ -31,7 +31,7 @@ public static partial class Cli
     public const int Ok = 0, Failed = 1, Usage = 2, Infra = 3;
 
     public static bool IsCommand(string[] args) =>
-        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "about" or "shared" or "reset" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" or "advise" or "format" or "reload" or "settings" or "targets" or "condition" or "watch" || args.Length > 0 && args[0] == "tcpkg-elevated";
+        args.Length > 0 && args[0].ToLowerInvariant() is "check" or "build" or "test" or "sil" or "hil" or "analyze" or "library" or "archive" or "scope" or "doc" or "feedback" or "update" or "storage" or "about" or "shared" or "reset" or "help" or "--help" or "-h" or "/?" or "version" or "--version" or "doctor" or "install" or "sbom" or "lock" or "ci" or "st" or "tcunit" or "skills" or "sources" or "knowledge" or "diag" or "backup" or "restore" or "knowledgebase" or "modules" or "plugins" or "prompts" or "advise" or "format" or "reload" or "settings" or "targets" or "condition" or "watch" || args.Length > 0 && args[0] == "tcpkg-elevated";
 
     sealed class Options
     {
@@ -63,6 +63,7 @@ public static partial class Cli
         if (args[0].Equals("modules", StringComparison.OrdinalIgnoreCase)) return Modules.RunCli(args);
         if (args[0].Equals("plugins", StringComparison.OrdinalIgnoreCase)) return Plugins.RunCli(args);
         if (args[0].Equals("update", StringComparison.OrdinalIgnoreCase)) return UpdateCli(args);       // Updates.cs - no solution, no IDE
+        if (args[0].Equals("storage", StringComparison.OrdinalIgnoreCase)) return StorageCli(args);     // Storage.cs - files only
         if (args[0].Equals("about", StringComparison.OrdinalIgnoreCase)) return AboutCli();
         if (args[0].Equals("shared", StringComparison.OrdinalIgnoreCase)) return SharedCli(args);       // SharedFolders.cs - files only
         if (args[0].Equals("reset", StringComparison.OrdinalIgnoreCase)) return ResetCli(args);         // Reset.cs - files only
@@ -965,6 +966,9 @@ public static partial class Cli
 
   TcAgent.exe update [check] [--force] [--json]
   TcAgent.exe update sources [--force] [--solution <sln>] [--json]
+  TcAgent.exe storage [list|clean [--area <a>] [--dry-run] [--permanent]|auto [--force]|project-delete --name <p>] [--json]
+      What TcAgent keeps under %LOCALAPPDATA%\TcAgent (chats, attachments, TcUnit runs, logs, caches, server versions,
+      downloads, *.bak-*) and the clean-up by the rules of settings.json ""retention""; recycle bin unless --permanent.
   TcAgent.exe update builtin [check|apply <version>|skip <version>|back] [--force] [--json]
   TcAgent.exe update local [--folder <dir>] [--kind vsix|xaeshell-vs15|xaeshell-vs17] [--bridge <TcAgentBridge.dll>] [--json]
       A test build in TCAGENT_UPDATE_FOLDER (or --folder): newer, or the same version built again (its TcAgentBridge.dll

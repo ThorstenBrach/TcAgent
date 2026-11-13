@@ -498,6 +498,32 @@ the tab a backup can also be compared with the current state (double-click), del
 copied.
 Command line: `TcAgent.exe knowledgebase list|backup|diff|restore`.
 
+### Storage
+
+The tab **Storage** shows what TcAgent keeps on this PC under `%LOCALAPPDATA%\TcAgent` and how long. Per area the size,
+the number of items, the oldest, the rule, what the rule would remove now and whether the daily run cleans it:
+
+| Area | Rule (default) | Daily |
+|---|---|---|
+| Chat conversations | 90 days, the newest 50 per solution | on request |
+| Chat attachments | 30 days | ✓ |
+| TcUnit runs | projects without a run for 90 days | on request |
+| Logs | 30 days; a log over 5 MB is set aside as `.old` | ✓ |
+| Library and document caches | not written for 90 days | ✓ |
+| Server versions (`app\<version>`) | the newest 2 and the one registered for the AI clients stay | ✓ |
+| Downloaded updates | 14 days | ✓ |
+| Backups of config files (`*.bak-*`) | the newest 3 per file | ✓ |
+| Files of ended processes | `busy`/`reload` files whose process has ended | ✓ |
+
+**Clean up …** lists every item first and moves them to the **recycle bin** (with areas selected: only those). Below,
+**per project**: the chats, TcUnit runs and workflow runs kept for each project, a project whose solution folder is gone
+is marked; **Delete everything of this project …** removes them (recycle bin; the project itself is not touched). Never
+touched: backups, your knowledge files, settings, the audit log, sources and plugins. Once a day, a minute after the IDE
+started, the areas marked ✓ are cleaned in the background (one line in the TcAgent log). The rules are set in
+`settings.json`, e.g. `"retention": { "chats": { "days": 60, "keep": 30 }, "logs": { "days": 14 }, "tcunit": false, "auto": false }` -
+`days` / `keep` per area, `false` switches an area off, `"auto": false` the daily run. Command line (also for pipelines):
+`TcAgent.exe storage`, `storage clean [--area <a>] [--dry-run] [--permanent]`, `storage project-delete --name <p>`.
+
 Decisions (apply a proposal, install, pull, promote) are made in the chat – the agent asks you.
 
 ---

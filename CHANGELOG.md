@@ -7,6 +7,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **Clean up TcAgent's files** - Knowledge window, tab **Storage**: what TcAgent keeps under `%LOCALAPPDATA%\TcAgent` per area
+  (chats, attachments, TcUnit runs, logs, caches, server versions, downloaded updates, `*.bak-*`, files of ended processes)
+  with size, oldest, rule and what the rule removes; **Clean up …** shows every item first and uses the recycle bin; per
+  project **Delete everything of this project …**. Once a day the safe areas are cleaned in the background. Rules in
+  `settings.json` `"retention"`; never touched: backups, knowledge, settings. CLI: `TcAgent.exe storage [clean|auto|project-delete]`.
 - **Install updates from the chat, also in the XAE Shell** - **Install …** closes the IDE (it asks to save), installs the
   package (VSIX installer, or the XAE Shell ZIP with `install-xaeshell.ps1`) and starts the IDE again with the same solution;
   the XAE Shell now downloads its ZIP from the release itself (`update download --kind xaeshell`, checked against
