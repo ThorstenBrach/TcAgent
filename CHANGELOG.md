@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **Chat history, stage 2** - **⋯ > Earlier conversations …** lists the saved conversations of the solution (read, continue,
+  delete); a continued conversation goes on in the agent's own session when the backend is the same and the session is still
+  there (Claude Code `--resume`, ACP `session/load`), otherwise with the summary as before. The history now also keeps your
+  answers to question cards and the id of the agent's session.
 - **Newer built-in knowledge without a new TcAgent** - the TcAgent Chat looks once a day for newer tags of the knowledge
   repository and shows what changed; **Use x.y.z** makes that version the built-in level (cache under
   `%LOCALAPPDATA%\TcAgent\builtin`), **Skip this version**, and **⋯ > About TcAgent** goes **Back**. Only versions this TcAgent can

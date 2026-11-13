@@ -431,7 +431,7 @@ namespace TcAgentBridge
             public Process P; public Backend Be; public Stream In;
             public readonly StringBuilder Answer = new StringBuilder(), Err = new StringBuilder();
             public TaskCompletionSource<string> Turn; public Stopwatch TurnSw; public string Summary;
-            public bool Exited, Greeted, Interrupted; public readonly Stopwatch Up = Stopwatch.StartNew();
+            public bool Exited, Greeted, Interrupted, Resumed; public readonly Stopwatch Up = Stopwatch.StartNew();
             public AcpState Acp;                // ACP backends (ChatAcp.cs)
             public string Server;               // TcAgent version registered when the session started
         }
@@ -499,10 +499,15 @@ namespace TcAgentBridge
         async Task<Session> StartSession(Backend be, string workDir, int generation)
         {
             var sw = Stopwatch.StartNew();
+            // the agent's own session of the reopened conversation (ChatRecord.cs): Claude Code --resume, ACP session/load
+            var resume = TakeResume(be);
             var s = await Task.Run(() =>
             {
                 var (file, args) = CommandLine(be, null, workDir);
-                var n = new Session { Be = be, Acp = IsAcp(be) ? new AcpState() : null, Server = Installer.RegisteredServerVersion() };
+                if (resume != null && be.Format == "claude-stream") args += " --resume " + resume;
+                var n = new Session { Be = be, Acp = IsAcp(be) ? new AcpState { ResumeId = resume } : null, Server = Installer.RegisteredServerVersion() };
+                // Claude continues its session: it knows the instructions and the conversation - the next prompt is a follow-up
+                if (resume != null && n.Acp == null) { n.Greeted = true; n.Resumed = true; }
                 n.P = Process.Start(Psi(file, args, be, workDir));
                 n.In = n.P.StandardInput.BaseStream;
                 return n;
@@ -522,6 +527,7 @@ namespace TcAgentBridge
             });
             _ = Task.Run(() => { string line; try { while ((line = s.P.StandardError.ReadLine()) != null) lock (s.Err) s.Err.AppendLine(line); } catch { } });
             sess = s;
+            if (s.Resumed) { handover = null; SystemLine("↻ Continues the agent's session of the last conversation."); }
             return s;
         }
 
@@ -904,7 +910,10 @@ namespace TcAgentBridge
             if (e == null) return (null, null, null, null, false);
             var type = e.TryGetValue("type", out var ty) ? ty as string : null;
             if (type == "system" && (e.TryGetValue("subtype", out var st) ? st as string : null) == "init")
+            {
+                if (e.TryGetValue("session_id", out var sid)) NoteSession(sid as string, sess?.Be);     // for a later --resume (ChatRecord.cs); not the combo box: a reader thread
                 return (null, null, $"Claude ready after {t:0.0} s - thinking ...", null, false);
+            }
             if (type == "assistant" && e.TryGetValue("message", out var mo) && mo is Dictionary<string, object> m
                 && m.TryGetValue("content", out var co) && co is IEnumerable items)
             {

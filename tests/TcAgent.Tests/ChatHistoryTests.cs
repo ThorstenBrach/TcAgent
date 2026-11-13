@@ -146,4 +146,18 @@ public sealed class ChatHistoryTests : IDisposable
         Assert.Equal(3, ChatHistory.DeleteProject(Sln));
         Assert.Empty(ChatHistory.Files(Sln));
     }
+
+    [Fact]
+    public void Card_answers_and_the_agent_session_are_kept()
+    {
+        var f = ChatHistory.NewFile(Sln, T0);
+        ChatHistory.Append(f, "start", new() { ["backend"] = "Claude Code" }, T0);
+        ChatHistory.Append(f, "question", new() { ["text"] = "Fix the homing" }, T0.AddMinutes(1));
+        ChatHistory.Append(f, "session", new() { ["id"] = "4f1c2b9e-0000-1111-2222-333344445555", ["backend"] = "claude" }, T0.AddMinutes(1));
+        ChatHistory.Append(f, "card", new() { ["question"] = "Fix the 2 compiler errors as well?", ["answer"] = "Yes" }, T0.AddMinutes(2));
+        ChatHistory.Append(f, "answer", new() { ["text"] = "Done." }, T0.AddMinutes(3));
+        var c = ChatHistory.Load(f);
+        Assert.Equal("4f1c2b9e-0000-1111-2222-333344445555", c.SessionId);
+        Assert.Contains("Asked: Fix the 2 compiler errors as well? -> Yes", ChatHistory.Format(c));
+    }
 }

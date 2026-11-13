@@ -117,7 +117,7 @@ work without the extension. The extension runs **inside** the IDE process and ad
   and the ACP backends the conversation goes on with the next question). The
   status line shows the state of the backend, while working "◐ Claude Code is working · 3 tool calls · 12 s · tc_check",
   afterwards "✓ Done in 14 s · 6 tool calls". The **⋯** menu is grouped: *Chat* (send editor context, check after changes, **Answer language**,
-  New chat, Copy conversation, Delete chat history of this solution), *Windows* (TcUnit Tests, Knowledge), *Setup and help* (Set up clients, Copy diagnostics,
+  New chat, Copy conversation, Earlier conversations, Delete chat history of this solution), *Windows* (TcUnit Tests, Knowledge), *Setup and help* (Set up clients, Copy diagnostics,
   Open user guide, Check for updates, About TcAgent) and the version. The result of **Set up clients** is one line at the top ("TcAgent x is set up for n
   clients – restart the open ones") with **Details** (the files written, user folders as %LOCALAPPDATA% / %USERPROFILE%).
 - **Answer language** – **⋯ > Answer language**: the language of Windows (the default), the language of the question, or one
@@ -128,14 +128,19 @@ work without the extension. The extension runs **inside** the IDE process and ad
 
 - **Chat history** – the chat keeps every conversation per solution on this PC, never in the project or in Git:
   `%LOCALAPPDATA%\TcAgent\chats\<solution>-<hash>\`, one file per conversation with the questions, the answers, one line per
-  tool call (name, ✓/✗, first line of the result), the task list of the agent and a stop. Attachments are kept by name
-  only. When you open the solution again, the chat shows the last conversation (its last 10 questions) and a line such as
+  tool call (name, ✓/✗, first line of the result), the task list of the agent, your answers to its question cards, a stop
+  and the id of the agent's own session. Attachments are kept by name only. When you open the solution again, the chat shows the last conversation (its last 10 questions) and a line such as
   "Last conversation in this project: 11.11. 17:42, 6 questions, 2 open tasks". Within 8 hours the next question simply
   continues it; after that, or after **New chat**, a new conversation begins. Either way the first question to the agent
   gets a short summary of the last conversation (questions, last answer, open tasks, whether it was stopped), so you can
-  ask *"Where did we stop?"* or *"Finish the open tasks"*. The agent reads more with `tc_chat_history` (read, list,
-  search) – with every AI client. Kept: 90 days and the last 50 conversations per solution. **⋯ > Delete chat history of
-  this solution** removes them; `"saveHistory": false` in `chat-backends.json` switches the history off.
+  ask *"Where did we stop?"* or *"Finish the open tasks"*. When a conversation goes on with the same backend, the agent
+  continues its **own session** instead of a summary (Claude Code `--resume`, ACP `session/load` where the agent offers
+  it; the chat says "↻ Continues the agent's session"); if that session is gone, the summary is used. The agent reads
+  more with `tc_chat_history` (read, list, search) – with every AI client. **⋯ > Earlier conversations …** lists the
+  saved conversations of the solution: **Read** shows one as text, **Continue** takes it up again (with the agent's own
+  session if it is still there), **Delete …** removes one. Kept: 90 days and the last 50 conversations per solution.
+  **⋯ > Delete chat history of this solution** removes them; `"saveHistory": false` in `chat-backends.json` switches the
+  history off.
 
 - **Shared folders** – **Attach … > Share a folder**, drop a folder on the input, or **⋯ > Shared folders**: the agent reads the folder
   without asking; changing a file there still asks you. A question decides, also for attached files: **only this chat**, or

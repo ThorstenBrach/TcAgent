@@ -252,6 +252,13 @@ namespace TcAgentBridge
         // Returns question -> answer (selected labels separated by ", ", plus the free text), or null if skipped.
         Dictionary<string, object> AskQuestions(Dictionary<string, object> input)
         {
+            var r = AskQuestionsCard(input);
+            RecordCards(input, r);          // the chat history keeps question and answer (ChatRecord.cs)
+            return r;
+        }
+
+        Dictionary<string, object> AskQuestionsCard(Dictionary<string, object> input)
+        {
             var questions = (input.TryGetValue("questions", out var qs) ? qs as IEnumerable : null)?.OfType<Dictionary<string, object>>().ToList()
                             ?? new List<Dictionary<string, object>>();
             if (questions.Count == 0) return null;

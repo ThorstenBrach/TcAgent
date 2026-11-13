@@ -299,6 +299,8 @@ namespace TcAgentBridge
             menu.Items.Add(Item("Shared folders …", ShowSharedFolders, "Folders the agent may read without asking"));
             menu.Items.Add(Item("New chat", () => clear.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent)), clear.ToolTip as string));
             menu.Items.Add(Item("Copy conversation", CopyConversation, "The questions and answers of this chat as text"));
+            menu.Items.Add(Item("Earlier conversations …", ShowEarlierConversations,
+                                "The saved conversations of this solution: read one, continue one (with the agent's own session if it is still there), delete one"));
             menu.Items.Add(Item("Delete chat history of this solution …", DeleteProjectHistory,
                                 "The conversations of this solution are kept on this PC (%LOCALAPPDATA%\\TcAgent\\chats) - the agent reads them with tc_chat_history"));
             menu.Items.Add(new Separator());

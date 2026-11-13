@@ -33,7 +33,7 @@ namespace TcAgentBridge
 
         sealed class AcpState
         {
-            public string SessionId;
+            public string SessionId, ResumeId;      // ResumeId: continue this session with session/load (ChatRecord.cs)
             public long NextId = 100;
             public readonly Dictionary<long, TaskCompletionSource<Dictionary<string, object>>> Pending = new Dictionary<long, TaskCompletionSource<Dictionary<string, object>>>();
             public Task Opening;
@@ -78,6 +78,19 @@ namespace TcAgentBridge
                     ["clientCapabilities"] = new Dictionary<string, object> { ["fs"] = new Dictionary<string, object> { ["readTextFile"] = false, ["writeTextFile"] = false }, ["terminal"] = false },
                     ["clientInfo"] = new Dictionary<string, object> { ["name"] = "tcagent-chat", ["version"] = BridgePackage.BridgeVersion }
                 });
+                // the session of the reopened conversation, if the agent can load sessions; otherwise a new one with the handover
+                var caps = init.TryGetValue("agentCapabilities", out var ac) ? ac as Dictionary<string, object> : null;
+                if (s.Acp.ResumeId != null && caps != null && caps.TryGetValue("loadSession", out var ls) && ls is bool canLoad && canLoad)
+                    try
+                    {
+                        await AcpCall(s, "session/load", new Dictionary<string, object> { ["sessionId"] = s.Acp.ResumeId, ["cwd"] = SolutionDir() ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ["mcpServers"] = AcpMcpServers(s.Be) });
+                        s.Acp.SessionId = s.Acp.ResumeId;
+                        s.Greeted = true; s.Resumed = true;
+                        _ = Dispatcher.BeginInvoke(new Action(() => { handover = null; SystemLine("↻ Continues the agent's session of the last conversation."); }));
+                        NoteSession(s.Acp.SessionId, s.Be);
+                        return;
+                    }
+                    catch (Exception ex) { BridgePackage.Instance?.LogLine("Chat: session/load failed, new session - " + ex.Message); }
                 Dictionary<string, object> sn;
                 try { sn = await AcpCall(s, "session/new", new Dictionary<string, object> { ["cwd"] = SolutionDir() ?? Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), ["mcpServers"] = AcpMcpServers(s.Be) }); }
                 catch (Exception ex) when (ex.Message.IndexOf("auth", StringComparison.OrdinalIgnoreCase) >= 0)
@@ -87,6 +100,7 @@ namespace TcAgentBridge
                     throw new Exception($"{s.Be.Name} is not signed in. {how ?? "Sign in once in a terminal."} Then ask again.");
                 }
                 s.Acp.SessionId = sn.TryGetValue("sessionId", out var sid) ? sid as string : throw new Exception("session/new returned no sessionId");
+                NoteSession(s.Acp.SessionId, s.Be);
             }
         }
 
