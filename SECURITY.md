@@ -23,9 +23,11 @@ activate configurations, start and stop the PLC, write variables. Use it accordi
 * **Stay local:** TcAgent runs as a local process (stdio). Do not expose it over a network or as a public URL.
 * **Connections it makes by itself:** the VS extension asks `api.github.com` for the releases of TcAgent once a day, after the IDE
   has loaded: an anonymous GET, with the TcAgent version in the User-Agent and nothing about the solution or the user. It also
-  fetches the Git repositories of the sources in use once a day (`git fetch`, no pull, no sign-in window). Pipelines, the
-  command line and the agent do not check. Both switches are in **⋯ > About TcAgent**; `updates.json` on the company or team
-  level locks them, e.g. `{ "check": false, "sources": false, "knowledgeSource": false }`.
+  fetches the Git repositories of the sources in use once a day (`git fetch`, no pull, no sign-in window), and the tags of the
+  knowledge repository TcAgent_Knowledge for a newer built-in knowledge (`git fetch` of the tags; taken over only on a click,
+  never in a pipeline). Pipelines, the command line and the agent do not check. The switches are in **⋯ > About TcAgent**;
+  `updates.json` on the company or team level locks them, e.g. `{ "check": false, "sources": false, "knowledgeSource": false,
+  "builtinUpdates": false }`.
 * **Predefined source:** the tab Sources offers the repository TcAgent_Knowledge. Nothing is read from it until somebody browses it, and an
   item is only taken over on a click, pinned to a commit. Skills and rules are instructions to the agent: check what you install.
 * **Updates are never installed silently.** A download starts on a click; the `.vsix` must match `SHA256SUMS.txt` of the release and

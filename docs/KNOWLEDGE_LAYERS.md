@@ -198,7 +198,31 @@ unless a placeholder is still open. The default is inserting. `TcAgent.exe promp
 
 `updates.json` on the company or team level decides about the checks of the VS extension for everybody, e.g.
 `{ "check": false, "sources": false, "knowledgeSource": false }`: `check` for new TcAgent versions, `sources` for newer versions in the
-repo sources, `knowledgeSource` for the predefined source `tcagent-knowledge`. A value there locks the switch in **⋯ > About TcAgent**; without one each user decides, and both are on by default.
+repo sources, `knowledgeSource` for the predefined source `tcagent-knowledge`, `builtinUpdates` for newer built-in knowledge (below). A value there locks the switch in **⋯ > About TcAgent**; without one each user decides, and both are on by default.
+
+## Updating the built-in level
+
+The built-in level comes with the package: `knowledge\` next to `TcAgent.exe`, the repository
+[TcAgent_Knowledge](https://github.com/ThorstenBrach/TcAgent_Knowledge) at the commit of the release. Between two releases TcAgent
+offers a newer version of that repository without a new program (`src/BuiltInKnowledge.cs`):
+
+- **Versions are tags** `vX.Y.Z` of the knowledge repository. Its `CHANGELOG.md` names per version the TcAgent it needs
+  (`Needs TcAgent 0.53.0 or later`) - skills and prompts use tools by name. A version that needs a newer TcAgent is not offered
+  (the notice names it); the newest one that fits is.
+- **Once a day** the TcAgent Chat asks (`TcAgent.exe update builtin`, a fetch of the tags into
+  `%LOCALAPPDATA%\TcAgent\builtin\repo`). Nothing changes by itself: skills are instructions to the agent. The notice shows
+  what changed; **Use x.y.z** takes it over (`update builtin apply x.y.z`: the files of the tag into
+  `%LOCALAPPDATA%\TcAgent\builtin\<version>\`), **Skip this version** ends the notice. **⋯ > About TcAgent** goes back to the
+  version before (`update builtin back`) and switches the daily look off.
+- **The package stays the fallback:** without a choice, when the chosen version is gone or needs a newer TcAgent, and when the
+  package is as new or newer (a newer TcAgent brought it along). Only the version in use and the one before it stay in the cache.
+- **Pipelines keep the package** - `--fail-on` must not change by itself: the usual CI variables (`CI`, `TF_BUILD`,
+  `GITHUB_ACTIONS`, `GITLAB_CI`, `JENKINS_URL` …) or `TCAGENT_BUILTIN=package`.
+- **Company and team** decide in `updates.json`: `"builtinUpdates": false` (only the package) or `"builtinVersion": "1.1.0"`
+  (this version; `"package"` = the one in the package).
+- **Your copies stay:** a file you copied from the built-in, company or team level (**Edit my copy**, **Add existing …**)
+  remembers its original (`tcagent-copy-of`, `tcagent-copy-sha`). When the original changes - for example by a newer built-in
+  knowledge - the Files tab shows **↑ original changed** with **Compare**, and the Overview names how many.
 
 ## Skills
 

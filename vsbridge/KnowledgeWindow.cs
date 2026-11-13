@@ -1106,6 +1106,8 @@ namespace TcAgentBridge
             if (mine > 0) attention.Children.Add(Chip($"✎ {mine} item(s) from a source changed locally - Sources", Orange, "Compare, merge, propose or revert", () => Show(tSources)));
             if (theirs > 0) attention.Children.Add(Chip($"↑ {theirs} item(s) newer in their source - Sources", Orange, "Update and merge", () => Show(tSources)));
             if (missing > 0) attention.Children.Add(Chip($"✗ {missing} installed item(s) missing - Sources", Orange, "Install them again or uninstall them", () => Show(tSources)));
+            var copies = Arr(data["entries"]).Count(e => B(e, "originalChanged"));
+            if (copies > 0) attention.Children.Add(Chip($"↑ {copies} of your copies: the original changed - Files", Blue, "A newer built-in, company or team version - compare it with your copy", () => Show(tEffective)));
             foreach (var l in Arr(data["layers"]))
                 if (l.TryGetValue("git", out var go) && go is Dictionary<string, object> g && !B(g, "same") && S(l, "level") != null)
                 {
@@ -1281,6 +1283,8 @@ namespace TcAgentBridge
             if (st is "needs plugin" or "needs module" or "needs TcAgent") return ("✗ " + st + lockedNote, Orange);
             var (srcText, srcMark) = SourceState(S(e, "sourceState"));
             if (srcText != null) return (srcText, srcMark);
+            // your copy of a built-in, company or team file whose original changed since (e.g. newer built-in knowledge)
+            if (B(e, "originalChanged")) return ("↑ original changed" + lockedNote, Blue);
             return ((st == "forced" ? "✓ applies (forced)" : "✓ applies") + lockedNote, Green);
         }
 
@@ -1318,6 +1322,9 @@ namespace TcAgentBridge
             if (S(d, "description") is string de) Row("Description", de);
             if (S(d, "reason") is string r && r.Length > 0) Row("Why", r);
             if (S(d, "git") is string gs) Row("Git", gs + " - not committed yet");
+            if (B(d, "originalChanged"))
+                Row("Original", "Your copy - the original changed since you made it (e.g. a newer built-in knowledge). Compare them and take over what you want.",
+                    ("Compare", () => CompareWithOriginal(d)));
             if (S(d, "source") is string so)
             {
                 Row("Source", $"{so} · license {S(d, "license") ?? "unknown"}" + (S(d, "sourceState") is string ss ? " · " + (SourceState(ss).Text ?? (ss == "ok" ? "✓ as installed" : ss)) : ""));
@@ -2291,6 +2298,21 @@ namespace TcAgentBridge
                 catch (Exception ex) { Error("Compare: " + ex.Message); }
             }
             status.Text = files.Count > 8 ? $"{files.Count} files changed - the first 8 are open." : $"{files.Count} changed file(s) open in the compare window.";
+        }
+
+        // your copy and the original it replaces (the same key on a lower level) in the compare window
+        void CompareWithOriginal(Dictionary<string, object> mine)
+        {
+            var orig = Arr(data?["entries"]).FirstOrDefault(x => S(x, "key") == S(mine, "key") && S(x, "status") == "replaced" && S(x, "path") != S(mine, "path"));
+            if (orig == null) { Hint("The original was not found any more."); return; }
+            var diff = Package.GetGlobalService(typeof(Microsoft.VisualStudio.Shell.Interop.SVsDifferenceService)) as Microsoft.VisualStudio.Shell.Interop.IVsDifferenceService;
+            if (diff == null) { OpenInEditor(S(orig, "path")); return; }
+            try
+            {
+                diff.OpenComparisonWindow2(S(orig, "path"), S(mine, "path"), $"{S(mine, "name")}: original ↔ yours", $"{S(orig, "path")} ↔ {S(mine, "path")}",
+                                           "Original (" + S(orig, "label") + ")", "Yours (" + S(mine, "label") + ")", S(mine, "name"), null, 0);
+            }
+            catch (Exception ex) { Error("Compare: " + ex.Message); }
         }
 
         static string EmptyFile() { var p = Path.Combine(Path.GetTempPath(), "tcagent-empty.txt"); if (!File.Exists(p)) File.WriteAllText(p, ""); return p; }

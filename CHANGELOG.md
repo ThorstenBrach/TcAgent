@@ -7,6 +7,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **Newer built-in knowledge without a new TcAgent** - the TcAgent Chat looks once a day for newer tags of the knowledge
+  repository and shows what changed; **Use x.y.z** makes that version the built-in level (cache under
+  `%LOCALAPPDATA%\TcAgent\builtin`), **Skip this version**, and **⋯ > About TcAgent** goes **Back**. Only versions this TcAgent can
+  use are offered ("Needs TcAgent" in their changelog); the package stays the fallback and pipelines always keep it
+  (`TCAGENT_BUILTIN=package`). `updates.json`: `"builtinUpdates": false` or `"builtinVersion": "1.1.0"`. CLI:
+  `TcAgent.exe update builtin [check|apply|skip|back]`. Your copies of built-in, company or team files show
+  **↑ original changed** in the Knowledge window when their original changed, with **Compare**.
 - **TcUnit report and window: tables in the test texts** - `///` lines that start and end with `|` are shown as a table
   (first line the head, a `|---|` separator line is left out, number columns right-aligned) in the HTML report, light and
   dark, and in the details of the TcUnit Tests window, e.g. the step table of a path test.

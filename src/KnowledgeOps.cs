@@ -126,6 +126,7 @@ public static class KnowledgeOps
             var target = Path.Combine(root, kind, name);
             if (Directory.Exists(target)) throw new ArgumentException(target + " exists already");
             CopyDir(folder, target);
+            MarkCopy(solutionDir, Path.Combine(target, main), folder);
             return Path.Combine(target, main);
         }
         if (!File.Exists(source) || !source.EndsWith(".md", StringComparison.OrdinalIgnoreCase)) throw new ArgumentException("pick a Markdown file (.md)");
@@ -133,7 +134,31 @@ public static class KnowledgeOps
         if (File.Exists(file)) throw new ArgumentException(file + " exists already");
         Directory.CreateDirectory(Path.GetDirectoryName(file)!);
         File.Copy(source, file);
+        if (kind is "prompts" or "coding-rules") MarkCopy(solutionDir, file, source);
         return file;
+    }
+
+    // ------------------------------------------------------------------ copies of other levels ("Edit my copy")
+    /// <summary>A copy of a file of another level (built-in, company, team, a platform) remembers where it came from and the
+    /// checksum of the original at that time: tcagent-copy-of (the level) and tcagent-copy-sha. OriginalChanged compares later.</summary>
+    static void MarkCopy(string solutionDir, string mainFile, string originalItem)
+    {
+        var layer = LayerOf(solutionDir, originalItem, Array.Empty<string>());
+        if (layer == null || layer.Level is "user" or "project") return;
+        var meta = new Dictionary<string, string> { ["tcagent-copy-of"] = layer.Level, ["tcagent-copy-sha"] = Sources.Checksum(originalItem)[..16] };
+        File.WriteAllText(mainFile, Sources.AddMeta(File.ReadAllText(mainFile), meta));
+    }
+
+    /// <summary>The original of a copy (same key, on the level named in tcagent-copy-of) was changed since the copy was made -
+    /// e.g. a newer built-in knowledge. Null when the entry is no such copy or the original is gone.</summary>
+    public static bool? OriginalChanged(KnowledgeLayers.Entry e, IEnumerable<KnowledgeLayers.Entry> all)
+    {
+        var level = e.Meta?.Get("copy-of"); var sha = e.Meta?.Get("copy-sha");
+        if (string.IsNullOrEmpty(level) || string.IsNullOrEmpty(sha)) return null;
+        var orig = all.FirstOrDefault(x => !ReferenceEquals(x, e) && x.Key == e.Key && x.Layer.Level == level);
+        if (orig == null) return null;
+        var now = Sources.Checksum(ItemOf(orig.Path));
+        return now.Length > 0 && !now.StartsWith(sha, StringComparison.OrdinalIgnoreCase);
     }
 
     // ------------------------------------------------------------------ platforms

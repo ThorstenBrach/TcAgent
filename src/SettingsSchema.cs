@@ -103,6 +103,11 @@ public static class SettingsSchema
         new("TCAGENT_RISK_RULES", "knowledge", "paths", "", null,
             "Additional risk rules", "Zusätzliche Risikoregeln",
             "Files or folders with risk rules, ';'-separated.", "Dateien oder Ordner mit Risikoregeln, mit ';' getrennt."),
+        new("TCAGENT_BUILTIN", "knowledge", "choice", "", new[] { "", "package" },
+            "Built-in knowledge", "Mitgeliefertes Wissen",
+            "package: always the built-in knowledge of the package, never a newer version taken over from the knowledge repository (pipelines do this anyway).",
+            "package: immer das mitgelieferte Wissen des Pakets, nie eine übernommene neuere Version aus dem Wissens-Repository (Pipelines tun das ohnehin).")
+        { ValueLabels = new[] { ("newer version when taken over", "neuere Version, wenn übernommen"), ("always the package", "immer das Paket") } },
         new("TCAGENT_KNOWLEDGE", "knowledge", "paths", "", null,
             "Additional knowledge sources", "Zusätzliche Wissensquellen",
             "URLs or folders the agent may look things up in, ';'-separated.", "URLs oder Ordner, in denen der Agent nachschlagen darf, mit ';' getrennt."),

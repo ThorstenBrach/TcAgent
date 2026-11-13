@@ -207,7 +207,7 @@ public static partial class Cli
                     ["kind"] = kind, ["name"] = e.Name, ["key"] = e.Key, ["level"] = e.Layer.Level, ["label"] = e.Layer.Label, ["platform"] = e.Layer.Platform,
                     ["status"] = e.Status, ["active"] = e.Active, ["reason"] = e.Reason, ["path"] = e.Path, ["locked"] = e.Locked, ["force"] = e.Force,
                     ["description"] = e.Meta?.Top.TryGetValue("description", out var d) == true ? d : null,
-                    ["source"] = e.Meta?.Get("source"), ["license"] = e.Meta?.Get("license"), ["sourceState"] = StateOf(e.Path), ["installLevel"] = Installed(e.Path).Level, ["detached"] = e.Meta?.Get("detached")
+                    ["source"] = e.Meta?.Get("source"), ["license"] = e.Meta?.Get("license"), ["sourceState"] = StateOf(e.Path), ["installLevel"] = Installed(e.Path).Level, ["detached"] = e.Meta?.Get("detached"), ["originalChanged"] = KnowledgeOps.OriginalChanged(e, list)
                 });
         }
         // the levels with their Git state (behind/ahead as of the last fetch, local changes) and what the window may do there

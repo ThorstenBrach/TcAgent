@@ -29,7 +29,8 @@ namespace TcAgentBridge
         readonly StackPanel notices = new StackPanel();
         readonly Ellipse updateDot = new Ellipse { Width = 6, Height = 6, Fill = AccentBrush, HorizontalAlignment = HorizontalAlignment.Right, VerticalAlignment = VerticalAlignment.Top, Margin = new Thickness(0, 1, 2, 0), Visibility = Visibility.Collapsed };
         Dictionary<string, object> update;       // the last answer of TcAgent.exe update check
-        Border updateStrip, sourcesStrip;
+        Border updateStrip, sourcesStrip, builtinStrip;
+        Dictionary<string, object> builtin;      // the last answer of TcAgent.exe update builtin
         bool checksStarted;
 
         static string S(Dictionary<string, object> d, string k) => d != null && d.TryGetValue(k, out var v) ? v as string : null;
@@ -67,6 +68,7 @@ namespace TcAgentBridge
                 var src = await Ask("update sources --json", TcUnitControl.SolutionPath());
                 var items = src != null && src.TryGetValue("items", out var o) ? (o as IEnumerable)?.OfType<object>().Count() ?? 0 : 0;
                 if (items > 0) ShowSourcesNotice(items);
+                ShowBuiltin(await Ask("update builtin --json"));
             }
             catch (Exception ex) { BridgePackage.Instance?.LogLine("Update check: " + ex.Message); }
         }
@@ -92,6 +94,69 @@ namespace TcAgentBridge
                 try { BridgePackage.Instance?.ShowKnowledge(true); KnowledgeControl.Instance?.ShowSources(); } catch (Exception ex) { status.Text = "Knowledge window: " + ex.Message; }
             }, () => { notices.Children.Remove(sourcesStrip); sourcesStrip = null; });
             notices.Children.Add(sourcesStrip);
+        }
+
+        // ------------------------------------------------------------------ newer built-in knowledge (src/BuiltInKnowledge.cs)
+        void ShowBuiltin(Dictionary<string, object> r)
+        {
+            if (r == null) return;
+            builtin = r;
+            if (builtinStrip != null) { notices.Children.Remove(builtinStrip); builtinStrip = null; }
+            if (!B(r, "notify")) return;
+            builtinStrip = Strip(AccentBrush, new[] { new Run("TcAgent knowledge " + S(r, "latest")) { FontWeight = FontWeights.SemiBold },
+                                                      new Run($" is available - newer skills, workflows and prompts (you have {S(r, "version") ?? "?"})") },
+                                 "What's new …", true, ShowBuiltinNews, () => { notices.Children.Remove(builtinStrip); builtinStrip = null; });
+            notices.Children.Add(builtinStrip);
+        }
+
+        // what changed, then the user takes it over, skips it or decides later - nothing changes by itself
+        void ShowBuiltinNews()
+        {
+            var r = builtin;
+            var offer = r != null && r.TryGetValue("offer", out var o) ? o as Dictionary<string, object> : null;
+            var version = S(offer, "version");
+            if (version == null) return;
+            var w = Dialog("TcAgent knowledge", 560, 520);
+            var head = new StackPanel { Margin = new Thickness(12, 10, 12, 6) };
+            head.Children.Add(new TextBlock { Text = "TcAgent knowledge " + version, FontSize = 15, FontWeight = FontWeights.SemiBold });
+            head.Children.Add(new TextBlock { Text = $"you have {S(r, "version") ?? "?"} ({S(r, "why")})" + (S(offer, "needs") is string n ? $" · needs TcAgent {n}" : ""), Opacity = 0.7, TextWrapping = TextWrapping.Wrap });
+            var doc = new FlowDocument { PagePadding = new Thickness(0), FontFamily = new FontFamily("Segoe UI"), FontSize = 12.5 };
+            doc.SetResourceReference(FlowDocument.ForegroundProperty, ThemedDialogColors.WindowPanelTextBrushKey);
+            foreach (var rel in List(offer, "releases")) AddNotes(doc, S(rel, "version"), S(rel, "notes"));
+            var notes = new FlowDocumentScrollViewer { Document = doc, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(12, 0, 12, 6) };
+            var state = new TextBlock { TextWrapping = TextWrapping.Wrap, Margin = new Thickness(12, 0, 12, 2) };
+            var blocked = offer.TryGetValue("blocked", out var bo) ? bo as Dictionary<string, object> : null;
+            var hint = new TextBlock { TextWrapping = TextWrapping.Wrap, Opacity = 0.7, Margin = new Thickness(12, 0, 12, 8),
+                                       Text = "Skills and workflows are instructions to the agent - read what changed before you take it over. Your own copies stay as they are; " +
+                                              "the Knowledge window shows where the original changed. About TcAgent goes back to the version before." +
+                                              (blocked != null ? $"\nKnowledge {S(blocked, "version")} needs TcAgent {S(blocked, "needs")} - update TcAgent for it." : "") };
+            var use = CardButton("Use " + version, true);
+            use.Click += async (s, e) =>
+            {
+                use.IsEnabled = false; state.ClearValue(TextBlock.ForegroundProperty); state.Text = "Taking it over …";
+                var res = await Ask($"update builtin apply {version} --json");
+                use.IsEnabled = true;
+                if (res == null || S(res, "error") is string err && S(res, "version") == null) { state.Foreground = ErrorBrush; state.Text = S(res, "error") ?? "Could not take it over."; return; }
+                ShowBuiltin(res);
+                if (S(res, "version") != version) { state.Foreground = ErrorBrush; state.Text = S(res, "error") ?? $"Still {S(res, "version")}: {S(res, "why")}"; return; }
+                state.Foreground = OkBrush; state.Text = $"✓ Knowledge {version} is the built-in level now - the agent uses it from its next request.";
+                use.Visibility = Visibility.Collapsed;
+            };
+            var skip = CardButton("Skip this version");
+            skip.ToolTip = "No notice for this version; a newer one is shown again";
+            skip.Click += async (s, e) => { await Ask("update builtin skip " + version); r["notify"] = false; ShowBuiltin(r); w.Close(); };
+            var later = CardButton("Later");
+            later.IsCancel = true;
+            later.Click += (s, e) => w.Close();
+            var bar = new DockPanel { Margin = new Thickness(12, 4, 12, 10), LastChildFill = false };
+            DockPanel.SetDock(use, Dock.Left); bar.Children.Add(use);
+            DockPanel.SetDock(later, Dock.Right); bar.Children.Add(later);
+            DockPanel.SetDock(skip, Dock.Right); bar.Children.Add(skip);
+            var root = new DockPanel();
+            DockPanel.SetDock(head, Dock.Top); DockPanel.SetDock(bar, Dock.Bottom); DockPanel.SetDock(hint, Dock.Bottom); DockPanel.SetDock(state, Dock.Bottom);
+            root.Children.Add(head); root.Children.Add(bar); root.Children.Add(hint); root.Children.Add(state); root.Children.Add(notes);
+            w.Content = root;
+            w.ShowDialog();
         }
 
         // a line above the conversation: a colored edge, the text, one button, ✕ (for this session)
@@ -342,7 +407,36 @@ namespace TcAgentBridge
             var last = new TextBlock { Opacity = 0.7, Margin = new Thickness(0, 3, 0, 0), TextWrapping = TextWrapping.Wrap };
             var known = new CheckBox { Content = "Offer the TcAgent knowledge repository in the tab Sources", IsChecked = true, Margin = new Thickness(0, 3, 0, 0),
                                        ToolTip = "Newer skills, prompts and rules between two versions of TcAgent. Nothing is read from it until you browse it" };
-            body.Children.Add(check); body.Children.Add(sources); body.Children.Add(known); body.Children.Add(last);
+            var builtinBox = new CheckBox { Content = "Look for new built-in knowledge (skills, workflows, prompts) once a day", IsChecked = true, Margin = new Thickness(0, 3, 0, 0),
+                                            ToolTip = "Offered with what changed; nothing is taken over without you. Pipelines always keep the knowledge of the package" };
+            var builtinLine = new TextBlock { Opacity = 0.85, Margin = new Thickness(0, 6, 0, 0), TextWrapping = TextWrapping.Wrap };
+            var builtinBack = CardButton("Back");
+            builtinBack.MinWidth = 0; builtinBack.Margin = new Thickness(0, 3, 6, 0); builtinBack.Visibility = Visibility.Collapsed;
+            var builtinNews = CardButton("What's new …");
+            builtinNews.MinWidth = 0; builtinNews.Margin = new Thickness(0, 3, 6, 0); builtinNews.Visibility = Visibility.Collapsed;
+            var builtinRow = new WrapPanel();
+            builtinRow.Children.Add(builtinNews); builtinRow.Children.Add(builtinBack);
+            void ShowKnowledge(Dictionary<string, object> k)
+            {
+                if (k == null) { builtinLine.Text = "Built-in knowledge: this TcAgent.exe cannot update it yet."; return; }
+                ShowBuiltin(k);
+                builtinBox.IsChecked = B(k, "builtinUpdates");
+                if (S(k, "lockedBy") is string by) { builtinBox.IsEnabled = false; builtinBox.ToolTip = $"Set on the {by} level (updates.json)"; }
+                builtinLine.Text = $"Built-in knowledge {S(k, "version") ?? "?"} - {S(k, "why")}" + (S(k, "pinned") is string p ? $" · fixed to {p} on the {S(k, "pinnedBy")} level" : "") +
+                                   (B(k, "available") ? $" · {S(k, "latest")} is available" : "") + (S(k, "error") is string er ? " · last check failed: " + er : "");
+                var prev = S(k, "previous");
+                builtinBack.Visibility = prev != null ? Visibility.Visible : Visibility.Collapsed;
+                builtinBack.Content = prev == "package" ? "Back to the package" : "Back to " + prev;
+                builtinNews.Visibility = B(k, "available") ? Visibility.Visible : Visibility.Collapsed;
+            }
+            builtinBack.Click += async (s, e) =>
+            {
+                if (MessageBox.Show("Use the built-in knowledge from before again?", "TcAgent knowledge", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+                ShowKnowledge(await Ask("update builtin back --json"));
+            };
+            builtinNews.Click += (s, e) => ShowBuiltinNews();
+            body.Children.Add(check); body.Children.Add(sources); body.Children.Add(known); body.Children.Add(builtinBox); body.Children.Add(last);
+            body.Children.Add(builtinLine); body.Children.Add(builtinRow);
             void Switch(CheckBox box, string key)
             {
                 RoutedEventHandler h = async (s, e) => await Ask($"update set {key} {(box.IsChecked == true ? "on" : "off")}");
@@ -366,6 +460,7 @@ namespace TcAgentBridge
                 now.IsEnabled = false;
                 await CheckNow();
                 Show(await Ask("update check --json --current " + BridgePackage.BridgeVersion));    // the time of the last check
+                ShowKnowledge(await Ask("update builtin --force --json"));
                 now.IsEnabled = true;
             };
             var license = CardButton("License");
@@ -403,7 +498,8 @@ namespace TcAgentBridge
                         Rows(install, installed); Rows(comps, components);
                     }
                     Show(await Ask("update check --json --current " + BridgePackage.BridgeVersion));
-                    Switch(check, "check"); Switch(sources, "sources"); Switch(known, "knowledge");
+                    ShowKnowledge(await Ask("update builtin --json"));
+                    Switch(check, "check"); Switch(sources, "sources"); Switch(known, "knowledge"); Switch(builtinBox, "builtin");
                 }
                 catch (Exception ex) { BridgePackage.Instance?.LogLine("About: " + ex.Message); }
             };

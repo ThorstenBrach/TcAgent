@@ -44,6 +44,28 @@ public static partial class Cli
                     else foreach (var x in r["items"].AsArray()) Console.WriteLine($"{x["item"]} ({x["level"]}): newer version in {x["source"]}");
                     return Ok;
                 }
+                case "builtin":
+                {
+                    // newer built-in knowledge (BuiltInKnowledge.cs): check | apply <version> | skip <version> | back
+                    JsonObject r;
+                    switch (words.ElementAtOrDefault(1) ?? "check")
+                    {
+                        case "check": r = BuiltInKnowledge.Check(force); break;
+                        case "apply": r = BuiltInKnowledge.Apply(words.ElementAtOrDefault(2) ?? throw new ArgumentException("update builtin apply <version>")); break;
+                        case "back": r = BuiltInKnowledge.Back(); break;
+                        case "skip": BuiltInKnowledge.Skip(words.ElementAtOrDefault(2) ?? throw new ArgumentException("update builtin skip <version>")); r = BuiltInKnowledge.Describe(Updates.LoadState()); break;
+                        default: throw new ArgumentException("update builtin [check|apply <version>|skip <version>|back]");
+                    }
+                    if (json) Console.WriteLine(r.ToJsonString());
+                    else
+                    {
+                        Console.WriteLine($"Built-in knowledge {r["version"] ?? "?"} - {r["why"]} ({r["root"]})");
+                        if (r["error"] != null) Console.WriteLine("Could not check: " + r["error"]);
+                        else if (r["available"]?.GetValue<bool>() == true) Console.WriteLine($"Knowledge {r["latest"]} is available - TcAgent.exe update builtin apply {r["latest"]}");
+                        if (r["offer"]?["blocked"] is JsonObject bl) Console.WriteLine($"Knowledge {bl["version"]} needs TcAgent {bl["needs"]} or later.");
+                    }
+                    return Ok;
+                }
                 case "download":
                 {
                     var file = Updates.Download(current);
@@ -59,16 +81,16 @@ public static partial class Cli
                 }
                 case "set":
                 {
-                    if (words.ElementAtOrDefault(1) is not ("check" or "sources" or "knowledge") || words.ElementAtOrDefault(2) is not ("on" or "off"))
-                        throw new ArgumentException("update set check|sources|knowledge on|off");
+                    if (words.ElementAtOrDefault(1) is not ("check" or "sources" or "knowledge" or "builtin") || words.ElementAtOrDefault(2) is not ("on" or "off"))
+                        throw new ArgumentException("update set check|sources|knowledge|builtin on|off");
                     var st = Updates.LoadState();
-                    var key = words[1] == "knowledge" ? Updates.KnowledgeSource : words[1];
+                    var key = words[1] switch { "knowledge" => Updates.KnowledgeSource, "builtin" => BuiltInKnowledge.SwitchKey, _ => words[1] };
                     if (Updates.Setting(key, st).LockedBy is { } by) throw new Exception($"locked on the {by} level");
                     st[key] = words[2] == "on";
                     Updates.SaveState(st);
                     return Ok;
                 }
-                default: throw new ArgumentException("update [check|sources|download|skip <version>|set check|sources|knowledge on|off]");
+                default: throw new ArgumentException("update [check|sources|builtin [check|apply <v>|skip <v>|back]|download|skip <version>|set check|sources|knowledge|builtin on|off]");
             }
         }
         catch (ArgumentException ex) { Console.Error.WriteLine(ex.Message); return Usage; }

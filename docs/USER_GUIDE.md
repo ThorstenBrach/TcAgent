@@ -154,11 +154,16 @@ work without the extension. The extension runs **inside** the IDE process and ad
   to the tab Sources; updating them stays your decision there. The source `tcagent-knowledge` is predefined there: it offers newer
   skills, prompts and rules between two versions of TcAgent (needs Git). An item you install from it replaces the built-in one of
   the same name for you and then follows the source. **⋯ > About TcAgent** switches the source off.
+  A third line offers a newer **built-in knowledge** (skills, workflows, prompts, risk rules of TcAgent) without a new TcAgent:
+  **What's new …** shows the changes, **Use x.y.z** takes it over, **Skip this version** ends the notice. Only a version this
+  TcAgent can use is offered; pipelines always keep the knowledge of the package. **⋯ > About TcAgent** shows which version is in
+  use and goes **Back** to the one before. Your own copies of built-in files stay; the Knowledge window marks them
+  **↑ original changed** when the original changed. Details: [KNOWLEDGE_LAYERS.md](KNOWLEDGE_LAYERS.md#updating-the-built-in-level).
 
   <img src="img/chat/up-to-date.png" width="340" alt="Check for updates answers in a dialog">
 
 - **About TcAgent** – **⋯ > About TcAgent**: author, license, the versions of extension, server, IDE and TwinCAT, the components with
-  their licenses, and the two switches for the daily checks. What they send: [SECURITY.md](../SECURITY.md).
+  their licenses, the switches for the daily checks and the version of the built-in knowledge (with **What's new …** and **Back**). What they send: [SECURITY.md](../SECURITY.md).
 
   <img src="img/chat/about.png" width="420" alt="About TcAgent: author, license, versions, components and the switches of the daily checks">
 
@@ -2166,6 +2171,7 @@ client.
 | `TCAGENT_RULES` | – | Additional coding rules (files/folders, `;`-separated), e.g. company rules |
 | `TCAGENT_RULES_GATE` | on | `0` disables the one-time rejection of the first write before the rules were read |
 | `TCAGENT_RISK_RULES` | – | Additional risk rules (files/folders, `;`-separated) |
+| `TCAGENT_BUILTIN` | – | `package`: always the built-in knowledge of the package, never a newer version taken over (pipelines do this anyway) |
 | `TCAGENT_KNOWLEDGE` | – | Additional knowledge sources (URLs/folders, `;`-separated) |
 | `TCAGENT_SEARCH` | – | Search service for `tc_docs`: `searxng:<url>` or `google:<API key>:<search engine ID>` |
 | `TCAGENT_TEAM` | – | Team level(s) of the knowledge: shared folder or Git repository per team, `;`-separated – between your user level and the platform |

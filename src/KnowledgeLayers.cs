@@ -32,7 +32,8 @@ public static class KnowledgeLayers
     public static string TcAgentVersion = Program.ServerVersion;
 
     public static string UserRoot => UserRootOverride ?? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent");
-    public static string BuiltInRoot => BuiltInRootOverride ?? Path.Combine(AppContext.BaseDirectory, "knowledge");
+    /// <summary>The package (knowledge\ next to TcAgent.exe) or a newer version the user took over (BuiltInKnowledge.cs).</summary>
+    public static string BuiltInRoot => BuiltInRootOverride ?? BuiltInKnowledge.ActiveRoot();
     public static string CompanyRoot => Expand(Environment.GetEnvironmentVariable("TCAGENT_COMPANY"));
     /// <summary>The team levels (TCAGENT_TEAM, ";"-separated) - between the user and the platform; shared like the company level.</summary>
     public static List<string> TeamRoots => ExpandList(Environment.GetEnvironmentVariable("TCAGENT_TEAM")).Take(5).ToList();

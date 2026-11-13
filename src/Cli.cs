@@ -965,11 +965,14 @@ public static partial class Cli
 
   TcAgent.exe update [check] [--force] [--json]
   TcAgent.exe update sources [--force] [--solution <sln>] [--json]
-  TcAgent.exe update download | skip <version> | set check|sources|knowledge on|off
+  TcAgent.exe update builtin [check|apply <version>|skip <version>|back] [--force] [--json]
+  TcAgent.exe update download | skip <version> | set check|sources|knowledge|builtin on|off
       New versions of TcAgent (GitHub releases, at most once a day unless --force) and of the repo sources in use. download
       fetches the .vsix and checks it against SHA256SUMS.txt. The TcAgent Chat uses these; updates.json on the company or team
-      level locks a switch: { ""check"": false, ""sources"": false, ""knowledgeSource"": false }. knowledge: the predefined source
-      tcagent-knowledge in the Sources tab.
+      level locks a switch: { ""check"": false, ""sources"": false, ""knowledgeSource"": false, ""builtinUpdates"": false }.
+      knowledge: the predefined source tcagent-knowledge in the Sources tab. builtin: a newer version of the built-in
+      knowledge (tags of TcAgent_Knowledge) used instead of the one in the package after apply; back returns to the one before.
+      Pipelines (CI variables, TCAGENT_BUILTIN=package) always keep the package; ""builtinVersion"": ""1.1.0"" in updates.json pins one.
 
   TcAgent.exe shared [list|check|add|keep|remove] [--path <folder or file>] [--all | --solution <sln>] [--json]
       Folders the agent may read in the TcAgent Chat, also searched by tc_docs. add keeps a folder for the solution or --all,
