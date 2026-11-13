@@ -80,6 +80,15 @@ public sealed class StorageTests : IDisposable
     }
 
     [Fact]
+    public void Server_files_an_update_set_aside_are_removed()
+    {
+        Write(@"app\0.55.0\TcAgent.exe");
+        Write(@"app\0.55.0\TcAgent.dll.old-20261113200000", "old copy");
+        var plan = Storage.Plan(area: "app", now: Now).Select(i => Path.GetRelativePath(dir, i.Path)).ToList();
+        Assert.Equal(new[] { @"app\0.55.0\TcAgent.dll.old-20261113200000" }, plan);
+    }
+
+    [Fact]
     public void A_big_log_is_set_aside()
     {
         var log = Write(@"bridge\bridge.log", new string('x', 2 * 1024 * 1024));

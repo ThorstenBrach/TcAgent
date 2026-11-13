@@ -510,10 +510,12 @@ the number of items, the oldest, the rule, what the rule would remove now and wh
 | TcUnit runs | projects without a run for 90 days | on request |
 | Logs | 30 days; a log over 5 MB is set aside as `.old` | ✓ |
 | Library and document caches | not written for 90 days | ✓ |
-| Server versions (`app\<version>`) | the newest 2 and the one registered for the AI clients stay | ✓ |
+| Server versions (`app\<version>`) | the newest 2 and the one registered for the AI clients stay; files an update set aside (`*.old-*`) once no AI client runs them | ✓ |
 | Downloaded updates | 14 days | ✓ |
 | Backups of config files (`*.bak-*`) | the newest 3 per file | ✓ |
 | Files of ended processes | `busy`/`reload` files whose process has ended | ✓ |
+
+<p><img src="img/knowledge/storage.png" width="900" alt="Storage: what TcAgent keeps on this PC, per area with its rule and what it would remove"><br><em>Storage: per area the size, the oldest item, the rule and what it would remove now</em></p>
 
 **Clean up …** lists every item first and moves them to the **recycle bin** (with areas selected: only those). Below,
 **per project**: the chats, TcUnit runs and workflow runs kept for each project, a project whose solution folder is gone

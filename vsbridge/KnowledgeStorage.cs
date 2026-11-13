@@ -37,7 +37,7 @@ namespace TcAgentBridge
         {
             if (storagePage != null) { LoadStorage(); return storagePage; }
             Columns(areaList, ("Area", 230, nameof(Line.C1)), ("Size", 80, nameof(Line.C2)), ("Items", 60, nameof(Line.C3)), ("Oldest", 90, nameof(Line.C4)),
-                    ("Rule", 300, nameof(Line.C5)), ("To remove", 130, "!" + nameof(Line.C6)), ("Daily", 60, nameof(Line.C7)));
+                    ("Rule", 300, nameof(Line.C5)), ("To remove", 130, "!" + nameof(Line.C6)), ("Daily", 90, nameof(Line.C7)));
             Columns(projectList, ("Project", 220, nameof(Line.C1)), ("Size", 80, nameof(Line.C2)), ("Last used", 90, nameof(Line.C3)), ("Kept", 220, nameof(Line.C4)),
                     ("Solution", 360, "!" + nameof(Line.C5)));
             var areaActs = new[] {
@@ -83,6 +83,7 @@ namespace TcAgentBridge
                 C5 = S(p, "solutionDir") == null ? "–" : B(p, "exists") ? "✓ " + UserPath(S(p, "solutionDir")) : "✗ not found: " + UserPath(S(p, "solutionDir")),
                 Mark = B(p, "exists") ? Green : Orange, Tip = string.Join("\n", Arr(p["parts"]).Select(x => UserPath(S(x, "path"))))
             }).ToList();
+            status.Text = "Ready.";
             Summary();
         }
 

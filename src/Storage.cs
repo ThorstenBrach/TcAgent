@@ -6,7 +6,7 @@
 //   tcunit       the last run per project            projects without a run for 90 days
 //   logs         logs\*.log, bridge\*.log            30 days; a log over 5 MB is set aside as .old (the previous .old goes)
 //   caches       libcache, doccache                  not written for 90 days
-//   app          app\<version> (the server)          the newest 2 and the one registered for the AI clients stay
+//   app          app\<version> (the server)          the newest 2 and the one registered for the AI clients stay; files set aside by an update (*.old-*)
 //   updates      downloaded and unpacked packages    14 days
 //   bak          *.bak-<time> of the config files    the newest 3 per file
 //   stale        busy.<pid>.txt, reload.<pid>.json   when that process no longer runs
@@ -110,7 +110,11 @@ public static class Storage
             case "tcunit": Dirs(P("tcunit")); break;
             case "logs": Files(P("logs"), "*.log"); Files(P("bridge"), "*.log*"); Files(P("updates"), "*.log"); break;
             case "caches": Files(P("libcache"), "*", SearchOption.AllDirectories); Files(P("doccache"), "*", SearchOption.AllDirectories); break;
-            case "app": Dirs(P("app")); break;
+            case "app":
+                Dirs(P("app"));
+                // files an update set aside because a running TcAgent.exe held them (vsbridge\Installer.cs): *.old-<time>
+                if (Directory.Exists(P("app"))) Files(P("app"), "*.old-*", SearchOption.AllDirectories);
+                break;
             case "updates":
                 Dirs(P("updates"));
                 if (Directory.Exists(P("updates")))
@@ -178,8 +182,12 @@ public static class Storage
                     break;
                 case "app":
                 {
-                    var keep = AppKeep(c.Select(i => Path.GetFileName(i.Path)), d.Keep);
-                    foreach (var i in c.Where(i => !keep.Contains(Path.GetFileName(i.Path)))) plan.Add(i with { Why = "an older server version" });
+                    var folders = c.Where(i => Directory.Exists(i.Path)).ToList();
+                    var keep = AppKeep(folders.Select(i => Path.GetFileName(i.Path)), d.Keep);
+                    var gone = folders.Where(i => !keep.Contains(Path.GetFileName(i.Path))).ToList();
+                    foreach (var i in gone) plan.Add(i with { Why = "an older server version" });
+                    foreach (var i in c.Where(i => File.Exists(i.Path) && !gone.Any(g => i.Path.StartsWith(g.Path + "\\", StringComparison.OrdinalIgnoreCase))))
+                        plan.Add(i with { Why = "set aside by an update (removed once no AI client runs it)" });
                     break;
                 }
                 case "bak":
