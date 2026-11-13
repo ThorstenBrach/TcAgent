@@ -183,7 +183,7 @@ work without the extension. The extension runs **inside** the IDE process and ad
   systems, see [The TcAgent settings window](#the-tcagent-settings-window)), shared folders, a new chat, the other windows,
   setup and help.
 
-  <img src="img/chat/menu.png" width="200" alt="The ⋯ menu of the TcAgent Chat">
+  <img src="img/chat/menu.png" width="280" alt="The ⋯ menu of the TcAgent Chat">
 
 - **Edit a prompt** – right-click it in the list. Your own prompt opens as it is. A built-in, company or team prompt stays unchanged:
   **Edit my copy** puts a copy into your folder (`%LOCALAPPDATA%\TcAgent\prompts\`), which replaces it for you.
