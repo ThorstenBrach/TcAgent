@@ -233,7 +233,7 @@ namespace TcAgentBridge
 
         static ListView NewList()
         {
-            var l = new ListView { BorderThickness = new Thickness(0), SelectionMode = SelectionMode.Single };
+            var l = new ListView { BorderThickness = new Thickness(0), SelectionMode = SelectionMode.Extended };     // Shift/Ctrl: several lines
             l.SetResourceReference(BackgroundProperty, EnvironmentColors.ToolWindowBackgroundBrushKey);
             l.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
             var item = new Style(typeof(ListViewItem));
@@ -560,7 +560,7 @@ namespace TcAgentBridge
             Columns(entries, ("Name", 200, nameof(Line.C1)), ("Kind", 100, nameof(Line.C2)), ("Level", 120, nameof(Line.C3)),
                     ("State", 190, "!" + nameof(Line.C4)), ("Source / license", 320, nameof(Line.C6)), ("Git", 60, nameof(Line.C7)), ("Why", 260, nameof(Line.C5)));
             Columns(sourceList, ("Source", 180, nameof(Line.C1)), ("Level", 80, nameof(Line.C2)), ("Repository", 420, nameof(Line.C3)), ("Branch / tag", 100, nameof(Line.C4)));
-            Columns(installedList, ("", 30, "?" + nameof(Line.On)), ("Item", 230, nameof(Line.C1)), ("Level", 80, nameof(Line.C2)), ("State", 190, "!" + nameof(Line.C3)),
+            Columns(installedList, ("Item", 230, nameof(Line.C1)), ("Level", 80, nameof(Line.C2)), ("State", 190, "!" + nameof(Line.C3)),
                     ("Source @ version", 200, nameof(Line.C4)), ("License", 100, nameof(Line.C5)), ("Installed", 100, nameof(Line.C6)));
             Columns(changes, ("Change", 150, nameof(Line.C1)), ("Date", 90, nameof(Line.C2)), ("What", 360, nameof(Line.C3)),
                     ("Before", 110, nameof(Line.C4)), ("After (runs)", 130, nameof(Line.C5)), ("Result", 110, "!" + nameof(Line.C6)));
@@ -737,44 +737,48 @@ namespace TcAgentBridge
         Dictionary<string, object> Entry() => (entries.SelectedItem as Line)?.D;
 
         // switched off for the project needs a solution; locked files only the company level switches off
-        bool CanOff(string level) => Entry() is Dictionary<string, object> d && !B(d, "locked") && S(d, "status") != "disabled" &&
+        bool CanOff(string level) => Selected(entries).Count > 0 && Selected(entries).All(l => !B(l.D, "locked") && S(l.D, "status") != "disabled") &&
                                      (level == "user" || !string.IsNullOrEmpty(S(data, "solutionDir")));
 
         FrameworkElement EffectivePage()
         {
             if (effectivePage != null) return effectivePage;
-            bool Sel() => entries.SelectedItem is Line;
-            bool FromSource() => S(Entry(), "sourceState") != null;
-            (string, string) Item0() { var d = Entry(); return (S(d, "name"), S(d, "installLevel") ?? (S(d, "label") ?? "").Split(' ')[0]); }
+            bool Sel() => OneSelected(entries);
+            bool Any() => AnySelected(entries);
+            // the selected files that came from a source: name, level label, state (the actions of the Sources tab)
+            List<(string Key, string Level, string State)> SrcT() => Selected(entries).Where(l => S(l.D, "sourceState") != null)
+                .Select(l => (S(l.D, "name"), S(l.D, "installLevel") ?? (S(l.D, "label") ?? "").Split(' ')[0], S(l.D, "sourceState"))).ToList();
+            bool FromSource() => Any() && Selected(entries).All(l => S(l.D, "sourceState") != null);
+            const string Many = " - on every selected file (Shift/Ctrl selects several)";
             var acts = new[] {
                 A("New …", "A new rule, risk rule, skill, workflow or lesson from a template", () => NewItem(false)),
                 A("Add existing …", "Take an existing file (or skill/workflow folder) over to a level", () => NewItem(true)),
                 Sep,
-                A("Open", "Open the file in the editor (or double-click)", OpenSelected, Sel, "Enter"),
+                A("Open", "Open the file in the editor (or double-click); several selected: each of them (up to 10)", OpenSelected, Any, "Enter"),
                 A("Open folder", "Show the file in the Explorer", OpenFolder, Sel),
                 Sep,
                 A("Rename …", "Rename the file or the skill/workflow folder (the name in its header follows)", RenameItem, Sel),
-                A("Move to level …", "Move the file to another level (shared levels in Git: as a pull request)", MoveItem, Sel),
+                A("Move to level …", "Move the file to another level (shared levels in Git: as a pull request)" + Many, MoveItem, Any),
                 Sep,
                 DropDown("Switch off", "disabled.json - the file itself stays unchanged", () => CanOff("project") || CanOff("user"),
                      A("For this project", "disabled.json of the project", () => Switch("disable", "project"), () => CanOff("project")),
                      A("For me (all projects)", "disabled.json of your user level", () => Switch("disable", "user"), () => CanOff("user"))),
-                A("Switch on", "Remove the entry from disabled.json (project and user)", SwitchOn, () => S(Entry(), "status") == "disabled"),
+                A("Switch on", "Remove the entry from disabled.json (project and user)" + Many, SwitchOn, () => Any() && Selected(entries).All(l => S(l.D, "status") == "disabled")),
                 Sep,
-                A("Delete …", "Delete the file (own levels only)", DeleteItem, () => Entry() is Dictionary<string, object> d && LayerOf(d) is Dictionary<string, object> ly && B(ly, "deletable"), "Del"),
+                A("Delete …", "Delete the file (own levels only)" + Many, DeleteItem, () => Any() && Selected(entries).All(l => LayerOf(l.D) is Dictionary<string, object> ly && B(ly, "deletable")), "Del"),
                 Sep,
-                A("Copy path", "Copy the path of the file", () => CopyPath(S(Entry(), "path")), Sel),
+                A("Copy path", "Copy the paths of the selected files", () => CopyPath(Joined(Selected(entries), "path")), Any),
                 Sep,
                 DropDown("Source", "An item installed from a source: your changes, a newer version, back to the source", FromSource,
-                     A(SrcCompare, "Your version and the installed one in the compare window", () => { var (n, lv) = Item0(); CompareSource(n, lv, detail); }),
-                     A(SrcChanges, "What changed in the source since the install", () => { var (n, lv) = Item0(); RunAsyncTo($"sources diff --item {Quote(n)}", detail); }),
-                     A(SrcMerge, "Merge the newer version of the source into your item (three-way; conflicts in the merge window)", () => { var (n, lv) = Item0(); MergeSource(n, lv, detail); }),
+                     A(SrcCompare, "Your version and the installed one in the compare window" + Many, () => CompareSources(SrcT(), detail)),
+                     A(SrcChanges, "What changed in the source since the install" + Many, () => DiffInstalledMany(SrcT(), detail)),
+                     A(SrcMerge, "Merge the newer version of the source into your item (three-way; conflicts in the merge window)" + Many, () => MergeSources(SrcT(), detail)),
                      Sep,
-                     A(SrcRevert, "Back to the installed version (yours goes to the backups)", () => { var (n, lv) = Item0(); RevertSource(n, lv); }),
-                     A(SrcDetach, "No longer tied to the source - no updates, the origin stays in the header", () => { var (n, lv) = Item0(); DetachSource(n, lv); }),
-                     A(SrcPropose, "Your changes as a branch for the source - push it and open the pull request", () => { var (n, lv) = Item0(); ProposeSource(n, lv, detail); }),
+                     A(SrcRevert, "Back to the installed version (yours goes to the backups)" + Many, () => RevertSources(SrcT())),
+                     A(SrcDetach, "No longer tied to the source - no updates, the origin stays in the header" + Many, () => DetachSources(SrcT())),
+                     A(SrcPropose, "Your changes as a branch for the source - push it and open the pull request (one file at a time)", () => { var t = SrcT(); if (t.Count == 1) ProposeSource(t[0].Key, t[0].Level, detail); }, Sel),
                      Sep,
-                     A(SrcUninstall, "Remove the item from its level (a copy goes to the backups; the source stays)", () => { var (n, lv) = Item0(); UninstallSource(n, lv, S(Entry(), "sourceState")); })) };
+                     A(SrcUninstall, "Remove the item from its level (a copy goes to the backups; the source stays)" + Many, () => UninstallSources(SrcT()))) };
             var tools = Bar(acts);
             entries.ContextMenu = MenuOf(acts);
             var filters = new WrapPanel { Margin = new Thickness(6, 0, 6, 4) };
@@ -801,7 +805,7 @@ namespace TcAgentBridge
         FrameworkElement SourcesPage()
         {
             if (sourcesPage != null) return sourcesPage;
-            bool SSel() => sourceList.SelectedItem is Line;
+            bool SSel() => OneSelected(sourceList);
             string Src(string k) => S((sourceList.SelectedItem as Line)?.D, k);
             var srcActs = new[] {
                 Main("Browse and install …", "Show what the sources offer and install items - license, files and scripts are shown first", BrowseSource),
@@ -815,33 +819,30 @@ namespace TcAgentBridge
                 Sep,
                 A("Delete …", "Delete the selected source from the list - asks whether the items installed from it go as well", RemoveSource, SSel, "Del"),
                 Sep,
-                A("Copy URL", "Copy the URL of the repository", () => CopyPath(Src("url")), SSel) };
+                A("Copy URL", "Copy the URLs of the selected repositories", () => CopyPath(Joined(Selected(sourceList), "url")), () => AnySelected(sourceList)) };
             var tools1 = Bar(srcActs);
-            bool ISel() => installedList.SelectedItem is Line;
-            bool IAny() => InstTargets().Count > 0;                         // ticked items or the selected line
-            bool IOne() => InstTargets().Count == 1;                        // actions that ask for one item (a commit message)
+            bool ISel() => OneSelected(installedList);
+            bool IAny() => AnySelected(installedList);
             string Inst(string k) => S((installedList.SelectedItem as Line)?.D, k);
-            void On(Action<string, string> act) { var t = InstTargets(); if (t.Count == 1) act(S(t[0].D, "key"), S(t[0].D, "level")); else Hint("Tick or select one installed item."); }
-            const string Many = " - on every ticked item (tick several with the same state), else on the selected one";
+            const string Many = " - on every selected item (Shift/Ctrl selects several)";
             var instActs = new[] {
                 A("Open", "Open the installed file in the editor (or double-click)", () => OpenInEditor(Inst("path")), ISel, "Enter"),
                 A("Open folder", "Show the installed item in the Explorer", () => ShowInExplorer(Inst("path")), ISel),
                 Sep,
-                A(SrcCompare, "Your version and the installed one in the compare window of Visual Studio" + Many, () => CompareSources(InstTargets()), IAny),
-                A(SrcMerge, "Merge the newer version of the source into your item (three-way; conflicts in the merge window)" + Many, () => MergeSources(InstTargets()), IAny),
+                A(SrcCompare, "Your version and the installed one in the compare window of Visual Studio" + Many, () => CompareSources(InstTargets(), sourceDetail), IAny),
+                A(SrcMerge, "Merge the newer version of the source into your item (three-way; conflicts in the merge window)" + Many, () => MergeSources(InstTargets(), sourceDetail), IAny),
                 DropDown("More", "Rarer actions on the installed items", IAny,
-                     A(SrcChanges, "What changed in the source since the install" + Many, () => DiffInstalledMany(InstTargets())),
+                     A(SrcChanges, "What changed in the source since the install" + Many, () => DiffInstalledMany(InstTargets(), sourceDetail)),
                      Sep,
                      A(SrcRevert, "Back to the installed version (yours goes to the backups)" + Many, () => RevertSources(InstTargets())),
                      A(SrcDetach, "No longer tied to the source - no updates, the origin stays in the header" + Many, () => DetachSources(InstTargets())),
-                     A(SrcPropose, "Your changes as a branch for the source - push it and open the pull request (one item at a time)", () => On((n, lv) => ProposeSource(n, lv, sourceDetail)), IOne)),
+                     A(SrcPropose, "Your changes as a branch for the source - push it and open the pull request (one item at a time)", () => ProposeSource(Inst("key"), Inst("level"), sourceDetail), ISel)),
                 Sep,
                 A(SrcUninstall, "Remove the item from its level (a copy goes to the backups; the source stays)" + Many, () => UninstallSources(InstTargets()), IAny, "Del"),
                 Sep,
-                A("Tick all like this", "Tick every installed item with the state of the selected one", TickLikeSelected, ISel),
-                A("Untick all", "Remove every tick", UntickAll, () => instTicked.Count > 0),
+                A("Select all like this", "Select every installed item with the state of the selected one", () => SelectLike(installedList, "state"), ISel),
                 Sep,
-                A("Copy path", "Copy the paths of the ticked items, else of the selected one", () => CopyPath(string.Join(Environment.NewLine, InstTargets().Select(l => S(l.D, "path")))), IAny) };
+                A("Copy path", "Copy the paths of the selected items", () => CopyPath(Joined(Selected(installedList), "path")), IAny) };
             var tools2 = Bar(instActs);
             // the actions on all installed items next to their heading
             var global = new StackPanel { Orientation = Orientation.Horizontal, VerticalAlignment = VerticalAlignment.Bottom, Margin = new Thickness(0, 0, 6, 2) };
@@ -858,20 +859,13 @@ namespace TcAgentBridge
             sourceList.MouseDoubleClick += (s, e) => OpenUrlOrFolder(Src("url"));
             installedList.MouseDoubleClick += (s, e) => OpenInEditor(Inst("path"));
             sourceList.ContextMenu = MenuOf(srcActs);
-            sourceList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { RemoveSource(); e.Handled = true; } else if (e.Key == Key.Enter) { OpenUrlOrFolder(Src("url")); e.Handled = true; } };
+            sourceList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete && SSel()) { RemoveSource(); e.Handled = true; } else if (e.Key == Key.Enter) { OpenUrlOrFolder(Src("url")); e.Handled = true; } };
             installedList.ContextMenu = MenuOf(instActs);
             installedList.PreviewKeyDown += (s, e) =>
             {
                 if (e.Key == Key.Delete) { UninstallSources(InstTargets()); e.Handled = true; }
-                else if (e.Key == Key.Enter) { OpenInEditor(Inst("path")); e.Handled = true; }
-                else if (e.Key == Key.Space && installedList.SelectedItem is Line l)
-                {
-                    if (l.Can) { l.On = !l.On; InstTicksChanged(); installedList.SelectedItem = l; }
-                    else Hint($"Only items with the same state are ticked together (ticked: {TickedState()}).");
-                    e.Handled = true;
-                }
+                else if (e.Key == Key.Enter && ISel()) { OpenInEditor(Inst("path")); e.Handled = true; }
             };
-            installedList.AddHandler(ToggleButton.ClickEvent, new RoutedEventHandler((s, e) => InstTicksChanged()));
             return sourcesPage = Rows((sourcesHeading, AutoH, 0), (tools1, AutoH, 0), (srcList, AutoH, 0), (head2, AutoH, 0), (tools2, AutoH, 0),
                                       (instList, Star(1), 80), (Output(sourceDetail), AutoH, 0));
         }
@@ -965,7 +959,7 @@ namespace TcAgentBridge
         FrameworkElement BackupsPage()
         {
             if (backupsPage != null) return backupsPage;
-            bool BSel() => backupList.SelectedItem is Line;
+            bool BSel() => OneSelected(backupList);
             var backupActs = new[] {
                 Main(BackupLabel, "Back up levels now - into a folder of your choice", BackupNow),
                 A(RestoreLabel, "The whole level, one file or one skill - the difference first, then you confirm; the current state is backed up before", RestoreBackup),
@@ -974,16 +968,16 @@ namespace TcAgentBridge
                 A("Open folder", "The folder with the backups (ZIP files with manifest.json)", OpenBackupFolder),
                 A("Compare with current state", "What restoring the selected backup would change (or double-click)", () => DiffBackup(null), BSel, "Enter"),
                 Sep,
-                A("Delete …", "Delete the selected backup file", DeleteBackup, BSel, "Del"),
+                A("Delete …", "Delete the selected backup files (Shift/Ctrl selects several)", DeleteBackup, () => AnySelected(backupList), "Del"),
                 Sep,
-                A("Copy path", "Copy the path of the backup file", () => CopyPath(S((backupList.SelectedItem as Line)?.D, "zip")), BSel) };
+                A("Copy path", "Copy the paths of the selected backup files", () => CopyPath(Joined(Selected(backupList), "zip")), () => AnySelected(backupList)) };
             var bt = Bar(backupActs);
             var hb = Heading("");
             Heading(hb, "Backups of the knowledge", "made automatically before every change; the last 20 per level are kept; levels in Git: uncommitted changes only");
             Columns(backupList, ("Level", 140, nameof(Line.C1)), ("Created", 150, nameof(Line.C2)), ("Reason", 300, nameof(Line.C3)), ("Files", 60, nameof(Line.C4)),
                     ("Kind", 170, nameof(Line.C5)), ("TcAgent", 70, nameof(Line.C6)));
             backupList.ContextMenu = MenuOf(backupActs);
-            backupList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { DeleteBackup(); e.Handled = true; } else if (e.Key == Key.Enter) { DiffBackup(null); e.Handled = true; } };
+            backupList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { DeleteBackup(); e.Handled = true; } else if (e.Key == Key.Enter && BSel()) { DiffBackup(null); e.Handled = true; } };
             backupList.SelectionChanged += (s, e) =>
             {
                 if (backupList.SelectedItem is Line l)
@@ -1450,24 +1444,42 @@ namespace TcAgentBridge
 
         void OpenFolder() => ShowInExplorer(S(Entry(), "path"));
 
+        // several selected: one level for all of them, files already on that level are left out
         async void MoveItem()
         {
-            if (!(entries.SelectedItem is Line l)) return;
-            var levels = Levels(false).Where(x => !x.Label.StartsWith(S(l.D, "label") + "  ") && x.Label != S(l.D, "label")).ToList();
+            var sel = Selected(entries);
+            if (sel.Count == 0) return;
+            var own = sel.Select(l => S(l.D, "label")).Distinct().ToList();
+            var levels = Levels(false).Where(x => !own.Any(o => x.Label == o || x.Label.StartsWith(o + "  ")) || own.Count > 1).ToList();
             if (levels.Count == 0) { Hint("There is no other level to move the file to."); return; }
-            var r = Prompt($"Move {S(l.D, "key")} ({S(l.D, "label")})", ("To level", levels.Select(x => x.Label).ToArray(), null));
+            var r = Prompt(sel.Count == 1 ? $"Move {S(sel[0].D, "key")} ({S(sel[0].D, "label")})" : $"Move {sel.Count} files", ("To level", levels.Select(x => x.Label).ToArray(), null));
             if (r == null) return;
             var target = levels.First(x => x.Label == r[0]);
-            var (mok, output) = await Cli($"knowledge move --path {Quote(S(l.D, "path"))} --level {Quote(target.Level)}", "Moving");
-            Report(mok, output, "Move");
+            var todo = sel.Where(l => !(target.Label == S(l.D, "label") || target.Label.StartsWith(S(l.D, "label") + "  "))).ToList();
+            if (sel.Count == 1)
+            {
+                var (mok, output) = await Cli($"knowledge move --path {Quote(S(sel[0].D, "path"))} --level {Quote(target.Level)}", "Moving");
+                Report(mok, output, "Move");
+            }
+            else await RunBatch("Move", null, todo, l => $"{S(l.D, "key")} ({S(l.D, "label")})", l => $"knowledge move --path {Quote(S(l.D, "path"))} --level {Quote(target.Level)}", output: detail);
             Load();
         }
 
         async void DeleteItem()
         {
-            if (!(entries.SelectedItem is Line l)) return;
-            if (!(LayerOf(l.D) is Dictionary<string, object> ly && B(ly, "deletable")))
-            { Hint($"Files of the {S(l.D, "label")} level are not deleted here - switch them off instead (Switch off ▾)."); return; }
+            var sel = Selected(entries);
+            if (sel.Count == 0) return;
+            var fixedOnes = sel.Where(l => !(LayerOf(l.D) is Dictionary<string, object> ly && B(ly, "deletable"))).ToList();
+            if (fixedOnes.Count > 0)
+            { Hint($"Files of the {S(fixedOnes[0].D, "label")} level are not deleted here - switch them off instead (Switch off ▾)."); return; }
+            if (sel.Count > 1)
+            {
+                await RunBatch("Delete", $"Delete these {sel.Count} files (skills and workflows: their folders)?\n\nThe levels are backed up first (Backups tab).", sel,
+                               l => $"{S(l.D, "key")} ({S(l.D, "label")})", l => $"knowledge delete --path {Quote(S(l.D, "path"))}", MessageBoxImage.Warning, detail);
+                Load();
+                return;
+            }
+            var l = sel[0];
             var what = S(l.D, "kind") is "skills" or "workflows" ? "the folder of " + S(l.D, "key") : S(l.D, "path");
             if (MessageBox.Show($"Delete {what}?\n\nThe level is backed up first (Backups tab).", "TcAgent Knowledge",
                                 MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
@@ -1734,28 +1746,35 @@ namespace TcAgentBridge
 
         void OpenSelected()
         {
-            var p = S(Entry(), "path");
-            if (p == null) { Hint("Select a file first."); return; }
-            OpenInEditor(p);
+            var sel = Selected(entries);
+            if (sel.Count == 0) { Hint("Select a file first."); return; }
+            foreach (var l in sel.Take(10)) OpenInEditor(S(l.D, "path"));
+            if (sel.Count > 10) status.Text = $"The first 10 of {sel.Count} files are open.";
         }
 
         async void Switch(string action, string level)
         {
-            var key = S(Entry(), "key");
-            if (key == null) return;
-            var (ok, output) = await Cli($"knowledge {action} --key {Quote(key)} --level {level}", action == "disable" ? "Switching off" : "Switching on");
-            Report(ok, output, action == "disable" ? "Switch off" : "Switch on");
+            var keys = Selected(entries).Select(l => S(l.D, "key")).Where(k => k != null).ToList();
+            if (keys.Count == 0) return;
+            var what = action == "disable" ? "Switch off" : "Switch on";
+            if (keys.Count == 1)
+            {
+                var (ok, output) = await Cli($"knowledge {action} --key {Quote(keys[0])} --level {level}", action == "disable" ? "Switching off" : "Switching on");
+                Report(ok, output, what);
+            }
+            else await RunBatch(what, null, keys, k => k, k => $"knowledge {action} --key {Quote(k)} --level {level}", output: detail);
             Load();
         }
 
         async void SwitchOn()
         {
-            var key = S(Entry(), "key");
-            if (key == null) return;
+            var keys = Selected(entries).Select(l => S(l.D, "key")).Where(k => k != null).ToList();
+            if (keys.Count == 0) return;
             var outs = new List<string>();
+            foreach (var key in keys)
             foreach (var level in new[] { "project", "user" })
             {
-                var (ok, output) = await Cli($"knowledge enable --key {Quote(key)} --level {level}", "Switching on");
+                var (ok, output) = await Cli($"knowledge enable --key {Quote(key)} --level {level}", "Switching on " + key);
                 if (ok) outs.Add(output.Trim());
                 else if (level == "project" && string.IsNullOrEmpty(S(data, "solutionDir"))) continue;
                 else { Report(false, output, "Switch on"); break; }
@@ -1779,146 +1798,125 @@ namespace TcAgentBridge
                 return new Line
                 {
                     D = i, C1 = S(i, "key"), C2 = S(i, "level"), C3 = stateText ?? (st == "ok" ? "✓ as installed" : st), C4 = S(i, "source") + " @" + Short(S(i, "commit")),
-                    C5 = S(i, "license"), C6 = S(i, "installed"), Mark = stateBrush ?? (st == "ok" ? Green : Orange), Tip = st + " · " + S(i, "url"),
-                    On = instTicked.Contains(TickKey(i))     // the ticks stay when the list is read again
+                    C5 = S(i, "license"), C6 = S(i, "installed"), Mark = stateBrush ?? (st == "ok" ? Green : Orange), Tip = st + " · " + S(i, "url")
                 };
             }).ToList();
-            InstTicksChanged(false);
         }
 
-        // ------------------------------------------------------------------ several installed items at once
-        // Items are ticked (check boxes, UI_GUIDELINES: never Ctrl/Shift) and only items with the same state together: an
-        // action then means the same for all of them. The actions of the list work on the ticked items, or on the selected
-        // line when nothing is ticked.
-        readonly HashSet<string> instTicked = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        static string TickKey(Dictionary<string, object> d) => S(d, "key") + "|" + S(d, "level");
-        IEnumerable<Line> InstLines() => (installedList.ItemsSource as IEnumerable<Line>) ?? Enumerable.Empty<Line>();
+        // ------------------------------------------------------------------ several items at once (every list of the window)
+        // Shift/Ctrl selects several lines (UI_GUIDELINES 2026-11-13); the actions of the bar and the context menu work on all
+        // selected lines with one question; actions that need exactly one item (open, rename, edit, propose) are grey then.
 
-        /// <summary>The state the ticked items share (null: nothing ticked).</summary>
-        string TickedState() => InstLines().Where(l => l.On).Select(l => l.C3).FirstOrDefault();
+        /// <summary>The selected lines in the order of the list.</summary>
+        static List<Line> Selected(ListView l) => l.Items.OfType<Line>().Where(x => l.SelectedItems.Contains(x)).ToList();
+        static bool OneSelected(ListView l) => l.SelectedItems.Count == 1;
+        static bool AnySelected(ListView l) => l.SelectedItems.Count > 0;
+        static string Joined(IEnumerable<Line> ls, string key) => string.Join(Environment.NewLine, ls.Select(x => S(x.D, key)).Where(x => !string.IsNullOrEmpty(x)));
 
-        void InstTicksChanged(bool refresh = true)
+        /// <summary>Selects every line with the same value of key as the selected one (e.g. the same state).</summary>
+        static void SelectLike(ListView l, string key)
         {
-            // a tick that does not fit the state of the others is taken back (Space, "Tick all like this" of an older list)
-            var first = InstLines().FirstOrDefault(l => l.On && instTicked.Contains(TickKey(l.D))) ?? InstLines().FirstOrDefault(l => l.On);
-            foreach (var l in InstLines()) if (l.On && first != null && l.C3 != first.C3) l.On = false;
-            instTicked.Clear();
-            foreach (var l in InstLines().Where(l => l.On)) instTicked.Add(TickKey(l.D));
-            var state = TickedState();
-            foreach (var l in InstLines())
-            {
-                l.Can = state == null || l.C3 == state;
-                if (!l.Can) l.Tip = $"Only items with the same state are ticked together (ticked: {state}) · " + (S(l.D, "state") ?? "");
-                else if (l.Tip != null && l.Tip.StartsWith("Only items with the same state")) l.Tip = l.Tip.Substring(l.Tip.IndexOf(" · ", StringComparison.Ordinal) + 3) + " · " + S(l.D, "url");
-            }
-            // after the click: the check box that was clicked must not be regenerated inside its own event
-            if (refresh) Dispatcher.BeginInvoke(new Action(() => installedList.Items.Refresh()));
-            var n = instTicked.Count;
-            if (n > 0) status.Text = $"{n} item(s) ticked ({state}) - the actions work on all of them.";
-            UpdateGates();
+            if (!(l.SelectedItem is Line sel)) return;
+            var v = S(sel.D, key);
+            l.SelectedItems.Clear();
+            foreach (var x in l.Items.OfType<Line>().Where(x => S(x.D, key) == v)) l.SelectedItems.Add(x);
+        }
+        static string NameList(IEnumerable<string> names)
+        {
+            var l = names.ToList();
+            return string.Join("\n", l.Take(25).Select(x => "  " + x)) + (l.Count > 25 ? $"\n  … and {l.Count - 25} more" : "");
         }
 
-        /// <summary>What an action of the list works on: the ticked items, otherwise the selected line.</summary>
-        List<Line> InstTargets()
+        /// <summary>One question for all (none if question is null), one call per item, the results in one report.</summary>
+        async System.Threading.Tasks.Task<bool> RunBatch<T>(string title, string question, IList<T> items, Func<T, string> name, Func<T, string> args,
+                                                           MessageBoxImage icon = MessageBoxImage.Question, TextBox output = null)
         {
-            var t = InstLines().Where(l => l.On).ToList();
-            if (t.Count == 0 && installedList.SelectedItem is Line sel) t.Add(sel);
-            return t;
-        }
-
-        void TickLikeSelected()
-        {
-            if (!(installedList.SelectedItem is Line sel)) { Hint("Select an installed item first."); return; }
-            foreach (var l in InstLines()) l.On = l.C3 == sel.C3;
-            InstTicksChanged();
-        }
-
-        void UntickAll() { foreach (var l in InstLines()) l.On = false; InstTicksChanged(); }
-
-        static string ItemList(IEnumerable<Line> t) => string.Join("\n", t.Select(l => $"  {S(l.D, "key")} ({S(l.D, "level")})"));
-
-        // revert, keep as own version, uninstall: one question for all, then one call per item
-        async void SourceBatch(List<Line> t, string title, string question, string sub, MessageBoxImage icon)
-        {
-            if (t.Count == 0) { Hint("Tick or select installed items first."); return; }
-            if (MessageBox.Show($"{question}\n\n{ItemList(t.Take(25))}{(t.Count > 25 ? $"\n  … and {t.Count - 25} more" : "")}", "TcAgent Knowledge", MessageBoxButton.YesNo, icon, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            if (items.Count == 0) { Hint("Select one or more lines first."); return false; }
+            if (question != null && MessageBox.Show($"{question}\n\n{NameList(items.Select(name))}", "TcAgent Knowledge", MessageBoxButton.YesNo, icon, MessageBoxResult.No) != MessageBoxResult.Yes) return false;
             var results = new List<string>(); bool all = true;
-            foreach (var l in t)
+            foreach (var i in items)
             {
-                var (ok, o) = await Cli($"sources {sub} --item {Quote(S(l.D, "key"))} --level {Quote(S(l.D, "level"))}", $"{title}: {S(l.D, "key")}");
+                var (ok, o) = await Cli(args(i), $"{title}: {name(i)}");
                 all &= ok;
-                results.Add((ok ? "✓ " : "✗ ") + S(l.D, "key") + ": " + o.Trim().Split('\n')[0].Trim());
+                results.Add((ok ? "✓ " : "✗ ") + name(i) + ": " + o.Trim().Split('\n')[0].Trim());
             }
-            Out(sourceDetail, string.Join("\n", results));
+            if (output != null) Out(output, string.Join("\n", results));
             Report(all, string.Join("\n", results), title);
-            if (all) instTicked.Clear();
+            return all;
+        }
+
+        // installed items: key (kind/name), level label, state - from the Sources list or the Files list
+        List<(string Key, string Level, string State)> InstTargets() =>
+            Selected(installedList).Select(l => (S(l.D, "key"), S(l.D, "level"), S(l.D, "state"))).ToList();
+
+        static string InstLabel((string Key, string Level, string State) i) => $"{i.Key} ({i.Level})";
+
+        async void RevertSources(List<(string Key, string Level, string State)> t)
+        {
+            if (t.Count == 1) { RevertSource(t[0].Key, t[0].Level); return; }
+            await RunBatch("Revert", $"Revert these {t.Count} items to their installed version?\n\nYour changes are copied to %LOCALAPPDATA%\\TcAgent\\backups\\sources first.",
+                           t, InstLabel, i => $"sources revert --item {Quote(i.Key)} --level {Quote(i.Level)}", MessageBoxImage.Warning, sourceDetail);
             Load();
         }
 
-        void RevertSources(List<Line> t)
+        async void DetachSources(List<(string Key, string Level, string State)> t)
         {
-            if (t.Count == 1) { RevertSource(S(t[0].D, "key"), S(t[0].D, "level")); return; }
-            SourceBatch(t, "Revert", $"Revert these {t.Count} items to their installed version?\n\nYour changes are copied to %LOCALAPPDATA%\\TcAgent\\backups\\sources first.", "revert", MessageBoxImage.Warning);
+            if (t.Count == 1) { DetachSource(t[0].Key, t[0].Level); return; }
+            await RunBatch("Keep as own version", $"Keep these {t.Count} items as your own versions?\n\nThey are no longer updated from their source; where they came from stays in their header.",
+                           t, InstLabel, i => $"sources detach --item {Quote(i.Key)} --level {Quote(i.Level)}", MessageBoxImage.Question, sourceDetail);
+            Load();
         }
 
-        void DetachSources(List<Line> t)
+        async void UninstallSources(List<(string Key, string Level, string State)> t)
         {
-            if (t.Count == 1) { DetachSource(S(t[0].D, "key"), S(t[0].D, "level")); return; }
-            SourceBatch(t, "Keep as own version", $"Keep these {t.Count} items as your own versions?\n\nThey are no longer updated from their source; where they came from stays in their header.", "detach", MessageBoxImage.Question);
+            if (t.Count == 1) { UninstallSource(t[0].Key, t[0].Level, t[0].State); return; }
+            var changed = t.Any(i => (i.State ?? "").Contains("changed locally"));
+            await RunBatch("Uninstall", $"Uninstall these {t.Count} items?\n\nTheir files are removed and they leave skills.lock.json; a copy goes to %LOCALAPPDATA%\\TcAgent\\backups\\sources. The sources stay." +
+                                        (changed ? "\n\nSome of them you changed - your changes are only in that copy afterwards." : ""),
+                           t, InstLabel, i => $"sources uninstall --item {Quote(i.Key)} --level {Quote(i.Level)}", changed ? MessageBoxImage.Warning : MessageBoxImage.Question, sourceDetail);
+            Load();
         }
 
-        void UninstallSources(List<Line> t)
+        void CompareSources(List<(string Key, string Level, string State)> t, TextBox output)
         {
-            if (t.Count == 1) { UninstallSource(S(t[0].D, "key"), S(t[0].D, "level"), S(t[0].D, "state")); return; }
-            var changed = t.Any(l => (S(l.D, "state") ?? "").Contains("changed locally"));
-            SourceBatch(t, "Uninstall", $"Uninstall these {t.Count} items?\n\nTheir files are removed and they leave skills.lock.json; a copy goes to %LOCALAPPDATA%\\TcAgent\\backups\\sources. The sources stay." +
-                                        (changed ? "\n\nYou changed them - your changes are only in that copy afterwards." : ""), "uninstall", changed ? MessageBoxImage.Warning : MessageBoxImage.Question);
-        }
-
-        void CompareSources(List<Line> t)
-        {
-            if (t.Count == 0) { Hint("Tick or select installed items first."); return; }
-            foreach (var l in t.Take(8)) CompareSource(S(l.D, "key"), S(l.D, "level"), sourceDetail);
+            if (t.Count == 0) { Hint("Select one or more installed items first."); return; }
+            foreach (var i in t.Take(8)) CompareSource(i.Key, i.Level, output);
             if (t.Count > 8) status.Text = $"The compare windows of the first 8 of {t.Count} items are open.";
         }
 
-        async void DiffInstalledMany(List<Line> t)
+        async void DiffInstalledMany(List<(string Key, string Level, string State)> t, TextBox output)
         {
-            if (t.Count == 0) { Hint("Tick or select installed items first."); return; }
+            if (t.Count == 0) { Hint("Select one or more installed items first."); return; }
             var parts = new List<string>();
-            foreach (var l in t)
-            {
-                var (ok, o) = await Cli($"sources diff --item {Quote(S(l.D, "key"))} --level {Quote(S(l.D, "level"))}", "Reading the source of " + S(l.D, "key"));
-                parts.Add(o.Trim());
-            }
-            Out(sourceDetail, string.Join("\n\n" + new string('-', 60) + "\n\n", parts));
+            foreach (var i in t) parts.Add((await Cli($"sources diff --item {Quote(i.Key)} --level {Quote(i.Level)}", "Reading the source of " + i.Key)).output.Trim());
+            Out(output, string.Join("\n\n" + new string('-', 60) + "\n\n", parts));
             status.Text = "Done - see the output.";
         }
 
         // update and merge several: the previews first, one question, then the merges (conflicts open in the merge window)
-        async void MergeSources(List<Line> t)
+        async void MergeSources(List<(string Key, string Level, string State)> t, TextBox output)
         {
-            if (t.Count == 0) { Hint("Tick or select installed items first."); return; }
-            if (t.Count == 1) { MergeSource(S(t[0].D, "key"), S(t[0].D, "level"), sourceDetail); return; }
-            var previews = new List<string>(); var plan = new List<Line>();
-            foreach (var l in t)
+            if (t.Count == 0) { Hint("Select one or more installed items first."); return; }
+            if (t.Count == 1) { MergeSource(t[0].Key, t[0].Level, output); return; }
+            var previews = new List<string>(); var plan = new List<(string Key, string Level, string State)>();
+            foreach (var i in t)
             {
-                var (pok, p) = await Cli($"sources merge --dry-run --item {Quote(S(l.D, "key"))} --level {Quote(S(l.D, "level"))}", "Fetching the source of " + S(l.D, "key"));
+                var (pok, p) = await Cli($"sources merge --dry-run --item {Quote(i.Key)} --level {Quote(i.Level)}", "Fetching the source of " + i.Key);
                 if (p.Contains("has no newer version")) { previews.Add(p.Trim()); continue; }
-                if (!pok && !p.Contains("Conflicts")) { previews.Add($"{S(l.D, "key")}: not possible - {p.Trim()}"); continue; }
-                previews.Add(p.Trim()); plan.Add(l);
+                if (!pok && !p.Contains("Conflicts")) { previews.Add($"{i.Key}: not possible - {p.Trim()}"); continue; }
+                previews.Add(p.Trim()); plan.Add(i);
             }
             var text = string.Join("\n\n", previews);
-            Out(sourceDetail, text);
+            Out(output, text);
             if (plan.Count == 0) { Info("None of them has a newer version in its source that can be merged - see the output."); return; }
             var conflicts = previews.Any(x => x.Contains("Conflicts"));
             if (!Confirm("Update and merge", $"Merge the new version of the source into {plan.Count} item(s)? Your versions are backed up first." +
                                              (conflicts ? " Conflicts open in the merge window of Visual Studio (or are marked with <<<<<<< in the file)." : ""),
                          text, "Merge", conflicts)) return;
             var results = new List<string>(); bool all = true;
-            foreach (var l in plan)
+            foreach (var i in plan)
             {
-                var (ok, o) = await Cli($"sources merge --json --item {Quote(S(l.D, "key"))} --level {Quote(S(l.D, "level"))}", "Merging " + S(l.D, "key"));
+                var (ok, o) = await Cli($"sources merge --json --item {Quote(i.Key)} --level {Quote(i.Level)}", "Merging " + i.Key);
                 var lines = o.Split('\n').ToList();
                 var cf = lines.FirstOrDefault(x => x.StartsWith("CONFLICT-FILES "));
                 all &= ok || o.Contains("Conflicts");
@@ -1931,13 +1929,11 @@ namespace TcAgentBridge
                     }
                     catch (Exception ex) { Error("Merge window: " + ex.Message); }
             }
-            Out(sourceDetail, string.Join("\n\n", results));
+            Out(output, string.Join("\n\n", results));
             if (!all) Report(false, string.Join("\n\n", results), "Merge");
             else status.Text = $"{plan.Count} item(s) merged - see the output.";
-            instTicked.Clear();
             Load();
         }
-
         static string Short(string commit) => (commit ?? "").Substring(0, Math.Min(8, (commit ?? "").Length));
 
         // ------------------------------------------------------------------ sources: edit, browse and install, update, diff
@@ -2451,11 +2447,14 @@ namespace TcAgentBridge
 
         void DeleteBackup()
         {
-            var d = (backupList.SelectedItem as Line)?.D;
-            var z = S(d, "zip");
-            if (z == null) { Hint("Select a backup first."); return; }
-            if (MessageBox.Show($"Delete this backup?\n\n{z}", "TcAgent Knowledge", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
-            try { File.Delete(z); status.Text = "Deleted: " + z; } catch (Exception ex) { Error(ex.Message); }
+            var zips = Selected(backupList).Select(l => S(l.D, "zip")).Where(z => z != null).ToList();
+            if (zips.Count == 0) { Hint("Select a backup first."); return; }
+            if (MessageBox.Show((zips.Count == 1 ? "Delete this backup?" : $"Delete these {zips.Count} backups?") + "\n\n" + NameList(zips), "TcAgent Knowledge",
+                                MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;
+            var failed = new List<string>();
+            foreach (var z in zips) try { File.Delete(z); } catch (Exception ex) { failed.Add(Path.GetFileName(z) + ": " + ex.Message); }
+            if (failed.Count > 0) Error(string.Join("\n", failed));
+            else status.Text = zips.Count == 1 ? "Deleted: " + zips[0] : $"{zips.Count} backups deleted.";
             LoadBackups();
         }
 
@@ -2566,7 +2565,7 @@ namespace TcAgentBridge
             if (platformsPage != null) return platformsPage;
             Columns(platformList, ("Platform", 180, nameof(Line.C1)), ("Applies here", 110, "!" + nameof(Line.C2)), ("Detected by libraries", 220, nameof(Line.C3)),
                     ("Detected by terms", 180, nameof(Line.C4)), ("Defined in", 360, nameof(Line.C5)));
-            bool PSel() => platformList.SelectedItem is Line;
+            bool PSel() => OneSelected(platformList);
             var acts = new[] {
                 A("New …", "A platform of your own: name, description, the libraries and terms that detect it", NewPlatform),
                 Sep,
@@ -2575,7 +2574,7 @@ namespace TcAgentBridge
                 Sep,
                 A("Delete …", "Delete the selected platform of your own with its folder", DeletePlatform, PSel, "Del"),
                 Sep,
-                A("Copy path", "Copy the path of its platform.md", () => CopyPath(S((platformList.SelectedItem as Line)?.D, "file")), PSel) };
+                A("Copy path", "Copy the paths of the platform.md of the selected platforms", () => CopyPath(Joined(Selected(platformList), "file")), () => AnySelected(platformList)) };
             var tools = Bar(acts);
             // the decision for this project first: what applies and why, with the two ways to change it
             var decide = new WrapPanel { Margin = new Thickness(6, 0, 6, 6) };
@@ -2588,7 +2587,7 @@ namespace TcAgentBridge
             decide.Children.Add(set); decide.Children.Add(auto);
             platformList.MouseDoubleClick += (s, e) => OpenPlatform();
             platformList.ContextMenu = MenuOf(acts);
-            platformList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { DeletePlatform(); e.Handled = true; } else if (e.Key == Key.Enter) { OpenPlatform(); e.Handled = true; } };
+            platformList.PreviewKeyDown += (s, e) => { if (!PSel()) return; if (e.Key == Key.Delete) { DeletePlatform(); e.Handled = true; } else if (e.Key == Key.Enter) { OpenPlatform(); e.Handled = true; } };
             var h = Heading("");
             Heading(h, "All platforms", "a platform brings its own rules, skills and lessons - it applies when its libraries or terms are found in the project");
             var list = WithEmpty(platformList, "No platform defined - \"New …\" creates one (a name, the libraries and terms that detect it).");
@@ -2765,7 +2764,7 @@ namespace TcAgentBridge
             Columns(docsList, ("Source", 300, nameof(Line.C1)), ("Type", 110, nameof(Line.C2)), ("Level", 80, nameof(Line.C3)),
                     ("State", 200, "!" + nameof(Line.C4)), ("Comment", 170, nameof(Line.C5)), ("Defined in", 300, nameof(Line.C6)));
             Columns(docsHits, ("Hit", 300, nameof(Line.C1)), ("Where", 420, nameof(Line.C2)), ("Text", 600, nameof(Line.C3)));
-            bool DSel() => docsList.SelectedItem is Line;
+            bool DSel() => OneSelected(docsList);
             Dictionary<string, object> Doc() => (docsList.SelectedItem as Line)?.D;
             bool Own() => (S(Doc(), "origin") ?? "").EndsWith("knowledge.md", StringComparison.OrdinalIgnoreCase);
             var acts = new[] {
@@ -2778,15 +2777,15 @@ namespace TcAgentBridge
                 Sep,
                 A("Edit …", "Change the selected link or folder, its comment or its level", () => EditDoc(docsList.SelectedItem as Line), () => DSel() && Own()),
                 Sep,
-                A("Delete …", "Delete the selected link or folder from its knowledge.md (the documents themselves stay)", RemoveDoc, () => DSel() && Own(), "Del"),
+                A("Delete …", "Delete the selected links or folders from their knowledge.md (the documents themselves stay; Shift/Ctrl selects several)", RemoveDoc, () => AnySelected(docsList) && Selected(docsList).All(l => (S(l.D, "origin") ?? "").EndsWith("knowledge.md", StringComparison.OrdinalIgnoreCase)), "Del"),
                 Sep,
-                A("Copy path", "Copy the link or the path", () => CopyPath(S(Doc(), "value")), DSel) };
+                A("Copy path", "Copy the links or paths of the selected sources", () => CopyPath(Joined(Selected(docsList), "value")), () => AnySelected(docsList)) };
             var tools = Bar(acts);
             docsInfo.Text = "What the agent looks things up in (tc_docs): Beckhoff InfoSys, the links and folders of the knowledge.md of every level and the documents " +
                             "in their knowledge\\ folders. Read only.";
             docsList.MouseDoubleClick += (s, e) => OpenDoc();
             docsList.ContextMenu = MenuOf(acts);
-            docsList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { RemoveDoc(); e.Handled = true; } else if (e.Key == Key.Enter) { OpenDoc(); e.Handled = true; } };
+            docsList.PreviewKeyDown += (s, e) => { if (e.Key == Key.Delete) { RemoveDoc(); e.Handled = true; } else if (e.Key == Key.Enter && DSel()) { OpenDoc(); e.Handled = true; } };
             // search like the agent: right here, the hits below
             var search = new WrapPanel { Margin = new Thickness(6, 8, 6, 0) };
             var go = Text("Search", "The same search as tc_docs (Enter)");
@@ -2795,13 +2794,13 @@ namespace TcAgentBridge
             search.Children.Add(Label("Search like the agent:"));
             search.Children.Add(SearchBox(docsQuery, "Words from the documents, e.g. EtherCAT diagnosis (Ctrl+F)", 380));
             search.Children.Add(go);
-            bool HSel() => docsHits.SelectedItem is Line;
+            bool HSel() => OneSelected(docsHits);
             docsHits.MouseDoubleClick += (s, e) => OpenHit();
             docsHits.PreviewKeyDown += (s, e) => { if (e.Key == Key.Enter) { OpenHit(); e.Handled = true; } };
             docsHits.ContextMenu = MenuOf(A("Open", "The document on the page of the hit, or the page in the browser", OpenHit, HSel, "Enter"),
                                           A("Open folder", "The folder of the document", OpenHitFolder, () => HSel() && S((docsHits.SelectedItem as Line)?.D, "kind") == "file"),
                                           Sep,
-                                          A("Copy path", "Copy the path or the address", () => CopyPath(S((docsHits.SelectedItem as Line)?.D, "where")), HSel));
+                                          A("Copy path", "Copy the paths or addresses of the selected hits", () => CopyPath(Joined(Selected(docsHits), "where")), () => AnySelected(docsHits)));
             var list = WithEmpty(docsList, "No reference yet - \"Add link or folder …\" or \"Add documents …\".");
             var hits = WithEmpty(docsHits, "Type words above and press Enter - the hits are listed here and open with a double-click.");
             return docsPage = Rows((tools, AutoH, 0), (docsInfo, AutoH, 0), (list, Star(3), 80), (search, AutoH, 0), (docsHitsHeading, AutoH, 0), (hits, Star(2), 70));
@@ -2939,7 +2938,17 @@ namespace TcAgentBridge
 
         async void RemoveDoc()
         {
-            var d = (docsList.SelectedItem as Line)?.D;
+            var sel = Selected(docsList);
+            if (sel.Count > 1)
+            {
+                if (sel.Any(l => !(S(l.D, "origin") ?? "").EndsWith("knowledge.md", StringComparison.OrdinalIgnoreCase)))
+                { Hint("Only links and folders of a knowledge.md are deleted here - select only those."); return; }
+                await RunBatch("Delete reference source", $"Delete these {sel.Count} sources from their knowledge.md?\n\n(the documents themselves stay where they are)", sel,
+                               l => S(l.D, "raw"), l => $"knowledge docs --action remove --path {Quote(S(l.D, "origin"))} --url {Quote(S(l.D, "raw"))}");
+                LoadDocs();
+                return;
+            }
+            var d = sel.FirstOrDefault()?.D;
             if (d == null) return;
             if (!(S(d, "origin") ?? "").EndsWith("knowledge.md", StringComparison.OrdinalIgnoreCase))
             { Hint(S(d, "type") == "documents" ? "A document folder cannot be removed - open it and delete the documents you do not want." : S(d, "type") == "web" ? "Beckhoff InfoSys is built in." : "This source comes from TCAGENT_KNOWLEDGE (settings.json) - change it there."); return; }

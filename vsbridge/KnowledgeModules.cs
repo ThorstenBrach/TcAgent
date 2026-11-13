@@ -52,6 +52,9 @@ namespace TcAgentBridge
             bool NeedsApproval() => S(SelectedPlugin, "status") == "needs approval";
             bool Approved() => SelectedPlugin is Dictionary<string, object> p && S(p, "status") == "ready" && S(p, "level") is "project" or "team";
             var acts = new[] {
+                A("Switch on", "Switch the selected modules and plugins on (Shift/Ctrl selects several)", () => SwitchModules(true), () => ModSel().Any(l => l.Can && !l.On)),
+                A("Switch off", "Switch the selected modules and plugins off", () => SwitchModules(false), () => ModSel().Any(l => l.Can && l.On)),
+                Sep,
                 A("Approve plugin …", "Shows what the selected plugin runs - only a mouse click on Approve approves it (for exactly its content)", ApprovePlugin, NeedsApproval),
                 A("Revoke approval", "The selected plugin of the project or team level no longer runs until it is approved again", RevokePlugin, Approved),
                 Sep,
@@ -182,6 +185,20 @@ namespace TcAgentBridge
             else Report(false, output, line.On ? "Switch on" : "Switch off");
             LoadModules();
             // what waits for a module (or only names its tools) changes with it: read the files again in the background
+            if (ok) Load();
+        }
+
+        // the selected lines of both lists (modules and plugins)
+        List<Line> ModSel() => Selected(moduleList).Concat(Selected(pluginList)).ToList();
+
+        // several at once: one call per module, then the lists and the files are read again
+        async void SwitchModules(bool on)
+        {
+            var todo = ModSel().Where(l => l.Can && l.On != on).ToList();
+            if (todo.Count == 0) return;
+            string Id(Line l) => l.D != null && l.D.ContainsKey("folder") ? "plugin:" + S(l.D, "id") : S(l.D, "id");
+            var ok = await RunBatch(on ? "Switch on" : "Switch off", null, todo, l => l.C1 ?? Id(l), l => $"modules {(on ? "enable" : "disable")} {Quote(Id(l))} --level {ModuleLevel}");
+            LoadModules();
             if (ok) Load();
         }
 

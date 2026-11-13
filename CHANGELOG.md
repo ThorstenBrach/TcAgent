@@ -19,10 +19,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   days / 50 per solution; **⋯ > Delete chat history of this solution**; `"saveHistory": false` in `chat-backends.json`
   switches it off. The chat now also follows a solution change of the IDE (new session in the new folder).
   [docs/USER_GUIDE.md](docs/USER_GUIDE.md#what-the-vs-extension-tcagentbridge-adds)
-- **Knowledge > Sources: several installed items at once** - tick items with the same state (the others grey out,
-  "Tick all like this", "Untick all", Space); My changes, Update and merge, What's new upstream, Revert, Keep as own
-  version, Uninstall and Copy path work on all ticked items with one question - Update and merge shows every preview
-  first and opens the conflicts in the merge window. Nothing ticked: the selected line as before.
+- **Knowledge window: several items at once in every list** - select with Shift or Ctrl, the actions of the bar and the
+  context menu work on all selected lines with one question. Sources (installed): My changes, Update and merge (every
+  preview first, conflicts in the merge window), What's new upstream, Revert, Keep as own version, Uninstall, Copy path,
+  "Select all like this"; Files: Open, Move to level, Switch off/on, Delete, Copy path and the Source actions; Backups and
+  Reference docs: Delete and Copy path; Platforms: Copy path; Modules: Switch on / Switch off. Actions for one item (rename,
+  edit, propose, open folder) are grey while several are selected.
 - **TcUnit shipped with TcAgent** - TcUnit 1.3.2 (MIT license, `thirdparty\TcUnit` with its license next to
   `TcAgent.exe`, listed in THIRD-PARTY-NOTICES.md). `tc_library action=ensure_tcunit` installs it into the TwinCAT library
   repository only if TcUnit is missing or older there (a newer one stays) and adds the reference to the PLC project if it

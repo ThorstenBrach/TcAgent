@@ -340,12 +340,13 @@ shared level kept in Git gets a commit on a new branch for a pull request instea
 installed from sources with their state – **✓ as installed**, **✎ changed locally**, **↑ newer in the source**, **⇅ both
 changed**, **✗ missing**; it is checked when the window opens, on refresh and when you save a file of a level in the
 editor – a source in a folder on this computer is read again each time, so a commit there shows at once; a Git URL as of
-its last fetch (daily, **Check for updates**, **Browse and install …**). Several items are ticked in the first column –
-only items with the same state together (the others grey out; **Tick all like this** ticks every item with the state of the
-selected one, **Untick all**, Space ticks the selected line). **My changes**, **Update and merge …**, **What's new
-upstream**, **Revert …**, **Keep as own version …**, **Uninstall …** and **Copy path** then work on all ticked items with
-one question (Update and merge shows the previews of all of them first); with nothing ticked they work on the selected
-line. **Propose upstream** takes one item at a time. Next to the heading **Check for updates** and **Update all …** (the plan first, scrollable); for the selected
+its last fetch (daily, **Check for updates**, **Browse and install …**). Several items are selected with Shift or Ctrl
+(**Select all like this** selects every item with the state of the selected one); **My changes**, **Update and merge …**,
+**What's new upstream**, **Revert …**, **Keep as own version …**, **Uninstall …** and **Copy path** then work on all of
+them with one question (Update and merge shows the previews of all of them first). **Propose upstream** takes one item at
+a time. The same holds in every list of the Knowledge window: in Files **Open**, **Move to level …**, **Switch off/on**,
+**Delete …**, **Copy path** and the **Source** actions; in Backups and Reference docs **Delete …** and **Copy path**, in Platforms
+**Copy path**; in Modules **Switch on** / **Switch off**; Advisor and Feedback as before. Next to the heading **Check for updates** and **Update all …** (the plan first, scrollable); for the selected
 item **Open**, **Open folder**, **My changes**, **Update and merge …**, **More ▾**, **Uninstall …**,
 **Copy path**:
 - **My changes** – the compare window of Visual Studio, installed version left, yours right;

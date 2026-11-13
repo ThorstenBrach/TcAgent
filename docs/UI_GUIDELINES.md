@@ -95,9 +95,12 @@ Buttons can be reached with Tab.
 
 - **Empty lists and views say what they are for and how to fill them** ("No source yet - New … adds a Git
   repository"); an empty chat shows suggestions to click; an empty chart says from when it shows something.
-- **Several items are chosen with check boxes** whenever the choice takes effort (tests, items to install): the ticks
-  stay when the filter or search changes; never Ctrl/Shift multi-selection - one click beside it would lose everything.
-  "Select all" / "Select none" where it helps.
+- **Several items in a list: Shift/Ctrl selection** (Thorsten 13.11., all lists of the Knowledge window): the actions of
+  the bar and the context menu work on every selected line with one question that names them; actions that need exactly
+  one item (open folder, rename, edit, propose) are grey while several are selected. A right-click on a selected line
+  keeps the selection. "Select all like this" where the state matters.
+- **Check boxes only where the choice takes effort over a filter** (tests to run, items to install in Browse and
+  install): the ticks stay when the filter or search changes. "Select all" / "Select none" where it helps.
 - Filters: kind, level, search box with a hint inside and ✕ to clear.
 
 ## 8. Safety-relevant information is visible
