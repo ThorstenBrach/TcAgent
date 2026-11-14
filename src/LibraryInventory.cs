@@ -26,6 +26,18 @@ namespace TcAgent;
 
 public static class LibraryInventory
 {
+    /// <summary>SaveAsLibrary with the hint the Automation Interface does not give: a library needs a title (and company, version)
+    /// in the project information of the PLC project.</summary>
+    public static void SaveAsLibrary(object plc, string file, bool install)
+    {
+        try { ComCall.Invoke(plc, "SaveAsLibrary", file, install); }
+        catch (Exception ex) when ((ex.InnerException?.Message ?? ex.Message).Contains("not a managed library", StringComparison.OrdinalIgnoreCase))
+        {
+            throw new Exception(System.Text.RegularExpressions.Regex.Replace((ex.InnerException?.Message ?? ex.Message).Trim(), @"\s*\r?\n\s*", " ") + " The PLC project needs a Title, Company and Version in its project information " +
+                                "(PLC project > Properties > Common, or <Title>, <Company>, <ProjectVersion> in the .plcproj) before it can be saved as a library.");     // no inner exception: the CLI prints the innermost message
+        }
+    }
+
     /// <summary>One library reference of a PLC project. Placeholder = placeholder name (null for a direct reference);
     /// Requested = version asked for ('*' = newest installed, a fixed version, or "unknown"); Version = resolved version
     /// (null = could not be resolved); ResolvedFrom = how Version was found.</summary>

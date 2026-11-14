@@ -253,7 +253,7 @@ public static partial class Cli
         {
             var plcs = SelectedPlcs(o, tc);
             if (plcs.Count > 1) throw new Exception("Several PLC projects - choose one with --plc.");
-            ComCall.Invoke(plcs[0], "SaveAsLibrary", file, o.Install);
+            LibraryInventory.SaveAsLibrary(plcs[0], file, o.Install);
             return 0;
         }, o.TimeoutSec * 1000);
         if (!File.Exists(file)) { Say("LIBRARY FAILED: no file written"); return Failed; }

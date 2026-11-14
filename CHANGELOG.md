@@ -63,6 +63,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `codeChecked`), the whole truth table in `results`; `tc_condition` offers turned comparisons.
 
 ### Fixed
+- `TcAgent.exe library` / `tc_library_save`: a PLC project without a title says what to fill in (Title, Company, Version in
+  the project information) instead of only "not a managed library".
 - `tc_motion_add kind=nc_task` returned an empty path and the next `kind=axis` found no Axes folder - the new NC task is
   looked up again by its name; `tc_motion` lists the tasks with their paths.
 - `tc_coe action=add`: the new entry no longer takes over "CompleteAccess" from the PDO entry it copies its format from

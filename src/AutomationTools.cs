@@ -84,7 +84,7 @@ public sealed partial class ToolRegistry
                 var plc = PlcProject(Str(a, "plcProjectPath"));
                 var file = Path.GetFullPath(Str(a, "file"));
                 Directory.CreateDirectory(Path.GetDirectoryName(file)!);
-                ComCall.Invoke(plc, "SaveAsLibrary", file, Bool(a, "install", false));
+                LibraryInventory.SaveAsLibrary(plc, file, Bool(a, "install", false));
                 return $"saved: {file}" + (Bool(a, "install", false) ? " (and installed)" : "") + (File.Exists(file) ? $", {new FileInfo(file).Length / 1024} KB" : "");
             }, 600_000));
 
