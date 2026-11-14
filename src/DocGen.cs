@@ -1118,6 +1118,7 @@ public sealed partial class ToolRegistry
         {
             var dir = SolutionDir(5000) ?? lastSolutionDir;
             if (dir == null) return null;
+            SaveBeforeReading();
             var items = tc.Sta.Run(() => tc.PlcProjects().Select(p => (p.Name, p.PathName)).ToList());
             var map = PlainText.ReadAll(dir, p => PlcTreeRoot(p, items));
             if (map == null) return null;
@@ -1131,6 +1132,29 @@ public sealed partial class ToolRegistry
             return map;
         }
         catch (Exception ex) when (!TwinCatSession.IsIdeLost(ex)) { Log.Info("project files for the analysis: " + ex.Message); return null; }
+    }
+
+    /// <summary>Saves everything open in the IDE before the analysis reads the project files, so changes written with
+    /// tc_plc_write are in the files (File.SaveAll, then every still unsaved document one by one). Not in ask/propose mode -
+    /// there nothing may be changed, so unsaved objects are read through the IDE instead. Returns what happened, for the output.</summary>
+    internal string SaveBeforeReading()
+    {
+        if (policy.Mode != AgentMode.Agent) return "not saved (mode " + policy.Mode + ")";
+        try
+        {
+            var left = tc.Sta.Run(() =>
+            {
+                var dte = tc.RequireDte();
+                try { dte.ExecuteCommand("File.SaveAll"); } catch { }
+                int n = 0;
+                foreach (EnvDTE.Document d in dte.Documents)
+                    try { if (!d.Saved) { d.Save(); if (!d.Saved) n++; } } catch { n++; }
+                return n;
+            }, 60_000);
+            Log.Info("saved before reading the project files" + (left > 0 ? $", {left} document(s) still unsaved" : ""));
+            return left > 0 ? $"saved first, {left} document(s) could not be saved" : "saved first";
+        }
+        catch (Exception ex) when (!TwinCatSession.IsIdeLost(ex)) { Log.Info("save before reading: " + ex.Message); return "saving failed: " + ex.Message; }
     }
 
     // SFC of one POU for the documentation: chain text and step-to-step edges

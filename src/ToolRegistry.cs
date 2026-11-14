@@ -321,7 +321,7 @@ public sealed partial class ToolRegistry
                    P("path", "string", "Only search below this tree path (default: all PLC projects)"),
                    P("max", "integer", "Max. hits (default 200)"),
                    P("seconds", "integer", "Time budget in seconds (default 40, max 240) - then the hits so far are returned"),
-                   P("source", "string", "files (default: the saved project files plus the editor documents with unsaved changes) or ide (every object through the IDE - slow, crashed Visual Studio in big projects)")),
+                   P("source", "string", "files (default: saves everything open in the IDE first, then reads the project files; in ask/propose mode nothing is saved and objects with unsaved changes come from the editor) or ide (every object through the IDE - slow, crashed Visual Studio in big projects)")),
             a => PlcSearchFilesFirst(a));
 
         Add("tc_plc_references", "Lists the library references of the PLC projects with resolved version and vendor (including placeholders). With installed=true also the libraries installed in the repository.",
@@ -1251,6 +1251,7 @@ public sealed partial class ToolRegistry
         {
             var dir = SolutionDir(5000) ?? lastSolutionDir;
             if (dir == null) return null;
+            var saved = SaveBeforeReading();
             var items = tc.Sta.Run(() => tc.PlcProjects().Select(p => (p.Name, p.PathName)).ToList());
             var r = PlainText.SearchFiles(dir, rx, int.MaxValue, budget, p => PlcTreeRoot(p, items));
             if (r == null) return null;
@@ -1298,9 +1299,8 @@ public sealed partial class ToolRegistry
                     for (int n = 0; n < lines.Length; n++) if (rx.IsMatch(lines[n])) Add(path, label, n + 1, lines[n]);
                 }
             var objects = r.Index.Count(x => Under(x.Path));
-            return $"{hits} hits in {objects} searched objects (the saved project files" +
-                   (dirty.Count > 0 ? $"; {dirty.Count} object(s) with unsaved changes read from the editor" : "") +
-                   "; changes written with tc_plc_write but not saved yet are not included - tc_save first)" +
+            return $"{hits} hits in {objects} searched objects (the project files, {saved}" +
+                   (dirty.Count > 0 ? $"; {dirty.Count} object(s) with unsaved changes read from the editor" : "") + ")" +
                    (hits >= max ? $" (truncated at max={max})" : "") +
                    (r.OutOfTime ? $" - STOPPED after {budget.TotalSeconds:0} s, not every file was searched" : "") + "\n" + o;
         }

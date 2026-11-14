@@ -63,6 +63,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `codeChecked`), the whole truth table in `results`; `tc_condition` offers turned comparisons.
 
 ### Fixed
+- Search, documentation, risk and refactoring analysis save everything open in the IDE first (like `tc_save`), so code
+  written with `tc_plc_write` is in the files they read; the search result says "saved first". Not in ask/propose mode -
+  there objects with unsaved changes are read through the IDE. Changes to the code still go only through the IDE.
 - Documentation, risk analysis (`tc_doc`, `tc_risk_rules`, `TcAgent.exe doc`) and `tc_refactor` read the code from the saved
   project files as well, the IDE only for objects open with unsaved changes - the risk analysis over a project with 430
   objects crashed Visual Studio the same way as the search. The result is the same (checked on the example project).
