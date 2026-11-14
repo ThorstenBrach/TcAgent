@@ -758,7 +758,10 @@ public sealed class TwinCatSession
         // a plain name like "Start" can occur in several FBs.
         var docPaths = doc != null ? ResolveDocPath(S(() => doc.FullName)) : new List<string>();
         var paths = docPaths.Count > 0
-            ? docPaths.Concat(ResolvePlcPaths(selected).Where(p => !docPaths.Contains(p))).ToList()
+            // the node selected in the Solution Explorer is usually the open object itself: its plain name ("Exchange") would
+            // add every object of that name - only names that are not the open object count
+            ? docPaths.Concat(ResolvePlcPaths(selected.Where(s => !docPaths.Any(d => d.EndsWith("^" + Path.GetFileNameWithoutExtension(s), StringComparison.OrdinalIgnoreCase))))
+                                .Where(p => !docPaths.Contains(p))).ToList()
             : ResolvePlcPaths(names.Concat(selected));
         o.AppendLine(paths.Count > 0 ? "Tree path(s):\n  " + string.Join("\n  ", paths) : "Tree path: cannot be determined unambiguously");
         return o.ToString();

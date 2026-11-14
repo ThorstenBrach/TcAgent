@@ -1585,6 +1585,7 @@ public sealed partial class ToolRegistry
         if (a["autoStart"] != null) changes.Add(("AutoStart", Bool(a, "autoStart", true) ? "true" : "false"));
         if (changes.Count == 0 && Str(a, "cores") == null) return res;
         var xml = (string)((dynamic)task).ProduceXml(false);
+        var rtWarning = "";
         if (Str(a, "cores") is { } coreList)
         {
             var cores = coreList.Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries).Select(int.Parse).ToList();
@@ -1592,6 +1593,18 @@ public sealed partial class ToolRegistry
             ulong mask = cores.Aggregate(0UL, (acc, c) => acc | (1UL << c));
             var cur = Regex.Match(xml, @"<CpuAffinity[^>]*>([^<]*)</CpuAffinity>", RegexOptions.IgnoreCase);
             changes.Add(("CpuAffinity", FormatMask(mask, cur.Success ? cur.Groups[1].Value : "#x0000000000000001")));
+            // a task can only run on a real-time core: say so before the activation fails
+            try
+            {
+                var rtSet = Regex.Match((string)((dynamic)tc.Item("TIRS")).ProduceXml(false), @"<Affinity>\s*#x([0-9a-fA-F]+)\s*</Affinity>", RegexOptions.IgnoreCase);
+                if (rtSet.Success && Convert.ToUInt64(rtSet.Groups[1].Value, 16) is var rtMask && (mask & ~rtMask) != 0)
+                {
+                    var rtCores = Enumerable.Range(0, 64).Where(i => (rtMask & (1UL << i)) != 0);
+                    rtWarning = $" WARNING: core(s) {string.Join(",", cores.Where(c => (rtMask & (1UL << c)) == 0))} are not real-time cores " +
+                                $"(real-time cores: {string.Join(",", rtCores)}) - add them first with tc_realtime set cores=..., or the activation fails.";
+                }
+            }
+            catch (Exception ex) when (ex is not OutOfMemoryException) { }
         }
         var notes = new List<string>();
         foreach (var (tag, val) in changes)
@@ -1601,9 +1614,9 @@ public sealed partial class ToolRegistry
             xml = re.Replace(xml, m => m.Groups[1].Value + val + m.Groups[4].Value, 1);
             notes.Add($"{tag}={val}");
         }
-        if (DryRun(a)) return res + " - PROPOSAL: " + string.Join(", ", notes);
+        if (DryRun(a)) return res + " - PROPOSAL: " + string.Join(", ", notes) + rtWarning;
         ((dynamic)task).ConsumeXml(xml);
-        return res + " - set: " + string.Join(", ", notes) + " (CycleTime in 100 ns steps). Takes effect after tc_activate.";
+        return res + " - set: " + string.Join(", ", notes) + " (CycleTime in 100 ns steps). Takes effect after tc_activate." + rtWarning;
     }
 
     // ------------------------------------------------------------------ Boot project

@@ -45,6 +45,7 @@ public sealed partial class ToolRegistry
                    P("changes", "array", "apply: [{object, kind: comment|rename, target: variable|member|pou|method, name, newName, comment, reason}]"),
                    P("dryRun", "boolean", "apply: only show the edits as diffs, ask nothing, write nothing"),
                    P("job", "string", "result: job id returned by apply (default: the latest job)"),
+                   P("plcProjectPath", "string", "the PLC project when the solution has several and the object is given by name (default: the one that has it)"),
                    P("waitSeconds", "integer", "apply/result: how long the call waits for the user's decisions before it returns the progress " +
                                                  "(default 45 or TCAGENT_JOB_WAIT; keep it below the client's call timeout)")),
             a => (Str(a, "action") ?? "analyze").ToLowerInvariant() switch
@@ -77,10 +78,7 @@ public sealed partial class ToolRegistry
                 }
                 catch { }
         }
-        var doc = BuildDoc(null);
-        var pou = doc.Pous.Values.FirstOrDefault(p => p.Path.Equals(target, StringComparison.OrdinalIgnoreCase))
-                  ?? (doc.Pous.TryGetValue(target, out var byName) ? byName : null)
-                  ?? throw new Exception($"Object '{target}' not found");
+        var (doc, pou) = DocWith(target, Str(a, "plcProjectPath"));
         // a clicked FB covers its methods/properties/actions; a clicked method only itself
         var scope = new List<PlcDoc.Pou> { pou };
         if (pou.Owner == null) scope.AddRange(pou.Members.Select(k => doc.Pous[k]).Where(m => m.Kind is not "TRANSITION"));
@@ -275,6 +273,22 @@ public sealed partial class ToolRegistry
                (applied > 0 ? "\nCheck with tc_check." : "");
     }
 
+    /// <summary>The PLC project that holds the object: from its tree path (TIPC^X^X Project^...), the given plcProjectPath, the
+    /// only PLC project, or - with several - the first one that has an object of that name.</summary>
+    (PlcDoc Doc, PlcDoc.Pou Pou) DocWith(string target, string plcProjectPath)
+    {
+        static PlcDoc.Pou Find(PlcDoc d, string t) => d.Pous.Values.FirstOrDefault(p => p.Path.Equals(t, StringComparison.OrdinalIgnoreCase)) ?? (d.Pous.TryGetValue(t, out var n) ? n : null);
+        var parts = target.Split('^');
+        if (plcProjectPath == null && parts.Length >= 3 && parts[0].Equals("TIPC", StringComparison.OrdinalIgnoreCase)) plcProjectPath = string.Join("^", parts.Take(3));
+        var projects = plcProjectPath != null ? new List<string> { plcProjectPath } : tc.Sta.Run(() => tc.PlcProjects().Select(p => p.PathName).ToList());
+        foreach (var path in projects.DefaultIfEmpty(null))
+        {
+            var d = BuildDoc(path);
+            if (Find(d, target) is { } pou) return (d, pou);
+        }
+        throw new Exception($"Object '{target}' not found" + (projects.Count > 1 ? " in " + string.Join(", ", projects) : ""));
+    }
+
     static string Norm(string t) => (t ?? "").Replace("\r\n", "\n").TrimEnd();
 
     RefactorPlan PlanChange(JsonObject c, int pid, List<string> hmi)
@@ -284,9 +298,7 @@ public sealed partial class ToolRegistry
         var target = (S("target") ?? "variable").ToLowerInvariant();
         var objName = S("object") ?? throw new Exception("object is required");
         var name = S("name");
-        var doc = BuildDoc(null);
-        var pou = doc.Pous.Values.FirstOrDefault(p => p.Path.Equals(objName, StringComparison.OrdinalIgnoreCase))
-                  ?? (doc.Pous.TryGetValue(objName, out var bn) ? bn : null) ?? throw new Exception($"object {objName} not found");
+        var (doc, pou) = DocWith(objName, S("plcProjectPath"));
         var plan = new RefactorPlan();
         if (kind == "comment")
         {
