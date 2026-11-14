@@ -63,6 +63,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `codeChecked`), the whole truth table in `results`; `tc_condition` offers turned comparisons.
 
 ### Fixed
+- `tc_refactor` works in a solution with several PLC projects - it finds the project of the object (`plcProjectPath` optional);
+  before it stopped with "Several PLC projects".
+- Editor context: two objects with the same name (e.g. a method `Exchange` in two FBs) no longer both appear as the
+  open object.
+- `tc_task set cores`: a warning when a core is not a real-time core - the activation would fail.
 - **TcUnit report showed old test texts** after a run without download when only `///` comments had changed: a run now
   saves what is open in the IDE before it reads the tests (texts and line numbers are current), and the report button
   of the window saves before it makes the report.
