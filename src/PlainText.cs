@@ -1250,6 +1250,36 @@ public static class PlainText
         return res;
     }
 
+    /// <summary>Declaration and implementation of every object, method, property, accessor and action in the saved project files,
+    /// by tree path - for reading a whole project without asking the IDE object by object (that crashed Visual Studio in big
+    /// projects). Null without a PLC project below slnDir. Unsaved changes in the editor are not seen.</summary>
+    public static Dictionary<string, (string Decl, string Impl, string Lang)> ReadAll(string slnDir, Func<PlcProj, string> treeRoot)
+    {
+        var plcs = SelectPlcs(slnDir, null, new Report());
+        if (plcs.Count == 0) return null;
+        var map = new Dictionary<string, (string, string, string)>(StringComparer.OrdinalIgnoreCase);
+        void Walk(Block b, string path)
+        {
+            map[path] = (b.Decl, b.Impl, b.ImplLang);
+            foreach (var s in b.Subs) Walk(s, path + "^" + s.Name);
+        }
+        foreach (var p in plcs)
+        {
+            var root = treeRoot(p);
+            foreach (var o in p.Objects)
+            {
+                if (!File.Exists(o.FullPath)) continue;
+                try
+                {
+                    var obj = ObjectFromXml(ReadText(o.FullPath).Text);
+                    Walk(obj, root + string.Concat(o.Folder.Split('\\', StringSplitOptions.RemoveEmptyEntries).Select(x => "^" + x)) + "^" + obj.Name);
+                }
+                catch (Exception ex) when (ex is PlainTextException or DecoderFallbackException or IOException) { }
+            }
+        }
+        return map;
+    }
+
     /// <summary>Tree paths for names like "FB_Motor", "FB_Motor.Run" or "Motor.TcPOU", most specific first. FB.Method hits are
     /// unambiguous and beat plain name hits.</summary>
     public static List<string> ResolveNames(IEnumerable<string> rawNames, IEnumerable<(string Name, string Path)> index)

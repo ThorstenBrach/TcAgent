@@ -177,7 +177,7 @@ public sealed partial class ToolRegistry
     }
 
     /// <summary>Tree path of the PLC project (nested project item) that belongs to a .plcproj.</summary>
-    static string PlcTreeRoot(PlainText.PlcProj plc, List<(string Name, string PathName)> items)
+    internal static string PlcTreeRoot(PlainText.PlcProj plc, List<(string Name, string PathName)> items)
     {
         var names = new[] { plc.Stem, plc.Stem + " Project", plc.Name, plc.Name + " Project" };
         var hits = items.Where(i => names.Any(n => n.Equals(i.Name, StringComparison.OrdinalIgnoreCase) ||

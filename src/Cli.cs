@@ -304,9 +304,14 @@ public static partial class Cli
         var sln = SolutionName(tc);
         var dir = Path.GetDirectoryName(sln);
         var mem = PlcDoc.Summaries.Load(dir);
+        // the code from the saved files (the IDE closes without saving anyway): reading every object through the IDE crashed
+        // Visual Studio in big projects
+        Dictionary<string, (string Decl, string Impl, string Lang)> files = null;
+        try { var items = tc.Sta.Run(() => tc.PlcProjects().Select(p => (p.Name, p.PathName)).ToList()); files = PlainText.ReadAll(dir, p => ToolRegistry.PlcTreeRoot(p, items)); }
+        catch (Exception ex) when (ex is not OutOfMemoryException) { Say("project files not readable, the code is read through the IDE: " + ex.Message); }
         var docs = tc.Sta.Run(() => SelectedPlcs(o, tc).Select(plc =>
         {
-            var d = PlcDoc.Collect(tc, plc, ToolRegistry.SfcForDoc);
+            var d = PlcDoc.Collect(tc, plc, ToolRegistry.SfcForDoc, files);
             d.Analyze();
             return d;
         }).ToList(), o.TimeoutSec * 1000);
@@ -321,7 +326,7 @@ public static partial class Cli
             file = Path.GetFullPath(file);
             Directory.CreateDirectory(Path.GetDirectoryName(file)!);
             File.WriteAllText(file, d.Html(mem, "TcAgent " + Program.ServerVersion), new System.Text.UTF8Encoding(false));
-            Say($"DOC OK: {file} ({d.Pous.Count} objects, {d.Findings().Count} findings, risks: {PlcDoc.RiskCounts(d.Risks())})");
+            Say($"DOC OK: {file} ({d.Pous.Count} objects, {d.Findings().Count} findings, risks: {PlcDoc.RiskCounts(d.Risks())}; code of {d.FromFiles} object(s) from the project files)");
         }
         // static risk rules (tc_doc action=risks): list and optionally fail the step
         var failed = false;

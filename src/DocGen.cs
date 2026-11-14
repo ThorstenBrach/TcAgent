@@ -45,6 +45,8 @@ public sealed partial class PlcDoc
     }
 
     public string Project = "";
+    /// <summary>How many objects came from the saved project files instead of the IDE (Collect).</summary>
+    public int FromFiles;
     public readonly Dictionary<string, Pou> Pous = new(StringComparer.OrdinalIgnoreCase);
     public readonly SortedDictionary<string, List<string>> Tasks = new(StringComparer.OrdinalIgnoreCase);
     readonly Dictionary<string, (string Gvl, string Type)> globals = new(StringComparer.OrdinalIgnoreCase);
@@ -52,22 +54,34 @@ public sealed partial class PlcDoc
     static readonly string[] PouKinds = { "PROGRAM", "FUNCTION_BLOCK", "FUNCTION", "INTERFACE" };
 
     // ================================================================== collect (STA thread)
-    public static PlcDoc Collect(TwinCatSession tc, ITcSmTreeItem plcProject, Func<ITcSmTreeItem, string, (string Text, List<(string, string, string)> Edges)> sfc)
+    /// <param name="files">the code from the saved project files by tree path (PlainText.ReadAll): objects found there are not
+    /// read through the IDE - reading every object of a big project that way crashed Visual Studio (feedback FB-4E5119CA)</param>
+    public static PlcDoc Collect(TwinCatSession tc, ITcSmTreeItem plcProject, Func<ITcSmTreeItem, string, (string Text, List<(string, string, string)> Edges)> sfc,
+                                 IReadOnlyDictionary<string, (string Decl, string Impl, string Lang)> files = null)
     {
         var d = new PlcDoc { Project = plcProject.Name };
         var items = tc.PlcObjects(plcProject).ToList();
         var byPath = new Dictionary<string, Pou>(StringComparer.OrdinalIgnoreCase);     // tree path -> object
+        int fromFiles = 0;
 
         foreach (var it in items)
         {
             string path, name; int type;
             try { path = it.PathName; name = it.Name; type = it.ItemType; } catch { continue; }
             if (type == 601) continue;                                         // folder
-            string decl = null, impl = null;
-            try { if (it is ITcPlcDeclaration dd) decl = dd.DeclarationText; } catch { }
-            try { if (it is ITcPlcImplementation ii) impl = ii.ImplementationText; } catch { }
+            string decl = null, impl = null, xmlLang = null;
+            if (files != null && files.TryGetValue(path, out var fromFile) && ++fromFiles > 0)
+            {
+                decl = fromFile.Decl; impl = fromFile.Impl;
+                if (string.IsNullOrWhiteSpace(impl) && !string.IsNullOrEmpty(fromFile.Lang) && !fromFile.Lang.Equals("ST", StringComparison.OrdinalIgnoreCase))
+                    xmlLang = fromFile.Lang.ToUpperInvariant();
+            }
+            else
+            {
+                try { if (it is ITcPlcDeclaration dd) decl = dd.DeclarationText; } catch { }
+                try { if (it is ITcPlcImplementation ii) impl = ii.ImplementationText; } catch { }
+            }
             // graphical bodies: ImplementationText may return the internal editor XML (<SFC><XmlArchive>...) instead of ""
-            string xmlLang = null;
             if (impl != null && Regex.Match(impl.TrimStart(), @"^<(SFC|CFC|FBD|LD|UML\w*)\b") is { Success: true } gm) { xmlLang = gm.Groups[1].Value.ToUpperInvariant(); impl = ""; }
             var parentPath = path.Contains('^') ? path[..path.LastIndexOf('^')] : "";
             var kind = KindOf(decl, type);
@@ -105,6 +119,7 @@ public sealed partial class PlcDoc
             d.Pous[pou.Key] = pou;
             byPath[path] = pou;
         }
+        if (files != null) { Log.Info($"analysis of {d.Project}: {fromFiles} of {items.Count} objects from the saved project files"); d.FromFiles = fromFiles; }
         // tasks: PLC task references (TcTTO) with their program calls, cycle time and priority from TIRT (DocTasks.cs)
         d.CollectTasks(tc, plcProject, items, byPath);
         // SFC charts (graphical - through PLCopen XML); other graphical languages are only listed
@@ -1083,15 +1098,39 @@ public sealed partial class ToolRegistry
 
     internal PlcDoc BuildDoc(string plcProjectPath)
     {
+        var files = CodeFromFiles();
         var d = tc.Sta.Run(() =>
         {
             var plc = PlcProject(plcProjectPath);
-            var doc = PlcDoc.Collect(tc, plc, SfcForDoc);
+            var doc = PlcDoc.Collect(tc, plc, SfcForDoc, files);
             doc.Analyze();
             return doc;
         }, 600_000);
         d.RiskConfig = RiskConfig.Load(SolutionDir());     // risk-rules.md files (company, personal, project)
         return d;
+    }
+
+    /// <summary>The code of the saved project files by tree path, or null (no solution folder, no PLC project on disk). Objects
+    /// open in an editor with unsaved changes are left out, so the IDE is asked for them.</summary>
+    Dictionary<string, (string Decl, string Impl, string Lang)> CodeFromFiles()
+    {
+        try
+        {
+            var dir = SolutionDir(5000) ?? lastSolutionDir;
+            if (dir == null) return null;
+            var items = tc.Sta.Run(() => tc.PlcProjects().Select(p => (p.Name, p.PathName)).ToList());
+            var map = PlainText.ReadAll(dir, p => PlcTreeRoot(p, items));
+            if (map == null) return null;
+            var dirty = tc.Sta.Run(() =>
+            {
+                var l = new List<string>();
+                try { foreach (EnvDTE.Document doc in tc.RequireDte().Documents) try { if (!doc.Saved) l.AddRange(tc.ResolveDocPath(doc.FullName)); } catch { } } catch { }
+                return l;
+            });
+            foreach (var p in dirty) map.Remove(p);
+            return map;
+        }
+        catch (Exception ex) when (!TwinCatSession.IsIdeLost(ex)) { Log.Info("project files for the analysis: " + ex.Message); return null; }
     }
 
     // SFC of one POU for the documentation: chain text and step-to-step edges
