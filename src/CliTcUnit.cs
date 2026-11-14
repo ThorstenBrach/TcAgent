@@ -20,10 +20,24 @@ namespace TcAgent;
 
 public static partial class Cli
 {
+    /// <summary>The solution open in a running IDE: --attach &lt;pid&gt;, or --attach alone when exactly one IDE has a solution open.</summary>
+    static string SolutionOfIde(string pid)
+    {
+        using var sta = new StaWorker();
+        var tc = new TwinCatSession(sta);
+        var list = sta.Run(() => tc.ListInstances().Where(i => !string.IsNullOrEmpty(i.Solution)).Select(i => (i.Pid, i.Solution)).ToList(), 60_000);
+        var hits = string.IsNullOrEmpty(pid) ? list : list.Where(i => i.Pid.ToString() == pid.Trim()).ToList();
+        return hits.Count == 1 ? hits[0].Solution
+             : throw new Exception(hits.Count == 0 ? (string.IsNullOrEmpty(pid) ? "no running IDE with an open solution" : $"no running IDE with pid {pid} and an open solution")
+                                                   : "several IDEs with a solution - --attach <pid>: " + string.Join(", ", hits.Select(h => $"{h.Pid} {h.Solution}")));
+    }
+
     static void ValidateTcUnit(Options o)
     {
         if (o.Sub is not ("list" or "run" or "report" or "watch" or "ensure")) throw new Exception("tcunit needs list, run, report, watch or ensure, e.g. TcAgent.exe tcunit list --solution <sln>");
         if (o.Sub == "ensure" && (o.Tests.Count > 0 || o.Download || o.Junit != null || o.Target != null)) throw new Exception("tcunit ensure only installs TcUnit - --tests, --download, --junit and --target are options of tcunit run");
+        // list, report and watch read files: --attach only names the IDE whose solution they read (feedback FB-D902BE21)
+        if (o.Sub is "list" or "report" or "watch" && o.Solution == null && o.Attach != null) { o.Solution = SolutionOfIde(o.Attach); o.Attach = null; }
         if (o.Sub is "list" or "report" or "watch" && o.Solution == null) throw new Exception($"tcunit {o.Sub} needs --solution <path to .sln>");
         if (o.Sub == "watch" && (o.Tests.Count > 0 || o.Download || o.Junit != null)) throw new Exception("tcunit watch only follows runs - --tests, --download and --junit are options of tcunit run");
         if (o.Sub == "report" && (o.Tests.Count > 0 || o.Download)) throw new Exception("--tests and --download are options of tcunit run");

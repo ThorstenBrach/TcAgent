@@ -945,7 +945,7 @@ public static partial class Cli
       actions/objects, never deletes; --dry-run lists the changes. Refused (exit 2) while the solution is open in an IDE.
       Graphical implementations (SFC, LD, FBD, CFC) stay as they are. Format: docs/PLAINTEXT.md.
 
-  TcAgent.exe tcunit list --solution <sln> [--plc <name>]
+  TcAgent.exe tcunit list --solution <sln>|--attach [pid] [--plc <name>]
       TcUnit tests read from the code (no IDE): PLC projects, suites, instances, tests with file, line, the /// description
       and the paths of the enable bools (bRunSuite, bRun_<TestMethod>) as JSON. Format: docs/TCUNIT_TESTS.md.
 
@@ -1020,7 +1020,7 @@ public static partial class Cli
       but only if TcUnit is missing there or older; a newer installed TcUnit stays. Reports whether the PLC project
       references TcUnit (nothing is saved - add it with tc_library action=ensure_tcunit or in the project). Starts the IDE.
 
-  TcAgent.exe tcunit report --solution <sln> [--junit <file>] [--out <file.html>] [--builtin] [--approve <id>]
+  TcAgent.exe tcunit report --solution <sln>|--attach [pid] [--junit <file>] [--out <file.html>] [--builtin] [--approve <id>]
       HTML report of the last tcunit run (or of the JUnit file given): the command of ""report"" in .tcagent\tcunit.json
       (placeholders {junit} {html} {solution} {solutionDir}, run in the solution folder) or TcAgent's own report.
       The command runs only after you approved it once for this solution and command text: until then TcAgent's own

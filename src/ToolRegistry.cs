@@ -1977,7 +1977,7 @@ public sealed partial class ToolRegistry
             var file = (e as FileNotFoundException)?.FileName ?? (e as FileLoadException)?.FileName;
             msg = $"{e.GetType().Name}: {file} {msg}".Trim();
             if (!File.Exists(Path.Combine(AppContext.BaseDirectory, "TcAgent.dll")) && !File.Exists(Path.Combine(AppContext.BaseDirectory, "TcAgent.exe")) ||
-                file?.StartsWith("System.", StringComparison.Ordinal) == true)
+                file?.StartsWith("System.", StringComparison.Ordinal) == true || ExeReplaced())
                 msg += " - the files of this running TcAgent were removed or replaced (update while it was running). " +
                        "Restart the AI client: TcAgent Chat (close/reopen the chat window or restart Visual Studio), desktop apps (tray icon > Quit), CLIs (start them again).";
         }
@@ -1986,6 +1986,19 @@ public sealed partial class ToolRegistry
             msg += " - the connection to the IDE was lost (TcXaeShell/Visual Studio crashed or was closed). Tell the user; when the IDE " +
                    "is open again call tc_attach and check the last change - do not repeat changes blindly.";
         return msg;
+    }
+
+    /// <summary>The program file of this process was replaced after it started (an update set it aside): an assembly loaded
+    /// later from it - TwinCAT.Ads on the first ADS call - can no longer be found (feedback FB-A0080B14).</summary>
+    static bool ExeReplaced()
+    {
+        try
+        {
+            var p = Environment.ProcessPath;
+            return p == null || p.Contains(".old-", StringComparison.OrdinalIgnoreCase) || !File.Exists(p) ||
+                   File.GetLastWriteTimeUtc(p) > System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
+        }
+        catch { return false; }
     }
 
     /// <summary>Saves the item before tc_delete: PLC objects as PLCopen XML (tc_import kind=plcopen), others as ProduceXml.

@@ -63,6 +63,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `codeChecked`), the whole truth table in `results`; `tc_condition` offers turned comparisons.
 
 ### Fixed
+- `tc_test_run`: code in folders starting with `_` (e.g. Control plus `_this`) now counts for "changed since the last
+  download" - a changed test suite there was run with the old code (feedback FB-6BF3EC9E).
+- `TcAgent.exe tcunit list|report|watch --attach [pid]`: the solution of the running IDE, no `--solution` needed (FB-D902BE21).
+- A missing assembly after an update while TcAgent was running (e.g. TwinCAT.Ads on the first ADS call) now says so and
+  asks to restart the AI client, instead of a bare FileNotFoundException (FB-A0080B14).
 - `TcAgent.exe library` / `tc_library_save`: a PLC project without a title says what to fill in (Title, Company, Version in
   the project information) instead of only "not a managed library".
 - `tc_motion_add kind=nc_task` returned an empty path and the next `kind=axis` found no Axes folder - the new NC task is
