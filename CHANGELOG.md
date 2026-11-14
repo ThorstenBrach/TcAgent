@@ -63,6 +63,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `codeChecked`), the whole truth table in `results`; `tc_condition` offers turned comparisons.
 
 ### Fixed
+- `tc_plc_search` no longer crashes Visual Studio in big projects: it searches the saved project files (in seconds instead of
+  minutes) and asks the IDE only for objects open with unsaved changes; reading every object through the IDE crashed
+  devenv.exe (C++ exception in KERNELBASE, reproduced twice on a project with 430 objects, feedback FB-4E5119CA).
+  `source=ide` keeps the old way.
 - `tc_test_run`: code in folders starting with `_` (e.g. Control plus `_this`) now counts for "changed since the last
   download" - a changed test suite there was run with the old code (feedback FB-6BF3EC9E).
 - `TcAgent.exe tcunit list|report|watch --attach [pid]`: the solution of the running IDE, no `--solution` needed (FB-D902BE21).

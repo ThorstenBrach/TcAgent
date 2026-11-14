@@ -320,8 +320,9 @@ public sealed partial class ToolRegistry
                    P("part", "string", "decl, impl or all (default)"),
                    P("path", "string", "Only search below this tree path (default: all PLC projects)"),
                    P("max", "integer", "Max. hits (default 200)"),
-                   P("seconds", "integer", "Time budget in seconds (default 40, max 240) - then the hits so far are returned")),
-            a => tc.Sta.Run(() => PlcSearch(a), 300_000));
+                   P("seconds", "integer", "Time budget in seconds (default 40, max 240) - then the hits so far are returned"),
+                   P("source", "string", "files (default: the saved project files plus the editor documents with unsaved changes) or ide (every object through the IDE - slow, crashed Visual Studio in big projects)")),
+            a => PlcSearchFilesFirst(a));
 
         Add("tc_plc_references", "Lists the library references of the PLC projects with resolved version and vendor (including placeholders). With installed=true also the libraries installed in the repository.",
             Schema(P("plcProjectPath", "string", "Path of the PLC project (default: all)"),
@@ -1187,6 +1188,20 @@ public sealed partial class ToolRegistry
         return o.ToString();
     }
 
+    // the saved project files first (feedback FB-4E5119CA): reading every object through the Automation Interface made
+    // Visual Studio crash in a big project (C++ exception in KERNELBASE), and it is slow; the IDE is only asked for the
+    // objects open in an editor with unsaved changes. source=ide reads every object through the IDE as before.
+    string PlcSearchFilesFirst(JsonObject a)
+    {
+        if (!string.Equals(Str(a, "source"), "ide", StringComparison.OrdinalIgnoreCase))
+        {
+            var opts = RegexOptions.CultureInvariant | (Bool(a, "caseSensitive", false) ? RegexOptions.None : RegexOptions.IgnoreCase);
+            var rx = new Regex(Bool(a, "regex", false) ? Str(a, "pattern") : Regex.Escape(Str(a, "pattern")), opts, TimeSpan.FromSeconds(2));
+            var budget = TimeSpan.FromSeconds(Math.Clamp(Int(a, "seconds", 40), 5, 240));
+            if (SearchProjectFiles(a, rx, (Str(a, "part") ?? "all").ToLowerInvariant(), Int(a, "max", 200), budget) is { } fromFiles) return fromFiles;
+        }
+        return tc.Sta.Run(() => PlcSearch(a), 300_000);
+    }
     string PlcSearch(JsonObject a)
     {
         var pat = Str(a, "pattern");
@@ -1199,6 +1214,7 @@ public sealed partial class ToolRegistry
         var budget = TimeSpan.FromSeconds(Math.Clamp(Int(a, "seconds", 40), 5, 240));
         var sw = System.Diagnostics.Stopwatch.StartNew();
         bool outOfTime = false;
+
         var root = Str(a, "path") is { Length: > 0 } p ? tc.Item(p) : null;
         var o = new StringBuilder();
         void Scan(string path, string label, string text)
@@ -1225,6 +1241,74 @@ public sealed partial class ToolRegistry
                    (outOfTime ? $" - STOPPED after {budget.TotalSeconds:0} s, not every object was searched: narrow it with path=<folder or object>, " +
                                 "raise seconds (max 240), or export the code once with tc_plaintext action=export and search the .st files" : "") + "\n";
         return head + o;
+    }
+
+    /// <summary>tc_plc_search over the saved project files plus the editor documents with unsaved changes (read from the IDE).
+    /// Null when the files cannot be used (no solution folder, no PLC project on disk) - then the IDE is searched.</summary>
+    string SearchProjectFiles(JsonObject a, Regex rx, string part, int max, TimeSpan budget)
+    {
+        try
+        {
+            var dir = SolutionDir(5000) ?? lastSolutionDir;
+            if (dir == null) return null;
+            var items = tc.Sta.Run(() => tc.PlcProjects().Select(p => (p.Name, p.PathName)).ToList());
+            var r = PlainText.SearchFiles(dir, rx, int.MaxValue, budget, p => PlcTreeRoot(p, items));
+            if (r == null) return null;
+            var under = Str(a, "path");
+            bool Under(string path) => string.IsNullOrEmpty(under) || path.Equals(under, StringComparison.OrdinalIgnoreCase) || path.StartsWith(under + "^", StringComparison.OrdinalIgnoreCase);
+            bool PartOk(string p) => part == "all" || part == "decl" && p == "declaration" || part == "impl" && p == "implementation";
+            // objects open in an editor with unsaved changes: their text comes from the IDE, not from the file
+            var dirty = tc.Sta.Run(() =>
+            {
+                var list = new List<(string Path, string Decl, string Impl)>();
+                try
+                {
+                    foreach (EnvDTE.Document d in tc.RequireDte().Documents)
+                    {
+                        bool saved; try { saved = d.Saved; } catch { continue; }
+                        if (saved) continue;
+                        foreach (var path in tc.ResolveDocPath(d.FullName))
+                            try
+                            {
+                                var it = tc.Item(path);
+                                list.Add((path, (it as ITcPlcDeclaration)?.DeclarationText, (it as ITcPlcImplementation)?.ImplementationText));
+                            }
+                            catch { }
+                    }
+                }
+                catch (Exception ex) when (!TwinCatSession.IsIdeLost(ex)) { }
+                return list;
+            });
+            var o = new StringBuilder();
+            int hits = 0;
+            void Add(string path, string label, int line, string text)
+            {
+                if (hits >= max) return;
+                hits++;
+                o.AppendLine($"{path}  [{label}:{line}]  {text.Trim()}");
+            }
+            foreach (var h in r.Hits)
+                if (Under(h.Path) && PartOk(h.Part) && !dirty.Any(x => x.Path.Equals(h.Path, StringComparison.OrdinalIgnoreCase)))
+                    Add(h.Path, h.Part == "declaration" ? "Decl" : "Impl", h.Line, h.Text);
+            foreach (var (path, decl, impl) in dirty.Where(x => Under(x.Path)))
+                foreach (var (label, text) in new[] { ("Decl", part == "impl" ? null : decl), ("Impl", part == "decl" ? null : impl) })
+                {
+                    if (string.IsNullOrEmpty(text)) continue;
+                    var lines = text.Replace("\r\n", "\n").Split('\n');
+                    for (int n = 0; n < lines.Length; n++) if (rx.IsMatch(lines[n])) Add(path, label, n + 1, lines[n]);
+                }
+            var objects = r.Index.Count(x => Under(x.Path));
+            return $"{hits} hits in {objects} searched objects (the saved project files" +
+                   (dirty.Count > 0 ? $"; {dirty.Count} object(s) with unsaved changes read from the editor" : "") +
+                   "; changes written with tc_plc_write but not saved yet are not included - tc_save first)" +
+                   (hits >= max ? $" (truncated at max={max})" : "") +
+                   (r.OutOfTime ? $" - STOPPED after {budget.TotalSeconds:0} s, not every file was searched" : "") + "\n" + o;
+        }
+        catch (Exception ex) when (!TwinCatSession.IsIdeLost(ex))
+        {
+            Log.Info("tc_plc_search, project files: " + ex.Message);
+            return null;
+        }
     }
 
     string PlcReferences(string plcPath, bool installed)
