@@ -56,7 +56,15 @@ public sealed partial class ToolRegistry
     {
         ITcSmTreeItem nc;
         try { nc = tc.Item("TINC"); } catch { return new List<ITcSmTreeItem>(); }
-        return TwinCatSession.Children(nc).ToList();
+        // a freshly created NC task comes back without PathName (and without children) from the collection - look it up again by name
+        return TwinCatSession.Children(nc).Select(t => Fresh(t, "TINC")).ToList();
+    }
+
+    /// <summary>The same item looked up again by its path when the COM object has none (just created / enumerated).</summary>
+    ITcSmTreeItem Fresh(ITcSmTreeItem it, string parentPath)
+    {
+        try { if (!string.IsNullOrEmpty(it.PathName)) return it; } catch { }
+        try { return tc.Item(parentPath + "^" + it.Name); } catch { return it; }
     }
 
     static ITcSmTreeItem AxesFolder(ITcSmTreeItem ncTask) =>
@@ -96,7 +104,7 @@ public sealed partial class ToolRegistry
                 var nc = tc.Item("TINC");
                 name ??= $"NC-Task {TwinCatSession.Children(nc).Count() + 1}";
                 if (DryRun(a)) return $"PROPOSAL (nothing created): NC task '{name}' under {nc.PathName}";
-                var t = (ITcSmTreeItem)((dynamic)nc).CreateChild(name, NcTaskSubType, "", null);
+                var t = Fresh((ITcSmTreeItem)((dynamic)nc).CreateChild(name, NcTaskSubType, "", null), "TINC");
                 return $"created: {t.PathName}" + (AxesFolder(t) is { } ax ? $"\nAxes folder: {ax.PathName}" : "");
             }
             case "axis":

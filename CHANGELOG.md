@@ -63,6 +63,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   `codeChecked`), the whole truth table in `results`; `tc_condition` offers turned comparisons.
 
 ### Fixed
+- `tc_motion_add kind=nc_task` returned an empty path and the next `kind=axis` found no Axes folder - the new NC task is
+  looked up again by its name; `tc_motion` lists the tasks with their paths.
+- `tc_coe action=add`: the new entry no longer takes over "CompleteAccess" from the PDO entry it copies its format from
+  (a single subindex was written as a complete access).
 - `tc_refactor` works in a solution with several PLC projects - it finds the project of the object (`plcProjectPath` optional);
   before it stopped with "Several PLC projects".
 - Editor context: two objects with the same name (e.g. a method `Exchange` in two FBs) no longer both appear as the

@@ -233,7 +233,9 @@ public sealed partial class ToolRegistry
             if (tpl != null)
             {
                 cmd = new XElement(tpl);
-                cmd.Attributes().Where(x => x.Name.LocalName is "Fixed" or "fixed").Remove();
+                // Fixed belongs to the device's own entries; CompleteAccess writes a whole object (the template is often the PDO
+                // assignment 0x1C12:00) - a single subindex must not take it over
+                cmd.Attributes().Where(x => x.Name.LocalName is "Fixed" or "fixed" or "CompleteAccess" or "completeAccess").Remove();
                 SetChild(cmd, "Transition", transition);
                 SetChild(cmd, "Index", FormatLike(index, Child(tpl, "Index")?.Value));
                 SetChild(cmd, "SubIndex", FormatLike(sub, Child(tpl, "SubIndex")?.Value));
