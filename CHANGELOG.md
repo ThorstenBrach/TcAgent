@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+## [0.55.0] – 2026-11-17
+
+The built-in knowledge in this version is TcAgent_Knowledge 1.1.0 (unchanged).
+
 ### Added
 - **Clean up TcAgent's files** - Knowledge window, tab **Storage**: what TcAgent keeps under `%LOCALAPPDATA%\TcAgent` per area
   (chats, attachments, TcUnit runs, logs, caches, server versions, downloaded updates, `*.bak-*`, files of ended processes)
@@ -73,7 +77,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   minutes) and asks the IDE only for objects open with unsaved changes; reading every object through the IDE crashed
   devenv.exe (C++ exception in KERNELBASE, reproduced twice on a project with 430 objects, feedback FB-4E5119CA).
   `source=ide` keeps the old way.
-- `tc_test_run`: code in folders starting with `_` (e.g. Control plus `_this`) now counts for "changed since the last
+- `tc_test_run`: code in folders starting with `_` (e.g. `_this`) now counts for "changed since the last
   download" - a changed test suite there was run with the old code (feedback FB-6BF3EC9E).
 - `TcAgent.exe tcunit list|report|watch --attach [pid]`: the solution of the running IDE, no `--solution` needed (FB-D902BE21).
 - A missing assembly after an update while TcAgent was running (e.g. TwinCAT.Ads on the first ADS call) now says so and

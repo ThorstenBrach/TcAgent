@@ -614,7 +614,7 @@ public sealed class TcUnitRun
         var dir = Path.GetDirectoryName(p.PlcProj)!;
         var files = new List<string> { p.PlcProj };
         files.AddRange(Directory.GetFiles(dir, "*.Tc*", SearchOption.AllDirectories)
-            // only the folders TwinCAT generates are left out - not every folder starting with "_" (Control plus keeps code in "_this",
+            // only the folders TwinCAT generates are left out - not every folder starting with "_" (some frameworks keep code in "_this",
             // a test suite there was not part of the hash: feedback FB-6BF3EC9E)
             .Where(f => !Path.GetRelativePath(dir, f).Split(Path.DirectorySeparatorChar).Any(s => GeneratedFolders.Contains(s)) &&
                         Path.GetExtension(f).ToLowerInvariant() is ".tcpou" or ".tcgvl" or ".tcdut" or ".tcio" or ".tctto")
