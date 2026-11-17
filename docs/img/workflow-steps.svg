@@ -64,7 +64,8 @@
 <rect x="870" y="190" width="120" height="44" rx="8" fill="#f0fdf4" stroke="#16a34a" stroke-width="1.5"/>
 <text x="930" y="209" class="g" text-anchor="middle">allowed target,</text>
 <text x="930" y="225" class="g" text-anchor="middle">your confirmation</text>
-<path d="M930,234 L930,268 L72,268 L72,169" stroke="#6366f1" stroke-width="2" stroke-dasharray="6 4" fill="none" marker-end="url(#ah)"/>
+<circle cx="858" cy="110" r="3.5" fill="#6366f1"/>
+<path d="M858,110 L858,268 L72,268 L72,169" stroke="#6366f1" stroke-width="2" stroke-dasharray="6 4" fill="none" marker-end="url(#ah)"/>
 <rect x="346" y="256" width="308" height="24" fill="#f8fafc"/>
 <text x="500" y="272" class="l" text-anchor="middle">Lessons, rules and skills stay for the next job</text>
 <text x="500" y="336" class="s" text-anchor="middle">Check, build and test run the same way without an AI in your pipeline.</text>
