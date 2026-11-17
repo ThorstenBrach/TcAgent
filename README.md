@@ -67,7 +67,7 @@ Details: [docs/ADVISOR.md](docs/ADVISOR.md).
 | **Plain-text ST** | The whole PLC code as `.st` files (one per POU with its methods/properties/actions) for reviews, Git diffs and bulk edits – and back into the project, Ids kept, nothing deleted; also as CI gate | `tc_plaintext` |
 | **SFC step chains** | Read and write sequential function charts as text – steps, actions, transitions, alternative and parallel branches, jumps; renumber steps, step comments, SFC flags | `tc_sfc` |
 | **Lessons learned** | The agent remembers hard-won solutions – what the problem was, why, and how it was solved – and recalls them by itself when the same error comes up again (project, personal or team file) | `tc_lessons` |
-| **Chat history** | The TcAgent Chat keeps its conversations per solution on your PC: open the project again and ask where you stopped – the agent gets a summary with the open tasks of its plan and reads more when needed | `tc_chat_history` |
+| **Chat history** | The TcAgent Chat keeps its conversations per solution on your PC: open the project again and ask where you stopped – the agent gets a summary with the open tasks of its plan and reads more when needed; **⋯ > Earlier conversations** reads, continues or deletes one | `tc_chat_history` |
 | **Program documentation** | Explains the project: call hierarchy, call graph, inheritance hierarchy, class diagram, step chains (SFC and CASE), a short description for every FB, method and function (from comments or derived from the code), findings – one HTML page with zoomable diagrams, explanations kept as project memory; task overview with cycle times and a static risk analysis | `tc_doc` |
 | **User manual** | Manual of FBs, functions and their structs/enums – in the style of your own example documents (Markdown, AsciiDoc or HTML), missing comments explained from the code | `tc_userdoc` |
 | **Formatting** | Ctrl+Alt+F formats the open object the same way every time - indentation, keyword case, aligned declarations, long calls, brackets that show the order of AND/OR, long conditions one operand per line with aligned brackets; every rule configurable per company, team or project, a safety net keeps the meaning, Ctrl+Z takes it back | `TcAgent.exe format` – [docs/FORMATTER.md](docs/FORMATTER.md) |
@@ -224,7 +224,9 @@ all of it in one place: every rule, skill, workflow and lesson of every level wi
 Git sources of skills and what changed in them, the platforms of the project, the documentation the agent looks things
 up in, the agent's feedback reports, the workflow history – and backups of the knowledge, made automatically before
 every change. New, add existing, rename, move to another level, switch off, delete, Git, install from a source, merge a
-newer version, propose a change upstream: all from the window, with the same menus in every tab.
+newer version, propose a change upstream: all from the window, with the same menus in every tab - select several items
+with Shift or Ctrl and the action applies to all of them. The tab **Storage** shows what TcAgent keeps on your PC and
+cleans it up (recycle bin, once a day automatically for the safe areas).
 
 <p><img src="docs/img/knowledge/files.png" width="900" alt="The knowledge window, tab Files: every knowledge file of every level with its status; a skill from a Git source shows that it was changed locally"></p>
 

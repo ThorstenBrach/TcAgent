@@ -19,7 +19,9 @@ Updates: install the newer VSIX – clients are re-registered automatically. Uni
 `%LOCALAPPDATA%\TcAgent\` and the client entries stay (backups `*.bak-*` next to each config file).
 
 Later versions: the TcAgent Chat says when one is out (**⋯ > Check for updates** asks right away). **What's new** downloads and checks
-the `.vsix` and opens the installer. Nothing installs by itself.
+the `.vsix`; **Install …** closes Visual Studio (it asks to save), installs the package and starts Visual Studio again with the
+same solution. Nothing installs by itself. Test builds of the same version: `TCAGENT_UPDATE_FOLDER`
+([USER_GUIDE.md](USER_GUIDE.md#what-the-vs-extension-tcagentbridge-adds)).
 
 If you previously installed the extension with `vsbridge\install.ps1`, run `vsbridge\uninstall.ps1` as administrator
 first – otherwise Visual Studio sees the extension twice.
@@ -76,7 +78,9 @@ Since 0.49 TcAgent is meant to work on a PC that has the TwinCAT XAE Shell alone
    `%LOCALAPPDATA%\TcAgent\app\<version>`, the interop is generated from your TwinCAT installation, and it asks whether the
    AI clients should be set up. Then **View > Other Windows > TcAgent Chat**.
 
-Update: the same with the ZIP of the new version. Remove: `install-xaeshell.ps1 -Uninstall`.
+Update: the TcAgent Chat in the XAE Shell offers new versions too - **What's new … > Download** fetches the ZIP and checks it,
+**Install …** closes the shell, runs `install-xaeshell.ps1` (administrator prompt) and starts the shell again. By hand: the same
+steps as above with the ZIP of the new version. Remove: `install-xaeshell.ps1 -Uninstall`.
 
 How it works without Visual Studio: `TcAgent.exe` is built against the automation interface EnvDTE 8.0, which the 32-bit
 shell brings along (Visual Studio 2022 offers a newer, compatible one), and it finds it in the shell's folder.

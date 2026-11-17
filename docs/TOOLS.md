@@ -519,6 +519,9 @@ Searches declarations and implementations of all PLC objects (full text or regex
 | `path` | string |  | Only search below this tree path (default: all PLC projects) |
 | `max` | integer |  | Max. hits (default 200) |
 | `seconds` | integer |  | Time budget in seconds (default 40, max 240) - then the hits so far are returned |
+| `source` | string |  | `files` (default): saves everything open in the IDE first, then searches the project files; in ask/propose mode nothing is saved and objects with unsaved changes come from the editor. `ide`: every object through the IDE (slow, crashed Visual Studio in big projects) |
+
+The result names its source, e.g. `(the project files, saved first)`. Documentation, risk analysis (`tc_doc`, `tc_risk_rules`, `TcAgent.exe doc`) and `tc_refactor action=analyze` read the code the same way.
 
 ### `tc_sfc`
 

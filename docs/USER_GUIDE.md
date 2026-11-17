@@ -572,6 +572,12 @@ written, jumping to a definition.
   be opened.
 - **Search** supports `regex`, `caseSensitive`, `part` (`decl`, `impl`, `all`), `path` (search only below a tree path;
   a single FB includes the FB itself and its methods/actions) and `max` (default 200).
+- **Where the code is read from.** Search, documentation, risk analysis and refactoring analysis first save everything
+  open in the IDE (like `tc_save`) and then read the code from the project files (`.TcPOU`, `.TcDUT`, `.TcGVL`) – in
+  seconds, also in big projects. Reading every object through the IDE crashed Visual Studio there and returned empty text
+  for many objects. The IDE still gives the structure (names and tree paths). In the modes `ask` and `propose` nothing is
+  saved; objects with unsaved changes are then read through the IDE. Changes to the code always go through the IDE.
+  `tc_plc_search source=ide` searches the old way, every object through the IDE.
 - **Open in editor** changes nothing in the project, so it is allowed even in the read-only modes. Line numbers count
   per part, as in `tc_plc_read`. With the extension the cursor is set and verified; without it the object is opened
   but the cursor is usually not placed. Actions and transitions (no declaration part) get the cursor at their
