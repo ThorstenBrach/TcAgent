@@ -8,6 +8,8 @@ Docs and issues are in English; issues and pull requests in German are welcome t
 * **Bugs and feature requests:** the issue forms of the repository. They ask for a **Diagnostics** block – in the IDE
   the chat window menu **⋯ > Copy diagnostics**, without the IDE `TcAgent.exe diag` (versions only, no names or paths).
 * **Questions:** the GitHub Discussions, category Q&A.
+* **Only through the forms:** blank issues are switched off, and an issue opened without a form is closed
+  automatically with a hint.
 * **Security problems:** privately, see [SECURITY.md](SECURITY.md) – not as a public issue.
 * Helpful: an excerpt from `%LOCALAPPDATA%\TcAgent\audit.jsonl` or `bridge\bridge.log` (without confidential content).
 
@@ -19,6 +21,8 @@ descriptions need improvement.
 
 ## Development
 
+* **Pull requests** use the template (`.github/pull_request_template.md`); a check keeps the PR red until every section
+  is filled in and every checklist line is ticked or marked `n/a`. Larger changes start with an issue.
 * **One language:** C#. `src/` is .NET 8, `vsbridge/` is .NET Framework 4.8 (Visual Studio extension; the same sources
   are compiled for the XAE Shell by `vsbridge/install-xaeshell.ps1` - stay compatible with the VS 2017 shell API).
 * **New tool:** register it in `src/ToolRegistry.cs` or one of its partial files (`Add(...)`); classify write tools in

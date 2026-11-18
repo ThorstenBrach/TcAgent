@@ -1,0 +1,38 @@
+# Checks that a pull request uses the template: the sections are filled in and every checklist box is ticked
+# (or the line ends with "n/a"). Reads only the PR description - no code of the PR is run.
+name: PR description
+
+on:
+  pull_request:
+    types: [opened, edited, reopened, synchronize]
+
+permissions: {}
+
+jobs:
+  template:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check the description against the template
+        env:
+          BODY: ${{ github.event.pull_request.body }}
+        run: |
+          body=$(printf '%s' "$BODY" | tr -d '\r' | sed -e ':a' -e 's/<!--[^>]*-->//g;/<!--/N;//ba')
+          fail=0
+          section() { printf '%s\n' "$body" | awk -v h="## $1" '$0==h{f=1;next} /^## /{f=0} f' ; }
+          for s in "What and why" "Issue" "Type of change" "How it was tested" "Checklist"; do
+            if ! printf '%s\n' "$body" | grep -qx "## $s"; then
+              echo "::error::Section '## $s' is missing - please use the pull request template."; fail=1; continue
+            fi
+            if [ -z "$(section "$s" | tr -d '[:space:]')" ]; then
+              echo "::error::Section '## $s' is empty."; fail=1
+            fi
+          done
+          if ! section "Type of change" | grep -qiE '^- \[x\]'; then
+            echo "::error::Tick at least one 'Type of change'."; fail=1
+          fi
+          open=$(section "Checklist" | grep -E '^- \[ \]' | grep -viE 'n/a\s*$' || true)
+          if [ -n "$open" ]; then
+            echo "::error::Checklist lines neither ticked nor marked n/a:"; printf '%s\n' "$open"; fail=1
+          fi
+          [ $fail -eq 0 ] && echo "Description follows the template."
+          exit $fail

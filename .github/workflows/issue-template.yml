@@ -1,0 +1,28 @@
+# Issues are only taken through the forms (blank issues are switched off in ISSUE_TEMPLATE/config.yml).
+# An issue opened another way (API, CLI) without a form is closed with a hint. The maintainer is exempt.
+name: Issue template
+
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  issues: write
+
+jobs:
+  check:
+    if: github.event.issue.user.login != github.repository_owner && github.event.issue.user.type != 'Bot'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close issues that do not use a form
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BODY: ${{ github.event.issue.body }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          # Headings that only the forms produce: bug report, feature request, documentation, TcAgent feedback.
+          if printf '%s' "$BODY" | grep -qE '^### (Diagnostics|The task|Page)\s*$|^\*\*Diagnostics\*\*\s*$'; then
+            echo "Issue uses a template."; exit 0
+          fi
+          gh issue comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body "Thanks! Please open the issue again with one of the forms (New issue > Bug report, Feature request, Documentation), so it has the details we need - or ask in the Discussions. This one was closed automatically because it does not use a form."
+          gh issue close "$NUMBER" --repo "$GITHUB_REPOSITORY" --reason "not planned"

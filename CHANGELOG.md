@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+### Added
+- **Contributing:** a pull request template with a check that it is filled in, an issue form for documentation, and
+  issues opened without a form are closed automatically with a hint.
+
 ## [0.55.0] – 2026-11-17
 
 The built-in knowledge in this version is TcAgent_Knowledge 1.1.0 (unchanged).

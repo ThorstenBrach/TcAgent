@@ -1,0 +1,26 @@
+name: Documentation
+description: Something in the docs is wrong, missing or hard to understand.
+labels: ["documentation", "needs-triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please leave out customer, machine and project names - an issue is public.
+  - type: input
+    id: page
+    attributes:
+      label: Page
+      description: File or link, e.g. docs/USER_GUIDE.md#tcunit
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong or missing
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: How it should read, if you know.
