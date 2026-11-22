@@ -6,7 +6,7 @@
 //       every declaration with its comment, findings (no comment, unclear name) and where a name is used outside
 //       (callers, I/O links, persistent data, HMI) - the agent then proposes changes from the context
 //   tc_refactor action=apply changes=[...]
-//       { "object": "FB_Axis", "kind": "comment" | "rename", "target": "variable" | "member" | "pou" | "method",
+//       { "object": "FB_Axis", "kind": "comment" | "rename", "target": "variable" | "member" | "pou" | "method" | "folder",
 //         "name": "x1", "newName": "bDoorClosed", "comment": "Door closed (sensor S12)", "reason": "..." }
 //       each change is shown with its reason, the affected objects and warnings and only applied after the user's answer.
 //       dryRun=true shows all edits as diffs without asking or writing.
@@ -42,7 +42,7 @@ public sealed partial class ToolRegistry
                            "call apply again for the same changes.",
             Schema(Req(P("action", "string", "analyze, apply or result")),
                    P("target", "string", "analyze: 'selection' (default) or object name / tree path"),
-                   P("changes", "array", "apply: [{object, kind: comment|rename, target: variable|member|pou|method, name, newName, comment, reason}]"),
+                   P("changes", "array", "apply: [{object, kind: comment|rename, target: variable|member|pou|method|folder (rename only, object = tree path of the folder), name, newName, comment, reason}]"),
                    P("dryRun", "boolean", "apply: only show the edits as diffs, ask nothing, write nothing"),
                    P("job", "string", "result: job id returned by apply (default: the latest job)"),
                    P("plcProjectPath", "string", "the PLC project when the solution has several and the object is given by name (default: the one that has it)"),
@@ -291,6 +291,30 @@ public sealed partial class ToolRegistry
 
     static string Norm(string t) => (t ?? "").Replace("\r\n", "\n").TrimEnd();
 
+    // a folder of the PLC project (tree item type 601): only its name in the tree changes - folders are not part of the code,
+    // no reference changes
+    RefactorPlan PlanFolderRename(string path, string kind, string newName)
+    {
+        if (kind != "rename") throw new Exception("target=folder works with kind=rename only");
+        if (string.IsNullOrWhiteSpace(newName)) throw new Exception("newName is required");
+        if (Regex.IsMatch(newName, @"[\^\\/:*?""<>|]")) throw new Exception($"'{newName}' is not a valid folder name");
+        if (!path.Contains('^')) throw new Exception("object: the tree path of the folder (e.g. TIPC^Plc^Plc Project^POUs^Old)");
+        var (type, oldName, taken) = tc.Sta.Run(() =>
+        {
+            var it = tc.Item(path);
+            var parent = tc.Item(path[..path.LastIndexOf('^')]);
+            var siblings = TwinCatSession.Children(parent).Select(ch => ch.Name).ToList();
+            return (it.ItemType, it.Name, siblings.Any(n => n.Equals(newName, StringComparison.OrdinalIgnoreCase) && !n.Equals(it.Name, StringComparison.OrdinalIgnoreCase)));
+        });
+        if (type != 601) throw new Exception($"{path} is not a PLC folder (tree item type {type}) - use target=pou or method for objects");
+        if (taken) throw new Exception($"{newName} already exists next to {oldName}");
+        return new RefactorPlan
+        {
+            Title = $"Rename folder {oldName} -> {newName}", TreeRenamePath = path, TreeRenameTo = newName,
+            Summary = $"{path} -> {newName}\nFolders are not part of the code: no references change."
+        };
+    }
+
     RefactorPlan PlanChange(JsonObject c, int pid, List<string> hmi)
     {
         string S(string k) => c[k] is JsonValue v ? v.ToString().Trim() : null;
@@ -298,6 +322,7 @@ public sealed partial class ToolRegistry
         var target = (S("target") ?? "variable").ToLowerInvariant();
         var objName = S("object") ?? throw new Exception("object is required");
         var name = S("name");
+        if (target == "folder") return PlanFolderRename(objName, kind, S("newName"));
         var (doc, pou) = DocWith(objName, S("plcProjectPath"));
         var plan = new RefactorPlan();
         if (kind == "comment")

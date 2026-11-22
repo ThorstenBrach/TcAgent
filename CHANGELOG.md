@@ -13,6 +13,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   or of tools are not formatted.
 - **Contributing:** a pull request template with a check that it is filled in, an issue form for documentation, and
   issues opened without a form are closed automatically with a hint.
+- **`tc_refactor` renames PLC folders:** `target=folder` with the tree path of the folder as `object` (kind `rename`).
 
 ### Fixed
 - **Documentation:** a module or plugin change reaches a running AI client without a restart (**Reload** in the settings
@@ -35,6 +36,9 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   base as UINT8); `dataType` overrides a type that is not elementary.
 - **Errors from the IDE keep their origin in the log:** a failing call on the STA thread is rethrown with its original
   call stack (it was lost, e.g. for "Value was either too large or too small for a UInt32" from the Automation Interface).
+- **`tc_refactor apply` asks in the TcAgent Chat:** while the chat is working, each change comes as a card with **Apply / Apply all /
+  Reject / Cancel** instead of a separate dialog the user had to find. A dry run that takes long says it is still planning
+  instead of "waiting for the user's decisions".
 
 ## [0.55.0] – 2026-11-17
 

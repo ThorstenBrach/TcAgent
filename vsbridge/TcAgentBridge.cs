@@ -176,6 +176,7 @@ namespace TcAgentBridge
             // tc_ask_user: waits for the user's answer in the chat - not on the UI thread (the card is shown there)
             else if (cmd == "ask") r = AskUser(req);
             // confirmation before a runtime action: a gate card in the chat when it is open (waits here, not on the UI thread)
+            else if (cmd == "choice") r = ChoiceInChat(Str(req, "title"), Str(req, "text"));
             else if (cmd == "confirm") r = ConfirmInChat(Str(req, "title"), Str(req, "text"), Str(req, "target"), Str(req, "local") != "False");
             // a test run started elsewhere (tc_test_run from an AI client): its events are handed to the TcUnit Tests window
             // without waiting for the UI - the run never slows the IDE down and the window catches up when it is idle
@@ -266,6 +267,18 @@ namespace TcAgentBridge
             bool ok = chat.AskGate(title, text, target, local);
             Log("Confirmation '" + text + "': " + (ok ? "yes" : "no"));
             return new Dictionary<string, object> { ["confirmed"] = ok };
+        }
+
+        // the choice as a card in the TcAgent Chat while a chat answer runs in the open chat window (like the gate card);
+        // otherwise the dialog
+        Dictionary<string, object> ChoiceInChat(string title, string text)
+        {
+            var chat = ChatControl.Instance;
+            bool card = chat != null && (bool)ui.Invoke(new Func<bool>(() => chat.IsVisible && chat.IsBusy));
+            if (!card) return (Dictionary<string, object>)ui.Invoke(new Func<Dictionary<string, object>>(() => ChoiceAction(title, text)));
+            var result = chat.AskChoice(title, text);
+            Log("Choice '" + (title ?? "") + "' (card): " + result);
+            return new Dictionary<string, object> { ["choice"] = result };
         }
 
         // ------------------------------------------------------------------ Choice: apply / apply all / reject / cancel

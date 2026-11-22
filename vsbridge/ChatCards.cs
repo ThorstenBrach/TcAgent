@@ -244,6 +244,34 @@ namespace TcAgentBridge
                 return Card("⛔ Confirm - " + (tool.Length > 0 ? tool : "runtime action"), body);
             }, false);
 
+        // ------------------------------------------------------------------ choice card
+        /// <summary>A proposal of tc_refactor apply: the change with its diff, Apply / Apply all / Reject / Cancel. Call from a
+        /// background thread. Returns apply, all, reject or cancel (also when the card is closed from outside).</summary>
+        internal string AskChoice(string title, string text) =>
+            WaitForCard<string>((done, body) =>
+            {
+                var box = new TextBox
+                {
+                    Text = text ?? "", IsReadOnly = true, BorderThickness = new Thickness(0), Background = Brushes.Transparent, TextWrapping = TextWrapping.Wrap,
+                    FontFamily = new FontFamily("Consolas"), FontSize = 12, MaxHeight = 360, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Margin = new Thickness(0, 2, 0, 2)
+                };
+                box.SetResourceReference(ForegroundProperty, EnvironmentColors.ToolWindowTextBrushKey);
+                body.Children.Add(box);
+                Facts(body, ("Consequence", "Apply changes the PLC code as shown; Apply all also takes the following changes without asking."),
+                            ("Gate", "TcAgent asks before every refactoring change (tc_refactor)."));
+                var buttons = new WrapPanel { Margin = new Thickness(0, 8, 0, 0) };
+                var result = CardText("", 11.5, 0.8);
+                void Pick(string key, string said) { result.Text = said; buttons.Visibility = Visibility.Collapsed; done(key); }
+                var apply = CardButton("Apply", true); apply.Click += (s, e) => Pick("apply", "✔ Applied");
+                var all = CardButton("Apply all"); all.Click += (s, e) => Pick("all", "✔ Applied, the following changes too");
+                var reject = CardButton("Reject"); reject.Click += (s, e) => Pick("reject", "✖ Rejected - the next change follows");
+                var cancel = CardButton("Cancel", no: true); cancel.Click += (s, e) => Pick("cancel", "✖ Cancelled - no further changes");
+                buttons.Children.Add(apply); buttons.Children.Add(all); buttons.Children.Add(reject); buttons.Children.Add(cancel);
+                body.Children.Add(buttons);
+                body.Children.Add(result);
+                return Card("✎ " + (title ?? "Refactoring"), body);
+            }, "cancel");
+
         /// <summary>Question of the TcAgent tool tc_ask_user (any AI client): the same card. Call from a background thread.</summary>
         internal Dictionary<string, object> AskFromTool(Dictionary<string, object> input) => AskQuestions(input);
 
