@@ -726,7 +726,7 @@ Open a POU, method, property, action, DUT or GVL and press **Ctrl+Alt+F** (or **
 formats the declaration and the implementation - indentation, case of keywords, spacing, aligned declarations, blank lines,
 long calls, brackets in conditions. Unsaved changes are included, **Ctrl+Z** takes it back. It never changes what the code
 means: a safety net compares the code before and after, and a part it cannot read stays as it is. To format on every save
-(Ctrl+S, Save All), switch on **Format when saving** in the formatter settings (`editor.format-on-save`).
+(Ctrl+S, Save All, closing a changed window with Save), switch on **Format when saving** in the formatter settings (`editor.format-on-save`).
 
 Every rule can be set in `formatting.json` on the knowledge levels (company, team, platform, project - a level can lock
 rules); **Tools > Formatter settings (TcAgent) ...** shows each rule with a live preview of what it does and saves the changed
