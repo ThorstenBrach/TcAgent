@@ -27,6 +27,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **Diagnostics for a hanging IDE:** a stall of the UI thread is now logged while it lasts (after 10 s, in
   `%LOCALAPPDATA%\TcAgent\bridge\bridge.log`) with the tool running, what the chat does, the memory of the process and the call stack of the UI
   thread - before, a hang that ended with closing the IDE left no trace.
+- **`tc_plc_write` / `tc_plc_create`: code that the IDE did not keep is no longer reported as written.** Methods of one POU
+  written in quick succession could end up empty while the tool said "written" (the IDE was still saving the shared
+  `.TcPOU` file). Every written part is now read back; a write that did not arrive or met a busy file is repeated once,
+  and a text that still differs is reported.
+- **`tc_scope add_channel` records ENUM and alias variables** as their elementary base type (e.g. an ENUM with USINT
+  base as UINT8); `dataType` overrides a type that is not elementary.
+- **Errors from the IDE keep their origin in the log:** a failing call on the STA thread is rethrown with its original
+  call stack (it was lost, e.g. for "Value was either too large or too small for a UInt32" from the Automation Interface).
 
 ## [0.55.0] – 2026-11-17
 

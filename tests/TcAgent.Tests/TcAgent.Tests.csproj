@@ -12,6 +12,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="..\..\src\StLexer.cs" Link="src\StLexer.cs" />
+    <Compile Include="..\..\src\PlcText.cs" Link="src\PlcText.cs" />
     <Compile Include="..\..\src\StFormatter.cs" Link="src\StFormatter.cs" />
     <Compile Include="..\..\src\StFormatConfig.cs" Link="src\StFormatConfig.cs" />
     <Compile Include="..\..\src\StExpr.cs" Link="src\StExpr.cs" />
