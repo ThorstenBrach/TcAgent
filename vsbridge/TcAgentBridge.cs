@@ -343,6 +343,7 @@ namespace TcAgentBridge
                 statusWatch = !(ChatSetting("statusLog") is bool sw0 && !sw0);   // on by default for now (diagnostics)
                 StartStallMonitor();
                 try { ReadFormatHotkey(); } catch (Exception ex) { Log("Format hotkey: " + Inner(ex)); }
+                try { InstallFormatOnSave(); } catch (Exception ex) { Log("Format on save: " + Inner(ex)); }
                 try { ReadConditionHotkey(); } catch (Exception ex) { Log("Condition hotkey: " + Inner(ex)); }
                 try { ReadScopeHotkey(); } catch (Exception ex) { Log("Scope hotkey: " + Inner(ex)); }
                 var spec = ChatSetting("askHotkey") as string ?? "Ctrl+Shift+Q";

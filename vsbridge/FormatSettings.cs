@@ -768,6 +768,7 @@ namespace TcAgentBridge
                 {
                     var res = await Task.Run(() => FmtRun(exe, $"format --save \"{file}\" --level {lv}" + (string.IsNullOrEmpty(sln) ? "" : " --solution \"" + sln + "\""), null));
                     foreach (var k in diff.Keys) { loaded[k] = current[k]; var rr = rows.First(x => x.Key == k); rr.From = lv; }
+                    ForgetFormatOnSave();
                     States();
                     statusLeft.Text = "✓ " + diff.Count + T(diff.Count == 1 ? " rule saved on level " : " rules saved on level ", diff.Count == 1 ? " Regel gespeichert in Ebene " : " Regeln gespeichert in Ebene ")
                                       + LevelName(lv) + T(" – Format ST code uses them from now on", " – ST-Code formatieren nutzt sie ab jetzt");
@@ -787,7 +788,7 @@ namespace TcAgentBridge
 
         static string GroupName(string g) => g switch
         {
-            "indent" => T("Indentation", "Einrückung"), "case" => T("Case", "Schreibweise"), "space" => T("Spaces", "Leerzeichen"), "comment" => T("Comments", "Kommentare"),
+            "editor" => T("In the editor", "Im Editor"), "indent" => T("Indentation", "Einrückung"), "case" => T("Case", "Schreibweise"), "space" => T("Spaces", "Leerzeichen"), "comment" => T("Comments", "Kommentare"),
             "layout" => "Layout", "align" => T("Columns", "Spalten"), "wrap" => T("Long lines", "Lange Zeilen"), "blank" => T("Blank lines", "Leerzeilen"),
             "eol" => T("Line ends", "Zeilenenden"), "paren" => T("Brackets in conditions", "Klammern in Bedingungen"), "cond" => T("Conditions", "Bedingungen"), _ => g
         };

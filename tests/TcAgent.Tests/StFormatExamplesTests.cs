@@ -18,7 +18,7 @@ public class StFormatExamplesTests
     {
         var without = StFormatConfig.Rules.Select(r => r.Key)
             .Except(StFormatExamples.All.Select(e => e.Rule))
-            .Except(new[] { "indent.tab-width", "indent.from-ide", "eol.trim-trailing", "eol.style" }).ToList();
+            .Except(new[] { "editor.format-on-save", "indent.tab-width", "indent.from-ide", "eol.trim-trailing", "eol.style" }).ToList();
         Assert.Empty(without);
     }
 

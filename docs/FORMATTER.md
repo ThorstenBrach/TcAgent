@@ -13,6 +13,13 @@ a message says why.
 
 The key can be changed or switched off: `"formatHotkey": "Ctrl+Alt+F"` (or `"off"`) in `chat-backends.json`.
 
+**Format on save** - in **Formatter settings**, group **In the editor**, set **Format when saving** to *yes*
+(`"editor.format-on-save": true` in `formatting.json`). Then **File > Save** (Ctrl+S) and **Save All** format the object of
+the active editor window first, the same way as Ctrl+Alt+F, and save the result; **Ctrl+Z** takes the formatting back. It works
+quietly: the status bar says what was formatted, nothing is said when the object was already formatted, a part that cannot be
+formatted is saved as it is. Off by default; like every rule it can be set per level and locked, so a team can switch it on for
+everyone. Only saves you start are formatted - when the agent or a tool saves (tc_save, a TcUnit run), nothing is formatted.
+
 ## Settings with a preview
 
 <p><img src="img/formatter-settings.png" width="900" alt="Formatter settings: the rules grouped with value and level, the details of a rule and its example with the rules set in the window"></p>
@@ -72,6 +79,7 @@ Nothing is a fixed rule. The defaults (profile `twincat`) - **an example with be
 
 | Rule | Default | Values |
 |---|---|---|
+| `editor.format-on-save` | `false` | `true`: Save and Save All in the IDE format the object of the active window first |
 | `indent.style` | `spaces` | spaces, tabs |
 | `indent.size` | `2` | spaces per level |
 | `indent.tab-width` | `4` | width of a tab |
