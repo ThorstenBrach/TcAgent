@@ -24,7 +24,7 @@ a large project takes seconds. Tasks (`.TcTTO`) and other files are not exported
 <folder>\<PLC project>\<folder in the PLC project>\<name>.st
 ```
 
-For example `st\M2XLibrary\references.json` next to `st\M2XLibrary\Core\...`.
+For example `st\ExampleLibrary\references.json` next to `st\ExampleLibrary\Core\...`.
 
 `<folder>` is `--out` (export/check) or `--from` (import), default `<solution folder>\st`. `<PLC project>` is the name of
 the `.plcproj` file without extension - a folder exported from a project with another name is imported with

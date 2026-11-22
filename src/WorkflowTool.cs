@@ -162,7 +162,8 @@ public sealed partial class ToolRegistry
               " Ask in your reply what they want, or start the workflow new-feature.";
     }
 
-    // Hard gate: activating a configuration that does not build would put a broken program on the target. A build
+    // Activate gate (on by default, TCAGENT_ACTIVATE_GATE=0 switches it off - TwinCAT itself refuses a non-building activation;
+    // order of the checks: CallOrder.cs): activating a configuration that does not build would put a broken program on the target. A build
     // (without "check all objects" - that also checks code that is never called) must have 0 errors. Saving stays allowed.
     // The build decides; the agent is told to run tc_check before (faster, no code generated) - see tc_build.
     void ActivateGate()
