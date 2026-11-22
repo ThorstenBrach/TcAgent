@@ -434,8 +434,47 @@ namespace TcAgentBridge
             public bool Exited, Greeted, Interrupted, Resumed; public readonly Stopwatch Up = Stopwatch.StartNew();
             public AcpState Acp;                // ACP backends (ChatAcp.cs)
             public string Server;               // TcAgent version registered when the session started
+            public Task Writes = Task.CompletedTask;    // the writes to stdin, in order (WriteIn)
+            public volatile bool InputStuck;    // a write has not finished for a while: the agent does not read its input
         }
         Session sess;
+
+        // What the chat does with the agent right now - read by the stall watchdog of the bridge (TcAgentBridge.cs)
+        internal static volatile string Activity;
+
+        // ------------------------------------------------------------------ writes to the agent's stdin
+        // Never on the UI thread: an agent that does not read its input (busy, or itself waiting until its output is read)
+        // blocks the write - on the UI thread that froze the whole IDE ("not responding"). The writes run one after another
+        // on a pool thread; one that has not finished after 15 s is reported in the chat, and Stop then ends the session.
+        const int InputStuckMs = 15000;
+
+        Task WriteIn(Session s, string json, string what)
+        {
+            var bytes = new UTF8Encoding(false).GetBytes(json);
+            Task t;
+            lock (s)
+            {
+                t = s.Writes = s.Writes.ContinueWith(_ =>
+                {
+                    Activity = $"writing {what} to {s.Be?.Name} ({bytes.Length / 1024} KB)";
+                    try { lock (writeLock) { s.In.Write(bytes, 0, bytes.Length); s.In.Flush(); } }
+                    finally { Activity = null; }
+                }, System.Threading.CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+            }
+            _ = Task.WhenAny(t, Task.Delay(InputStuckMs)).ContinueWith(w =>
+            {
+                if (t.IsCompleted || s.Exited || s.InputStuck) return;
+                s.InputStuck = true;
+                BridgePackage.Instance?.LogLine($"Chat: {s.Be?.Name} has not read {what} for {InputStuckMs / 1000} s (stdin blocked)");
+                Dispatcher.BeginInvoke(new Action(() =>
+                {
+                    if (sess != s) return;
+                    SystemLine($"{s.Be?.Name} has not taken {what} for {InputStuckMs / 1000} s - it does not read its input. Stop ends the session; the next question starts a new one.", true);
+                }));
+            }, TaskScheduler.Default);
+            t.ContinueWith(_ => s.InputStuck = false, TaskContinuationOptions.OnlyOnRanToCompletion);
+            return t;
+        }
 
         Backend Current => (backendBox.SelectedItem as ComboBoxItem)?.Tag as Backend;
 
@@ -533,7 +572,13 @@ namespace TcAgentBridge
 
         void OnSessionLine(Session s, string line)
         {
-            if (line.IndexOf("\"control_request\"", StringComparison.Ordinal) >= 0 && ControlRequest(s, line)) return;
+            // a permission or question card waits for the user: on its own task, so this reader keeps reading the output -
+            // otherwise the agent (several agents streaming) blocks on a full stdout pipe and both sides wait for each other
+            if (line.IndexOf("\"control_request\"", StringComparison.Ordinal) >= 0 && ParseControl(line) is Dictionary<string, object> ctl)
+            {
+                Task.Run(() => { try { ControlRequest(s, ctl); } catch (Exception ex) { BridgePackage.Instance?.LogLine("Chat: control request: " + ex.Message); } });
+                return;
+            }
             var t = s.TurnSw?.Elapsed.TotalSeconds ?? 0;
             var (show, final, stat, sum, done) = ClaudeEvent(line, t, s.Answer.Length > 0);
             if (stat != null && stat.StartsWith("Claude ready")) SetState(s.Be, s.Turn == null ? "ready" : "working");
@@ -552,12 +597,16 @@ namespace TcAgentBridge
         // The answer goes back on stdin as control_response: allow (once, or with the suggested rules for this session) or deny.
         readonly object writeLock = new object();
 
-        bool ControlRequest(Session s, string line)
+        static Dictionary<string, object> ParseControl(string line)
         {
             Dictionary<string, object> e;
             try { e = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Deserialize<Dictionary<string, object>>(line); }
-            catch { return false; }
-            if (e == null || (e.TryGetValue("type", out var ty) ? ty as string : null) != "control_request") return false;
+            catch { return null; }
+            return e != null && (e.TryGetValue("type", out var ty) ? ty as string : null) == "control_request" ? e : null;
+        }
+
+        void ControlRequest(Session s, Dictionary<string, object> e)
+        {
             var id = e.TryGetValue("request_id", out var ri) ? ri as string : null;
             var req = e.TryGetValue("request", out var rq) ? rq as Dictionary<string, object> : null;
             var subtype = req != null && req.TryGetValue("subtype", out var su) ? su as string : null;
@@ -573,7 +622,7 @@ namespace TcAgentBridge
                 {
                     WriteControl(s, new Dictionary<string, object> { ["subtype"] = "success", ["request_id"] = id,
                         ["response"] = new Dictionary<string, object> { ["behavior"] = "allow", ["updatedInput"] = input } });
-                    return true;
+                    return;
                 }
                 // follow-up question of the agent (tool AskUserQuestion): options to click or a free answer
                 if ((req.TryGetValue("tool_name", out var tq) ? tq as string : null) == "AskUserQuestion" && input != null)
@@ -592,7 +641,7 @@ namespace TcAgentBridge
                         ra["updatedInput"] = updated;
                     }
                     WriteControl(s, new Dictionary<string, object> { ["subtype"] = "success", ["request_id"] = id, ["response"] = ra });
-                    return true;
+                    return;
                 }
                 var choice = AskPermission(tool, what, why, input, SuggestionText(suggestions));   // card in the chat (ChatCards.cs)
                 var r = new Dictionary<string, object>();
@@ -612,18 +661,12 @@ namespace TcAgentBridge
             // other requests of the protocol are not used by this window - answer so the CLI does not wait
             else response = new Dictionary<string, object> { ["subtype"] = "error", ["request_id"] = id, ["error"] = "not supported by the TcAgent Chat: " + subtype };
             WriteControl(s, response);
-            return true;
         }
 
         void WriteControl(Session s, Dictionary<string, object> response)
         {
             var json = new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(new Dictionary<string, object> { ["type"] = "control_response", ["response"] = response }) + "\n";
-            try
-            {
-                var bytes = new UTF8Encoding(false).GetBytes(json);
-                lock (writeLock) { s.In.Write(bytes, 0, bytes.Length); s.In.Flush(); }
-            }
-            catch { }   // session ended meanwhile
+            _ = WriteIn(s, json, "the answer to its request").ContinueWith(t => { _ = t.Exception; });   // a session that ended meanwhile: nothing to do
         }
 
         // "Read in D:\...\**" from the suggested rules ({"type":"addRules","rules":[{"toolName":"Read","ruleContent":"//d/x/**"}]},
@@ -661,8 +704,11 @@ namespace TcAgentBridge
             SetState(s.Be, "idle");
             s.Turn?.TrySetResult(null);
             if (s.Exited) return;
-            try { s.In.Close(); } catch { }
+            // taskkill first, then close stdin off the UI thread: a write the agent never read holds the pipe, and closing it
+            // waits for that write
             try { Process.Start(new ProcessStartInfo("taskkill", $"/T /F /PID {s.P.Id}") { CreateNoWindow = true, UseShellExecute = false }); } catch { }
+            var input = s.In;
+            Task.Run(() => { try { input.Close(); } catch { } });
         }
 
         // The first warm-up waits until the IDE has loaded: the window is there at once and shows "starting", the agent and its
@@ -820,9 +866,10 @@ namespace TcAgentBridge
                     ["content"] = new object[] { new Dictionary<string, object> { ["type"] = "text", ["text"] = prompt } }
                 }
             };
-            var bytes = new UTF8Encoding(false).GetBytes(new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(msg) + "\n");
-            await s.In.WriteAsync(bytes, 0, bytes.Length);
-            await s.In.FlushAsync();
+            // not s.In.WriteAsync: on the synchronous pipe stream it can wait on the UI thread (WriteIn)
+            var written = WriteIn(s, new JavaScriptSerializer { MaxJsonLength = int.MaxValue }.Serialize(msg) + "\n", "the question");
+            await Task.WhenAny(written, s.Turn.Task);
+            if (written.IsFaulted && !s.Turn.Task.IsCompleted) s.Turn.TrySetResult(null);     // the session ended: reported below
             var answer = await s.Turn.Task;
             s.Turn = null;
             if (answer == null)
@@ -977,6 +1024,12 @@ namespace TcAgentBridge
                 SystemLine("⊘ Stopped by you.");
                 return;
             }
+            if (sess != null && sess.InputStuck)
+            {
+                KillSession();          // the agent does not read its input: an interrupt would not reach it either
+                SystemLine("⊘ Stopped by you - the agent did not read its input, the next question starts a new session.");
+                return;
+            }
             if (sess != null && sess.Turn != null && sess.Acp?.SessionId != null)
             {
                 AcpCancel(sess);        // the agent ends the turn; the session stays open
@@ -1012,12 +1065,12 @@ namespace TcAgentBridge
                 ["type"] = "control_request", ["request_id"] = "stop-" + Guid.NewGuid().ToString("N"),
                 ["request"] = new Dictionary<string, object> { ["subtype"] = "interrupt" }
             }) + "\n";
-            try
+            // off the UI thread (WriteIn); if the write fails the session has ended - start anew with the next question
+            WriteIn(s, json, "the stop request").ContinueWith(t => Dispatcher.BeginInvoke(new Action(() =>
             {
-                var bytes = new UTF8Encoding(false).GetBytes(json);
-                lock (writeLock) { s.In.Write(bytes, 0, bytes.Length); s.In.Flush(); }
-            }
-            catch { KillSession(); SystemLine("⊘ Stopped by you - the next question starts a new session."); return; }
+                if (sess != s) return;
+                KillSession(); SystemLine("⊘ Stopped by you - the next question starts a new session.");
+            })), TaskContinuationOptions.OnlyOnFaulted);
             CancelOpenCards();
             status.Text = "Stopping ...";
             _ = Task.Delay(8000).ContinueWith(_ => Dispatcher.BeginInvoke(new Action(() =>

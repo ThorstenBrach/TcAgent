@@ -2356,6 +2356,7 @@ Packaged clients (for example Claude Desktop) may redirect `%LOCALAPPDATA%` to
 | TcUnit output appears as errors | These are runtime messages; `tc_errors kind=compile` or `tc_test_results` separate them. |
 | `tc_ide command=ping` fails | Extension not installed or Visual Studio not restarted. Check `%LOCALAPPDATA%\TcAgent\bridge\bridge.log`. |
 | Cursor shows "declaration, line 1" | You have not clicked into the editor since Visual Studio started. Click into the code once. |
+| The IDE stops responding while the chat works ("Not responding") | Update to the next version: the chat no longer waits on the agent on the UI thread. If the chat says the agent "does not read its input", press **Stop** - it ends the session, the next question starts a new one. After a hang, `bridge.log` contains "UI blocked for … s and still blocked" with the call stack - attach it to the feedback. |
 | Yellow bar "stopped responding … TcAgentBridge" | First export of a large library. Do not disable the extension – afterwards everything comes from the cache. |
 | No variables to link / "PLC project has no task reference" | Assign a task (`tc_task action=assign`), declare `AT %I*`/`%Q*`, then `tc_build`. |
 | Dialog "… needs at least one sync variable" on build | Normal on the first build with a fresh process image. Confirm with OK, link the I/O, build again. |

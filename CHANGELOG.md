@@ -19,6 +19,14 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   window or `TcAgent.exe reload`), not only after one (PLUGINS.md); the activate gate is described as on by default and
   switchable (`TCAGENT_ACTIVATE_GATE=0`) instead of a hard gate (KNOWLEDGE_LAYERS.md, TOOLS.md); neutral library name in
   the PLAINTEXT.md example.
+- **TcAgent Chat: the IDE no longer hangs while the agent works with background agents.** The chat wrote to the agent's
+  input on the UI thread (the question, Stop, ACP requests); when the agent did not read its input - several agents
+  streaming, a permission card open - that write never returned and Visual Studio / the XAE Shell stopped responding.
+  All writes now run in the background; one that has not finished after 15 s is shown in the chat, and Stop then ends the
+  session. Permission and question cards no longer stop the chat from reading the agent's output while they wait.
+- **Diagnostics for a hanging IDE:** a stall of the UI thread is now logged while it lasts (after 10 s, in
+  `%LOCALAPPDATA%\TcAgent\bridge\bridge.log`) with the tool running, what the chat does, the memory of the process and the call stack of the UI
+  thread - before, a hang that ended with closing the IDE left no trace.
 
 ## [0.55.0] – 2026-11-17
 

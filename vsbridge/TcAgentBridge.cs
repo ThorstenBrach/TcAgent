@@ -377,24 +377,18 @@ namespace TcAgentBridge
         void StartStallMonitor()
         {
             var last = System.Diagnostics.Stopwatch.StartNew();
+            lastTick = Environment.TickCount;
+            StartWatchdog(Thread.CurrentThread);
             var t = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Input) { Interval = TimeSpan.FromMilliseconds(250) };
             t.Tick += (s, e) =>
             {
+                lastTick = Environment.TickCount;
                 var ms = last.ElapsedMilliseconds - 250;
                 if (ms > 150)
                 {
                     string fg = "";
                     try { fg = System.Windows.Input.Keyboard.FocusedElement?.GetType().Name ?? ""; } catch { }
-                    string agent = "-";
-                    try
-                    {
-                        var busy = Directory.GetFiles(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent"), "busy.*.txt")
-                                            .Where(ServerAlive)     // a server that was killed leaves its file behind
-                                            .Select(f => { try { return File.ReadAllText(f); } catch { return null; } }).Where(x => x != null).ToList();
-                        if (busy.Count > 0) agent = string.Join(",", busy);
-                    }
-                    catch { }
-                    Log($"UI blocked {ms} ms (TcAgent tool: {agent}, bridge: {CurrentOp ?? "-"}, focus: {fg}, status bar: \"{StatusText()}\")");
+                    Log($"UI blocked {ms} ms (TcAgent tool: {BusyTools()}, bridge: {CurrentOp ?? "-"}, focus: {fg}, status bar: \"{StatusText()}\")");
                 }
                 if (statusWatch)
                 {
@@ -407,6 +401,77 @@ namespace TcAgentBridge
             };
             t.Start();
         }
+
+        // the tools the TcAgent servers run right now (busy.<pid>.txt) - "-" if none
+        static string BusyTools()
+        {
+            try
+            {
+                var busy = Directory.GetFiles(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "TcAgent"), "busy.*.txt")
+                                    .Where(ServerAlive)     // a server that was killed leaves its file behind
+                                    .Select(f => { try { return File.ReadAllText(f); } catch { return null; } }).Where(x => x != null).ToList();
+                if (busy.Count > 0) return string.Join(",", busy);
+            }
+            catch { }
+            return "-";
+        }
+
+        // The timer above logs a stall only when it is over - a hang that never ends (Windows or the user closes the IDE)
+        // left no trace. This thread notices a stall while it lasts: after 10 s it logs what TcAgent and the chat do, the
+        // memory of the process (the XAE Shell is 32-bit) and the call stack of the UI thread - once per stall.
+        volatile int lastTick;
+        const int HangMs = 10000;
+
+        void StartWatchdog(Thread uiThread)
+        {
+            new Thread(() =>
+            {
+                bool reported = false;
+                while (!stop)
+                {
+                    Thread.Sleep(1000);
+                    var blocked = unchecked(Environment.TickCount - lastTick);
+                    if (blocked < HangMs) { reported = false; continue; }
+                    if (reported) continue;
+                    reported = true;
+                    try
+                    {
+                        Log($"UI blocked for {blocked / 1000} s and still blocked (TcAgent tool: {BusyTools()}, bridge: {CurrentOp ?? "-"}, chat: {ChatControl.Activity ?? "-"}, {MemoryText()})");
+                        Log("UI thread call stack:" + Environment.NewLine + UiStack(uiThread));
+                    }
+                    catch (Exception ex) { Log("Watchdog: " + Inner(ex)); }
+                }
+            }) { IsBackground = true, Name = "TcAgentBridge watchdog" }.Start();
+        }
+
+        static string MemoryText()
+        {
+            using (var p = System.Diagnostics.Process.GetCurrentProcess())
+                return $"memory: private {p.PrivateMemorySize64 >> 20} MB, virtual {p.VirtualMemorySize64 >> 20} MB{(Environment.Is64BitProcess ? "" : " of 4096 MB (32-bit)")}, managed {GC.GetTotalMemory(false) >> 20} MB";
+        }
+
+        // The managed call stack of the blocked UI thread: suspended for the moment of the walk, on a helper thread with a
+        // time limit (a walk that does not finish must not leave the UI thread suspended).
+#pragma warning disable 618     // Thread.Suspend/Resume and StackTrace(Thread) - the only way in .NET Framework, used only for this log line
+        static string UiStack(Thread ui)
+        {
+            string result = null;
+            var walker = new Thread(() =>
+            {
+                try
+                {
+                    ui.Suspend();
+                    try { result = new System.Diagnostics.StackTrace(ui, false).ToString(); }
+                    finally { ui.Resume(); }
+                }
+                catch (Exception ex) { result = "(no call stack: " + Inner(ex) + ")"; }
+            }) { IsBackground = true, Name = "TcAgentBridge stack" };
+            walker.Start();
+            if (walker.Join(5000)) return result;
+            try { ui.Resume(); } catch { }
+            return "(no call stack: the walk did not finish in 5 s)";
+        }
+#pragma warning restore 618
 
         static bool ServerAlive(string busyFile)
         {
