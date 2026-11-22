@@ -1913,48 +1913,37 @@ public sealed partial class ToolRegistry
     {
         bool writesCode = (name is "tc_plc_write" or "tc_plc_create" or "tc_test_skeleton" || name == "tc_refactor" && string.Equals(Str(args, "action"), "apply", StringComparison.OrdinalIgnoreCase)
                            || name == "tc_plaintext" && string.Equals(Str(args, "action"), "import", StringComparison.OrdinalIgnoreCase)) && !DryRun(args);
-        // an Advisor run changes nothing (AdvisorTool.cs)
-        if (AdvisorRefusal(name, args) is { } advisorNo)
-        {
-            Log.Info($"{name} not executed: Advisor run");
-            return new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = advisorNo }), ["isError"] = true };
-        }
-        // a new function outside a workflow: the user decides once per chat whether it goes on without a specification (WorkflowTool.cs)
-        if (NewCodeGate(name, args) is { } noNewCode)
-        {
-            Log.Info($"{name} not executed: new code without a specification refused");
-            return new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = noNewCode }), ["isError"] = true };
-        }
-        // spec-ok: a workflow that asks for a specification writes no code before the user decided (WorkflowTool.cs)
-        if (writesCode && Workflows.SpecPending(run) is { } openSpec)
-        {
-            openSpec.GateStops++;
-            Log.Info($"{name} not executed: specification open");
-            return new JsonObject
+        // The checks before the tool run in the order of spec MCP-020 (CallOrder.cs); the first refusal ends the call.
+        string NotExecuted(string why, string message) { Log.Info($"{name} not executed: {why}"); return message; }
+        if (CallOrder.FirstRefusal(new Dictionary<CallCheck, Func<string>>
             {
-                ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] =
-                    $"NOT executed: workflow {run.Workflow} writes no PLC code before the specification is settled. Finish the step " +
-                    $"'{openSpec.Id}' with tc_workflow action=step: TcAgent asks the user to confirm it. If the user does not want one, skip=true asks them that." }),
-                ["isError"] = true
-            };
-        }
-        // Safety net: if there are coding guidelines and the agent has not read them yet, the first writing
-        // code call is not executed; the guidelines are returned instead (once per session).
-        if (!rulesSeen && writesCode && Environment.GetEnvironmentVariable("TCAGENT_RULES_GATE") != "0")
-        {
-            rulesSeen = true;
-            if (CodingRules.Text(SolutionDir()) is { } rt)
-            {
-                Log.Info($"{name} not executed: coding guidelines not read yet");
-                return new JsonObject
+                // an Advisor run changes nothing (AdvisorTool.cs)
+                [CallCheck.Advisor] = () => AdvisorRefusal(name, args) is { } no ? NotExecuted("Advisor run", no) : null,
+                // a new function outside a workflow: the user decides once per chat whether it goes on without a specification (WorkflowTool.cs)
+                [CallCheck.NewCode] = () => NewCodeGate(name, args) is { } no ? NotExecuted("new code without a specification refused", no) : null,
+                // spec-ok: a workflow that asks for a specification writes no code before the user decided (WorkflowTool.cs)
+                [CallCheck.SpecOpen] = () =>
                 {
-                    ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] =
-                        "NOT executed: this project has coding guidelines that have not been read yet. " +
-                        "Align the code with them and then repeat the call (next time call tc_coding_rules first).\n\n" + rt }),
-                    ["isError"] = true
-                };
-            }
-        }
+                    if (!writesCode || Workflows.SpecPending(run) is not { } openSpec) return null;
+                    openSpec.GateStops++;
+                    return NotExecuted("specification open",
+                        $"NOT executed: workflow {run.Workflow} writes no PLC code before the specification is settled. Finish the step " +
+                        $"'{openSpec.Id}' with tc_workflow action=step: TcAgent asks the user to confirm it. If the user does not want one, skip=true asks them that.");
+                },
+                // Safety net: if there are coding guidelines and the agent has not read them yet, the first writing
+                // code call is not executed; the guidelines are returned instead (once per session).
+                [CallCheck.CodingRules] = () =>
+                {
+                    if (rulesSeen || !writesCode || Environment.GetEnvironmentVariable("TCAGENT_RULES_GATE") == "0") return null;
+                    rulesSeen = true;
+                    return CodingRules.Text(SolutionDir()) is { } rt
+                        ? NotExecuted("coding guidelines not read yet",
+                            "NOT executed: this project has coding guidelines that have not been read yet. " +
+                            "Align the code with them and then repeat the call (next time call tc_coding_rules first).\n\n" + rt)
+                        : null;
+                },
+            }) is { } refusal)
+            return new JsonObject { ["content"] = new JsonArray(new JsonObject { ["type"] = "text", ["text"] = refusal.Text }), ["isError"] = true };
         string text; bool isError = false;
         var sw = System.Diagnostics.Stopwatch.StartNew();
         // For the bridge's hang diagnostics: which tool is currently running (one file per TcAgent process)
@@ -1962,29 +1951,36 @@ public sealed partial class ToolRegistry
         try { File.WriteAllText(busy, name); } catch { }
         try
         {
-            policy.Check(name, () => TargetOf(name, args), args);
-            // values that are not allowed are refused before anybody is asked to confirm them (Packages.cs)
-            if (name == "tc_packages_change") PackagesChangeArgs(args);
-            // nobody is asked to confirm an activation that would be refused anyway
-            if (name == "tc_activate") ActivateGate();
-            if (Confirm.Needed(name, args))
+            CallOrder.RunBeforeTool(new Dictionary<CallCheck, Action>
             {
-                string target = null;
-                try { target = TargetOf(name, args); } catch { }
-                var what = Confirm.Describe(name, args, target);
-                var ok = Confirm.Ask(name, what, tc.AttachedPid, target, policy.IsLocal(target));
-                // no answer and nobody to ask are refusals too (Guards.cs) - without a question only with TCAGENT_CONFIRM=off
-                if (Guards.ConfirmRefusal(ok, Confirm.LastNotShown, what) is { } refused)
+                [CallCheck.Policy] = () => policy.Check(name, () => TargetOf(name, args), args),
+                // values that are not allowed are refused before anybody is asked to confirm them (Packages.cs)
+                [CallCheck.Arguments] = () => { if (name == "tc_packages_change") PackagesChangeArgs(args); },
+                // nobody is asked to confirm an activation that would be refused anyway
+                [CallCheck.ActivateGate] = () => { if (name == "tc_activate") ActivateGate(); },
+                [CallCheck.Confirm] = () =>
                 {
-                    if (ok == false && !Confirm.LastNotShown && run != null) run.Corrections++;   // the user said no: a correction
-                    if (ok == null) Log.Info("No confirmation possible (no channel), refused - " + what);
-                    throw new OperationCanceledException(refused);
-                }
-            }
-            // the knowledge levels are backed up before a tool changes them (KnowledgeBackup.cs - only what changed since the last backup)
-            if (name is "tc_knowledge" or "tc_skills" or "tc_sources" or "tc_improve" or "tc_lessons" or "tc_coding_rules_add" or "tc_risk_rules" or "tc_docs_add"
-                && Policy.ClassOf(name, args) != ToolClass.Read && !DryRun(args))
-                KnowledgeBackup.BeforeWrite(SolutionDir(), name + " " + (Str(args, "action") ?? ""));
+                    if (!Confirm.Needed(name, args)) return;
+                    string target = null;
+                    try { target = TargetOf(name, args); } catch { }
+                    var what = Confirm.Describe(name, args, target);
+                    var ok = Confirm.Ask(name, what, tc.AttachedPid, target, policy.IsLocal(target));
+                    // no answer and nobody to ask are refusals too (Guards.cs) - without a question only with TCAGENT_CONFIRM=off
+                    if (Guards.ConfirmRefusal(ok, Confirm.LastNotShown, what) is { } refused)
+                    {
+                        if (ok == false && !Confirm.LastNotShown && run != null) run.Corrections++;   // the user said no: a correction
+                        if (ok == null) Log.Info("No confirmation possible (no channel), refused - " + what);
+                        throw new OperationCanceledException(refused);
+                    }
+                },
+                // the knowledge levels are backed up before a tool changes them (KnowledgeBackup.cs - only what changed since the last backup)
+                [CallCheck.KnowledgeBackup] = () =>
+                {
+                    if (name is "tc_knowledge" or "tc_skills" or "tc_sources" or "tc_improve" or "tc_lessons" or "tc_coding_rules_add" or "tc_risk_rules" or "tc_docs_add"
+                        && Policy.ClassOf(name, args) != ToolClass.Read && !DryRun(args))
+                        KnowledgeBackup.BeforeWrite(SolutionDir(), name + " " + (Str(args, "action") ?? ""));
+                },
+            });
             Log.Info($"{name} started{LogAttrs(args)}");
             // tc_refactor apply/result wait for the user themselves (job with its own dialog watch) - see RefactorJobs.cs
             text = WatchesItself(name, args) ? t.Handler(args) : RunWatchingDialogs(name, () => t.Handler(args), args);
