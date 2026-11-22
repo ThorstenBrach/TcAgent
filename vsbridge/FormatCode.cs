@@ -127,7 +127,7 @@ namespace TcAgentBridge
         // older than 30 s (a formatting.json edited by hand counts from the next save) and right after Save in the settings window.
         // Only saves a person starts (a key or a click just before): File.SaveAll of the agent or of a tool (tc_save, TcUnit run,
         // docs) does not format - the agent formats only the code it wrote itself.
-        EnvDTE.CommandEvents saveCmdEvents;     // the field keeps the COM event source alive (otherwise the events stop)
+        readonly List<EnvDTE.CommandEvents> saveCmdEvents = new List<EnvDTE.CommandEvents>();  // keeps the COM event sources alive (otherwise the events stop)
         readonly object fmtOnSaveLock = new object();
         string fmtOnSaveSln;
         bool fmtOnSaveValue;
@@ -139,8 +139,16 @@ namespace TcAgentBridge
         {
             var dte = GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
             if (dte == null) { Log("Format on save: DTE not available"); return; }
-            saveCmdEvents = dte.Events.get_CommandEvents(Microsoft.VisualStudio.VSConstants.GUID_VSStandardCommandSet97.ToString("B"), -1);
-            saveCmdEvents.BeforeExecute += OnBeforeSaveCommand;
+            // one event source per command: with the ID -1 no save event arrived - Ctrl+S saved without formatting (VS 2022,
+            // 22.11.2026); every save command that arrives is logged
+            var group = Microsoft.VisualStudio.VSConstants.GUID_VSStandardCommandSet97.ToString("B");
+            foreach (var id in new[] { Microsoft.VisualStudio.VSConstants.VSStd97CmdID.Save, Microsoft.VisualStudio.VSConstants.VSStd97CmdID.SaveProjectItem,
+                                       Microsoft.VisualStudio.VSConstants.VSStd97CmdID.SaveSolution })
+            {
+                var ev = dte.Events.get_CommandEvents(group, (int)id);
+                ev.BeforeExecute += OnBeforeSaveCommand;
+                saveCmdEvents.Add(ev);
+            }
             Log("Format on save: watching Save and Save All");
         }
 
@@ -149,12 +157,14 @@ namespace TcAgentBridge
             bool saveAll = id == (int)Microsoft.VisualStudio.VSConstants.VSStd97CmdID.SaveSolution;
             if (!saveAll && id != (int)Microsoft.VisualStudio.VSConstants.VSStd97CmdID.SaveProjectItem && id != (int)Microsoft.VisualStudio.VSConstants.VSStd97CmdID.Save) return;
             if (fmtOnSaveBusy) return;
+            Log("Format on save: " + (saveAll ? "Save All" : "Save") + " command");
             try
             {
-                if (!ByPerson()) return;
+                if (!ByPerson()) { Log("Format on save: skipped - no key or click just before (a save of the agent or a tool)"); return; }
                 if (!FormatOnSaveOn()) return;
                 // Save (selected items) with the focus in a tool window saves what is selected there, not the open editor
-                if (!saveAll && (GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ActiveWindow?.Type != EnvDTE.vsWindowType.vsWindowTypeDocument) return;
+                if (!saveAll && (GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ActiveWindow?.Type != EnvDTE.vsWindowType.vsWindowTypeDocument)
+                { Log("Format on save: skipped - the active window is not an editor"); return; }
                 fmtOnSaveBusy = true;
                 Log("Format on save (" + (saveAll ? "Save All" : "Save") + ")");
                 FormatFromEditor(onSave: true);
