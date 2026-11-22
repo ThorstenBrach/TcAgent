@@ -14,7 +14,7 @@ a message says why.
 The key can be changed or switched off: `"formatHotkey": "Ctrl+Alt+F"` (or `"off"`) in `chat-backends.json`.
 
 **Format on save** - in **Formatter settings**, group **In the editor**, set **Format when saving** to *yes*
-(`"editor.format-on-save": true` in `formatting.json`). Then **File > Save** (Ctrl+S) and **Save All** format the object of
+(`"editor.format-on-save": true` in `formatting.json`). Then **File > Save** (Ctrl+S), **Save All** and **Save** in the question when a changed window is closed format the object of
 the active editor window first, the same way as Ctrl+Alt+F, and save the result; **Ctrl+Z** takes the formatting back. It works
 quietly: the status bar says what was formatted, nothing is said when the object was already formatted, a part that cannot be
 formatted is saved as it is. Off by default; like every rule it can be set per level and locked, so a team can switch it on for
@@ -79,7 +79,7 @@ Nothing is a fixed rule. The defaults (profile `twincat`) - **an example with be
 
 | Rule | Default | Values |
 |---|---|---|
-| `editor.format-on-save` | `false` | `true`: Save and Save All in the IDE format the object of the active window first |
+| `editor.format-on-save` | `false` | `true`: Save, Save All and saving when a window is closed format the object of the active window first |
 | `indent.style` | `spaces` | spaces, tabs |
 | `indent.size` | `2` | spaces per level |
 | `indent.tab-width` | `4` | width of a tab |

@@ -149,7 +149,59 @@ namespace TcAgentBridge
                 ev.BeforeExecute += OnBeforeSaveCommand;
                 saveCmdEvents.Add(ev);
             }
-            Log("Format on save: watching Save and Save All");
+            // a save without a Save command: closing a changed window and "Save" in the question of Visual Studio
+            if (GetService(typeof(SVsRunningDocumentTable)) is IVsRunningDocumentTable rdt)
+            {
+                rdtEvents = new RdtSaveEvents(this, rdt);
+                rdt.AdviseRunningDocTableEvents(rdtEvents, out rdtCookie);
+            }
+            Log("Format on save: watching Save, Save All and saving when a window is closed");
+        }
+
+        RdtSaveEvents rdtEvents;
+        uint rdtCookie;
+        int lastSaveCommandTick;    // the save command formatted already - the document saves it then starts are not formatted twice
+
+        /// <summary>A document is about to be saved without a Save command before it (the question when a changed window is
+        /// closed): the object of the active editor window is formatted when it is that document.</summary>
+        void OnBeforeDocumentSave(IVsRunningDocumentTable rdt, uint docCookie)
+        {
+            if (fmtOnSaveBusy) return;
+            if (unchecked(Environment.TickCount - lastSaveCommandTick) < 3000) return;     // Ctrl+S / Save All: done by the command
+            try
+            {
+                string moniker = null;
+                try { rdt.GetDocumentInfo(docCookie, out _, out _, out _, out moniker, out _, out _, out _); } catch { }
+                if (!ByPerson()) return;        // the agent or a tool saves: quiet, as for the commands
+                if (!FormatOnSaveOn()) return;
+                var dte = GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
+                string active = null;
+                try { active = dte?.ActiveDocument?.FullName; } catch { }
+                Log($"Format on save: document save ({Path.GetFileName(moniker ?? "?")}, active: {Path.GetFileName(active ?? "-")})");
+                // only the document of the active window - the formatter works on the active editor (a tab closed in the background
+                // is saved as it is)
+                if (!string.IsNullOrEmpty(moniker) && !string.IsNullOrEmpty(active) && !string.Equals(moniker, active, StringComparison.OrdinalIgnoreCase))
+                { Log("Format on save: skipped - the document saved is not the one in the active window"); return; }
+                fmtOnSaveBusy = true;
+                FormatFromEditor(onSave: true);
+            }
+            catch (Exception ex) { Log("Format on save: " + Inner(ex)); }
+            finally { fmtOnSaveBusy = false; }
+        }
+
+        sealed class RdtSaveEvents : IVsRunningDocTableEvents3
+        {
+            readonly BridgePackage pkg; readonly IVsRunningDocumentTable rdt;
+            public RdtSaveEvents(BridgePackage p, IVsRunningDocumentTable t) { pkg = p; rdt = t; }
+            public int OnBeforeSave(uint docCookie) { pkg.OnBeforeDocumentSave(rdt, docCookie); return 0; }
+            public int OnAfterFirstDocumentLock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining) => 0;
+            public int OnBeforeLastDocumentUnlock(uint docCookie, uint dwRDTLockType, uint dwReadLocksRemaining, uint dwEditLocksRemaining) => 0;
+            public int OnAfterSave(uint docCookie) => 0;
+            public int OnAfterAttributeChange(uint docCookie, uint grfAttribs) => 0;
+            public int OnBeforeDocumentWindowShow(uint docCookie, int fFirstShow, IVsWindowFrame pFrame) => 0;
+            public int OnAfterDocumentWindowHide(uint docCookie, IVsWindowFrame pFrame) => 0;
+            public int OnAfterAttributeChangeEx(uint docCookie, uint grfAttribs, IVsHierarchy pHierOld, uint itemidOld, string pszMkDocumentOld,
+                                                IVsHierarchy pHierNew, uint itemidNew, string pszMkDocumentNew) => 0;
         }
 
         void OnBeforeSaveCommand(string guid, int id, object customIn, object customOut, ref bool cancelDefault)
@@ -158,6 +210,7 @@ namespace TcAgentBridge
             if (!saveAll && id != (int)Microsoft.VisualStudio.VSConstants.VSStd97CmdID.SaveProjectItem && id != (int)Microsoft.VisualStudio.VSConstants.VSStd97CmdID.Save) return;
             if (fmtOnSaveBusy) return;
             Log("Format on save: " + (saveAll ? "Save All" : "Save") + " command");
+            lastSaveCommandTick = Environment.TickCount;
             try
             {
                 if (!ByPerson()) { Log("Format on save: skipped - no key or click just before (a save of the agent or a tool)"); return; }
