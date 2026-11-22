@@ -7,6 +7,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 ## [Unreleased]
 
 ### Added
+- **Format on save** - **Formatter settings**, group **In the editor**: **Format when saving** formats the object of the active
+  editor window before **File > Save** (Ctrl+S) and **Save All**, like Ctrl+Alt+F (Ctrl+Z takes it back), quietly with a note in
+  the status bar. Rule `editor.format-on-save` in `formatting.json` (off by default, per level, can be locked). Saves of the agent
+  or of tools are not formatted.
 - **Contributing:** a pull request template with a check that it is filled in, an issue form for documentation, and
   issues opened without a form are closed automatically with a hint.
 

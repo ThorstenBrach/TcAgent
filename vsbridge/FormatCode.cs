@@ -4,6 +4,8 @@
 //   Hotkey Ctrl+Alt+F ("formatHotkey" in chat-backends.json, "off" switches it off), menu Tools > Format ST code (TcAgent).
 //   The rules come from formatting.json on the knowledge levels of the solution (TcAgent.exe format --show-rules).
 //   The text goes into the editor like a paste of the whole part, so the undo of the editor takes it back in one step.
+//   Format on save: the rule editor.format-on-save (formatting.json, Formatter settings > In the editor) formats the object of
+//   the active window before File > Save / Ctrl+S / Save All runs - quietly, the status bar says what happened.
 //
 // SPDX-License-Identifier: MIT
 using System;
@@ -44,8 +46,9 @@ namespace TcAgentBridge
 
         bool IsFormatKey(int vk) => fmtOn && vk == (int)fmtKey && System.Windows.Forms.Control.ModifierKeys == fmtMods;
 
-        /// <summary>Formats the PLC object in the active editor: both parts, each only when it changes.</summary>
-        internal void FormatFromEditor()
+        /// <summary>Formats the PLC object in the active editor: both parts, each only when it changes.
+        /// onSave: before a save - no message boxes, nothing said when there is nothing to format.</summary>
+        internal void FormatFromEditor(bool onSave = false)
         {
             var said = new List<string>();
             fmtGerman = UiGerman();
@@ -64,8 +67,10 @@ namespace TcAgentBridge
                 // actions and transitions: one text editor without a declaration
                 if (halves.Count == 0 && SafeCall(dv, "GetActiveSynEdControl", SafeGet(dv, "EditorView")) is System.Windows.Forms.Control only)
                     halves.Add((only, "implementation"));
+                if (halves.Count == 0 && onSave) return;
                 if (halves.Count == 0) { FormatMessage(T("Format ST code: open a POU, method, property, action, DUT or GVL in the editor first.", "ST-Code formatieren: Öffne zuerst eine POU, Methode, Eigenschaft, Aktion, einen DUT oder eine GVL im Editor."), true); return; }
                 var exe = TcUnitControl.TcAgentExe();
+                if (exe == null && onSave) { Log("Format on save: TcAgent.exe not found"); return; }
                 if (exe == null) { FormatMessage(T("Format ST code: TcAgent.exe was not found - set it up in the TcAgent Chat first.", "ST-Code formatieren: TcAgent.exe wurde nicht gefunden - richte TcAgent zuerst im TcAgent Chat ein."), true); return; }
                 var sln = TcUnitControl.SolutionPath();
                 int changed = 0;
@@ -99,15 +104,136 @@ namespace TcAgentBridge
                     if (!Replace(syn, formatted)) said.Add(part + T(": the editor did not take the text - check it, Ctrl+Z takes it back", ": der Editor hat den Text nicht übernommen - bitte prüfen, Strg+Z nimmt es zurück"));
                     else changed++;
                 }
-                var msg = changed > 0 ? T($"TcAgent: formatted ({changed} part{(changed == 1 ? "" : "s")}) - Ctrl+Z takes it back", $"TcAgent: formatiert ({changed} Teil{(changed == 1 ? "" : "e")}) - Strg+Z nimmt es zurück")
+                if (onSave && changed == 0 && said.Count == 0 && atCaret == null && offNotes.Count == 0) { Log("Format on save: already formatted"); return; }
+                var msg = changed > 0 ? T($"TcAgent: {(onSave ? "formatted on save" : "formatted")} ({changed} part{(changed == 1 ? "" : "s")}) - Ctrl+Z takes it back", $"TcAgent: {(onSave ? "beim Speichern formatiert" : "formatiert")} ({changed} Teil{(changed == 1 ? "" : "e")}) - Strg+Z nimmt es zurück")
                                       : T("TcAgent: already formatted", "TcAgent: bereits formatiert");
                 if (atCaret != null) msg = (changed > 0 ? T($"TcAgent: formatted ({changed} part{(changed == 1 ? "" : "s")}), but ", $"TcAgent: formatiert ({changed} Teil{(changed == 1 ? "" : "e")}), aber ") : "TcAgent: ") + atCaret;
                 else if (offNotes.Count > 0) msg += " - " + string.Join("; ", offNotes);
-                if (said.Count > 0) FormatMessage(T("Format ST code", "ST-Code formatieren") + "\n\n" + string.Join("\n", said), true);
+                if (said.Count > 0 && onSave) msg += " - " + string.Join("; ", said);
+                else if (said.Count > 0) FormatMessage(T("Format ST code", "ST-Code formatieren") + "\n\n" + string.Join("\n", said), true);
                 SetStatus(msg);
+                // the save writes "Item(s) Saved" into the status bar afterwards: say it again once it is done
+                if (onSave) ui?.BeginInvoke(new Action(() => SetStatus(msg)), System.Windows.Threading.DispatcherPriority.ApplicationIdle);
                 Log(msg + (said.Count > 0 ? " | " + string.Join(" | ", said) : ""));
             }
+            catch (Exception ex) when (onSave) { SetStatus(T("TcAgent: format on save failed - saved as it was: ", "TcAgent: Formatieren beim Speichern fehlgeschlagen - so gespeichert, wie es war: ") + Inner(ex)); Log("Format on save: " + Inner(ex)); }
             catch (Exception ex) { FormatMessage(T("Format ST code failed: ", "ST-Code formatieren fehlgeschlagen: ") + Inner(ex), true); }
+        }
+
+        // ------------------------------------------------------------------ format on save
+        // File > Save (Ctrl+S, "SaveSelectedItems") and Save All of Visual Studio: before they run, the PLC object of the active
+        // window is formatted when editor.format-on-save is true on the knowledge levels of the solution. The rule is read with
+        // TcAgent.exe format --show-rules: once per solution before the first save, then again in the background when it is
+        // older than 30 s (a formatting.json edited by hand counts from the next save) and right after Save in the settings window.
+        // Only saves a person starts (a key or a click just before): File.SaveAll of the agent or of a tool (tc_save, TcUnit run,
+        // docs) does not format - the agent formats only the code it wrote itself.
+        EnvDTE.CommandEvents saveCmdEvents;     // the field keeps the COM event source alive (otherwise the events stop)
+        readonly object fmtOnSaveLock = new object();
+        string fmtOnSaveSln;
+        bool fmtOnSaveValue;
+        DateTime fmtOnSaveRead = DateTime.MinValue;
+        bool fmtOnSaveRefreshing, fmtOnSaveBusy;
+        int fmtOnSaveGen;
+
+        void InstallFormatOnSave()
+        {
+            var dte = GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE;
+            if (dte == null) { Log("Format on save: DTE not available"); return; }
+            saveCmdEvents = dte.Events.get_CommandEvents(Microsoft.VisualStudio.VSConstants.GUID_VSStandardCommandSet97.ToString("B"), -1);
+            saveCmdEvents.BeforeExecute += OnBeforeSaveCommand;
+            Log("Format on save: watching Save and Save All");
+        }
+
+        void OnBeforeSaveCommand(string guid, int id, object customIn, object customOut, ref bool cancelDefault)
+        {
+            bool saveAll = id == (int)Microsoft.VisualStudio.VSConstants.VSStd97CmdID.SaveSolution;
+            if (!saveAll && id != (int)Microsoft.VisualStudio.VSConstants.VSStd97CmdID.SaveProjectItem && id != (int)Microsoft.VisualStudio.VSConstants.VSStd97CmdID.Save) return;
+            if (fmtOnSaveBusy) return;
+            try
+            {
+                if (!ByPerson()) return;
+                if (!FormatOnSaveOn()) return;
+                // Save (selected items) with the focus in a tool window saves what is selected there, not the open editor
+                if (!saveAll && (GetService(typeof(EnvDTE.DTE)) as EnvDTE.DTE)?.ActiveWindow?.Type != EnvDTE.vsWindowType.vsWindowTypeDocument) return;
+                fmtOnSaveBusy = true;
+                Log("Format on save (" + (saveAll ? "Save All" : "Save") + ")");
+                FormatFromEditor(onSave: true);
+            }
+            catch (Exception ex) { Log("Format on save: " + Inner(ex)); }
+            finally { fmtOnSaveBusy = false; }
+        }
+
+        [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
+        struct LASTINPUTINFO { public uint cbSize; public uint dwTime; }
+        [System.Runtime.InteropServices.DllImport("user32.dll")] static extern bool GetLastInputInfo(ref LASTINPUTINFO info);
+
+        /// <summary>A key or a click in the last 2 seconds: the save comes from a person, not from the agent or a tool.</summary>
+        static bool ByPerson()
+        {
+            var li = new LASTINPUTINFO { cbSize = (uint)System.Runtime.InteropServices.Marshal.SizeOf(typeof(LASTINPUTINFO)) };
+            if (!GetLastInputInfo(ref li)) return true;
+            return unchecked((uint)Environment.TickCount - li.dwTime) < 2000;
+        }
+
+        /// <summary>editor.format-on-save for the open solution - the cached value, read first when there is none for it.</summary>
+        bool FormatOnSaveOn()
+        {
+            var sln = TcUnitControl.SolutionPath() ?? "";
+            bool known, stale;
+            lock (fmtOnSaveLock)
+            {
+                known = fmtOnSaveSln == sln && fmtOnSaveRead != DateTime.MinValue;
+                stale = !known || DateTime.UtcNow - fmtOnSaveRead > TimeSpan.FromSeconds(30);
+            }
+            if (!known) return ReadFormatOnSave(sln);
+            if (stale) RefreshFormatOnSave();
+            lock (fmtOnSaveLock) return fmtOnSaveValue;
+        }
+
+        /// <summary>After Save in the settings window: the next save reads the rule again (a read still running does not count).</summary>
+        internal void ForgetFormatOnSave()
+        {
+            lock (fmtOnSaveLock) { fmtOnSaveGen++; fmtOnSaveRead = DateTime.MinValue; }
+        }
+
+        /// <summary>Reads the rule again in the background when the cached value is old.</summary>
+        void RefreshFormatOnSave()
+        {
+            lock (fmtOnSaveLock) { if (fmtOnSaveRefreshing) return; fmtOnSaveRefreshing = true; }
+            var sln = TcUnitControl.SolutionPath() ?? "";
+            System.Threading.Tasks.Task.Run(() =>
+            {
+                try { ReadFormatOnSave(sln); }
+                finally { lock (fmtOnSaveLock) fmtOnSaveRefreshing = false; }
+            });
+        }
+
+        bool ReadFormatOnSave(string sln)
+        {
+            int gen;
+            lock (fmtOnSaveLock) gen = fmtOnSaveGen;
+            bool on = false;
+            try
+            {
+                var exe = TcUnitControl.TcAgentExe();
+                if (exe != null)
+                {
+                    var j = FmtJson(FmtRun(exe, "format --show-rules --json" + (sln.Length == 0 ? "" : " --solution \"" + sln + "\""), null));
+                    on = j.TryGetValue("rules", out var r) && r is Dictionary<string, object> rules
+                         && rules.TryGetValue("editor.format-on-save", out var rule) && rule is Dictionary<string, object> rd
+                         && string.Equals(FmtStr(rd, "value"), "true", StringComparison.OrdinalIgnoreCase);
+                }
+            }
+            catch (Exception ex) { Log("Format on save: reading the rule: " + Inner(ex)); }
+            bool changedValue;
+            lock (fmtOnSaveLock)
+            {
+                if (gen != fmtOnSaveGen) return on;     // the rules were saved meanwhile: this value may be old
+                changedValue = fmtOnSaveSln != sln || fmtOnSaveValue != on;
+                fmtOnSaveSln = sln; fmtOnSaveValue = on; fmtOnSaveRead = DateTime.UtcNow;
+            }
+            if (changedValue) Log("Format on save: " + (on ? "on" : "off") + (sln.Length == 0 ? "" : " (" + Path.GetFileName(sln) + ")"));
+            return on;
         }
 
         Dictionary<string, object> RunFormatter(string exe, string sln, string part, string text)

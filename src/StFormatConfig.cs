@@ -15,6 +15,7 @@ public sealed class StFormatConfig
     /// <summary>Every rule with its default (profile twincat) and its allowed values - the reference for docs and the window.</summary>
     public static readonly (string Key, string Default, string Values, string Description)[] Rules =
     {
+        ("editor.format-on-save", "false", "true | false", "the IDE formats the PLC object of the active window when you save it (Save, Ctrl+S, Save All) - like the hotkey, Ctrl+Z takes it back"),
         ("indent.style", "spaces", "spaces | tabs", "indent with spaces or tabs"),
         ("indent.size", "2", "number", "spaces per level (with tabs: one tab per level)"),
         ("indent.tab-width", "4", "number", "width of a tab, for columns and line length"),
@@ -75,6 +76,7 @@ public sealed class StFormatConfig
     /// <summary>Short names in plain words for the settings window (the key stays in the details).</summary>
     public static readonly Dictionary<string, string> Labels = new(StringComparer.OrdinalIgnoreCase)
     {
+        ["editor.format-on-save"] = "Format when saving",
         ["indent.style"] = "Indent with", ["indent.size"] = "Spaces per level", ["indent.tab-width"] = "Width of a tab",
         ["indent.case-labels"] = "CASE labels one level in", ["indent.continuation"] = "Continuation lines", ["indent.underscore"] = "Names with _ one column left", ["indent.from-ide"] = "Take indentation from the IDE",
         ["case.keywords"] = "Keywords", ["case.types"] = "Data types", ["case.literals"] = "TRUE, FALSE, T#",
@@ -98,6 +100,7 @@ public sealed class StFormatConfig
     /// <summary>The names in German, for the settings window when the chat answers in German (English for every other language).</summary>
     public static readonly Dictionary<string, (string Label, string Description)> German = new(StringComparer.OrdinalIgnoreCase)
     {
+        ["editor.format-on-save"] = ("Beim Speichern formatieren", "die IDE formatiert das PLC-Objekt im aktiven Fenster, wenn du es speicherst (Speichern, Strg+S, Alle speichern) - wie mit dem Hotkey, Strg+Z nimmt es zurück"),
         ["indent.style"] = ("Einrücken mit", "mit Leerzeichen oder Tabs einrücken"),
         ["indent.size"] = ("Leerzeichen pro Ebene", "Leerzeichen pro Einrückungsebene (mit Tabs: ein Tab pro Ebene)"),
         ["indent.tab-width"] = ("Breite eines Tabs", "Breite eines Tabs, für Spalten und Zeilenlänge"),
