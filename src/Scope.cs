@@ -341,9 +341,25 @@ public sealed partial class ToolRegistry
             if (!loader.Symbols.TryGetInstance(symbol, out var s)) return null;
             long g = 0, off = 0;
             if (s is IAdsSymbol ads) { g = ads.IndexGroup; off = ads.IndexOffset; }
-            return (s.TypeName, g, off);
+            return (Elementary(s.DataType) ?? s.TypeName, g, off);
         }
         catch { return null; }
+    }
+
+    // an ENUM or an alias (TYPE X : INT) is recorded as its base type - the name of the elementary type, else null
+    static string Elementary(TwinCAT.TypeSystem.IDataType t)
+    {
+        for (int i = 0; t != null && i < 8; i++)
+        {
+            if (ScopeTypes.ContainsKey(t.Name ?? "")) return t.Name;
+            t = t switch
+            {
+                TwinCAT.TypeSystem.IEnumType e => e.BaseType,
+                TwinCAT.TypeSystem.IAliasType al => al.BaseType,
+                _ => null
+            };
+        }
+        return null;
     }
 
     string ScopeAddChannel(JsonObject a)
@@ -353,6 +369,8 @@ public sealed partial class ToolRegistry
         int port = Int(a, "port", 851);
         var info = AdsSymbolInfo(net, port, symbol);
         string iec = info?.iec ?? Str(a, "dataType") ?? throw new Exception($"PLC symbol {symbol} not readable via ADS ({net}:{port}) - pass dataType (e.g. REAL64).");
+        // dataType overrides a type that is not elementary (e.g. a struct member read as raw bytes)
+        if (!ScopeTypes.ContainsKey(iec.Trim()) && Str(a, "dataType") is { } given && ScopeTypes.ContainsKey(given.Trim())) iec = given;
         if (!ScopeTypes.TryGetValue(iec.Trim(), out var st))
             throw new Exception($"Type {iec} cannot be recorded as one channel - choose a member with an elementary type (BOOL, INT, DINT, REAL, LREAL ...).");
 

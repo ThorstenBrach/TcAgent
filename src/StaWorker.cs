@@ -31,7 +31,9 @@ public sealed class StaWorker : IDisposable
         using var done = new ManualResetEventSlim();
         queue.Add(() => { try { result = f(); } catch (Exception ex) { err = ex; } finally { done.Set(); } });
         if (!done.Wait(timeoutMs)) throw new TimeoutException($"Timeout after {timeoutMs / 1000}s");
-        if (err != null) throw err is COMException c ? new Exception($"COM error 0x{c.HResult:X8}: {c.Message}", c) : err;
+        if (err is COMException c) throw new Exception($"COM error 0x{c.HResult:X8}: {c.Message}", c);
+        // rethrow with the original stack (where in TcAgent or TwinCAT it failed) - "throw err" kept only this line
+        if (err != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(err).Throw();
         return result;
     }
 

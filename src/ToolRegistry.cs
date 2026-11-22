@@ -708,7 +708,7 @@ public sealed partial class ToolRegistry
         if (decl != null)
         {
             if (item is not ITcPlcDeclaration d) throw new Exception("Object has no declaration part");
-            d.DeclarationText = decl; done.Add("declaration");
+            done.Add(PlcText.SetAndVerify("declaration", () => d.DeclarationText, t => d.DeclarationText = t, decl));
         }
         if (impl != null)
         {
@@ -717,9 +717,9 @@ public sealed partial class ToolRegistry
             if (current != null && GraphicalBody.IsMatch(current) && !GraphicalBody.IsMatch(impl))
                 throw new Exception("this object has a graphical body (SFC/CFC/FBD/LD) - its implementation cannot be written as text. " +
                                     "SFC: tc_sfc action=write; step actions and transitions are own objects (tc_plc_write on them).");
-            i.ImplementationText = impl; done.Add("implementation");
+            done.Add(PlcText.SetAndVerify("implementation", () => i.ImplementationText, t => i.ImplementationText = t, impl));
         }
-        return done.Count == 0 ? "nothing changed" : string.Join(" + ", done) + " written";
+        return done.Count == 0 ? "nothing changed" : string.Join(" + ", done);
     }
 
     static string Pretty(JsonObject o) => o.ToJsonString(new System.Text.Json.JsonSerializerOptions
@@ -1447,7 +1447,7 @@ public sealed partial class ToolRegistry
             }
             if (impl != null)
             {
-                if (child is ITcPlcImplementation ci) { ci.ImplementationText = impl; notes.Add(nm + " code written"); }
+                if (child is ITcPlcImplementation ci) notes.Add(nm + " " + PlcText.SetAndVerify("code", () => ci.ImplementationText, t => ci.ImplementationText = t, impl));
                 else notes.Add(nm + " has no implementation part");
             }
         }
