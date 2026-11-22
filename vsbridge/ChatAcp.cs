@@ -44,11 +44,8 @@ namespace TcAgentBridge
 
         static JavaScriptSerializer Js() => new JavaScriptSerializer { MaxJsonLength = int.MaxValue };
 
-        void AcpWrite(Session s, Dictionary<string, object> msg)
-        {
-            var bytes = new UTF8Encoding(false).GetBytes(Js().Serialize(msg) + "\n");
-            lock (writeLock) { s.In.Write(bytes, 0, bytes.Length); s.In.Flush(); }
-        }
+        // off the UI thread, in order (WriteIn, ChatWindow.cs) - the task fails if the session has ended
+        Task AcpWrite(Session s, Dictionary<string, object> msg, string what = "a message") => WriteIn(s, Js().Serialize(msg) + "\n", what);
 
         /// <summary>A request to the agent; the task ends with its result (or throws with the error of the agent).</summary>
         async Task<Dictionary<string, object>> AcpCall(Session s, string method, Dictionary<string, object> prms)
@@ -56,7 +53,7 @@ namespace TcAgentBridge
             var tcs = new TaskCompletionSource<Dictionary<string, object>>(TaskCreationOptions.RunContinuationsAsynchronously);
             long id;
             lock (s.Acp.Pending) { id = s.Acp.NextId++; s.Acp.Pending[id] = tcs; }
-            AcpWrite(s, new Dictionary<string, object> { ["jsonrpc"] = "2.0", ["id"] = id, ["method"] = method, ["params"] = prms });
+            await AcpWrite(s, new Dictionary<string, object> { ["jsonrpc"] = "2.0", ["id"] = id, ["method"] = method, ["params"] = prms }, method == "session/prompt" ? "the question" : method);
             var done = await Task.WhenAny(tcs.Task, Task.Run(async () => { while (!s.Exited) await Task.Delay(200); }));
             if (done != tcs.Task) throw new Exception("the agent ended");
             var m = await tcs.Task;
@@ -153,7 +150,8 @@ namespace TcAgentBridge
             {
                 // requests of the agent: permission (a card in the chat); others are not offered by this client
                 if (method == "session/request_permission") Task.Run(() => AcpPermission(s, reqId, prms));
-                else AcpWrite(s, new Dictionary<string, object> { ["jsonrpc"] = "2.0", ["id"] = reqId, ["error"] = new Dictionary<string, object> { ["code"] = -32601, ["message"] = "not supported by the TcAgent Chat: " + method } });
+                else _ = AcpWrite(s, new Dictionary<string, object> { ["jsonrpc"] = "2.0", ["id"] = reqId, ["error"] = new Dictionary<string, object> { ["code"] = -32601, ["message"] = "not supported by the TcAgent Chat: " + method } })
+                         .ContinueWith(t => { _ = t.Exception; });
                 return;
             }
             if (method == "session/update" && prms?["update"] is Dictionary<string, object> u && s.Turn != null) AcpUpdate(s, u);
@@ -238,7 +236,8 @@ namespace TcAgentBridge
             var choice = AskPermission(title, null, null, input, always != null ? (always.TryGetValue("name", out var n) ? n as string : "always") : null, s.Be.Name);
             var pick = choice == "session" ? Opt("allow_always") ?? Opt("allow") : choice == "once" ? Opt("allow_once") ?? Opt("allow") : Opt("reject_once") ?? Opt("reject");
             var outcome = pick != null ? new Dictionary<string, object> { ["outcome"] = "selected", ["optionId"] = pick } : new Dictionary<string, object> { ["outcome"] = "cancelled" };
-            try { AcpWrite(s, new Dictionary<string, object> { ["jsonrpc"] = "2.0", ["id"] = reqId, ["result"] = new Dictionary<string, object> { ["outcome"] = outcome } }); } catch { }
+            _ = AcpWrite(s, new Dictionary<string, object> { ["jsonrpc"] = "2.0", ["id"] = reqId, ["result"] = new Dictionary<string, object> { ["outcome"] = outcome } }, "the answer to its request")
+                    .ContinueWith(t => { _ = t.Exception; });
         }
 
         async Task SendAcp(Backend be, string text, string ctx)
@@ -285,8 +284,8 @@ namespace TcAgentBridge
         /// <summary>Stop: session/cancel - the agent ends the turn, the session stays open.</summary>
         void AcpCancel(Session s)
         {
-            try { AcpWrite(s, new Dictionary<string, object> { ["jsonrpc"] = "2.0", ["method"] = "session/cancel", ["params"] = new Dictionary<string, object> { ["sessionId"] = s.Acp.SessionId } }); }
-            catch { KillSession(); }
+            AcpWrite(s, new Dictionary<string, object> { ["jsonrpc"] = "2.0", ["method"] = "session/cancel", ["params"] = new Dictionary<string, object> { ["sessionId"] = s.Acp.SessionId } }, "the stop request")
+                .ContinueWith(t => Dispatcher.BeginInvoke(new Action(() => { if (sess == s) KillSession(); })), TaskContinuationOptions.OnlyOnFaulted);
             CancelOpenCards();
         }
     }
