@@ -49,7 +49,9 @@ TcAgent.exe modules enable scope --level project --solution <sln>
 
 The same in the IDE: tab **Modules** of the TcAgent Knowledge window – a check box per module for you or for this
 project, the plugins with their state and **Approve plugin …** (only a mouse click approves). A running AI client sees
-a change after TcAgent was restarted. When an agent connects to another solution, TcAgent
+a change without a restart: after **Reload** in the TcAgent settings window (or `TcAgent.exe reload`) every running
+TcAgent server reads `modules.json` and the plugins again within two seconds and tells its client that the tool list
+changed (`notifications/tools/list_changed`). When an agent connects to another solution, TcAgent
 reads its project level and tells the client that the tool list changed (`notifications/tools/list_changed`).
 
 ## Plugins
@@ -139,5 +141,5 @@ project to project, the skill says how to find them, and the agent adds them to 
 ### Example
 
 [`docs/plugins/todo-finder`](plugins/todo-finder) is a complete plugin in Windows PowerShell: one tool that runs
-`tc_plc_search` through `tcagent/call`. Copy the folder to `%LOCALAPPDATA%\TcAgent\plugins\todo-finder` and restart the
-AI client.
+`tc_plc_search` through `tcagent/call`. Copy the folder to `%LOCALAPPDATA%\TcAgent\plugins\todo-finder` and run `TcAgent.exe reload`
+(or restart the AI client).

@@ -1289,7 +1289,8 @@ TwinCAT is in Run and the PLCs of the solution answer. A changed target stays in
 **Gate (since 0.32):** before the activation (and before anybody is asked to confirm it) TcAgent builds the solution –
 without "check all objects", which also checks code that is never called. With build errors the activation is refused
 and the build report is returned – the agent is told to show the errors and ask before it changes any code.
-`TCAGENT_ACTIVATE_GATE=0` switches the gate off.
+The gate is on by default; `TCAGENT_ACTIVATE_GATE=0` (or the settings window, page "Gates") switches it off. TwinCAT
+itself refuses to activate a project that does not build.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

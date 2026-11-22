@@ -10,6 +10,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **Contributing:** a pull request template with a check that it is filled in, an issue form for documentation, and
   issues opened without a form are closed automatically with a hint.
 
+### Fixed
+- **Documentation:** a module or plugin change reaches a running AI client without a restart (**Reload** in the settings
+  window or `TcAgent.exe reload`), not only after one (PLUGINS.md); the activate gate is described as on by default and
+  switchable (`TCAGENT_ACTIVATE_GATE=0`) instead of a hard gate (KNOWLEDGE_LAYERS.md, TOOLS.md); neutral library name in
+  the PLAINTEXT.md example.
+
 ## [0.55.0] – 2026-11-17
 
 The built-in knowledge in this version is TcAgent_Knowledge 1.1.0 (unchanged).

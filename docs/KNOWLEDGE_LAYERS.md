@@ -4,7 +4,7 @@
 > Since 0.30: levels × platform, one file per topic, front matter, locked/force, `disabled.json`, `tc_knowledge` – for
 > coding rules, risk rules, lessons, knowledge sources and templates. Since 0.31: skills (`tc_skills`, built-in skills,
 > mirror into the agent CLIs). Since 0.32: workflows with checkpoints (`tc_workflow`, built-in `new-feature`) and the
-> hard gate "`tc_activate` only after a build with 0 errors". Since 0.33: run logs and `tc_improve` (proposals by fixed rules,
+> activate gate "`tc_activate` only after a build with 0 errors" (on by default, switchable). Since 0.33: run logs and `tc_improve` (proposals by fixed rules,
 > apply after asking, evaluation over 10 runs, revert, promote with name check). Since 0.34: sources (`tc_sources`, `skills.lock.json`, license check, overlay
 > `tcagent-extends`, `TcAgent.exe sources sync`). Since 0.35: the knowledge manager window (Overview, Effective, Sources, History; now Overview, Files, Sources, Platforms, Modules, Reference, Feedback, Backups, Workflow runs) and
 > `TcAgent.exe knowledge json|disable|enable`. Since 0.37: the team level between user and platform (`TCAGENT_TEAM`). Since 0.38: the chat window speaks ACP (GitHub Copilot). Since 0.40–0.42: the
@@ -355,7 +355,9 @@ description: Add a driver FB for a new device
 - **Hard gates** are enforced by TcAgent itself (like today's gate that refuses the first write before the coding rules
   were read):
   - `tc_activate` only if the **build** has 0 errors. "Check all objects" is not the measure – it also checks code that
-    is never called and does not break the build.
+    is never called and does not break the build. This gate is on by default; a person may switch it off
+    (`TCAGENT_ACTIVATE_GATE=0`, settings window page "Gates"). TwinCAT itself refuses to activate a project that does not
+    build, so the gate is the early, clear report, not the last line of defence.
   - Saving (`tc_save`) stays allowed with compiler errors, so intermediate states can be kept.
   - TcUnit tests are **not** a hard gate – not every task has tests. A workflow can recommend them.
   - Checkpoints belong to the **step of a workflow**, not to TcAgent as a whole: a coding workflow (e.g. `new-feature`)
@@ -473,7 +475,7 @@ first conversions and the next steps: [DETERMINISTIC_FIRST.md](DETERMINISTIC_FIR
    `TCAGENT_COMPANY`, `platforms\`, `config.json`, detection and the question on ambiguity, file header, `locked`/`force`,
    one file per topic/lesson, split command.
 2. `tc_skills` (Agent Skills format) with the mirror into the skill folders of the set-up CLIs.
-3. Workflows and hard gates (`tc_activate` only after a build without errors).
+3. Workflows and gates (`tc_activate` only after a build without errors, on by default and switchable).
 4. Run logs and the improvement loop (`tc_improve`), moving knowledge up with the name check, pull requests for shared
    levels.
 5. Deterministic-first candidates.
