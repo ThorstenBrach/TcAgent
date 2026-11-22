@@ -20,6 +20,7 @@ namespace TcAgent;
 sealed class RefactorJob
 {
     public readonly string Id;
+    public bool Dry;            // dryRun: nothing is asked - a job still running is still planning, not waiting for the user
     public readonly System.Diagnostics.Stopwatch Clock = System.Diagnostics.Stopwatch.StartNew();
     public System.Threading.Tasks.Task<string> Work;
     readonly object gate = new();
@@ -89,7 +90,7 @@ public sealed partial class ToolRegistry
                                     (w != null ? $", the dialog asks about {w}" : "") + $") - call tc_refactor action=result job={busy.Id}; " +
                                     "start further changes only after it has finished.");
             }
-            job = new RefactorJob($"rf{++refactorJobCounter}-{DateTime.Now:HHmmss}", changes.Count);
+            job = new RefactorJob($"rf{++refactorJobCounter}-{DateTime.Now:HHmmss}", changes.Count) { Dry = DryRun(a) };
             refactorJobs.Add(job);
             while (refactorJobs.Count > KeepJobs)
             {
@@ -155,11 +156,19 @@ public sealed partial class ToolRegistry
         if (dialogs != null)
             o.AppendLine("The IDE is showing a dialog and waiting for input - the refactoring job continues only after it is closed:\n  " +
                          string.Join("\n  ", dialogs) + "\nAsk the user to read and close it (or tc_dialogs action=close, which is Cancel/X).\n");
+        if (job.Dry)
+        {
+            // a dry run asks nothing: it is still planning (cross references of many names take a while)
+            o.AppendLine($"Dry run still planning - {done} of {total} changes planned, nothing is asked and nothing written.");
+            o.AppendLine($"Call tc_refactor action=result job={job.Id} to get the proposal (it waits up to {seconds} s again).");
+            if (report.Trim().Length > 0) o.AppendLine("\nSo far:\n" + report.TrimEnd());
+            return o.ToString();
+        }
         o.AppendLine($"Still waiting for the user's decisions - {done} of {total} done" +
-                     (waitingFor != null ? $"; the dialog now asks about {waitingFor}" : "") + ".");
+                     (waitingFor != null ? $"; the question now is about {waitingFor}" : "") + ".");
         o.AppendLine($"The job keeps running in TcAgent. Call tc_refactor action=result job={job.Id} to get the final report " +
                      $"(it waits up to {seconds} s again). Do NOT call apply again for these changes. Tell the user that the " +
-                     "confirmation dialog is waiting for them (Visual Studio / XAE Shell or the client's question).");
+                     "confirmation is waiting for them (a card in the TcAgent Chat, a dialog in Visual Studio / XAE Shell, or the client's question).");
         if (report.Trim().Length > 0) o.AppendLine("\nSo far:\n" + report.TrimEnd());
         return o.ToString();
     }
