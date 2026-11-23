@@ -1977,7 +1977,8 @@ public sealed partial class ToolRegistry
             {
                 [CallCheck.Policy] = () => policy.Check(name, () => TargetOf(name, args), args),
                 // values that are not allowed are refused before anybody is asked to confirm them (Packages.cs)
-                [CallCheck.Arguments] = () => { if (name == "tc_packages_change") PackagesChangeArgs(args); },
+                // ... and a tcpkg.exe that may not be started elevated too (Packages.cs, TcpkgTrust.cs); its warning goes into the question
+                [CallCheck.Arguments] = () => { if (name == "tc_packages_change") { PackagesChangeArgs(args); if (!DryRun(args)) TrustedTcpkgExe(); } },
                 // nobody is asked to confirm an activation that would be refused anyway
                 [CallCheck.ActivateGate] = () => { if (name == "tc_activate") ActivateGate(); },
                 [CallCheck.Confirm] = () =>

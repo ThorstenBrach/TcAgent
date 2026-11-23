@@ -808,7 +808,8 @@ namespace TcAgentBridge
                 var changed = rows.Where(r => r.Changed).ToList();
                 if (changed.Count == 0) return;
                 // the safety settings once more in plain words
-                var risky = changed.Where(r => r.Key == "TCAGENT_CONFIRM" && r.Value == "off" || r.Key == "TCAGENT_ACTIVATE_GATE" && r.Value == "0" || r.Key == "TCAGENT_ALLOW_TARGETS" && r.Value.Length > 0).ToList();
+                var risky = changed.Where(r => r.Key == "TCAGENT_CONFIRM" && r.Value == "off" || r.Key == "TCAGENT_ACTIVATE_GATE" && r.Value == "0" || r.Key == "TCAGENT_ALLOW_TARGETS" && r.Value.Length > 0
+                                                 || r.Key == "TCAGENT_TCPKG_ALLOW_USER_WRITABLE" && r.Value == "1").ToList();
                 if (risky.Count > 0 && MessageBox.Show(w, T("You change safety settings:", "Du änderst Sicherheits-Einstellungen:") + "\n\n" + string.Join("\n", risky.Select(r => "• " + Label(r.Def) + ": " + ValueWord(r.Def, r.Value))) +
                                                          "\n\n" + T("The agent then acts with fewer questions. Save?", "Der Agent handelt dann mit weniger Rückfragen. Speichern?"),
                                                          T("TcAgent settings", "TcAgent-Einstellungen"), MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes) return;

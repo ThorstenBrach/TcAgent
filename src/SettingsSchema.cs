@@ -79,6 +79,11 @@ public static class SettingsSchema
             "Read the coding rules before writing", "Codierregeln vor dem Schreiben lesen",
             "The first write is refused once until the agent read the coding rules.",
             "Der erste Schreibversuch wird einmal abgelehnt, bis der Agent die Codierregeln gelesen hat.") { ValueLabels = OnOffLabels },
+        new("TCAGENT_TCPKG_ALLOW_USER_WRITABLE", "gates", "onoff", "0", OnOff,
+            "Start tcpkg although users may write to its folder", "tcpkg starten, obwohl Benutzer in seinen Ordner schreiben dürfen",
+            "RISK: tc_packages_change starts %ProgramData%\\Beckhoff\\TcPkg\\tcpkg.exe with administrator rights although normal users may create files in that folder (the default of TcPkg) - any normal user could place a file there that the elevated tcpkg loads. The exe itself, its owner and its signature are still checked; you see a warning each time. Only from your own settings or the Windows environment, never from a project. Safer: as administrator remove the write right of Users on the folder.",
+            "RISIKO: tc_packages_change startet %ProgramData%\\Beckhoff\\TcPkg\\tcpkg.exe mit Administratorrechten, obwohl normale Benutzer in diesem Ordner Dateien anlegen dürfen (Standard von TcPkg) - jeder normale Benutzer könnte dort eine Datei ablegen, die das erhöhte tcpkg lädt. Die exe selbst, ihr Besitzer und ihre Signatur werden weiter geprüft; du siehst jedes Mal eine Warnung. Nur aus deinen eigenen Einstellungen oder der Windows-Umgebung, nie aus einem Projekt. Sicherer: als Administrator das Schreibrecht der Benutzer auf den Ordner entfernen.")
+        { ValueLabels = OnOffLabels },
         new("TCAGENT_LESSONS_RECALL", "gates", "onoff", "1", OnOff,
             "Recall lessons on errors", "Bei Fehlern an Lessons erinnern",
             "On an error, TcAgent adds matching lessons to the answer.", "Bei einem Fehler hängt TcAgent passende Lessons an die Antwort.") { ValueLabels = OnOffLabels },

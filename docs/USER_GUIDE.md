@@ -2232,6 +2232,7 @@ client.
 | `TCAGENT_JOB_WAIT` | `45` | Seconds `tc_refactor apply/result` waits for your decisions before returning progress |
 | `TCAGENT_ACTIVATE_GATE` | on | `0` lets `tc_activate` go on without the clean build it otherwise needs first |
 | `TCAGENT_SPEC_GATE` | on | `0` turns off the question before new code (FB, program, function, method) without a specification |
+| `TCAGENT_TCPKG_ALLOW_USER_WRITABLE` | off | **Risk.** `1` lets `tc_packages_change` start `%ProgramData%\Beckhoff\TcPkg\tcpkg.exe` with administrator rights although normal users may create files in that folder (TcPkg's default) – any normal user could place a file there that the elevated tcpkg loads. The exe, the owners and the signature are still checked; the question and the result carry a warning. Read only from your own settings (window, `TcAgent.exe settings`) or a Windows environment variable – never from a project or an MCP configuration. Safer: remove the write right of Users on the folder as administrator. |
 | `TCAGENT_COMPANY` | – | Folder or Git repository of the company level of the knowledge |
 | `TCAGENT_PLATFORMS` | – | Further roots of platforms (an automation framework in a repository of its own), `;`-separated |
 | `TCAGENT_LESSONS` | – | Team file or folder for lessons (older; newer: the `lessons` folder of the team level) |

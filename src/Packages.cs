@@ -108,7 +108,8 @@ public sealed partial class ToolRegistry
                       System.Diagnostics.Process.GetProcessesByName("TcXaeShell").Length + System.Diagnostics.Process.GetProcessesByName("TcXaeShell64").Length > 0;
         var (code, output) = RunTcpkg(args, elevated: true, timeoutMs: 3_600_000);
         output = CleanTcpkg(output);
-        var o = new StringBuilder($"{cmd}  (exit code {code})\n{Tail(output, 30_000)}");
+        var o = new StringBuilder(TcpkgWarning is { } warn ? "WARNING: " + warn + "\n" : "");
+        o.Append($"{cmd}  (exit code {code})\n{Tail(output, 30_000)}");
         if (code != 0 && ideOpen)
             o.Append("\nVisual Studio / XAE Shell is open - XAE packages can usually only be changed with the IDE closed. Ask the user to close it and retry.");
         if (code == 0 && action is "install" or "upgrade" or "repair")
@@ -199,6 +200,7 @@ public sealed partial class ToolRegistry
     /// a tcpkg.exe in a folder the user can write to must not run with administrator rights.</summary>
     static string TrustedTcpkgExe()
     {
+        TcpkgWarning = null;
         foreach (var root in ProgramRoots())
             foreach (var rel in TcpkgLocations)
                 if (File.Exists(Path.Combine(root, rel))) return Path.Combine(root, rel);
@@ -208,13 +210,23 @@ public sealed partial class ToolRegistry
         var acls = chain.Select(ReadAcl).Where(a => a != null).ToList();
         bool signed = false; string sigInfo = "not checked";
         if (chain.Count > 0) (signed, sigInfo) = Authenticode.Verify(exe);
-        if (TcpkgTrust.Refusal(exe, ProgramRoots(), programData, acls, signed, sigInfo) is { } refusal)
+        // the opt-in only from the user's own settings.json and the Windows environment - never from a project (TcpkgTrust.cs)
+        var allow = TcpkgTrust.AllowUserWritable(Path.Combine(KnowledgeLayers.UserRoot, "settings.json"),
+                                                 Environment.GetEnvironmentVariable(TcpkgTrust.AllowSwitch, EnvironmentVariableTarget.User),
+                                                 Environment.GetEnvironmentVariable(TcpkgTrust.AllowSwitch, EnvironmentVariableTarget.Machine));
+        var d = TcpkgTrust.Decide(exe, ProgramRoots(), programData, acls, signed, sigInfo, allow);
+        if (d.Refusal != null)
         {
-            Log.Info(refusal);
-            throw new Exception(refusal);
+            Log.Info(d.Refusal);
+            throw new Exception(d.Refusal);
         }
+        if (d.Warning != null) { Log.Info("WARNING: " + d.Warning); TcpkgWarning = d.Warning; }
         return exe;
     }
+
+    /// <summary>Set by the last check of tcpkg.exe when it is started only thanks to TCAGENT_TCPKG_ALLOW_USER_WRITABLE -
+    /// shown in the confirmation question and the result of tc_packages_change.</summary>
+    internal static string TcpkgWarning;
 
     /// <summary>Owner and the allow entries that apply to the file/folder itself (SIDs), null if they cannot be read.</summary>
     static TcpkgTrust.PathAcl ReadAcl(string path)

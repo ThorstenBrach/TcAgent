@@ -162,7 +162,8 @@ public static class Confirm
                 return $"Add ADS route '{S("name")}' to {S("netId")} ({S("ip") ?? S("host")}) - also stored on the target system.";
             case "tc_packages_change":
                 return $"TwinCAT Package Manager on this PC: {S("action")} {S("packages") ?? S("name")}" +
-                       (B("allowDowngrade") ? " (downgrade allowed)" : "") + " - runs with administrator rights (Windows asks again).";
+                       (B("allowDowngrade") ? " (downgrade allowed)" : "") + " - runs with administrator rights (Windows asks again)." +
+                       (ToolRegistry.TcpkgWarning is { } w ? " WARNING: " + w : "");
             case "tc_test_run":
                 return $"Run TcUnit tests {(string.IsNullOrWhiteSpace(S("tests")) ? "(all)" : S("tests"))}{(string.IsNullOrEmpty(target) ? " on the local runtime" : on)}: " +
                        "build and activate if the code changed, reset and start the PLC, write the test selection via ADS.";

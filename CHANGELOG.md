@@ -44,6 +44,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   to start it with administrator rights: valid Authenticode signature, and only Administrators, SYSTEM or TrustedInstaller
   own and may change the exe and every folder from `%ProgramData%\Beckhoff` down to it. Otherwise the refusal now says
   exactly what failed (e.g. which account may write to which folder) instead of only "not in the program folders".
+  TcPkg's install lets normal users create files in these folders; the new opt-in **Start tcpkg although users may write
+  to its folder** (`TCAGENT_TCPKG_ALLOW_USER_WRITABLE`, settings window page "Gates and confirmations", off by default,
+  never taken from a project or an MCP configuration) tolerates exactly that for `%ProgramData%\Beckhoff\TcPkg\tcpkg.exe`,
+  with a warning in the question, the result and the log. The refusal is now given before anybody is asked.
 - **Documentation:** a module or plugin change reaches a running AI client without a restart (**Reload** in the settings
   window or `TcAgent.exe reload`), not only after one (PLUGINS.md); the activate gate is described as on by default and
   switchable (`TCAGENT_ACTIVATE_GATE=0`) instead of a hard gate (KNOWLEDGE_LAYERS.md, TOOLS.md); neutral library name in
