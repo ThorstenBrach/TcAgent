@@ -107,6 +107,9 @@ public static class Guards
     public static void TcpkgArgs(IReadOnlyList<string> args)
     {
         if (args == null || args.Count == 0 || !TcpkgVerbs.Contains(args[0])) throw new ArgumentException("tcpkg: unknown command " + (args?.FirstOrDefault() ?? "(none)"));
+        // "source remove <name>" has no options at all (tcpkg 2.1: "Unrecognized command or argument '-y'", feedback FB-03965DDF)
+        if (args.Count > 1 && args[0] == "source" && args[1] == "remove" && args.Skip(2).Any(x => x.StartsWith("-")))
+            throw new ArgumentException("tcpkg: source remove takes only the feed name, no options");
         for (int i = 1; i < args.Count; i++)
         {
             var a = args[i];

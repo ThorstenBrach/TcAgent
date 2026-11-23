@@ -18,8 +18,17 @@ public sealed class GuardsTests
     public void FeedNamesWithShellCharactersAreRefused(string name)
     {
         Assert.Throws<ArgumentException>(() => Guards.FeedNameOf(name));
-        Assert.Throws<ArgumentException>(() => Guards.TcpkgArgs(new[] { "source", "remove", name, "-y" }));
+        Assert.Throws<ArgumentException>(() => Guards.TcpkgArgs(new[] { "source", "remove", name }));
         Assert.Throws<ArgumentException>(() => Guards.TcpkgArgs(new[] { "install", "TF6310.TCP-IP.XAE", "-n", name, "-y" }));
+    }
+
+    // tcpkg 2.1: "source remove <name>" has no options - "-y" made every feed_remove fail (feedback FB-03965DDF)
+    [Fact]
+    public void SourceRemoveTakesOnlyTheFeedName()
+    {
+        Guards.TcpkgArgs(new[] { "source", "remove", "Test Feed" });
+        Assert.Throws<ArgumentException>(() => Guards.TcpkgArgs(new[] { "source", "remove", "Test Feed", "-y" }));
+        Guards.TcpkgArgs(new[] { "source", "add", "-n", "Test Feed", "-s", @"D:\Tmp\feed", "-y" });   // add/edit do know -y
     }
 
     [Theory]

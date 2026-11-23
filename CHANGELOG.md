@@ -52,6 +52,8 @@ The built-in knowledge in this version is TcAgent_Knowledge 1.1.0 (unchanged).
   to its folder** (`TCAGENT_TCPKG_ALLOW_USER_WRITABLE`, settings window page "Gates and confirmations", off by default,
   never taken from a project or an MCP configuration) tolerates exactly that for `%ProgramData%\Beckhoff\TcPkg\tcpkg.exe`,
   with a warning in the question, the result and the log. The refusal is now given before anybody is asked.
+- **`tc_packages_change action=feed_remove` removes the feed again:** it passed `-y`, which `tcpkg source remove` does not
+  know (tcpkg 2.1: "Unrecognized command or argument '-y'"), so every removal failed after the UAC prompt.
 - **Documentation:** a module or plugin change reaches a running AI client without a restart (**Reload** in the settings
   window or `TcAgent.exe reload`), not only after one (PLUGINS.md); the activate gate is described as on by default and
   switchable (`TCAGENT_ACTIVATE_GATE=0`) instead of a hard gate (KNOWLEDGE_LAYERS.md, TOOLS.md); neutral library name in

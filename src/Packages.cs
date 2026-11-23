@@ -158,7 +158,8 @@ public sealed partial class ToolRegistry
                 args.Add("-y");
                 break;
             case "feed_remove":
-                args.AddRange(new[] { "source", "remove", Name(), "-y" });
+                // no -y: "source remove" has no options and refuses one (tcpkg 2.1, feedback FB-03965DDF); it does not prompt either
+                args.AddRange(new[] { "source", "remove", Name() });
                 break;
             default: throw new Exception("action: install, upgrade, uninstall, repair, feed_add, feed_edit or feed_remove");
         }
