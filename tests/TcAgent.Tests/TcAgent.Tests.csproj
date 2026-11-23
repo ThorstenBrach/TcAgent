@@ -22,6 +22,7 @@
     <Compile Include="..\..\src\TcUnitDiscovery.cs" Link="src\TcUnitDiscovery.cs" />
     <Compile Include="..\..\src\Guards.cs" Link="src\Guards.cs" />
     <Compile Include="..\..\src\PlcTemplates.cs" Link="src\PlcTemplates.cs" />
+    <Compile Include="..\..\src\PlcCreateInfo.cs" Link="src\PlcCreateInfo.cs" />
     <Compile Include="..\..\src\CallOrder.cs" Link="src\CallOrder.cs" />
     <Compile Include="..\..\src\TcUnitResults.cs" Link="src\TcUnitResults.cs" />
     <Compile Include="..\..\src\TcUnitDoc.cs" Link="src\TcUnitDoc.cs" />

@@ -305,7 +305,8 @@ public sealed partial class ToolRegistry
             Schema(Req(P("parentPath", "string", "Parent folder/POU, e.g. ...^POUs or ...^POUs^FB_Axis for methods")),
                    Req(P("name", "string", "Object name")), Req(P("kind", "string", "Object type")),
                    P("language", "string", "ST (default), IL, SFC, FBD, CFC, LD"),
-                   P("returnType", "string", "Return type for function/method/property"),
+                   P("returnType", "string", "Return type for function/method/interface_method/property"),
+                   P("baseType", "string", "dut_alias: the type the alias stands for, e.g. INT or STRING(80) (default: from the declaration TYPE X : <type>)"),
                    P("declaration", "string", "complete declaration part"), P("implementation", "string", "implementation part (for property: the Get accessor)"),
                    P("implements", "string", "function_block only: interface(s), comma-separated - creates IMPLEMENTS and all methods/properties " +
                                               "of the interface (incl. EXTENDS) as stubs, like the TwinCAT dialog. Project and library interfaces."),
@@ -1363,6 +1364,14 @@ public sealed partial class ToolRegistry
         var decl = Str(a, "declaration");
         if (impls.Count > 0 && decl == null)
             decl = $"FUNCTION_BLOCK {name} IMPLEMENTS {string.Join(", ", impls)}\nVAR_INPUT\nEND_VAR\nVAR_OUTPUT\nEND_VAR\nVAR\nEND_VAR\n";
+        var ret = Str(a, "returnType");
+        // an alias needs the type it stands for: baseType or the declaration TYPE X : <type>;
+        var baseType = Str(a, "baseType") ?? (sub == 623 ? PlcCreateInfo.AliasBaseType(decl) : null);
+        if (sub == 623 && string.IsNullOrWhiteSpace(baseType))
+            throw new Exception("dut_alias needs the type it stands for: baseType (e.g. INT, STRING(80), ARRAY[1..10] OF REAL) or declaration " +
+                                $"'TYPE {name} : INT;\\nEND_TYPE'.");
+        if (sub == 623) decl ??= PlcCreateInfo.AliasDeclaration(name, baseType);
+        if (sub == 610) decl ??= PlcCreateInfo.InterfaceMethodDeclaration(name, ret);
         // Determine interface members up front (also for dryRun)
         var members = new List<(string Iface, LibApi.Member M)>();
         var missing = new List<string>();
@@ -1381,17 +1390,9 @@ public sealed partial class ToolRegistry
                    (members.Count > 0 ? "\n--- Stubs from " + string.Join(", ", impls) + " ---\n" +
                                         string.Join("\n", members.Select(m => m.M.IsProperty ? $"PROPERTY {m.M.Name} : {m.M.ReturnType} (Get/Set)" : m.M.Declaration.Split('\n').First(ln => !ln.StartsWith("///")))) : "");
         var lang = Languages.TryGetValue(Str(a, "language") ?? "ST", out var l) ? l : 1;
-        var ret = Str(a, "returnType");
-        object vInfo = sub switch
-        {
-            602 or 604 or 608 or 613 or 614 => lang,
-            603 or 609 or 610 => new object[] { lang, ret ?? "BOOL" },
-            611 or 612 => ret ?? "BOOL",
-            _ => null
-        };
         var parent = tc.Item(Str(a, "parentPath"));
         ITcSmTreeItem item;
-        try { item = (ITcSmTreeItem)((dynamic)parent).CreateChild(name, sub, "", vInfo); }
+        try { item = CreatePlcChild(parent, name, sub, PlcCreateInfo.Candidates(sub, lang, ret, sub == 623 ? decl : null)); }
         catch (Exception ex) when (Guards.ReservedNameHint(name) is { } why) { throw new Exception(why + " (TwinCAT: " + ex.Message + ")", ex); }
         string w;
         if (sub is 611 or 612)
@@ -1426,6 +1427,26 @@ public sealed partial class ToolRegistry
         }
         if (members.Count > 0) o.Append("\nStubs are empty - add the implementation with tc_plc_write, then tc_check.");
         return o.ToString();
+    }
+
+    /// <summary>CreateChild with the vInfo candidates of PlcCreateInfo in order: the first that TwinCAT accepts wins. If a
+    /// failed attempt created the object after all, that object is used. The first error is thrown when none works.</summary>
+    static ITcSmTreeItem CreatePlcChild(ITcSmTreeItem parent, string name, int sub, List<object> candidates)
+    {
+        Exception first = null;
+        foreach (var vInfo in candidates)
+        {
+            try { return (ITcSmTreeItem)((dynamic)parent).CreateChild(name, sub, "", vInfo); }
+            catch (Exception ex)
+            {
+                first ??= ex;
+                if (candidates.Count == 1) throw;
+                Log.Info($"CreateChild {name} (subtype {sub}) with vInfo {(vInfo is object[] arr ? "{" + string.Join(", ", arr) + "}" : vInfo ?? "null")}: {ex.Message}");
+                var made = TwinCatSession.Children(parent).FirstOrDefault(c => c.Name.Equals(name, StringComparison.OrdinalIgnoreCase) && c.ItemSubType == sub);
+                if (made != null) return made;
+            }
+        }
+        throw first!;
     }
 
     // Ensure Get/Set below a property (TwinCAT subtypes 613/614)

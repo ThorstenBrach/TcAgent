@@ -492,6 +492,9 @@ Creates a PLC object and optionally sets declaration/implementation. kind: folde
 Properties automatically get Get and Set accessors. With `implements` it creates an FB with all methods/properties of the interface as stubs.
 A name that is an IEC keyword, operator, standard function or type (e.g. a method `Add`) is refused by TwinCAT; the answer
 says so and suggests another name.
+`interface_method` goes below an interface (`parentPath=...^ITF_Axis`) and has no implementation; without `declaration` it
+gets `METHOD <name> : <returnType>` with an empty `VAR_INPUT`. `dut_alias` needs the type it stands for: `baseType` (e.g.
+`INT`, `STRING(80)`) or a declaration `TYPE T_X : INT; END_TYPE`; without `declaration` that one is written.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -499,7 +502,8 @@ says so and suggests another name.
 | `name` | string | yes | Object name |
 | `kind` | string | yes | Object type |
 | `language` | string |  | ST (default), IL, SFC, FBD, CFC, LD |
-| `returnType` | string |  | Return type for function/method/property |
+| `returnType` | string |  | Return type for function/method/interface_method/property |
+| `baseType` | string |  | dut_alias: the type the alias stands for, e.g. INT or STRING(80) (default: from the declaration `TYPE X : <type>`) |
 | `declaration` | string |  | complete declaration part |
 | `implementation` | string |  | implementation part (for property: the Get accessor) |
 | `implements` | string |  | function_block only: interface(s), comma-separated; creates IMPLEMENTS and all members (incl. EXTENDS) as stubs – project and library interfaces |

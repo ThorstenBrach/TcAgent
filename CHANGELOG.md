@@ -36,6 +36,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   and the templates available, instead of failing inside TwinCAT. The template folders of newer TwinCAT builds
   (`Components\Plc\Build_<build>\PlcTemplates\...`) are searched too. A failed attempt no longer leaves the new project
   folder behind.
+- **`tc_plc_create kind=interface_method` and `kind=dut_alias`:** as the Automation Interface documents it, an interface
+  method is created with its return type (instead of the language/return type pair of a method) and gets a declaration
+  without implementation; an alias is created with its declaration `TYPE X : <type>; END_TYPE`, built from the new
+  parameter `baseType` or taken from `declaration` - without a base type it is refused with a clear message.
 - **Documentation:** a module or plugin change reaches a running AI client without a restart (**Reload** in the settings
   window or `TcAgent.exe reload`), not only after one (PLUGINS.md); the activate gate is described as on by default and
   switchable (`TCAGENT_ACTIVATE_GATE=0`) instead of a hard gate (KNOWLEDGE_LAYERS.md, TOOLS.md); neutral library name in
