@@ -135,6 +135,19 @@ public static class Guards
         return "\"" + s + new string('\\', trailing) + "\"";
     }
 
+    /// <summary>Hint for an OverflowException ("Value was either too large or too small for a UInt32") from the Automation
+    /// Interface while a tool walks the PLC tree: seen on a PLC project added in the same IDE session, gone after the
+    /// solution was reopened (ThorstenBrach/TcAgent-internal#403). Empty for other errors and tools.</summary>
+    public static string TreeOverflowHint(string tool, Exception ex)
+    {
+        if (tool is not ("tc_tree" or "tc_plc_read" or "tc_plc_create" or "tc_plc_write")) return "";
+        for (var e = ex; e != null; e = e.InnerException)
+            if (e is OverflowException)
+                return " - the IDE has probably not settled a newly added PLC project yet (a known state of the Automation Interface " +
+                       "right after the project was created). Ask the user to save all and reopen the solution (or restart the IDE), then retry.";
+        return "";
+    }
+
     /// <summary>Decision after a confirmation question: null = go ahead, otherwise the reason why the action is not executed.
     /// ok == null means nobody could be asked - that is refused too.</summary>
     public static string ConfirmRefusal(bool? ok, bool notShown, string what) => ok switch

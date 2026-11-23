@@ -2361,6 +2361,7 @@ Packaged clients (for example Claude Desktop) may redirect `%LOCALAPPDATA%` to
 | Cursor shows "declaration, line 1" | You have not clicked into the editor since Visual Studio started. Click into the code once. |
 | The IDE stops responding while the chat works ("Not responding") | Update to the next version: the chat no longer waits on the agent on the UI thread. If the chat says the agent "does not read its input", press **Stop** - it ends the session, the next question starts a new one. After a hang, `bridge.log` contains "UI blocked for … s and still blocked" with the call stack - attach it to the feedback. |
 | Yellow bar "stopped responding … TcAgentBridge" | First export of a large library. Do not disable the extension – afterwards everything comes from the cache. |
+| "Value was either too large or too small for a UInt32" on a PLC project just added | The IDE has not settled the new PLC project yet. **File > Save All**, close and reopen the solution (or restart the IDE), then retry. |
 | No variables to link / "PLC project has no task reference" | Assign a task (`tc_task action=assign`), declare `AT %I*`/`%Q*`, then `tc_build`. |
 | Dialog "… needs at least one sync variable" on build | Normal on the first build with a fresh process image. Confirm with OK, link the I/O, build again. |
 | `tc_motion action=link` says WRITTEN, BUT NOT VERIFIED | Check "Link To I/O" of the axis in the IDE. |

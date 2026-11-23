@@ -1989,7 +1989,7 @@ public sealed partial class ToolRegistry
             text = WatchesItself(name, args) ? t.Handler(args) : RunWatchingDialogs(name, () => t.Handler(args), args);
             Log.Info($"{name} done ({sw.ElapsedMilliseconds} ms)");
         }
-        catch (Exception ex) { text = "Error: " + ErrorText(ex); isError = true; Log.Error($"{name}: {ex}"); }
+        catch (Exception ex) { text = "Error: " + ErrorText(ex) + Guards.TreeOverflowHint(name, ex); isError = true; Log.Error($"{name}: {ex}"); }
         finally { try { File.Delete(busy); } catch { } }
         try { ObserveWorkflow(name, args, isError, text); } catch (Exception ex) { Log.Error("Workflow: " + ex.Message); }
         // lessons learned: recall known solutions for this error, remind to save one after a hard-won success

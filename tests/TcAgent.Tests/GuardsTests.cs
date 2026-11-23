@@ -111,4 +111,22 @@ public sealed class GuardsTests
         Assert.NotEqual(a, Guards.ReportApprovalId(@"C:\P\B.sln", "python report.py {junit}"));
         Assert.Matches("^[0-9a-f]{16}$", a);
     }
+
+    [Theory]
+    [InlineData("tc_tree")]
+    [InlineData("tc_plc_read")]
+    [InlineData("tc_plc_create")]
+    public void AnOverflowWhileWalkingTheTreeGetsTheReopenHint(string tool)
+    {
+        var overflow = new OverflowException("Value was either too large or too small for a UInt32.");
+        Assert.Contains("reopen the solution", Guards.TreeOverflowHint(tool, overflow));
+        Assert.Contains("reopen the solution", Guards.TreeOverflowHint(tool, new InvalidOperationException("wrapped", overflow)));
+    }
+
+    [Fact]
+    public void OtherErrorsAndToolsGetNoOverflowHint()
+    {
+        Assert.Equal("", Guards.TreeOverflowHint("tc_tree", new InvalidOperationException("not found")));
+        Assert.Equal("", Guards.TreeOverflowHint("ads_read", new OverflowException()));
+    }
 }
