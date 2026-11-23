@@ -44,6 +44,19 @@ public static class AskQuestions
         return list;
     }
 
+    /// <summary>Where a question is shown, in this order: "bridge" = the card in the chat window of the IDE, "client" = the
+    /// client's own question dialog (MCP elicitation). From the TcAgent Chat the card first; other clients their own dialog,
+    /// the IDE card only as a fallback (ideCardFallback) - a card in an IDE that nobody of this client watches would wait
+    /// until the client times out. Empty = nobody can be asked: the caller decides at once (ADR 0023, GAP-005).</summary>
+    public static IReadOnlyList<string> Channels(bool fromChat, bool canElicit, bool ideCardFallback)
+    {
+        var list = new List<string>();
+        if (fromChat) list.Add("bridge");
+        if (canElicit) list.Add("client");
+        if (!fromChat && ideCardFallback) list.Add("bridge");
+        return list;
+    }
+
     /// <summary>The questions in the format of the TcAgent Chat cards (same as the agent CLI's own question tool).</summary>
     public static JsonObject ForCard(IEnumerable<Question> qs) => new()
     {

@@ -205,6 +205,9 @@ For `spec-ok` TcAgent asks the user itself when the agent marks the step done, a
 own specification. Until the user decided, the run writes no PLC code. With `TCAGENT_CONFIRM=off` nobody is asked.
 Outside a workflow, the first `tc_plc_create` of a new function (FB, program, function, method) in a chat makes TcAgent ask the
 user once: go on without a specification, or clarify first (then the agent starts `new-feature`). `TCAGENT_SPEC_GATE=0` switches it off.
+The question comes as a card in the TcAgent Chat or as the client's own question dialog; when the client can show neither (no
+elicitation, not the chat), `tc_plc_create` goes on at once instead of waiting for an answer nobody sees. `spec-ok` in a workflow
+stays strict: without anybody to ask the step is not completed.
 
 The other checkpoint steps cannot be skipped. When the agent marks a `check-ok` / `build-ok` step done while its check is missing
 or failed, TcAgent runs `tc_check` itself (since 0.36) and completes the step if it passes; for `build-ok` (since 0.39) it runs

@@ -69,8 +69,10 @@ public sealed partial class ToolRegistry
         return AskQuestions.Format(qs, answers);
     }
 
-    /// <summary>Asks in the TcAgent Chat or the client's dialog. null = nobody can be asked, empty = closed without an answer.</summary>
-    Dictionary<string, string> AskAnswers(List<AskQuestions.Question> qs)
+    /// <summary>Asks in the TcAgent Chat or the client's dialog. null = nobody can be asked, empty = closed without an answer.
+    /// ideCardFallback=false: a client other than the TcAgent Chat is asked only in its own dialog, never by a card in the IDE
+    /// (for questions that must not block when nobody of this client can see them - the new-code gate).</summary>
+    Dictionary<string, string> AskAnswers(List<AskQuestions.Question> qs, bool ideCardFallback = true)
     {
         int pid = tc.AttachedPid > 0 ? tc.AttachedPid : int.TryParse(Environment.GetEnvironmentVariable("TCAGENT_VS_PID"), out var vp) ? vp : 0;
         bool fromChat = (Environment.GetEnvironmentVariable("TCAGENT_CLIENT") ?? "").StartsWith("chat:", StringComparison.OrdinalIgnoreCase)
@@ -102,6 +104,8 @@ public sealed partial class ToolRegistry
             return Mcp.LastElicitOutcome is "decline" or "cancel" && Mcp.LastElicitMs >= 1500 ? new Dictionary<string, string>() : null;
         }
 
-        return fromChat ? ViaBridge() ?? ViaClient() : ViaClient() ?? ViaBridge();
+        foreach (var channel in AskQuestions.Channels(fromChat, Mcp.CanElicit, ideCardFallback))
+            if ((channel == "bridge" ? ViaBridge() : ViaClient()) is { } answers) return answers;
+        return null;
     }
 }

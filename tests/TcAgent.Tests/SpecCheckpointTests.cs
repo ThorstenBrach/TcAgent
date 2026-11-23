@@ -94,4 +94,25 @@ public class SpecCheckpointTests
     [InlineData("add a timeout first", null)]
     [InlineData(null, null)]
     public void TheAnswerDecides(string answer, bool? expected) => Assert.Equal(expected, Workflows.SpecAnswer(answer));
+
+    // ADR 0023, GAP-005: the new-code gate asks only where a person of this client sees the question at once
+    [Fact]
+    public void ANewCodeQuestionFromAClientWithoutElicitationAsksNobody() =>
+        Assert.Empty(AskQuestions.Channels(fromChat: false, canElicit: false, ideCardFallback: false));
+
+    [Fact]
+    public void ANewCodeQuestionFromAClientWithElicitationUsesOnlyItsDialog() =>
+        Assert.Equal(new[] { "client" }, AskQuestions.Channels(fromChat: false, canElicit: true, ideCardFallback: false));
+
+    [Fact]
+    public void ANewCodeQuestionFromTheChatUsesTheCard() =>
+        Assert.Equal(new[] { "bridge" }, AskQuestions.Channels(fromChat: true, canElicit: false, ideCardFallback: false));
+
+    [Fact]
+    public void OtherQuestionsKeepTheIdeCardAsFallback()
+    {
+        Assert.Equal(new[] { "client", "bridge" }, AskQuestions.Channels(fromChat: false, canElicit: true, ideCardFallback: true));
+        Assert.Equal(new[] { "bridge" }, AskQuestions.Channels(fromChat: false, canElicit: false, ideCardFallback: true));
+        Assert.Equal(new[] { "bridge", "client" }, AskQuestions.Channels(fromChat: true, canElicit: true, ideCardFallback: true));
+    }
 }

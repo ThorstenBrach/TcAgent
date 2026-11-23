@@ -151,8 +151,15 @@ public sealed partial class ToolRegistry
         var t = Workflows.SpecTexts(AnswerLanguage());
         var q = new AskQuestions.Question($"{t.NewCode} ({Str(args, "kind")} {Str(args, "name")})", "Specification",
             new List<AskQuestions.Option> { new(t.Clarify, t.ClarifyWhat), new(t.Go, t.GoWhat) }, false);
-        var answers = AskAnswers(new List<AskQuestions.Question> { q });
-        if (answers == null) return null;                       // nobody can be asked (no dialog, no chat): as in a pipeline
+        // only where a person of this client sees the question at once (ADR 0023, GAP-005): the TcAgent Chat or the client's own
+        // dialog - never a card in an IDE that this client does not show (a remote session without elicitation waited for it
+        // until the client timed out and nothing was created)
+        var answers = AskAnswers(new List<AskQuestions.Question> { q }, ideCardFallback: false);
+        if (answers == null)                                    // nobody can be asked (no dialog, no chat): go on at once, as in a pipeline
+        {
+            Log.Info("new code without a specification: nobody can be asked - going on");
+            return null;
+        }
         answers.TryGetValue(q.Text, out var answer);
         Log.Info("new code without a specification: " + (answer ?? "(no answer)"));
         if (Workflows.NewCodeAnswer(answer) == true) { newCodeDecided = true; return null; }
