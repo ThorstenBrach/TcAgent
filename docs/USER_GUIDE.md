@@ -1787,6 +1787,12 @@ the project's settings), `sarifFile` (SARIF export, 4026.20+), `metricsFile` (st
   `feed_remove`. **Only when you ask, always confirmed by you, and run with administrator rights (UAC prompt).** Close
   Visual Studio / XAE Shell before changing XAE packages. `dryRun=true` only shows the `tcpkg` command. Package ids, versions,
   feed names and sources are checked first (no quotes or shell characters); tcpkg runs without a shell.
+- Which `tcpkg.exe` runs elevated: the one in the program folders or `C:\TwinCAT`; the one in TcPkg's own folder
+  `%ProgramData%\Beckhoff\TcPkg` only when it is validly signed and only administrators may change it and its folders.
+  A normal TcPkg installation lets users create files in that folder - then the call is refused with the reason, until you
+  either remove that write right (as administrator, `icacls`) or switch on **Start tcpkg although users may write to its
+  folder** (`TCAGENT_TCPKG_ALLOW_USER_WRITABLE`, page **Gates and confirmations**, see the settings table) - with a
+  warning in every question and result.
 
 Version mismatches between IDE integrations (for example Scope) are fixed by upgrading the workload.
 

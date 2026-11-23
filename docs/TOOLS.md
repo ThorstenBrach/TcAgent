@@ -480,6 +480,8 @@ Reads declaration and implementation of a PLC object (POU, method, property, DUT
 ### `tc_plc_write`
 
 Overwrites declaration and/or implementation of a PLC object (ST text). With dryRun=true (always in 'propose' mode) nothing is written; a diff is returned instead.
+Every written part is read back (also by `tc_plc_create` and the plain-text import): a write the IDE did not keep or that met a
+busy `.TcPOU` file is repeated once, and a text that still differs is reported instead of "written".
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|
@@ -1121,7 +1123,7 @@ TwinCAT Scope: list (configurations, charts, axes, channels with their PLC varia
 | `symbol` | string |  | add_channel: PLC variable, e.g. MAIN.fSine |
 | `netId` | string |  | add_channel: AmsNetId (default 127.0.0.1.1.1) |
 | `port` | integer |  | add_channel: ADS port (default 851) |
-| `dataType` | string |  | add_channel: Scope data type if the PLC is not reachable: BIT, INT8, UINT8, INT16, UINT16, INT32, UINT32, INT64, UINT64, REAL32, REAL64 |
+| `dataType` | string |  | add_channel: Scope data type if the PLC is not reachable or the variable is not elementary: BIT, INT8, UINT8, INT16, UINT16, INT32, UINT32, INT64, UINT64, REAL32, REAL64 (ENUM and alias variables are recorded as their elementary base type, e.g. an ENUM with USINT base as UINT8) |
 | `file` | string |  | export: target file |
 | `template` | string |  | add_config: .tcscopex to copy (default: YT Scope Project of the installation) |
 

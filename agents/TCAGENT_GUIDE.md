@@ -32,7 +32,8 @@ Applies equally to all clients: Claude, GitHub Copilot, Gemini, ChatGPT/Codex.
    rules. Details - where rules come from, precedence, adding rules - in the section "Coding rules" below.
 4. **Change:** `tc_plc_write` (always send the COMPLETE declaration or implementation part) or
    `tc_plc_create` (kind: function_block, function, program, method, property, dut_struct, dut_enum, gvl,
-   interface, folder ...; for methods `parentPath` is the FB).
+   interface, interface_method, dut_alias, folder ...; for methods `parentPath` is the FB, for an interface_method the
+   interface; dut_alias needs `baseType`, e.g. INT).
    **Implement an interface:** `tc_plc_create kind=function_block implements=IName` creates IMPLEMENTS and all methods/
    properties (incl. Get/Set) as stubs in ONE call - do not look them up and create them one by one. Then just fill the stubs
    with `tc_plc_write`. Properties always get Get/Set automatically.
@@ -195,7 +196,7 @@ treat them like project rules for that library.
 - New steps written by `tc_sfc write` get "Duplicate on copy" (embedded actions copied, not referenced); `duplicate=all` for all steps.
 - Never delete action objects because they look empty: graphical actions (FBD/LD/CFC) and embedded step actions are shown
   without text. `tc_delete` writes a backup (`<solution>\.tcagent\backup\delete`, restore with `tc_import kind=plcopen`)
-  and always asks the user; without a backup it deletes nothing.
+  and always asks the user; without a backup it deletes nothing. After deleting a PLC object it saves the TwinCAT project.
 - New chain: `tc_plc_create language=SFC`, then the actions (`tc_plc_create kind=action parentPath=<POU>`, ST code) and
   transitions with code if needed (`kind=transition`), then `tc_sfc action=write chain=...` with the complete chain.
   A transition line holds an ST condition (`bDone AND NOT bError`) or the name of a transition object.
