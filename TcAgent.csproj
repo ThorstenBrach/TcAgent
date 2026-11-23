@@ -14,6 +14,11 @@
     <!-- restore always includes the win-x64 graph (build.ps1/build-vsix.ps1 publish with -r win-x64): otherwise a plain
          restore/build drops the RID section from packages.lock.json and every publish adds it again -->
     <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <!-- the same for the ILLink pack: build-vsix.ps1 publishes as a single file, which turns on the single-file analyzer and
+         makes the SDK reference Microsoft.NET.ILLink.Tasks (Microsoft.NET.Publish.targets); build.ps1 does not. Always
+         requiring it keeps one packages.lock.json for both builds - it only adds the package to the restore, no analyzer,
+         no trimming. -->
+    <_RequiresILLinkPack>true</_RequiresILLinkPack>
     <NoWarn>CA1416;CS8632</NoWarn>
     <!-- false for the VSIX build: the interop is not shipped but generated on the target machine (InteropResolver.cs) -->
     <InteropPrivate Condition="'$(InteropPrivate)'==''">true</InteropPrivate>
