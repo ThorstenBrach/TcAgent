@@ -1077,7 +1077,7 @@ TwinCAT Package Manager (tcpkg, TwinCAT 4026+), read only: installed packages an
 
 ### `tc_packages_change`
 
-TwinCAT Package Manager, changes: install, upgrade, uninstall, repair packages; add, edit, remove feeds. Always confirmed by the user and run with administrator rights (UAC prompt): tcpkg.exe of the program folders, started without a shell. Package ids and versions only `[A-Za-z0-9._-]`, feed names words of these characters with single blanks, sources an http(s) URL or an absolute folder - other values are refused before the confirmation. Close Visual Studio / XAE Shell before changing XAE packages.
+TwinCAT Package Manager, changes: install, upgrade, uninstall, repair packages; add, edit, remove feeds. Always confirmed by the user and run with administrator rights (UAC prompt): tcpkg.exe of the program folders or `C:\TwinCAT`, started without a shell. A tcpkg.exe in TcPkg's install folder `%ProgramData%\Beckhoff\TcPkg` is started elevated only when it has a valid Authenticode signature and neither it nor any folder from `%ProgramData%\Beckhoff` down to it can be changed by anyone but Administrators, SYSTEM or TrustedInstaller (owner and ACL); otherwise the call is refused and the reason names the folder and the account that may write there. Any other location is refused. Package ids and versions only `[A-Za-z0-9._-]`, feed names words of these characters with single blanks, sources an http(s) URL or an absolute folder - other values are refused before the confirmation. Close Visual Studio / XAE Shell before changing XAE packages.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

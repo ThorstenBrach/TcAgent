@@ -4,7 +4,8 @@
 //                        outdated packages, details of a package, configured feeds, feed check, tcpkg settings
 //   tc_packages_change   install, upgrade, uninstall, repair packages; add, edit, remove feeds.
 //                        Always confirmed by the user (runtime class) and run elevated (UAC prompt on this PC):
-//                        TcAgent.exe tcpkg-elevated starts tcpkg.exe of the program folders directly, without cmd.exe.
+//                        TcAgent.exe tcpkg-elevated starts tcpkg.exe of the program folders (or of %ProgramData%\Beckhoff\TcPkg
+//                        when only administrators can change it and it is signed - TcpkgTrust.cs) directly, without cmd.exe.
 // Package ids, versions, feed names and options are checked against fixed character sets first (Guards.TcpkgArgs).
 //
 // Command syntax from the TwinCAT installation documentation (InfoSys "Working with the command line": list, install,
@@ -184,23 +185,61 @@ public sealed partial class ToolRegistry
                 var f = Path.Combine(root, rel);
                 if (File.Exists(f)) return f;
             }
+        // TcPkg's own install folder (%ProgramData%\Beckhoff\TcPkg)
+        var pd = Path.Combine(TcpkgTrust.ProgramDataTcpkgDir(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData)), "tcpkg.exe");
+        if (File.Exists(pd)) return pd;
         throw new Exception("tcpkg.exe not found - the TwinCAT Package Manager is part of TwinCAT 3.1 build 4026 and later (Beckhoff TcPkg). " +
                             "If it is installed elsewhere, add its folder to PATH.");
     }
 
     static string QuoteArg(string s) => s.Length > 0 && s.IndexOfAny(new[] { ' ', '"', '\t' }) < 0 ? s : "\"" + s.Replace("\"", "\\\"") + "\"";
 
-    /// <summary>tcpkg.exe for the elevated run: only from the program folders or C:\TwinCAT - a tcpkg.exe in a folder of
-    /// PATH the user can write to must not run with administrator rights.</summary>
+    /// <summary>tcpkg.exe for the elevated run: from the program folders or C:\TwinCAT, or from TcPkg's install folder
+    /// %ProgramData%\Beckhoff\TcPkg when only administrators can change it and the exe is validly signed (TcpkgTrust.cs) -
+    /// a tcpkg.exe in a folder the user can write to must not run with administrator rights.</summary>
     static string TrustedTcpkgExe()
     {
         foreach (var root in ProgramRoots())
             foreach (var rel in TcpkgLocations)
                 if (File.Exists(Path.Combine(root, rel))) return Path.Combine(root, rel);
         var exe = Path.GetFullPath(TcpkgExe());
-        if (!ProgramRoots().Select(r => r.TrimEnd('\\') + "\\").Any(r => exe.StartsWith(r, StringComparison.OrdinalIgnoreCase)))
-            throw new Exception($"tcpkg.exe ({exe}) is not in the program folders or C:\\TwinCAT - it is not started with administrator rights.");
+        var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+        var chain = TcpkgTrust.ChainToCheck(exe, programData);
+        var acls = chain.Select(ReadAcl).Where(a => a != null).ToList();
+        bool signed = false; string sigInfo = "not checked";
+        if (chain.Count > 0) (signed, sigInfo) = Authenticode.Verify(exe);
+        if (TcpkgTrust.Refusal(exe, ProgramRoots(), programData, acls, signed, sigInfo) is { } refusal)
+        {
+            Log.Info(refusal);
+            throw new Exception(refusal);
+        }
         return exe;
+    }
+
+    /// <summary>Owner and the allow entries that apply to the file/folder itself (SIDs), null if they cannot be read.</summary>
+    static TcpkgTrust.PathAcl ReadAcl(string path)
+    {
+        try
+        {
+            System.Security.AccessControl.FileSystemSecurity sec = File.Exists(path)
+                ? new FileInfo(path).GetAccessControl()
+                : new DirectoryInfo(path).GetAccessControl();
+            static string Name(System.Security.Principal.SecurityIdentifier sid)
+            {
+                try { return sid.Translate(typeof(System.Security.Principal.NTAccount)).Value; } catch { return sid.Value; }
+            }
+            var owner = (System.Security.Principal.SecurityIdentifier)sec.GetOwner(typeof(System.Security.Principal.SecurityIdentifier));
+            var allow = new List<TcpkgTrust.Ace>();
+            foreach (System.Security.AccessControl.FileSystemAccessRule r in sec.GetAccessRules(true, true, typeof(System.Security.Principal.SecurityIdentifier)))
+            {
+                if (r.AccessControlType != System.Security.AccessControl.AccessControlType.Allow) continue;
+                if (r.PropagationFlags.HasFlag(System.Security.AccessControl.PropagationFlags.InheritOnly)) continue;   // not for the object itself
+                var sid = (System.Security.Principal.SecurityIdentifier)r.IdentityReference;
+                allow.Add(new TcpkgTrust.Ace(sid.Value, Name(sid), (int)r.FileSystemRights));
+            }
+            return new TcpkgTrust.PathAcl(path, owner?.Value, owner != null ? Name(owner) : null, allow);
+        }
+        catch (Exception ex) { Log.Info($"ACL of {path}: {ex.Message}"); return null; }
     }
 
     static (int code, string output) RunTcpkgDirect(string exe, IReadOnlyList<string> args, int timeoutMs)

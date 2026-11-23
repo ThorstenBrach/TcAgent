@@ -40,6 +40,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   method is created with its return type (instead of the language/return type pair of a method) and gets a declaration
   without implementation; an alias is created with its declaration `TYPE X : <type>; END_TYPE`, built from the new
   parameter `baseType` or taken from `declaration` - without a base type it is refused with a clear message.
+- **`tc_packages_change` accepts tcpkg.exe in `%ProgramData%\Beckhoff\TcPkg`** (TcPkg's own install folder) when it is safe
+  to start it with administrator rights: valid Authenticode signature, and only Administrators, SYSTEM or TrustedInstaller
+  own and may change the exe and every folder from `%ProgramData%\Beckhoff` down to it. Otherwise the refusal now says
+  exactly what failed (e.g. which account may write to which folder) instead of only "not in the program folders".
 - **Documentation:** a module or plugin change reaches a running AI client without a restart (**Reload** in the settings
   window or `TcAgent.exe reload`), not only after one (PLUGINS.md); the activate gate is described as on by default and
   switchable (`TCAGENT_ACTIVATE_GATE=0`) instead of a hard gate (KNOWLEDGE_LAYERS.md, TOOLS.md); neutral library name in
