@@ -6,6 +6,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+## [0.56.0] – 2026-11-23
+
+The built-in knowledge in this version is TcAgent_Knowledge 1.1.0 (unchanged).
+
 ### Added
 - **Format on save** - **Formatter settings**, group **In the editor**: **Format when saving** formats the object of the active
   editor window before **File > Save** (Ctrl+S), **Save All** and **Save** when a changed window is closed, like Ctrl+Alt+F (Ctrl+Z takes it back), quietly with a note in
@@ -1185,7 +1189,9 @@ build, TcUnit results, I/O and tasks, runtime control via ADS with guardrails (a
 coding rules, documentation sources, agent feedback, the TcAgent Chat window and the inline question (Ctrl+Shift+Q),
 one-click VSIX installation with client setup for Claude, GitHub Copilot, Gemini and Codex.
 
-[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.54.0...HEAD
+[Unreleased]: https://github.com/ThorstenBrach/TcAgent/compare/v0.56.0...HEAD
+[0.56.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.55.0...v0.56.0
+[0.55.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.54.0...v0.55.0
 [0.54.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.53.0...v0.54.0
 [0.53.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.52.0...v0.53.0
 [0.52.0]: https://github.com/ThorstenBrach/TcAgent/compare/v0.51.0...v0.52.0
