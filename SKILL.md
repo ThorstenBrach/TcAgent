@@ -197,7 +197,8 @@ treat them like project rules for that library.
   (Declare=true or `SFCInit : BOOL;` in the declaration - the result says which).
 - New steps written by `tc_sfc write` get "Duplicate on copy" (embedded actions copied, not referenced); `duplicate=all` for all steps.
 - Never delete action objects because they look empty: graphical actions (FBD/LD/CFC) and embedded step actions are shown
-  without text. `tc_delete` writes a backup (`<solution>\.tcagent\backup\delete`, restore with `tc_import kind=plcopen`).
+  without text. `tc_delete` writes a backup (`<solution>\.tcagent\backup\delete`, restore with `tc_import kind=plcopen`)
+  and always asks the user; without a backup it deletes nothing.
 - New chain: `tc_plc_create language=SFC`, then the actions (`tc_plc_create kind=action parentPath=<POU>`, ST code) and
   transitions with code if needed (`kind=transition`), then `tc_sfc action=write chain=...` with the complete chain.
   A transition line holds an ST condition (`bDone AND NOT bError`) or the name of a transition object.

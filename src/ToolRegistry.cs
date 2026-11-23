@@ -205,16 +205,17 @@ public sealed partial class ToolRegistry
             a => tc.Sta.Run(() => { ((dynamic)tc.Item(Str(a, "path"))).ConsumeXml(Str(a, "xml")); return "OK"; }));
 
         Add("tc_delete", "Deletes a child item in the tree. A backup is written first (PLC objects as PLCopen XML, restorable with " +
-                         "tc_import kind=plcopen). Never delete PLC objects only because they look empty (graphical code, embedded SFC actions).",
+                         "tc_import kind=plcopen); without a backup nothing is deleted. The user is always asked first (unless TCAGENT_CONFIRM=off). " +
+                         "Never delete PLC objects only because they look empty (graphical code, embedded SFC actions).",
             Schema(Req(P("parentPath", "string", "Path of the parent item")), Req(P("name", "string", "Name of the child"))),
-            a => tc.Sta.Run(() =>
+            a =>
             {
-                var parent = Str(a, "parentPath") ?? throw new Exception("parentPath is required: the path of the parent item");
-                var child = Str(a, "name") ?? throw new Exception("name is required: the name of the child to delete, without its path");
-                var backup = BackupBeforeDelete(parent, child);
-                ((dynamic)tc.Item(parent)).DeleteChild(child);
-                return "deleted" + (backup != null ? $" - backup: {backup}" : " (no backup possible)");
-            }));
+                var (parent, child) = DeleteArgs(a);
+                // normally written in the confirmation step (CallCheck.Confirm), so the question can name it
+                var backup = Interlocked.Exchange(ref deleteBackup, null) ?? tc.Sta.Run(() => DeleteBackupOrRefuse(parent, child));
+                tc.Sta.Run(() => { ((dynamic)tc.Item(parent)).DeleteChild(child); return 0; });
+                return $"deleted - backup: {backup}";
+            });
 
         // ---------------------------------------------------------- Create I/O devices
         Add("tc_io_add", "Creates I/O configuration: devices under TIID (e.g. EtherCAT master), below them boxes/couplers/terminals by " +
@@ -1960,6 +1961,8 @@ public sealed partial class ToolRegistry
                 [CallCheck.ActivateGate] = () => { if (name == "tc_activate") ActivateGate(); },
                 [CallCheck.Confirm] = () =>
                 {
+                    // tc_delete: backup first, then always a question (ADR 0023, GAP-007)
+                    if (name == "tc_delete") { ConfirmDelete(args); return; }
                     if (!Confirm.Needed(name, args)) return;
                     string target = null;
                     try { target = TargetOf(name, args); } catch { }
@@ -2079,6 +2082,43 @@ public sealed partial class ToolRegistry
                    File.GetLastWriteTimeUtc(p) > System.Diagnostics.Process.GetCurrentProcess().StartTime.ToUniversalTime();
         }
         catch { return false; }
+    }
+
+    string deleteBackup;   // tc_delete: the backup written in the confirmation step, taken by the handler
+
+    static (string parent, string child) DeleteArgs(JsonObject a) =>
+        (Str(a, "parentPath") ?? throw new Exception("parentPath is required: the path of the parent item"),
+         Str(a, "name") ?? throw new Exception("name is required: the name of the child to delete, without its path"));
+
+    /// <summary>tc_delete (ADR 0023, GAP-007): the backup first; without one nothing is deleted. Call on the STA thread.</summary>
+    string DeleteBackupOrRefuse(string parent, string child)
+    {
+        tc.Item(parent + "^" + child);    // not found: that error, not "no backup"
+        return BackupBeforeDelete(parent, child)
+               ?? throw new OperationCanceledException($"NOT deleted: no backup of {parent}^{child} could be written (see the log), so nothing was " +
+                                                       "changed. Save the object another way first (tc_export, tc_plc_read) and ask the user to delete it in TwinCAT.");
+    }
+
+    /// <summary>The confirmation step of tc_delete: write the backup, then ask the user (always, unless TCAGENT_CONFIRM=off)
+    /// with the backup named in the question. A refusal removes the backup again - nothing was deleted.</summary>
+    void ConfirmDelete(JsonObject args)
+    {
+        deleteBackup = null;
+        var (parent, child) = DeleteArgs(args);
+        var backup = tc.Sta.Run(() => DeleteBackupOrRefuse(parent, child));
+        if (Confirm.Needed("tc_delete", args))
+        {
+            var what = Confirm.Describe("tc_delete", args, null) + " Backup: " + backup;
+            var ok = Confirm.Ask("tc_delete", what, tc.AttachedPid);
+            if (Guards.ConfirmRefusal(ok, Confirm.LastNotShown, what) is { } refused)
+            {
+                if (ok == false && !Confirm.LastNotShown && run != null) run.Corrections++;
+                if (ok == null) Log.Info("No confirmation possible (no channel), refused - " + what);
+                try { File.Delete(backup); } catch { }
+                throw new OperationCanceledException(refused);
+            }
+        }
+        deleteBackup = backup;
     }
 
     /// <summary>Saves the item before tc_delete: PLC objects as PLCopen XML (tc_import kind=plcopen), others as ProduceXml.

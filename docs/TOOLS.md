@@ -389,6 +389,8 @@ Writes XML to a tree item (ConsumeXml) - changes configuration. Read the format 
 ### `tc_delete`
 
 Deletes a child item in the tree. A backup is written first to `<solution>\.tcagent\backup\delete` (PLC objects as PLCopen XML – restore with `tc_import kind=plcopen`, other items as ProduceXml).
+When no backup can be written, nothing is deleted. Then the user is always asked (Yes/No, the question names the backup), at every
+`TCAGENT_CONFIRM` level except `off`; a "no" removes the backup again. If nobody can be asked, the call is refused.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

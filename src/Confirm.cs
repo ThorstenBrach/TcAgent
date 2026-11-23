@@ -2,7 +2,8 @@
 // The whitelist (TCAGENT_ALLOW_TARGETS) decides WHERE the agent may act - this decides WHETHER a person agrees each time.
 //
 //   TCAGENT_CONFIRM   runtime (default) = ask before runtime actions
-//                     all               = also before project changes (code, I/O, tasks, deleting ...)
+//                     all               = also before project changes (code, I/O, tasks ...)
+//                     (tc_delete always asks, at every level except off - and only after its backup is written)
 //                     off               = never ask (pipelines, unattended agents)
 //
 // Channel: from the TcAgent Chat a Yes/No dialog in Visual Studio (TcAgentBridge); in other clients the client's own
@@ -35,6 +36,7 @@ public static class Confirm
         if (tool == "tc_refactor") return false;     // asks per change itself (Apply / Apply all / Reject / Cancel)
         if (tool == "tc_improve") return false;      // asks itself, with the diff of the change
         if (tool == "tc_sources" && args?["action"]?.ToString() is "install" or "pull" or "promote") return false;   // asks itself: files, scripts, license
+        if (tool == "tc_delete") return Configured != Level.Off;   // always asks, like the refactorings (ADR 0023, GAP-007)
         if (Plugins.Undeclared(tool) && Configured != Level.Off) return true;   // a plugin tool that did not say what it does
         return Configured switch
         {
@@ -164,6 +166,8 @@ public static class Confirm
             case "tc_test_run":
                 return $"Run TcUnit tests {(string.IsNullOrWhiteSpace(S("tests")) ? "(all)" : S("tests"))}{(string.IsNullOrEmpty(target) ? " on the local runtime" : on)}: " +
                        "build and activate if the code changed, reset and start the PLC, write the test selection via ADS.";
+            case "tc_delete":
+                return $"Delete {S("name")} from {S("parentPath")} in the project.";
             case "tc_runtime_startup":
                 return $"Set the start mode of the local TwinCAT runtime to '{S("mode")}' (takes effect from the next boot).";
             default:

@@ -15,6 +15,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
   issues opened without a form are closed automatically with a hint.
 - **`tc_refactor` renames PLC folders:** `target=folder` with the tree path of the folder as `object` (kind `rename`).
 
+### Changed
+- **`tc_delete` always asks and never deletes without a backup.** The backup is written first; when that is not possible,
+  nothing is deleted. Then the user confirms the deletion (the question names the backup file) at every `TCAGENT_CONFIRM`
+  level except `off` - before, only `all` asked. A "no" removes the backup again; if nobody can be asked, the call is refused.
+
 ### Fixed
 - **`tc_plc_create` no longer times out when the new-code question cannot be shown.** A client without its own question
   dialog (e.g. a remote session) got the question as a card in the IDE that nobody saw, waited until the client gave up

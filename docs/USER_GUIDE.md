@@ -670,6 +670,8 @@ exist only in the IDE. A good agent saves at the end of a task; ask for it if yo
 
 *"Delete the unused POU FB_Old."* – `tc_delete` removes a child item of the tree. **A backup is written first** to
 `<solution>\.tcagent\backup\delete` (PLC objects as PLCopen XML, other items as ProduceXml; the folder is git-ignored).
+If no backup can be written, nothing is deleted. **You are always asked before** an object is deleted (unless
+`TCAGENT_CONFIRM=off`); the question names the backup file.
 To restore: *"Restore FB_Old from the delete backup"* – `tc_import kind=plcopen` with the backup file; the object goes
 back into its original folder.
 
@@ -2156,13 +2158,14 @@ pipeline, `--allow` in the pipeline definition releases a target for that run.
 | Value | You confirm |
 |---|---|
 | `runtime` (default) | Runtime actions: `tc_activate`, `tc_plc_online`, `ads_write`, `tc_runtime_mode`, `tc_runtime_startup` (when setting a mode), `tc_route_add`, `tc_packages_change` |
-| `all` | Additionally every project change (code, I/O, tasks, deleting …) |
+| `all` | Additionally every project change (code, I/O, tasks …) |
 | `off` | Nothing (pipelines, unattended agents) |
 
 - From the TcAgent Chat: a Yes/No dialog in Visual Studio. Elsewhere: the client's own question dialog (MCP elicitation).
 - No answer counts as "no". A declined confirmation is final.
 - Dry runs (`dryRun=true`) never ask.
 - `tc_refactor` always asks per change (Apply / Apply all / Reject / Cancel), whatever the setting.
+- `tc_delete` always asks too (with `runtime` and `all`), after its backup is written; without a backup nothing is deleted.
 - If nobody can be asked (a client without a question dialog and no TcAgentBridge dialog in the IDE), the action is
   refused with a message - it never runs unconfirmed. To run runtime actions without a question (pipelines, unattended
   agents) set `TCAGENT_CONFIRM=off` deliberately; the whitelist still applies.
