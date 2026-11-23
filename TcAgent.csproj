@@ -11,6 +11,9 @@
     <!-- fixed package versions (licenses checked for exactly these, see THIRD-PARTY-NOTICES.md); packages.lock.json is
          committed so every build ships the same dependencies. After changing a version: dotnet restore with the option force-evaluate -->
     <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <!-- restore always includes the win-x64 graph (build.ps1/build-vsix.ps1 publish with -r win-x64): otherwise a plain
+         restore/build drops the RID section from packages.lock.json and every publish adds it again -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <NoWarn>CA1416;CS8632</NoWarn>
     <!-- false for the VSIX build: the interop is not shipped but generated on the target machine (InteropResolver.cs) -->
     <InteropPrivate Condition="'$(InteropPrivate)'==''">true</InteropPrivate>
