@@ -174,4 +174,32 @@ public class SettingsSchemaTests
         }
         finally { try { Directory.Delete(dir, true); } catch { } }
     }
+
+    // TCAGENT_TCPKG_ALLOW_USER_WRITABLE counts only from settings.json / Windows (TcpkgTrust): a copy in an MCP configuration
+    // is neither "set from outside" nor the effective value
+    [Fact]
+    public void A_user_only_setting_ignores_mcp_configurations()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "tcagent-settings-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var sf = Path.Combine(dir, "settings.json");
+            File.WriteAllText(sf, "{\"env\":{}}");
+            var mcp = Path.Combine(dir, "mcp-copilot.json");
+            File.WriteAllText(mcp, "{\"mcpServers\":{\"tcagent\":{\"env\":{\"TCAGENT_TCPKG_ALLOW_USER_WRITABLE\":\"1\"}}}}");
+            Assert.True(SettingsSchema.Find("TCAGENT_TCPKG_ALLOW_USER_WRITABLE")!.UserOnly);
+            var s = SettingsSchema.Show(sf, new[] { mcp })["settings"]!.AsArray().OfType<System.Text.Json.Nodes.JsonObject>()
+                .First(x => x["key"]!.ToString() == "TCAGENT_TCPKG_ALLOW_USER_WRITABLE");
+            if (string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TCAGENT_TCPKG_ALLOW_USER_WRITABLE", EnvironmentVariableTarget.User)) &&
+                string.IsNullOrEmpty(Environment.GetEnvironmentVariable("TCAGENT_TCPKG_ALLOW_USER_WRITABLE", EnvironmentVariableTarget.Machine)))
+            {
+                Assert.Equal("default", s["from"]!.ToString());
+                Assert.Equal("0", s["effective"]!.ToString());
+                Assert.Null(s["outsideFrom"]);
+            }
+            else Assert.Equal("Windows environment variable", s["outsideFrom"]!.ToString());
+        }
+        finally { try { Directory.Delete(dir, true); } catch { } }
+    }
 }

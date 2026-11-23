@@ -6,6 +6,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 
 ## [Unreleased]
 
+### Fixed
+- **Settings window: "Start tcpkg although users may write to its folder" no longer shows as "set from outside".** The
+  client setup copied it from `settings.json` into the AI clients' MCP configurations, so the window showed it as locked
+  by e.g. `mcp-copilot.json`. TcAgent reads this switch only from your own settings and the Windows environment (never
+  from an MCP configuration), so the setup no longer copies it and the window ignores such copies.
+
 ## [0.56.0] – 2026-11-23
 
 The built-in knowledge in this version is TcAgent_Knowledge 1.1.0 (unchanged).

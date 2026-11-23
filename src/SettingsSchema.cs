@@ -16,6 +16,10 @@ public sealed record Setting(string Key, string Page, string Type, string Defaul
 {
     /// <summary>Plain words for the values (en, de), same order as Values.</summary>
     public (string En, string De)[] ValueLabels { get; init; }
+
+    /// <summary>Read only from settings.json and the Windows environment variables - an MCP configuration (which a project can
+    /// bring along) does not count, so it is neither shown as "set from outside" nor copied into the clients' configurations.</summary>
+    public bool UserOnly { get; init; }
 }
 
 public static class SettingsSchema
@@ -83,7 +87,7 @@ public static class SettingsSchema
             "Start tcpkg although users may write to its folder", "tcpkg starten, obwohl Benutzer in seinen Ordner schreiben dürfen",
             "RISK: tc_packages_change starts %ProgramData%\\Beckhoff\\TcPkg\\tcpkg.exe with administrator rights although normal users may create files in that folder (the default of TcPkg) - any normal user could place a file there that the elevated tcpkg loads. The exe itself, its owner and its signature are still checked; you see a warning each time. Only from your own settings or the Windows environment, never from a project. Safer: as administrator remove the write right of Users on the folder.",
             "RISIKO: tc_packages_change startet %ProgramData%\\Beckhoff\\TcPkg\\tcpkg.exe mit Administratorrechten, obwohl normale Benutzer in diesem Ordner Dateien anlegen dürfen (Standard von TcPkg) - jeder normale Benutzer könnte dort eine Datei ablegen, die das erhöhte tcpkg lädt. Die exe selbst, ihr Besitzer und ihre Signatur werden weiter geprüft; du siehst jedes Mal eine Warnung. Nur aus deinen eigenen Einstellungen oder der Windows-Umgebung, nie aus einem Projekt. Sicherer: als Administrator das Schreibrecht der Benutzer auf den Ordner entfernen.")
-        { ValueLabels = OnOffLabels },
+        { ValueLabels = OnOffLabels, UserOnly = true },
         new("TCAGENT_LESSONS_RECALL", "gates", "onoff", "1", OnOff,
             "Recall lessons on errors", "Bei Fehlern an Lessons erinnern",
             "On an error, TcAgent adds matching lessons to the answer.", "Bei einem Fehler hängt TcAgent passende Lessons an die Antwort.") { ValueLabels = OnOffLabels },
@@ -212,7 +216,8 @@ public static class SettingsSchema
             if (saved != null) o["saved"] = saved;
             // outside: Windows (user or machine variable) or an MCP configuration - wins over settings.json
             var win = Environment.GetEnvironmentVariable(s.Key, EnvironmentVariableTarget.User) ?? Environment.GetEnvironmentVariable(s.Key, EnvironmentVariableTarget.Machine);
-            if (fromMcp.TryGetValue(s.Key, out var m)) { o["outside"] = m.Value; o["outsideFrom"] = "MCP configuration " + m.File; }
+            // a user-only setting ignores MCP configurations (TcpkgTrust.AllowUserWritable reads it the same way)
+            if (!s.UserOnly && fromMcp.TryGetValue(s.Key, out var m)) { o["outside"] = m.Value; o["outsideFrom"] = "MCP configuration " + m.File; }
             else if (!string.IsNullOrEmpty(win)) { o["outside"] = win; o["outsideFrom"] = "Windows environment variable"; }
             o["effective"] = o["outside"]?.ToString() ?? saved ?? s.Default;
             o["from"] = o["outside"] != null ? "outside" : saved != null ? "saved" : "default";

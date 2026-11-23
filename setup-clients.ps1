@@ -95,6 +95,11 @@ Set-Prop $settings 'env' $envObj
 Set-Prop $settings 'server' $server
 Save-Json $settingsFile $settings
 $done.Add("Settings: $settingsFile (single source for all clients)")
+# user-only settings (SettingsSchema UserOnly) stay in settings.json but are not copied into the clients' configurations:
+# TcAgent reads them only from settings.json / Windows, a copy would just show up as "set from outside" in the settings window
+foreach ($k in @('TCAGENT_TCPKG_ALLOW_USER_WRITABLE')) { if ($envVars.Contains($k)) { $envVars.Remove($k) } }
+$envObj = New-Object PSObject
+foreach ($k in $envVars.Keys) { Set-Prop $envObj $k $envVars[$k] }
 Write-Host "TcAgent: $TcAgentExe"
 Write-Host ("Environment: " + (($envVars.GetEnumerator() | ForEach-Object { if ($_.Key -eq 'TCAGENT_SEARCH') { "$($_.Key)=$(($_.Value -split ':')[0]):***" } else { "$($_.Key)=$($_.Value)" } }) -join '; '))
 
