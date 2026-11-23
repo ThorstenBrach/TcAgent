@@ -250,12 +250,41 @@ public sealed partial class ToolRegistry
         else
         {
             var template = Str(a, "template") ?? "Standard PLC Template";
-            if (!template.Contains('\\') && !template.EndsWith(".plcproj", StringComparison.OrdinalIgnoreCase))
-                template = TwinCatSession.FindTemplate($@"Plc\PlcTemplate\Plc Templates\{template}.plcproj") ?? template;   // full path is language independent
+            if (template.Contains('\\') || template.Contains('/'))
+            {
+                template = Path.GetFullPath(template);
+                if (!File.Exists(template)) throw new FileNotFoundException("PLC project template not found - nothing was created", template);
+            }
+            else
+            {
+                // a name: the full path is language independent; classic template folder first, then those of newer builds (PlcTemplates.cs)
+                var folders = PlcTemplates.Folders(PlcTemplates.ComponentRoots());
+                template = PlcTemplates.Find(template, folders) ?? throw new Exception(
+                    $"PLC project template '{template}' not found - nothing was created. " +
+                    (folders.Count == 0 ? "No PLC template folder found below the TwinCAT Components folder (TWINCAT3DIR, C:\\TwinCAT\\3.1, Program Files (x86)\\Beckhoff\\TwinCAT\\3.1). "
+                                        : $"Searched: {string.Join("; ", folders)}. Available: {string.Join(", ", PlcTemplates.Available(folders))}. ") +
+                    "Pass template=<name> of an available template or the full path of a .plcproj template.");
+            }
             sub = 0; info = template; what = $"new from template {template}";
         }
         if (DryRun(a)) return $"PROPOSAL (nothing created): PLC project '{name}' - {what}";
-        var created = (ITcSmTreeItem)((dynamic)tipc).CreateChild(name, sub, "", info);
+        // a failed attempt from a template leaves the new project folder behind: remember whether it was there before
+        string newDir = null;
+        if (string.IsNullOrEmpty(file) && !string.IsNullOrWhiteSpace(name))
+            try { newDir = tc.TwinCatProjectDir() is { } td ? Path.Combine(td, name.Trim()) : null; if (newDir != null && Directory.Exists(newDir)) newDir = null; } catch { newDir = null; }
+        ITcSmTreeItem created;
+        try { created = (ITcSmTreeItem)((dynamic)tipc).CreateChild(name, sub, "", info); }
+        catch (Exception ex) when (newDir != null && Directory.Exists(newDir))
+        {
+            bool inTree = false;
+            try { tc.Item("TIPC^" + name.Trim()); inTree = true; } catch { }
+            if (inTree) throw;
+            string cleanup;
+            try { Directory.Delete(newDir, true); cleanup = $"the folder {newDir} it left behind was removed"; }
+            catch (Exception dex) { cleanup = $"the folder {newDir} it left behind could not be removed ({dex.Message}) - delete it before the next attempt"; }
+            Log.Info("tc_plc_project_add failed, " + cleanup);
+            throw new Exception($"Creating the PLC project failed: {ErrorText(ex)} - {cleanup}.", ex);
+        }
         tc.InvalidatePlcIndex();
         var o = new StringBuilder($"created: {created.PathName} - {what}");
         foreach (var c in TwinCatSession.Children(created)) o.Append("\n  ").Append(c.PathName);

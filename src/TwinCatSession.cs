@@ -546,6 +546,23 @@ public sealed class TwinCatSession
         if (problem != null) throw new Exception(problem);
     }
 
+    /// <summary>The folder of the .tsproj of the TwinCAT project TcAgent works with (null = unknown). Must run on the STA thread.</summary>
+    public string TwinCatProjectDir()
+    {
+        var dte = RequireDte();
+        string first = null;
+        foreach (Project p in dte.Solution.Projects)
+            try
+            {
+                if (p.Object is not ITcSysManager sm) continue;
+                var dir = Path.GetDirectoryName(p.FullName);
+                if (ReferenceEquals(sm, SysMan)) return dir;
+                first ??= dir;
+            }
+            catch { }
+        return first;
+    }
+
     /// <summary>Beckhoff template below ...\TwinCAT\3.1\Components\ (TWINCAT3DIR, C:\TwinCAT, Program Files (x86)).</summary>
     public static string FindTemplate(string relative)
     {

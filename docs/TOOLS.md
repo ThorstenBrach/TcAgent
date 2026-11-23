@@ -841,6 +841,11 @@ Starts Visual Studio/XAE and creates a new solution with a TwinCAT XAE project (
 
 Adds a PLC project: new from a template (default 'Standard PLC Template') or an existing .plcproj/.tpzip (file). The PLC instance and its task appear below TIPC; check with tc_tree path=TIPC.
 
+A template name is looked up in `Components\Plc\PlcTemplate\Plc Templates` and then in the template folders of newer builds
+(`Components\Plc\Build_<build>\PlcTemplates\<version>\Plc Templates`, newest first) below `TWINCAT3DIR`, `C:\TwinCAT\3.1` and
+`C:\Program Files (x86)\Beckhoff\TwinCAT\3.1`. If no template file is found, nothing is created and the error lists the folders
+searched and the templates available. If creating fails, the project folder it left behind is removed.
+
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `name` | string | yes | Name of the PLC project (ignored with fileMode=original) |
