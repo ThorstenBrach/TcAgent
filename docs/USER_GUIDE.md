@@ -1089,9 +1089,11 @@ confirmed by you**.
    TcLinkTo, persistent/retain, HMI files).
 2. The agent proposes changes: comments where missing (meaning, unit, range), new names only where a name is really
    unclear, following your naming rules.
-3. `tc_refactor action=apply changes=[...]` asks you **per change**: **Apply / Apply all / Reject / Cancel** – a dialog
-   in Visual Studio (TcAgent Chat) or your client's question dialog.
+3. `tc_refactor action=apply changes=[...]` asks you **per change**: **Apply / Apply all / Reject / Cancel** – a card
+   in the TcAgent Chat while the chat is working, otherwise a dialog in Visual Studio or your client's question dialog.
 4. The agent runs `tc_check` afterwards.
+
+   <img src="img/chat/refactor-card.png" width="460" alt="Card in the TcAgent Chat: rename a function block, the diff of the declaration, Apply / Apply all / Reject / Cancel">
 
 Comments go as `// ...` on the declaration line or `/// ...` above (as your rules say). Renames are whole-word edits
 outside strings and comments in the object (and its members/derived FBs for FB variables) and – for names visible
