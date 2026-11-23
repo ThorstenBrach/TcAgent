@@ -305,11 +305,20 @@ public sealed class TwinCatSession
     {
         note = "";
         var dte = RequireDte();
-        Project proj = null;
-        foreach (Project p in dte.Solution.Projects)
-            try { if (string.Equals(p.FullName, projectFile, StringComparison.OrdinalIgnoreCase)) proj = p; } catch { }
-        if (proj == null) return edit();   // not loaded in the IDE - plain file edit
+        var proj = FindProject(dte, projectFile, out var wasUnloaded);
+        if (proj == null) return edit();   // not in the solution - plain file edit
         var file = Path.GetFileName(projectFile);
+        if (wasUnloaded)                   // already unloaded (an earlier reload=false, a reload whose save question got No): edit the files
+        {
+            var r = edit();
+            if (!reload)
+                note = $" ({file} is UNLOADED in Visual Studio - ask the user to reload it: Solution Explorer > right-click the project > Reload Project)";
+            else
+                try { LoadedProject(projectFile, out _); note = $" ({file} was already unloaded in Visual Studio; changed and reloaded)"; }
+                catch (IdeLostException) { throw; }
+                catch (Exception ex) { note = $" (the change is written; {ex.Message})"; }
+            return r;
+        }
         CheckIdeMemory("unloading and reloading " + file);
         var dir = Path.GetDirectoryName(projectFile) ?? "";
         foreach (Document d in dte.Documents.Cast<Document>().ToList())
@@ -327,15 +336,7 @@ public sealed class TwinCatSession
         var projName = proj.Name;
         // Project.UnloadProject/ReloadProject act on the selection in the Solution Explorer - it has to be the active window,
         // otherwise (e.g. while a Scope or HMI editor has the focus) the command is not available and DTE returns E_FAIL.
-        void SelectProject()
-        {
-            try { dte.Windows.Item(EnvDTE.Constants.vsWindowKindSolutionExplorer).Activate(); } catch { }
-            UIHierarchyItem node = null;
-            try { node = dte.ToolWindows.SolutionExplorer.GetItem(slnName + "\\" + projName); } catch { }
-            node ??= FindNode(dte.ToolWindows.SolutionExplorer.UIHierarchyItems, projName)
-                     ?? throw new Exception($"project '{projName}' not found in the Solution Explorer");
-            node.Select(vsUISelectionType.vsUISelectionTypeSelect);
-        }
+        void SelectProject() => SelectInSolutionExplorer(dte, slnName, projName);
         void Run(string command)
         {
             try { dte.ExecuteCommand(command); }
@@ -369,6 +370,93 @@ public sealed class TwinCatSession
         }
         if (editError != null) System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(editError).Throw();
         return result;
+    }
+
+    /// <summary>Selects a project in the Solution Explorer (Project.UnloadProject/ReloadProject act on the selection, and only
+    /// while the Solution Explorer is the active window - e.g. with an HMI or Scope editor in focus DTE returns E_FAIL).</summary>
+    static void SelectInSolutionExplorer(DTE2 dte, string slnName, string projName)
+    {
+        try { dte.Windows.Item(EnvDTE.Constants.vsWindowKindSolutionExplorer).Activate(); } catch { }
+        UIHierarchyItem node = null;
+        try { node = dte.ToolWindows.SolutionExplorer.GetItem(slnName + "\\" + projName); } catch { }
+        node ??= FindNode(dte.ToolWindows.SolutionExplorer.UIHierarchyItems, projName)
+                 ?? throw new Exception($"project '{projName}' not found in the Solution Explorer");
+        node.Select(vsUISelectionType.vsUISelectionTypeSelect);
+    }
+
+    const string KindUnloaded = "{67294A52-A4F0-11D2-AA88-00C04F688DDE}";        // vsProjectKindUnmodeled: an unloaded project
+    const string KindSolutionFolder = "{66A26720-8FB5-11D2-AA7E-00C04F688DDE}";  // vsProjectKindSolutionItems
+
+    static IEnumerable<Project> AllProjects(Projects projects)
+    {
+        var list = new List<Project>();
+        void Add(Project p, int depth)
+        {
+            if (p == null || depth > 6) return;
+            list.Add(p);
+            string kind = null;
+            try { kind = p.Kind; } catch { }
+            if (!string.Equals(kind, KindSolutionFolder, StringComparison.OrdinalIgnoreCase)) return;
+            try { foreach (ProjectItem i in p.ProjectItems) { Project sub = null; try { sub = i.SubProject; } catch { } Add(sub, depth + 1); } } catch { }
+        }
+        foreach (Project p in projects) Add(p, 0);
+        return list;
+    }
+
+    /// <summary>The project of the open solution with this project file, also in solution folders. An unloaded project has no
+    /// FullName - it is found by its UniqueName (the path relative to the solution) and reported with unloaded=true.</summary>
+    public static Project FindProject(DTE2 dte, string projectFile, out bool unloaded)
+    {
+        unloaded = false;
+        string slnDir = "";
+        try { slnDir = Path.GetDirectoryName(dte.Solution.FullName) ?? ""; } catch { }
+        foreach (var p in AllProjects(dte.Solution.Projects))
+        {
+            string full = null, kind = null, unique = null;
+            try { full = p.FullName; } catch { }
+            if (!string.IsNullOrEmpty(full) && string.Equals(full, projectFile, StringComparison.OrdinalIgnoreCase)) return p;
+            try { kind = p.Kind; } catch { }
+            if (!string.Equals(kind, KindUnloaded, StringComparison.OrdinalIgnoreCase)) continue;
+            try { unique = p.UniqueName; } catch { }
+            if (string.IsNullOrEmpty(unique)) continue;
+            string path;
+            try { path = Path.GetFullPath(Path.IsPathRooted(unique) ? unique : Path.Combine(slnDir, unique)); } catch { continue; }
+            if (string.Equals(path, Path.GetFullPath(projectFile), StringComparison.OrdinalIgnoreCase)) { unloaded = true; return p; }
+        }
+        return null;
+    }
+
+    /// <summary>The loaded project with this file. A project left unloaded (e.g. by an earlier edit with reload=false, or a
+    /// reload whose save question was answered with No) is reloaded first; note says so. null = not in the solution.
+    /// Must run on the STA thread.</summary>
+    public Project LoadedProject(string projectFile, out string note)
+    {
+        note = "";
+        var dte = RequireDte();
+        var proj = FindProject(dte, projectFile, out var unloaded);
+        if (proj == null || !unloaded) return proj;
+        string projName = Path.GetFileNameWithoutExtension(projectFile);
+        try { projName = proj.Name; } catch { }
+        var file = Path.GetFileName(projectFile);
+        Log.Info($"{file} is unloaded in the IDE - reloading it");
+        CheckIdeMemory("reloading " + file);
+        try
+        {
+            SelectInSolutionExplorer(dte, Path.GetFileNameWithoutExtension(dte.Solution.FullName), projName);
+            dte.ExecuteCommand("Project.ReloadProject");
+        }
+        catch (Exception ex) when (IsIdeLost(ex)) { throw Lost(ex, $"reloading {projName}"); }
+        catch (Exception ex)
+        {
+            throw new Exception($"The project {projName} is UNLOADED in Visual Studio and could not be reloaded automatically ({ex.Message}). " +
+                                "Ask the user to reload it: Solution Explorer > right-click the project > Reload Project (or close and reopen the solution), then retry.", ex);
+        }
+        proj = FindProject(dte, projectFile, out unloaded);
+        if (proj == null || unloaded)
+            throw new Exception($"The project {projName} is still UNLOADED in Visual Studio after Reload Project (a dialog may have been answered). " +
+                                "Ask the user to reload it: Solution Explorer > right-click the project > Reload Project, then retry.");
+        note = $"{projName} was unloaded in Visual Studio (left so by an earlier change) and has been reloaded.\n";
+        return proj;
     }
 
     static readonly int[] LostCodes =

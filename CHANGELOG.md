@@ -28,6 +28,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 - **"Value was either too large or too small for a UInt32" now says what to do:** when `tc_tree`, `tc_plc_read`,
   `tc_plc_create` or `tc_plc_write` meet this error of the Automation Interface (seen on a PLC project added in the same
   IDE session), the message adds that the IDE has not settled the new PLC project yet: save all, reopen the solution, retry.
+- **`tc_hmi action=build` builds an HMI project that an earlier change left unloaded** instead of saying "not part of
+  the open solution": the project is reloaded first (the reply says so); if that fails, the error says it is unloaded and
+  how to reload it. `tc_hmi_page`, `tc_hmi_control`, `tc_hmi_symbol` and the Scope tools with `reload` (default) also
+  reload a project they find already unloaded.
 - **Documentation:** a module or plugin change reaches a running AI client without a restart (**Reload** in the settings
   window or `TcAgent.exe reload`), not only after one (PLUGINS.md); the activate gate is described as on by default and
   switchable (`TCAGENT_ACTIVATE_GATE=0`) instead of a hard gate (KNOWLEDGE_LAYERS.md, TOOLS.md); neutral library name in

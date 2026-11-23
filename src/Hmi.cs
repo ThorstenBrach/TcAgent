@@ -261,15 +261,14 @@ public sealed partial class ToolRegistry
                 return tc.Sta.Run(() =>
                 {
                     var dte = tc.RequireDte();
-                    EnvDTE.Project proj = null;
-                    foreach (EnvDTE.Project x in dte.Solution.Projects)
-                        try { if (string.Equals(x.FullName, p.ProjFile, StringComparison.OrdinalIgnoreCase)) proj = x; } catch { }
-                    if (proj == null) throw new Exception("The HMI project is not part of the open solution - add it in Visual Studio.");
+                    // an HMI project left unloaded by an earlier tc_hmi_symbol/_page/_control edit is reloaded first
+                    var proj = tc.LoadedProject(p.ProjFile, out var reloaded)
+                               ?? throw new Exception($"The HMI project {p.ProjFile} is not part of the open solution (neither loaded nor unloaded) - add it in Visual Studio.");
                     var sb = dte.Solution.SolutionBuild;
                     sb.BuildProject(sb.ActiveConfiguration.Name, proj.UniqueName, true);
                     var (compile, _) = tc.ReadErrorList(1000);
                     var mine = compile.Where(e => (e.Project ?? "").Contains(p.Name, StringComparison.OrdinalIgnoreCase) || (e.File ?? "").StartsWith(p.Dir, StringComparison.OrdinalIgnoreCase)).ToList();
-                    return $"HMI build {(sb.LastBuildInfo == 0 ? "OK" : "FAILED")}: {mine.Count(e => e.Level == "ERROR")} errors, {mine.Count(e => e.Level == "WARN")} warnings\n" +
+                    return reloaded + $"HMI build {(sb.LastBuildInfo == 0 ? "OK" : "FAILED")}: {mine.Count(e => e.Level == "ERROR")} errors, {mine.Count(e => e.Level == "WARN")} warnings\n" +
                            string.Join("\n", mine.Take(200)) + "\nPublish to the HMI server in Visual Studio (TwinCAT HMI > Publish).";
                 }, 600_000);
             default: throw new Exception("action: info, read, controls or build");

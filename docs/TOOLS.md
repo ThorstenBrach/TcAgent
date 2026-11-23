@@ -1119,6 +1119,10 @@ TwinCAT Scope: list (configurations, charts, axes, channels with their PLC varia
 
 TwinCAT HMI project (file based): info (pages, startup view, ADS runtimes, mapped symbols), read (a view/content file), controls (available control types and their attributes from the installed control package), build (via Visual Studio). Create the HMI project once in Visual Studio; pages/controls/symbols then with tc_hmi_page, tc_hmi_control, tc_hmi_symbol.
 
+`build` reloads an HMI project that an earlier change left unloaded (`reload=false`, or a save question during the reload answered
+with No) and says so; if the reload fails, the error says that the project is unloaded and how to reload it. The edit tools also
+reload a project they find already unloaded when `reload` is true.
+
 | Parameter | Type | Required | Description |
 |---|---|---|---|
 | `action` | string | yes | info, read, controls or build |
