@@ -23,6 +23,8 @@ The built-in knowledge in this version is TcAgent_Knowledge 1.1.0 (unchanged).
 - **`tc_delete` always asks and never deletes without a backup.** The backup is written first; when that is not possible,
   nothing is deleted. Then the user confirms the deletion (the question names the backup file) at every `TCAGENT_CONFIRM`
   level except `off` - before, only `all` asked. A "no" removes the backup again; if nobody can be asked, the call is refused.
+  After a PLC object is deleted, the TwinCAT project is saved: TwinCAT removes the object's file at once, and the `.plcproj`
+  still listed it until the next save (a crash in between left a project with a missing file).
 
 ### Fixed
 - **`tc_plc_create` no longer times out when the new-code question cannot be shown.** A client without its own question

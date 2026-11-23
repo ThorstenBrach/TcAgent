@@ -206,6 +206,7 @@ public sealed partial class ToolRegistry
 
         Add("tc_delete", "Deletes a child item in the tree. A backup is written first (PLC objects as PLCopen XML, restorable with " +
                          "tc_import kind=plcopen); without a backup nothing is deleted. The user is always asked first (unless TCAGENT_CONFIRM=off). " +
+                         "Deleting a PLC object saves the TwinCAT project afterwards (TwinCAT removes the object's file at once). " +
                          "Never delete PLC objects only because they look empty (graphical code, embedded SFC actions).",
             Schema(Req(P("parentPath", "string", "Path of the parent item")), Req(P("name", "string", "Name of the child"))),
             a =>
@@ -214,7 +215,16 @@ public sealed partial class ToolRegistry
                 // normally written in the confirmation step (CallCheck.Confirm), so the question can name it
                 var backup = Interlocked.Exchange(ref deleteBackup, null) ?? tc.Sta.Run(() => DeleteBackupOrRefuse(parent, child));
                 tc.Sta.Run(() => { ((dynamic)tc.Item(parent)).DeleteChild(child); return 0; });
-                return $"deleted - backup: {backup}";
+                if (!parent.StartsWith("TIPC^", StringComparison.OrdinalIgnoreCase)) return $"deleted - backup: {backup}";
+                // TwinCAT deletes the object's file (.TcPOU ...) at once, but the .plcproj keeps listing it until the project is
+                // saved - a crash or closing without saving would leave a project that misses a file (feedback FB-6DE7F55A).
+                // So the TwinCAT project is saved right away (with its PLC projects; open documents are not saved).
+                string saved = null, why = null;
+                try { saved = tc.Sta.Run(() => tc.SaveTwinCatProject()); } catch (Exception ex) { why = ex.Message; }
+                return $"deleted - backup: {backup}" + (saved != null
+                    ? $"\nThe project was saved ({Path.GetFileName(saved)} with its PLC projects): TwinCAT removed the object's file at once, so the project file must not list it any longer."
+                    : $"\nWARNING: the project could not be saved{(why != null ? " (" + why + ")" : "")} - TwinCAT removed the object's file at once, but the .plcproj " +
+                      "still lists it until the project is saved. Call tc_save now.");
             });
 
         // ---------------------------------------------------------- Create I/O devices

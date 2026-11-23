@@ -547,20 +547,32 @@ public sealed class TwinCatSession
     }
 
     /// <summary>The folder of the .tsproj of the TwinCAT project TcAgent works with (null = unknown). Must run on the STA thread.</summary>
-    public string TwinCatProjectDir()
+    public string TwinCatProjectDir() => TwinCatProject() is { } p ? Path.GetDirectoryName(p.FullName) : null;
+
+    /// <summary>The DTE project of the TwinCAT project TcAgent works with (.tsproj), null = unknown. Must run on the STA thread.</summary>
+    Project TwinCatProject()
     {
         var dte = RequireDte();
-        string first = null;
+        Project first = null;
         foreach (Project p in dte.Solution.Projects)
             try
             {
                 if (p.Object is not ITcSysManager sm) continue;
-                var dir = Path.GetDirectoryName(p.FullName);
-                if (ReferenceEquals(sm, SysMan)) return dir;
-                first ??= dir;
+                if (ReferenceEquals(sm, SysMan)) return p;
+                first ??= p;
             }
             catch { }
         return first;
+    }
+
+    /// <summary>Saves the TwinCAT project (.tsproj) and with it its PLC projects (.plcproj) - only these, not the open
+    /// documents or other projects. Returns the .tsproj, null if it could not be saved. Must run on the STA thread.</summary>
+    public string SaveTwinCatProject()
+    {
+        var p = TwinCatProject();
+        if (p == null) return null;
+        p.Save();
+        return p.FullName;
     }
 
     /// <summary>Beckhoff template below ...\TwinCAT\3.1\Components\ (TWINCAT3DIR, C:\TwinCAT, Program Files (x86)).</summary>

@@ -391,6 +391,9 @@ Writes XML to a tree item (ConsumeXml) - changes configuration. Read the format 
 Deletes a child item in the tree. A backup is written first to `<solution>\.tcagent\backup\delete` (PLC objects as PLCopen XML – restore with `tc_import kind=plcopen`, other items as ProduceXml).
 When no backup can be written, nothing is deleted. Then the user is always asked (Yes/No, the question names the backup), at every
 `TCAGENT_CONFIRM` level except `off`; a "no" removes the backup again. If nobody can be asked, the call is refused.
+After a PLC object is deleted, the TwinCAT project is saved (with its PLC projects, not the open documents): TwinCAT removes
+the object's file at once, and the `.plcproj` would otherwise still list it until the next save. If saving fails, the result
+says so and asks for `tc_save`.
 
 | Parameter | Type | Required | Description |
 |---|---|---|---|

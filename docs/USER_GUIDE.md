@@ -671,7 +671,8 @@ exist only in the IDE. A good agent saves at the end of a task; ask for it if yo
 *"Delete the unused POU FB_Old."* – `tc_delete` removes a child item of the tree. **A backup is written first** to
 `<solution>\.tcagent\backup\delete` (PLC objects as PLCopen XML, other items as ProduceXml; the folder is git-ignored).
 If no backup can be written, nothing is deleted. **You are always asked before** an object is deleted (unless
-`TCAGENT_CONFIRM=off`); the question names the backup file.
+`TCAGENT_CONFIRM=off`); the question names the backup file. Afterwards TcAgent saves the TwinCAT project, because
+TwinCAT removes the object's file at once and the project file must not keep listing it.
 To restore: *"Restore FB_Old from the delete backup"* – `tc_import kind=plcopen` with the backup file; the object goes
 back into its original folder.
 
